@@ -1,0 +1,38 @@
+Voxelwild capture 2026-09-24 19:47:49
+GPU Qualcomm(R) Adreno(TM) X1-85 GPU (Direct3D12), CPU Snapdragon(R) X 10-core X1P64100 @ 3.40 GHz x10
+view distance 10 columns, seed 20260924
+spawn ready after 0.43s at float3(-8.5f, 90.04312f, 22.5f)
+full view distance ready after 2.29s: 441 columns, 534 sections, 1900k tris
+frame time [idle at spawn]: avg 18.30 ms, p50 18.00, p95 22.49, max 24.42, cpu main p50 3.01, gpu p50 16.35, tris 1892k
+showcase: placed 21 blocks via BlockInteractor.TryPlace, edited sections 0
+captured 01_player_eye: eye float3(-8.5f, 92.66312f, 22.5f), sections 533, tris 1892k
+frame time [01_player_eye]: avg 17.82 ms, p50 17.37, p95 22.41, max 27.01, cpu main p50 2.91, gpu p50 16.19, tris 1892k
+captured 02_showcase_closeup: eye float3(-10.7f, 92.44312f, 21f), sections 533, tris 1892k
+frame time [02_showcase_closeup]: avg 14.33 ms, p50 14.18, p95 18.36, max 21.64, cpu main p50 1.61, gpu p50 13.13, tris 1892k
+captured 03_overview: eye float3(-48.5f, 145.0431f, -17.5f), sections 738, tris 2652k
+frame time [03_overview]: avg 23.61 ms, p50 23.32, p95 31.56, max 39.04, cpu main p50 3.94, gpu p50 18.37, tris 2652k
+captured 04_mountains: eye float3(-94.40631f, 235.0906f, -7.017212f), sections 787, tris 2805k
+frame time [04_mountains]: avg 27.96 ms, p50 28.01, p95 39.32, max 43.19, cpu main p50 4.29, gpu p50 19.66, tris 2805k
+captured 05_coast: eye float3(-100.5033f, 73.67007f, -25.76199f), sections 726, tris 2536k
+frame time [05_coast]: avg 20.04 ms, p50 20.04, p95 25.07, max 34.63, cpu main p50 3.43, gpu p50 16.16, tris 2536k
+06_forest_interior: standing at int3(-73, 80, 352), open sight line 24 blocks
+captured 06_forest_interior: eye float3(-72.5f, 81.621f, 352.5f), sections 708, tris 3875k
+frame time [06_forest_interior]: avg 20.05 ms, p50 19.95, p95 22.72, max 25.24, cpu main p50 1.93, gpu p50 18.22, tris 3875k
+07_jungle: standing at int3(-24, 76, 430), open sight line 24 blocks
+captured 07_jungle: eye float3(-23.5f, 77.621f, 430.5f), sections 717, tris 3858k
+frame time [07_jungle]: avg 20.24 ms, p50 19.79, p95 27.94, max 30.53, cpu main p50 2.70, gpu p50 16.99, tris 3858k
+captured 08_taiga: eye float3(-306.0938f, 122.891f, 790.8698f), sections 693, tris 4230k
+frame time [08_taiga]: avg 31.46 ms, p50 30.69, p95 39.86, max 50.46, cpu main p50 3.88, gpu p50 26.37, tris 4230k
+captured 09_badlands: eye float3(94.89925f, 134.3013f, 218.043f), sections 707, tris 3013k
+frame time [09_badlands]: avg 21.69 ms, p50 22.13, p95 26.07, max 31.74, cpu main p50 3.70, gpu p50 17.74, tris 3013k
+captured 10_desert: eye float3(68.29555f, 109.7574f, -179.6252f), sections 766, tris 2456k
+frame time [10_desert]: avg 20.51 ms, p50 20.77, p95 27.08, max 30.03, cpu main p50 3.25, gpu p50 16.13, tris 2456k
+captured 11_swamp: eye float3(-159.455f, 115.7276f, 577.624f), sections 677, tris 4485k
+frame time [11_swamp]: avg 37.37 ms, p50 37.15, p95 46.96, max 48.87, cpu main p50 3.89, gpu p50 30.92, tris 4485k
+captured 12_river: eye float3(-265.7616f, 119.3108f, 81.00269f), sections 675, tris 2537k
+frame time [12_river]: avg 23.43 ms, p50 24.10, p95 28.20, max 29.77, cpu main p50 3.68, gpu p50 19.47, tris 2537k
+cave at int3(-21, 10, 4) (openness 80, passage 13), placed 5 torches, heightmap above 85
+captured 13_cave: eye float3(-20.5f, 11.621f, 4.5f), sections 122, tris 388k
+frame time [13_cave]: avg 12.65 ms, p50 12.60, p95 15.55, max 17.00, cpu main p50 2.71, gpu p50 11.03, tris 388k
+frame time [moving (surface fly-through)]: avg 17.62 ms, p50 17.40, p95 24.67, max 46.56, cpu main p50 2.89, gpu p50 14.69, tris 1376k
+done in 53.7s

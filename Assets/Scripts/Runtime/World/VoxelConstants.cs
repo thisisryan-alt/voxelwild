@@ -23,16 +23,35 @@ namespace Voxelwild.World
 
         public const int SeaLevel = 64;
 
-        /// <summary>Padded section used by the mesher: one voxel of neighbour data on every side.</summary>
-        public const int PaddedSize = ChunkSize + 2;
-        public const int PaddedArea = PaddedSize * PaddedSize;
-        public const int PaddedVolume = PaddedArea * PaddedSize;
+        /// <summary>Column voxel buffer used during generation: all sections of a column, contiguous.</summary>
+        public const int ColumnVolume = ChunkVolume * SectionsPerColumn;
+
+        /// <summary>Max light level; light spreads at most this far, which sizes the mesher's region margin.</summary>
+        public const int MaxLight = 15;
+
+        /// <summary>
+        /// Mesher/lighting region: the section plus a 16-voxel margin on every side (64^3). Light from any
+        /// source that can reach the section (or its 1-voxel shell) lies inside it, so lighting is exact.
+        /// </summary>
+        public const int RegionMargin = 16;
+        public const int RegionSize = ChunkSize + 2 * RegionMargin;
+        public const int RegionArea = RegionSize * RegionSize;
+        public const int RegionVolume = RegionArea * RegionSize;
+
+        /// <summary>Region index for section-local coordinates (valid range -16..47).</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int RegionIndex(int x, int y, int z) =>
+            (x + RegionMargin) + (z + RegionMargin) * RegionSize + (y + RegionMargin) * RegionArea;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ColumnIndex(int x, int worldY, int z)
+        {
+            int y = worldY - MinWorldY;
+            return ((y >> ChunkSizeLog2) * ChunkVolume) + Index(x, y & ChunkMask, z);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Index(int x, int y, int z) => x + (z << ChunkSizeLog2) + (y << (ChunkSizeLog2 * 2));
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int PaddedIndex(int x, int y, int z) => (x + 1) + (z + 1) * PaddedSize + (y + 1) * PaddedArea;
 
         /// <summary>Arithmetic shift is floor division, so negative coordinates map correctly.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

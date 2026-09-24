@@ -10,6 +10,10 @@ namespace Voxelwild.World
     {
         public const int PosX = 0, NegX = 1, PosY = 2, NegY = 3, PosZ = 4, NegZ = 5;
 
+        /// <summary>Diagonal planes of cross-shaped plants (drawn double-sided).
+        /// CrossA runs (0,0)->(1,1) in xz, CrossB runs (1,0)->(0,1).</summary>
+        public const int CrossA = 6, CrossB = 7;
+
         public static int3 Normal(int face) => face switch
         {
             PosX => new int3(1, 0, 0),

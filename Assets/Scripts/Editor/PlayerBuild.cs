@@ -17,6 +17,7 @@ namespace Voxelwild.EditorTools
             bool arm = RuntimeInformation.OSArchitecture == Architecture.Arm64;
             UnityEditor.WindowsStandalone.UserBuildSettings.architecture = arm ? OSArchitecture.ARM64 : OSArchitecture.x64;
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.Mono2x);
+            PlayerSettings.enableFrameTimingStats = true;   // CPU/GPU split in the capture report
 
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
@@ -28,7 +29,7 @@ namespace Voxelwild.EditorTools
 
             var s = report.summary;
             Debug.Log($"[PlayerBuild] {s.result}: {s.totalSize / (1024 * 1024)} MB, {s.totalErrors} errors, {s.totalWarnings} warnings, {s.totalTime.TotalSeconds:0}s ({(arm ? "ARM64" : "x64")})");
-            if (s.result != BuildResult.Succeeded && Application.isBatchMode) EditorApplication.Exit(1);
+            if ((s.result != BuildResult.Succeeded || s.totalErrors > 0) && Application.isBatchMode) EditorApplication.Exit(1);
         }
     }
 }

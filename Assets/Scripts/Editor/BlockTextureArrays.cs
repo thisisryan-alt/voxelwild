@@ -8,9 +8,10 @@ namespace Voxelwild.EditorTools
     /// <summary>
     /// Packs the scanned PBR maps listed in SourceArt/Textures/block_layers.json into three flipbook
     /// atlases that Unity imports as Texture2DArrays:
-    ///   BlockAlbedo_Array  RGB = colour, A = height            (sRGB)
-    ///   BlockNormal_Array  RGB = OpenGL tangent-space normal   (linear)
-    ///   BlockMask_Array    R = AO, G = roughness, B = metallic (linear)
+    ///   BlockAlbedo_Array  RGB = colour, A = opacity if the set has one, else height   (sRGB)
+    ///   BlockNormal_Array  RGB = OpenGL tangent-space normal                          (linear)
+    ///   BlockMask_Array    R = AO, G = roughness, B = metallic, A = emission          (linear)
+    /// Sources: 'ambientCG' scans (tools/fetch_ambientcg.py) and 'generated' sets (tools/generate_textures.py).
     /// Layer i sits in grid cell (i % columns, i / columns), counted from the top-left, which is the
     /// order Unity uses when slicing a flipbook into array layers.
     /// </summary>
@@ -21,7 +22,7 @@ namespace Voxelwild.EditorTools
         public const string AlbedoPath = OutputFolder + "/BlockAlbedo_Array.png";
         public const string NormalPath = OutputFolder + "/BlockNormal_Array.png";
         public const string MaskPath = OutputFolder + "/BlockMask_Array.png";
-        const int MaxColumns = 4;
+        const int MaxColumns = 6;
 
         [Serializable]
         public class LayerEntry
@@ -65,7 +66,9 @@ namespace Voxelwild.EditorTools
                 var layer = manifest.layers[i];
                 string dir = Path.Combine("SourceArt/Textures", layer.source, layer.id);
                 if (!Directory.Exists(dir))
-                    throw new DirectoryNotFoundException($"{dir} missing - run `python tools/fetch_ambientcg.py`");
+                    throw new DirectoryNotFoundException(layer.source == "generated"
+                        ? $"{dir} missing - run `python tools/generate_textures.py`"
+                        : $"{dir} missing - run `python tools/fetch_ambientcg.py`");
 
                 var color = Load(dir, "_Color", res, required: true, fallback: Color.magenta);
                 var height = Load(dir, "_Displacement", res, required: false, fallback: Color.gray);
@@ -73,6 +76,9 @@ namespace Voxelwild.EditorTools
                 var ao = Load(dir, "_AmbientOcclusion", res, required: false, fallback: Color.white);
                 var rough = Load(dir, "_Roughness", res, required: true, fallback: Color.white);
                 var metal = Load(dir, "_Metalness", res, required: false, fallback: Color.black);
+                var emission = Load(dir, "_Emission", res, required: false, fallback: Color.black);
+                bool hasOpacity = HasMap(dir, "_Opacity");
+                var opacity = hasOpacity ? Load(dir, "_Opacity", res, required: true, fallback: Color.white) : null;
 
                 int cellX = (i % cols) * res;
                 int cellY = (rows - 1 - i / cols) * res;   // pixel rows start at the bottom
@@ -82,10 +88,10 @@ namespace Voxelwild.EditorTools
                     int s = x + y * res;
                     int d = (cellX + x) + (cellY + y) * w;
                     var c = color[s];
-                    albedo[d] = new Color32(c.r, c.g, c.b, height[s].r);
+                    albedo[d] = new Color32(c.r, c.g, c.b, hasOpacity ? opacity[s].r : height[s].r);
                     var nn = nrm[s];
                     normal[d] = new Color32(nn.r, nn.g, nn.b, 255);
-                    mask[d] = new Color32(ao[s].r, rough[s].r, metal[s].r, 255);
+                    mask[d] = new Color32(ao[s].r, rough[s].r, metal[s].r, emission[s].r);
                 }
                 Debug.Log($"[BlockTextureArrays] layer {i} {layer.name} <- {layer.id}");
             }
@@ -98,6 +104,13 @@ namespace Voxelwild.EditorTools
             foreach (var p in new[] { AlbedoPath, NormalPath, MaskPath })
                 AssetDatabase.ImportAsset(p, ImportAssetOptions.ForceUpdate);
             Debug.Log($"[BlockTextureArrays] built {n} layers at {res}px ({cols}x{rows} grid)");
+        }
+
+        static bool HasMap(string dir, string suffix)
+        {
+            foreach (var f in Directory.GetFiles(dir))
+                if (Path.GetFileNameWithoutExtension(f).EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
 
         static Color32[] Load(string dir, string suffix, int res, bool required, Color fallback)
@@ -176,6 +189,9 @@ namespace Voxelwild.EditorTools
             ti.maxTextureSize = 16384;
             ti.textureCompression = TextureImporterCompression.CompressedHQ;
             ti.isReadable = false;
+            // alpha-tested foliage keeps its coverage in distant mips instead of thinning out
+            ti.mipMapsPreserveCoverage = assetPath.Contains("Albedo");
+            ti.alphaTestReferenceValue = 0.5f;
             ti.streamingMipmaps = false;
         }
     }

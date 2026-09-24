@@ -9,33 +9,58 @@
 - **Binary art is Git LFS** (see `.gitattributes`): textures, .blend, .fbx, audio and fonts.
 - **Quality gate:** an asset isn't done until it has been seen in-engine through a capture.
 
-## Block textures (Phase 1, in use)
+## Block textures (in use)
 
 ```
-SourceArt/Textures/block_layers.json      ordered layer list (must match enum TextureLayer)
-SourceArt/Textures/ambientCG/<id>/*.jpg   Color, NormalGL, Roughness, AmbientOcclusion, Displacement
-        │  python tools/fetch_ambientcg.py        (re-download; CC0, 1K JPG sets)
+SourceArt/Textures/block_layers.json          ordered layer list (must match enum TextureLayer; test-enforced)
+SourceArt/Textures/ambientCG/<id>/*.jpg       scanned CC0 sets: Color, NormalGL, Roughness, AO, Displacement, (Opacity)
+        │  python tools/fetch_ambientcg.py    (layers + generator inputs listed under extraSources)
+SourceArt/Textures/generated/<name>/*.png     procedural sets, same map names + Opacity / Emission / Metalness
+        │  python tools/generate_textures.py  (numpy + Pillow; deterministic seeds)
         ▼
-Voxelwild ▸ Art ▸ Build Block Texture Arrays   (BlockTextureArrays.cs)
+Voxelwild ▸ Art ▸ Build Block Texture Arrays  (BlockTextureArrays.cs)
         ▼
-Assets/Art/Textures/Blocks/BlockAlbedo_Array.png   RGB colour, A height        sRGB
-                          BlockNormal_Array.png   RGB OpenGL normal           linear
-                          BlockMask_Array.png     R AO, G rough, B metal      linear
-        │  BlockTextureArrayImporter (AssetPostprocessor): 4-column flipbook → Texture2DArray,
-        │  BC7, Kaiser mips, aniso 8, max size 16384
+Assets/Art/Textures/Blocks/BlockAlbedo_Array.png   RGB colour, A = opacity if the set has one, else height   sRGB
+                          BlockNormal_Array.png   RGB OpenGL normal                                         linear
+                          BlockMask_Array.png     R AO, G roughness, B metallic, A emission                 linear
+        │  BlockTextureArrayImporter: 6-column flipbook -> Texture2DArray, BC7, Kaiser mips,
+        │  alpha-coverage-preserving mips (foliage keeps its density at distance), aniso 8
         ▼
-Terrain.mat (_AlbedoArray/_NormalArray/_MaskArray) + TerrainLayerProfile (per-layer tuning)
+Terrain.mat / Foliage.mat + TerrainLayerProfile (per-layer tiling, normal, roughness, specular, tint,
+                                                  emission, translucency, biome tint, cutout)
 ```
 
-To add a block texture:
+### Procedural sets (`tools/generate_textures.py`)
 
-1. Append a layer to `block_layers.json`.
-2. Append the same name to `enum TextureLayer`. An EditMode test enforces that the order matches.
-3. Run the fetch tool, then `./tools/unity.ps1 build`.
-4. Reference the layer from the block's `BlockDefinition`.
-5. Tune it in `Assets/Settings/Rendering/TerrainLayerProfile.asset`.
+Where no suitable scan exists, sets are generated, using real scans as ingredients where possible:
 
-The builder creates the profile only when it's missing, so manual tuning is preserved.
+| Set | Built from |
+|---|---|
+| Leaves | ~300 rotated, scaled and colour-jittered copies of the scanned **Leaf001**. Normals are rotated with the sprite, and depth-ordered AO and height are included. Tileable, 83% coverage. |
+| Needles | Spruce twigs drawn procedurally, with the normal from the drawn height |
+| Grass tuft, poppy, dandelion, dead bush | Tapered, curved blades and petals drawn at 2× and downsampled. Folded-blade normals, colour bleed into transparent texels, transparent frame for clean mips. |
+| Glowcap | Domed cave mushrooms with an emission mask on caps and spots |
+| Torch, torch top | Wood stick, charred band and glowing ember (emission), laid out so world-projected UVs put the ember at the top of the 10/16-high post |
+| Cactus, cactus top | Ribbed body with areoles and spines; radial top |
+| Coal / iron / gold / diamond ore | The **Rock058** stone scan with clustered mineral blobs. Per-crystal faceted normals, darker halo, per-ore roughness, and metalness for gold. |
+| Log top | Centre crop of the round **TreeEnd002** scan, so rings fill the face |
+
+The generated PNGs are committed (LFS), so the project opens without Python. Regenerate after editing
+the generator.
+
+### Adding a block texture
+
+1. Append a layer to `block_layers.json` (`ambientCG` id, or `generated` with a generator in
+   `generate_textures.py`).
+2. Append the same name to `enum TextureLayer`.
+3. Fetch or generate the sources, then run `./tools/unity.ps1 build`.
+4. Reference the layer from the block's `BlockDefinition` in `BlockRegistry`.
+5. Add per-layer defaults in `WorldSceneBuilder.DefaultLayer`, or tune
+   `Assets/Settings/Rendering/TerrainLayerProfile.asset`. The builder regenerates the profile only when
+   the layer count changes; delete it to re-apply code defaults.
+
+**Git LFS budget.** The three atlases total about 190 MB and change whenever a layer changes. Commit
+rebuilt atlases once per phase, not on every tuning iteration.
 
 ## Blender → Unity (Phase 3, planned)
 
@@ -50,7 +75,7 @@ tools/blender.ps1                                 runs Blender --background --py
 Assets/Art/Models/<category>/<asset>_LOD{0..n}.fbx
         │  ModelImporter postprocessor: scale, tangents, materials from naming, LODGroup
         ▼
-Prefabs placed by world generation (Phase 2 feature placement)
+Instanced detail meshes placed by DecorationJob (props, rocks, cave formations, hero trees)
 ```
 
 The conventions are fixed now so that Phase 3 assets drop straight in:

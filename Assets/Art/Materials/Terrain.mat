@@ -39,8 +39,10 @@ Material:
     m_Floats:
     - _BevelStrength: 0.8
     - _BevelWidth: 0.075
+    - _Cutoff: 0.5
     - _EdgeWear: 0.12
     - _GrassOverhang: 0.24
+    - _Translucency: 0
     - _VoxelAODirect: 0.3
     - _VoxelAOStrength: 0.85
     m_Colors: []

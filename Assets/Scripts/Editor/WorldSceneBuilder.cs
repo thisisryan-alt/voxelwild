@@ -42,7 +42,11 @@ namespace Voxelwild.EditorTools
 
             ConfigureUrp();
             var profile = LayerProfile();
-            var terrain = TerrainMaterial();
+            var terrain = TerrainMaterial("Terrain", "Voxelwild/Terrain");
+            var foliage = TerrainMaterial("Foliage", "Voxelwild/Foliage");
+            foliage.SetFloat("_Cutoff", 0.5f);
+            foliage.SetFloat("_Translucency", 1f);
+            foliage.SetFloat("_VoxelAODirect", 0.15f);
             var water = MaterialAt(MaterialsFolder + "/Water.mat", "Voxelwild/Water");
             water.SetColor("_ShallowColor", new Color(0.16f, 0.46f, 0.47f));
             water.SetColor("_DeepColor", new Color(0.02f, 0.11f, 0.16f));
@@ -60,6 +64,7 @@ namespace Voxelwild.EditorTools
             // and a stale in-memory reference serializes as null.
             profile = Reload(profile);
             terrain = Reload(terrain);
+            foliage = Reload(foliage);
             water = Reload(water);
             outline = Reload(outline);
             sky = Reload(sky);
@@ -103,7 +108,7 @@ namespace Voxelwild.EditorTools
             // --- world
             var worldGo = new GameObject("VoxelWorld");
             var world = worldGo.AddComponent<VoxelWorld>();
-            Assign(world, ("terrainMaterial", terrain), ("waterMaterial", water), ("layerProfile", profile));
+            Assign(world, ("terrainMaterial", terrain), ("foliageMaterial", foliage), ("waterMaterial", water), ("layerProfile", profile));
 
             // --- player
             var playerGo = new GameObject("Player");
@@ -138,7 +143,9 @@ namespace Voxelwild.EditorTools
             var hud = diagGo.AddComponent<DebugHud>();
             Assign(hud, ("world", world), ("player", controller), ("interactor", interactor));
             var director = diagGo.AddComponent<ScreenshotDirector>();
-            Assign(director, ("world", world), ("player", controller), ("interactor", interactor), ("captureCamera", cam), ("hud", hud));
+            Assign(director, ("world", world), ("player", controller), ("interactor", interactor), ("captureCamera", cam), ("hud", hud), ("sun", sun));
+            var pcRenderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>("Assets/Settings/PC_Renderer.asset");
+            if (pcRenderer != null) Assign(director, ("rendererData", pcRenderer));
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -172,11 +179,11 @@ namespace Voxelwild.EditorTools
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 if (!path.Contains("PC_")) continue;
                 var so = new SerializedObject(AssetDatabase.LoadMainAssetAtPath(path));
-                so.FindProperty("m_ShadowDistance").floatValue = 150f;
+                so.FindProperty("m_ShadowDistance").floatValue = 110f;
                 so.FindProperty("m_ShadowCascadeCount").intValue = 4;
-                so.FindProperty("m_Cascade4Split").vector3Value = new Vector3(0.06f, 0.16f, 0.38f);
+                so.FindProperty("m_Cascade4Split").vector3Value = new Vector3(0.08f, 0.2f, 0.45f);
                 so.FindProperty("m_MainLightShadowmapResolution").intValue = 4096;
-                so.FindProperty("m_SoftShadowQuality").intValue = 3;
+                so.FindProperty("m_SoftShadowQuality").intValue = 2;   // medium: high costs ~10 ms on integrated GPUs in forests
                 so.FindProperty("m_ShadowDepthBias").floatValue = 0.6f;
                 so.FindProperty("m_ShadowNormalBias").floatValue = 0.6f;
                 so.FindProperty("m_RequireDepthTexture").boolValue = true;
@@ -189,6 +196,11 @@ namespace Voxelwild.EditorTools
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 if (!path.Contains("PC_")) continue;
+                var rendererSo = new SerializedObject(AssetDatabase.LoadMainAssetAtPath(path));
+                // the SSAO depth-normals prepass already lays down depth: prime with it so the forward pass
+                // shades each pixel once instead of once per overlapping leaf
+                rendererSo.FindProperty("m_DepthPrimingMode").intValue = 2;   // Forced
+                rendererSo.ApplyModifiedPropertiesWithoutUndo();
                 foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(path))
                 {
                     if (obj == null || obj.GetType().Name != "ScreenSpaceAmbientOcclusion") continue;
@@ -196,6 +208,7 @@ namespace Voxelwild.EditorTools
                     so.FindProperty("m_Settings.Intensity").floatValue = 0.9f;
                     so.FindProperty("m_Settings.Radius").floatValue = 0.45f;
                     so.FindProperty("m_Settings.DirectLightingStrength").floatValue = 0.3f;
+                    so.FindProperty("m_Settings.Downsample").boolValue = true;
                     so.ApplyModifiedPropertiesWithoutUndo();
                 }
             }
@@ -216,35 +229,70 @@ namespace Voxelwild.EditorTools
             // Starting values tuned against the capture screenshots; edit the asset to art-direct further.
             profile.layers = new TerrainLayerProfile.Layer[manifest.layers.Length];
             for (int i = 0; i < manifest.layers.Length; i++)
-            {
-                string n = manifest.layers[i].name;
-                bool built = n == "Cobblestone" || n == "Planks" || n == "Bricks";
-                var layer = new TerrainLayerProfile.Layer
-                {
-                    name = n,
-                    blocksPerTile = built ? 1f : n == "GrassTop" ? 2f : 2.5f,
-                    normalStrength = built ? 1.0f : 1.15f,
-                    roughnessScale = 1.15f,
-                    macroVariation = built ? 0.12f : 0.4f,
-                    tint = Color.white,
-                };
-                switch (n)
-                {
-                    case "Stone": layer.tint = new Color(1.45f, 1.42f, 1.38f); layer.roughnessScale = 1.35f; break;
-                    case "Bedrock": layer.tint = new Color(1.3f, 1.3f, 1.3f); layer.roughnessScale = 1.3f; break;
-                    case "GrassTop": layer.tint = new Color(0.92f, 1.0f, 0.86f); layer.roughnessScale = 1.8f; break;
-                    case "Dirt": layer.roughnessScale = 1.3f; break;
-                    case "Snow": layer.roughnessScale = 1.2f; layer.macroVariation = 0.15f; break;
-                }
-                profile.layers[i] = layer;
-            }
+                profile.layers[i] = DefaultLayer(manifest.layers[i].name);
             EditorUtility.SetDirty(profile);
             return profile;
         }
 
-        static Material TerrainMaterial()
+        static TerrainLayerProfile.Layer DefaultLayer(string n)
         {
-            var m = MaterialAt(MaterialsFolder + "/Terrain.mat", "Voxelwild/Terrain");
+            bool built = n == "Cobblestone" || n == "Planks" || n == "Bricks";
+            var layer = new TerrainLayerProfile.Layer
+            {
+                name = n,
+                blocksPerTile = built ? 1f : n == "GrassTop" ? 2f : 2.5f,
+                normalStrength = built ? 1.0f : 1.15f,
+                roughnessScale = 1.15f,
+                macroVariation = built ? 0.12f : 0.4f,
+                tint = Color.white,
+                specular = 1f,
+            };
+            switch (n)
+            {
+                case "Stone": layer.tint = new Color(1.45f, 1.42f, 1.38f); layer.roughnessScale = 1.35f; break;
+                case "Bedrock": layer.tint = new Color(1.3f, 1.3f, 1.3f); layer.roughnessScale = 1.3f; break;
+                case "GrassTop": layer.tint = new Color(0.84f, 0.92f, 0.76f); layer.roughnessScale = 1.8f; layer.biomeTint = true; break;
+                case "Dirt": layer.roughnessScale = 1.3f; break;
+                case "Snow": layer.roughnessScale = 1.2f; layer.macroVariation = 0.15f; break;
+                case "OakLog": case "SpruceLog": case "JungleLog":
+                    layer.blocksPerTile = 1.5f; layer.macroVariation = 0.15f; layer.roughnessScale = 1.3f; break;
+                case "BirchLog":
+                    layer.blocksPerTile = 1.5f; layer.macroVariation = 0.1f; layer.tint = new Color(1.55f, 1.52f, 1.45f); break;
+                case "LogTop": layer.blocksPerTile = 1f; layer.macroVariation = 0.05f; break;
+                case "Leaves":
+                    layer.blocksPerTile = 1f; layer.macroVariation = 0.25f; layer.roughnessScale = 1.1f;
+                    layer.tint = new Color(0.62f, 0.78f, 0.48f); layer.biomeTint = true; layer.cutout = true; layer.translucency = 0.9f; layer.roughnessScale = 1.5f; break;
+                case "Needles":
+                    layer.blocksPerTile = 1f; layer.macroVariation = 0.2f; layer.biomeTint = true; layer.cutout = true; layer.translucency = 0.5f; break;
+                case "Sandstone": layer.tint = new Color(1.1f, 1.02f, 0.9f); layer.blocksPerTile = 2f; break;
+                case "RedSandstone": layer.blocksPerTile = 3f; layer.tint = new Color(1.15f, 0.92f, 0.8f); break;
+                case "Mud": layer.roughnessScale = 0.8f; break;
+                case "Moss": layer.blocksPerTile = 2f; layer.roughnessScale = 1.3f; break;
+                case "Ice": layer.blocksPerTile = 2f; layer.roughnessScale = 0.5f; layer.macroVariation = 0.1f; break;
+                case "CoalOre": case "IronOre": case "GoldOre": case "DiamondOre":
+                    layer.blocksPerTile = 1f; layer.macroVariation = 0.2f; layer.tint = new Color(1.45f, 1.42f, 1.38f); break;
+                case "GrassTuft":
+                    layer.blocksPerTile = 1f; layer.macroVariation = 0.2f; layer.biomeTint = true; layer.cutout = true;
+                    layer.translucency = 1.0f; layer.roughnessScale = 1.3f; layer.tint = new Color(0.9f, 1f, 0.85f); break;
+                case "FlowerRed": case "FlowerYellow": case "DeadBush":
+                    layer.blocksPerTile = 1f; layer.macroVariation = 0f; layer.cutout = true; layer.translucency = 0.7f; break;
+                case "Glowcap":
+                    layer.blocksPerTile = 1f; layer.macroVariation = 0f; layer.cutout = true; layer.emission = 5f; layer.translucency = 0.4f; break;
+                case "Torch": case "TorchTop":
+                    layer.blocksPerTile = 1f; layer.macroVariation = 0f; layer.emission = 9f; break;
+                case "Cactus": case "CactusTop": layer.blocksPerTile = 1f; layer.macroVariation = 0.1f; break;
+            }
+            switch (n)
+            {
+                case "GrassTop": case "Leaves": case "Needles": case "GrassTuft": case "Moss": layer.specular = 0.3f; break;
+                case "FlowerRed": case "FlowerYellow": case "DeadBush": case "Dirt": layer.specular = 0.5f; break;
+            }
+            return layer;
+        }
+
+        static Material TerrainMaterial(string name, string shader)
+        {
+            var m = MaterialAt(MaterialsFolder + $"/{name}.mat", shader);
             m.SetTexture("_AlbedoArray", AssetDatabase.LoadAssetAtPath<Texture2DArray>(BlockTextureArrays.AlbedoPath));
             m.SetTexture("_NormalArray", AssetDatabase.LoadAssetAtPath<Texture2DArray>(BlockTextureArrays.NormalPath));
             m.SetTexture("_MaskArray", AssetDatabase.LoadAssetAtPath<Texture2DArray>(BlockTextureArrays.MaskPath));
@@ -291,11 +339,13 @@ namespace Voxelwild.EditorTools
             bloom.intensity.Override(0.22f);
             bloom.threshold.Override(1.1f);
             bloom.scatter.Override(0.65f);
+            bloom.downscale.Override(BloomDownscaleMode.Quarter);
+            bloom.maxIterations.Override(5);
 
             var color = Get<ColorAdjustments>(profile);
             color.postExposure.Override(0.25f);
             color.contrast.Override(12f);
-            color.saturation.Override(6f);
+            color.saturation.Override(0f);
 
             var wb = Get<WhiteBalance>(profile);
             wb.temperature.Override(4f);

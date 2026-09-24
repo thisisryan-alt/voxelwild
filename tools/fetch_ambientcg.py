@@ -46,6 +46,8 @@ def main() -> None:
     for layer in manifest["layers"]:
         if layer["source"] == "ambientCG":
             fetch(layer["id"], res, force)
+    for asset_id in manifest.get("extraSources", []):
+        fetch(asset_id, res, force)
 
 
 if __name__ == "__main__":

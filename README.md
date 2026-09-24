@@ -1,47 +1,60 @@
 # Voxelwild
 
 A block-based sandbox in the spirit of Minecraft, built with Unity 6 (URP). It aims for modern,
-realistic environment rendering: scanned PBR materials, custom shaders, real lighting and
-atmosphere. The world stays readable as blocks.
+realistic environment rendering: scanned PBR materials, custom shaders, voxel light and atmosphere.
+The world stays readable as blocks.
 
-![Eye level](docs/images/eye-level.png)
+![Forest interior](docs/images/forest.png)
 
 | | |
 |---|---|
-| ![Close-up](docs/images/closeup.png) | ![Coast](docs/images/coast.png) |
-| ![Overview](docs/images/overview.png) | ![Mountains](docs/images/mountains.png) |
+| ![Forest from above](docs/images/forest-aerial.png) | ![Badlands](docs/images/badlands.png) |
+| ![Snowy taiga](docs/images/taiga.png) | ![Torch-lit cave](docs/images/cave.png) |
+| ![Overview](docs/images/overview.png) | ![Desert coast](docs/images/desert.png) |
 
-*All images are unedited frames from the Windows ARM64 player build (`-vwCapture`), Phase 1.*
+*All images are unedited frames from the Windows ARM64 player build (`-vwCapture`), Phase 2.*
 
 ## Status
 
-**Phase 1 (Foundation) is complete.** See [docs/ROADMAP.md](docs/ROADMAP.md) for all eight phases,
-what is still a stopgap, and known issues.
+**Phases 1 (Foundation) and 2 (World) are complete.** See [docs/ROADMAP.md](docs/ROADMAP.md) for all
+eight phases, what is still a stopgap, and known issues.
 
-What works today:
-
-- **Infinite streamed world:** 32³ sections stacked in columns (y −64…191), Burst-compiled generation
-  and meshing on worker threads, pooled memory, and distance-based load and unload.
-- **Terrain generation:** domain-warped continents, oceans, beaches, rolling hills, and mountain
-  massifs with ridges, cliffs, scree and snow caps.
-- **Custom terrain shader:** hand-written URP HLSL with scanned PBR layers in Texture2DArrays, world-space
-  mapping, grass creeping over the tops of block sides, bevelled convex block edges with wear, voxel AO
-  plus SSAO, and cascaded soft shadows.
-- **Phase 1 water:** depth absorption, Fresnel sky reflection, a GGX sun highlight and ripples.
-- **First-person player:** walk, sprint, jump, swim and fly. Collision is custom swept-AABB against the
-  voxel grid, with no terrain colliders.
-- **Block editing:** break and place with the DDA raycast, a 9-slot hotbar, and edits that survive the
-  chunk unloading.
-- **Automated verification:** 32 EditMode and 3 PlayMode tests, plus a capture mode that renders real
-  frames and reports streaming and frame-time numbers.
+- **Streamed world:** 32³ sections in columns (y −64…191). A Burst-compiled pipeline builds each column:
+  terrain → trees → lit meshes, all on worker threads.
+- **Biomes:** ocean, beach, river, plains, forest, dense forest, jungle, savanna, swamp, desert, badland
+  mesas, taiga, snowy taiga, tundra, mountains and snowy peaks. They come from continentalness,
+  erosion, temperature and humidity fields, with dithered borders and biome-tinted grass and leaves.
+- **3D terrain:** overhangs; spaghetti tunnels and caverns; flooded underground lakes; ore clusters by
+  depth (coal, iron, gold, diamond); moss and bioluminescent glowcaps on cave floors.
+- **Trees and plants:** oak, big oak, birch, spruce, tall spruce, jungle and giant 2×2 jungle trees,
+  bushes, swamp oaks, cacti, tall grass, flowers and dead bushes. Trees cross column borders seamlessly
+  and deterministically.
+- **Voxel lighting:** 15-level sky light (dimmed by leaves and water, leaking under overhangs, dark in
+  caves) and block light (torches, glowcaps), smooth-lit per vertex. It drives ambient, reflections and
+  how much sun a surface can receive.
+- **Custom shaders:** hand-written URP HLSL for terrain, foliage and water.
+  - Terrain: scanned PBR layers in Texture2DArrays, bevelled block edges, grass and snow creeping over
+    block sides, voxel AO plus SSAO.
+  - Foliage: alpha-tested and double-sided, with wind sway and sun transmission.
+  - Water: Phase 1 version.
+- **Performance:**
+  - Cave culling: a section-connectivity visibility graph hides sealed caves from the surface, and the
+    surface from deep caves.
+  - Leaf level of detail by distance.
+  - Depth priming.
+  - Mesh jobs copy their own input, so the main thread stays at 2–5 ms.
+- **Player:** walk, sprint, jump, swim and fly on custom voxel physics. Break and place blocks,
+  including torches. Plants and torches drop when their support is broken.
+- **Verification:** 44 EditMode and 4 PlayMode tests. The capture tool tours every biome and a cave,
+  and reports CPU/GPU time per view.
 
 ## Requirements
 
 | | |
 |---|---|
 | Unity | **6000.4.11f1** (the native Windows ARM64 editor is used on Arm machines) |
-| Git LFS | required: textures, scenes' binary data and screenshots are LFS objects |
-| Python 3.9+ | only to re-download source textures (`tools/fetch_ambientcg.py`, stdlib only) |
+| Git LFS | required: textures, scene data and screenshots are LFS objects |
+| Python 3.9+ | only to rebuild source textures: `pip install -r tools/requirements.txt` (numpy, Pillow) |
 | Blender 5.2 | asset pipeline from Phase 3 onwards |
 
 ## Getting started
@@ -63,64 +76,70 @@ git clone https://github.com/thisisryan-alt/voxelwild.git
 | Left Shift | descend while flying |
 | F | toggle flying |
 | LMB / RMB | break / place block (hold to repeat) |
-| 1–9, mouse wheel | select hotbar block |
+| 1–9, mouse wheel | hotbar: cobblestone, stone, dirt, planks, bricks, oak log, leaves, sandstone, torch |
 | F3 / F1 | stats overlay / hide HUD |
 
 ## Tooling
 
-Everything can be driven headless through `tools/unity.ps1`. It finds the right editor, runs it in batch
-mode, and summarises errors and test results.
-
 ```powershell
-./tools/unity.ps1 build                    # rebuild texture arrays + World scene from code
-./tools/unity.ps1 test -Platform EditMode  # 32 tests
-./tools/unity.ps1 test -Platform PlayMode  # 3 tests on the real scene
-./tools/unity.ps1 capture                  # screenshots + report into Screenshots/
+./tools/unity.ps1 build                    # texture arrays + World scene, generated from code
+./tools/unity.ps1 test -Platform EditMode  # 44 tests
+./tools/unity.ps1 test -Platform PlayMode  # 4 tests on the real scene
+./tools/unity.ps1 capture                  # batch-mode screenshots into Screenshots/
 ./tools/unity.ps1 player                   # Windows player into Builds/Windows/
-Builds/Windows/Voxelwild.exe -vwCapture Screenshots/player   # real-GPU capture + frame times
+Builds/Windows/Voxelwild.exe -vwCapture Screenshots/player            # real-GPU biome tour + CPU/GPU timings
+Builds/Windows/Voxelwild.exe -vwCapture out -vwShots 08,13 -vwToggles nossao,hardshadows   # A/B a render feature
+python tools/fetch_ambientcg.py            # re-download scanned CC0 materials
+python tools/generate_textures.py          # regenerate procedural sets (foliage, plants, ores, torch...)
 ```
 
-`WorldSceneBuilder` generates the scene, materials, sky, post-processing stack and URP settings. Change
-the builder rather than hand-editing the scene, so the setup stays reproducible and reviewable.
+`WorldSceneBuilder` generates the scene, materials, sky, post-processing and URP settings. Change the
+builder rather than hand-editing the scene.
 
-## Performance (Phase 1 baseline)
+## Performance (Phase 2)
 
 Windows ARM64 player, Snapdragon X Plus (X1P64100) and Adreno X1-85, 1600×900. View distance is
-10 columns (320 m), with about 1.2–1.4 M triangles, 4 × 4096 soft shadow cascades, SSAO and SMAA.
+10 columns (320 m), with SSAO, 4 soft shadow cascades and SMAA. The main thread costs 2–4 ms everywhere;
+the scene is GPU-bound. Full data: [docs/perf-phase2.txt](docs/perf-phase2.txt).
 
-| Case | Avg | p95 |
-|---|---|---|
-| Idle at spawn | 12.4 ms | 15.6 ms |
-| Moving (fly-through) | 16.1 ms | 20.5 ms |
-| Full view distance streamed from cold start | 2.5 s | |
+| View | GPU (p50) | Frame (avg) | Triangles |
+|---|---|---|---|
+| Spawn (forest edge) | 16.4 ms | 18.3 ms | 1.9 M |
+| Forest interior | 18.2 ms | 20.1 ms | 3.9 M |
+| Desert / badlands aerial | 16–18 ms | 20–22 ms | 2.5–3.0 M |
+| Snowy taiga aerial | 26.4 ms | 31.5 ms | 4.2 M |
+| Dense forest aerial | 30.9 ms | 37.4 ms | 4.5 M |
+| Cave (5 torches) | 11.0 ms | 12.7 ms | 0.4 M |
+| Surface fly-through at ~20 m/s | 14.7 ms | 17.6 ms | 1.4 M |
+
+Full view distance streams in about 2.3 s from a cold start.
 
 ## Project layout
 
 ```
 Assets/
-  Art/            Materials, Texture2DArray atlases (generated), later Blender exports
+  Art/            Materials, Texture2DArray atlases (generated)
   Scenes/         World.unity (generated by WorldSceneBuilder)
   Scripts/
     Runtime/      Voxelwild.Runtime assembly
-      Core/         shared interfaces (IVoxelQuery)
-      World/        blocks, sections/columns, VoxelWorld streaming, raycast
-        Generation/   terrain noise + Burst generation jobs
-        Meshing/      Burst mesher, vertex format, neighbourhood builder
+      World/        blocks, sections/columns, VoxelWorld streaming + culling, raycast
+        Generation/   terrain/biome noise, column generation job, tree decoration job
+        Meshing/      Burst lighting + mesher, vertex format, region builder
       Player/       controller, voxel physics body, block interaction
-      Rendering/    layer profile, environment lighting
-      Diagnostics/  debug HUD, screenshot/perf director
+      Rendering/    layer profile (material framework), environment lighting
+      Diagnostics/  debug HUD, capture/perf director
     Editor/       scene builder, texture arrays, capture runner, player build
-  Shaders/        Terrain/, Water/, Utility/, Include/ (shared HLSL)
+  Shaders/        Terrain/, Foliage/, Water/, Utility/, Include/ (shared HLSL)
   Settings/       URP assets, post profile, TerrainLayerProfile
   Tests/          EditMode/, PlayMode/
-SourceArt/        source textures (and later .blend files), outside Assets/
-tools/            unity.ps1, fetch_ambientcg.py
-docs/             ROADMAP, ARCHITECTURE, ASSET_PIPELINE, images
+SourceArt/        scanned + generated source textures (later .blend files), outside Assets/
+tools/            unity.ps1, fetch_ambientcg.py, generate_textures.py
+docs/             ROADMAP, ARCHITECTURE, ASSET_PIPELINE, perf data, images
 ```
 
 ## Documentation
 
 - [docs/ROADMAP.md](docs/ROADMAP.md): phases, status, stopgaps, known issues
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): world data, streaming, meshing, rendering
-- [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md): textures today, Blender → Unity from Phase 3
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): world data, generation, lighting, meshing, culling, rendering
+- [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md): scanned and generated textures, Blender → Unity (Phase 3)
 - [CREDITS.md](CREDITS.md): texture sources (CC0)
