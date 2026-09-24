@@ -40,7 +40,7 @@ Shader "Voxelwild/Water"
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Assets/Shaders/Include/VoxelLighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
             #include "Assets/Shaders/Include/VoxelCommon.hlsl"
 
@@ -58,7 +58,9 @@ Shader "Voxelwild/Water"
             struct Attributes
             {
                 float4 positionOS : POSITION;
-                float4 packed : TEXCOORD0;
+                float4 d0 : TEXCOORD0;
+                float4 d1 : TEXCOORD1;
+                float4 d2 : TEXCOORD2;
             };
 
             struct Varyings
@@ -67,6 +69,7 @@ Shader "Voxelwild/Water"
                 float3 positionWS : TEXCOORD0;
                 nointerpolation float face : TEXCOORD1;
                 float fogFactor : TEXCOORD2;
+                float2 light : TEXCOORD3;   // sky, block
             };
 
             Varyings Vert(Attributes input)
@@ -74,7 +77,9 @@ Shader "Voxelwild/Water"
                 Varyings o;
                 o.positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 o.positionCS = TransformWorldToHClip(o.positionWS);
-                o.face = DecodeVoxelVertex(input.packed).face;
+                VoxelVertex v = DecodeVoxelVertex(input.d0, input.d1, input.d2);
+                o.face = v.face;
+                o.light = float2(v.sky, v.block);
                 o.fogFactor = ComputeFogFactor(o.positionCS.z);
                 return o;
             }
@@ -94,7 +99,7 @@ Shader "Voxelwild/Water"
                 float3 N = kFaceN[face];
                 float3 V = GetWorldSpaceNormalizeViewDir(i.positionWS);
 
-                float rippleFade = 1.0 - saturate(length(i.positionWS - GetCameraPositionWS()) / 160.0);
+                float rippleFade = 1.0 - saturate(length(i.positionWS - GetCameraPositionWS()) / 90.0);
                 if (face == 2u && rippleFade > 0.0)
                 {
                     float t = _Time.y * _RippleSpeed;
@@ -115,16 +120,18 @@ Shader "Voxelwild/Water"
                 float absorb = 1.0 - exp(-thickness * _Absorption);
 
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(i.positionWS));
-                float shadow = mainLight.shadowAttenuation * mainLight.distanceAttenuation;
+                float skyAmbient = VoxelSkyAmbient(i.light.x);
+                float shadow = mainLight.shadowAttenuation * mainLight.distanceAttenuation * VoxelSkyDirect(i.light.x);
                 float ndl = saturate(dot(N, mainLight.direction));
 
-                half3 ambient = SampleSHPixel(half3(0, 0, 0), float3(0, 1, 0));
+                half3 ambient = SampleSHPixel(half3(0, 0, 0), float3(0, 1, 0)) * skyAmbient + VoxelBlockIrradiance(i.light.y);
                 half3 body = lerp(_ShallowColor.rgb, _DeepColor.rgb, absorb);
                 half3 diffuse = body * (ambient + mainLight.color * ndl * shadow * 0.6);
 
                 float fresnel = 0.02 + 0.98 * pow(1.0 - saturate(dot(N, V)), 5.0);
                 half3 R = reflect(-V, N);
-                half3 reflection = GlossyEnvironmentReflection(R, i.positionWS, 1.0 - _Smoothness, 1.0, screenUV);
+                half3 reflection = GlossyEnvironmentReflection(R, i.positionWS, 1.0 - _Smoothness, 1.0, screenUV) * skyAmbient
+                                 + VoxelBlockIrradiance(i.light.y) * 0.25;
 
                 // GGX sun highlight; roughness grows with distance so sub-pixel ripples don't sparkle.
                 float3 H = normalize(mainLight.direction + V);
@@ -134,7 +141,7 @@ Shader "Voxelwild/Water"
                 float nh = saturate(dot(N, H));
                 float d = nh * nh * (a2 - 1.0) + 1.0;
                 float ggx = a2 / (PI * d * d);
-                half3 spec = mainLight.color * shadow * ndl * min(ggx, 60.0) * fresnel * 0.25;
+                half3 spec = mainLight.color * shadow * ndl * min(ggx, 18.0) * fresnel * 0.15;
 
                 half3 color = lerp(diffuse, reflection, fresnel) + spec;
                 float alpha = saturate(max(lerp(_MinAlpha, 1.0, absorb), fresnel));

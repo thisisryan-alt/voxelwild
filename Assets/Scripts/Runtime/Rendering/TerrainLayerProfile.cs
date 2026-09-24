@@ -11,7 +11,7 @@ namespace Voxelwild.Rendering
     [CreateAssetMenu(menuName = "Voxelwild/Terrain Layer Profile", fileName = "TerrainLayerProfile")]
     public sealed class TerrainLayerProfile : ScriptableObject
     {
-        public const int MaxLayers = 32;
+        public const int MaxLayers = 64;
 
         [Serializable]
         public struct Layer
@@ -25,33 +25,49 @@ namespace Voxelwild.Rendering
             [Tooltip("Low-frequency brightness/hue variation that hides tiling.")]
             [Range(0f, 1f)] public float macroVariation;
             public Color tint;
+            [Tooltip("Scales specular reflectance (F0 and grazing reflection). Vegetation should be low: it scatters rather than mirrors.")]
+            [Range(0f, 1f)] public float specular;
+            [Tooltip("Emission strength of the mask's alpha channel (glowcaps, torch embers).")]
+            [Range(0f, 20f)] public float emission;
+            [Tooltip("Sun light transmitted through thin surfaces (leaves, grass).")]
+            [Range(0f, 2f)] public float translucency;
+            [Tooltip("Multiply by the biome grass/foliage colour.")]
+            public bool biomeTint;
+            [Tooltip("Albedo alpha is opacity (alpha-tested) instead of height.")]
+            public bool cutout;
         }
 
         public Layer[] layers = Array.Empty<Layer>();
 
         static readonly int ParamsId = Shader.PropertyToID("_VoxelLayerParams");
         static readonly int TintId = Shader.PropertyToID("_VoxelLayerTint");
+        static readonly int Params2Id = Shader.PropertyToID("_VoxelLayerParams2");
 
         public void ApplyGlobals()
         {
             var p = new Vector4[MaxLayers];
             var t = new Vector4[MaxLayers];
+            var p2 = new Vector4[MaxLayers];
             for (int i = 0; i < MaxLayers; i++)
             {
                 if (i < layers.Length)
                 {
                     var l = layers[i];
                     p[i] = new Vector4(1f / Mathf.Max(0.01f, l.blocksPerTile), l.normalStrength, l.roughnessScale, l.macroVariation);
-                    t[i] = l.tint.linear;
+                    Color lin = l.tint.linear;
+                    t[i] = new Vector4(lin.r, lin.g, lin.b, l.specular);
+                    p2[i] = new Vector4(l.emission, l.translucency, l.biomeTint ? 1 : 0, l.cutout ? 1 : 0);
                 }
                 else
                 {
                     p[i] = new Vector4(1f, 1f, 1f, 0.3f);
                     t[i] = Vector4.one;
+                    p2[i] = Vector4.zero;
                 }
             }
             Shader.SetGlobalVectorArray(ParamsId, p);
             Shader.SetGlobalVectorArray(TintId, t);
+            Shader.SetGlobalVectorArray(Params2Id, p2);
         }
 
         void OnValidate() => ApplyGlobals();
