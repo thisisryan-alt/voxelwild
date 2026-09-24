@@ -19,8 +19,8 @@ namespace Voxelwild.Player
 
         public static readonly ushort[] Hotbar =
         {
-            BlockId.Stone, BlockId.Cobblestone, BlockId.Dirt, BlockId.Grass, BlockId.Planks,
-            BlockId.Bricks, BlockId.Sand, BlockId.Gravel, BlockId.Snow,
+            BlockId.Cobblestone, BlockId.Stone, BlockId.Dirt, BlockId.Planks, BlockId.Bricks,
+            BlockId.OakLog, BlockId.OakLeaves, BlockId.Sandstone, BlockId.Torch,
         };
 
         public int SelectedSlot { get; set; }
@@ -97,13 +97,24 @@ namespace Voxelwild.Player
                     if (f != Faces.NegY && world.GetBlockOrAir(block + Faces.Normal(f)) == BlockId.Water)
                         replacement = BlockId.Water;
             }
-            return world.SetBlock(block, replacement);
+            if (!world.SetBlock(block, replacement)) return false;
+            // plants and torches standing on the broken block drop with it
+            var above = block + new int3(0, 1, 0);
+            if (world.TryGetBlock(above, out var up) && BlockRegistry.Get(up).Has(BlockFlags.NeedsSupport))
+                world.SetBlock(above, BlockId.Air);
+            return true;
         }
 
         public bool TryPlace(int3 cell, ushort block)
         {
             if (!world.TryGetBlock(cell, out var existing) || !BlockRegistry.Get(existing).Has(BlockFlags.Replaceable)) return false;
-            if (BlockRegistry.Get(block).Has(BlockFlags.Solid) && player.Body.Overlaps(cell)) return false;
+            var def = BlockRegistry.Get(block);
+            if (def.Has(BlockFlags.Solid) && player.Body.Overlaps(cell)) return false;
+            if (def.Has(BlockFlags.NeedsSupport))
+            {
+                if (!world.TryGetBlock(cell - new int3(0, 1, 0), out var below) || !BlockRegistry.Get(below).Has(BlockFlags.Opaque)) return false;
+                if (existing == BlockId.Water) return false;
+            }
             return world.SetBlock(cell, block);
         }
     }

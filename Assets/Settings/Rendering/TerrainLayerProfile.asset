@@ -19,57 +19,382 @@ MonoBehaviour:
     roughnessScale: 1.35
     macroVariation: 0.4
     tint: {r: 1.45, g: 1.42, b: 1.38, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
   - name: Dirt
     blocksPerTile: 2.5
     normalStrength: 1.15
     roughnessScale: 1.3
     macroVariation: 0.4
     tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 0.5
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
   - name: GrassTop
     blocksPerTile: 2
     normalStrength: 1.15
     roughnessScale: 1.8
     macroVariation: 0.4
-    tint: {r: 0.92, g: 1, b: 0.86, a: 1}
+    tint: {r: 0.84, g: 0.92, b: 0.76, a: 1}
+    specular: 0.3
+    emission: 0
+    translucency: 0
+    biomeTint: 1
+    cutout: 0
   - name: Sand
     blocksPerTile: 2.5
     normalStrength: 1.15
     roughnessScale: 1.15
     macroVariation: 0.4
     tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
   - name: Gravel
     blocksPerTile: 2.5
     normalStrength: 1.15
     roughnessScale: 1.15
     macroVariation: 0.4
     tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
   - name: Snow
     blocksPerTile: 2.5
     normalStrength: 1.15
     roughnessScale: 1.2
     macroVariation: 0.15
     tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
   - name: Bedrock
     blocksPerTile: 2.5
     normalStrength: 1.15
     roughnessScale: 1.3
     macroVariation: 0.4
     tint: {r: 1.3, g: 1.3, b: 1.3, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
   - name: Cobblestone
     blocksPerTile: 1
     normalStrength: 1
     roughnessScale: 1.15
     macroVariation: 0.12
     tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
   - name: Planks
     blocksPerTile: 1
     normalStrength: 1
     roughnessScale: 1.15
     macroVariation: 0.12
     tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
   - name: Bricks
     blocksPerTile: 1
     normalStrength: 1
     roughnessScale: 1.15
     macroVariation: 0.12
     tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: OakLog
+    blocksPerTile: 1.5
+    normalStrength: 1.15
+    roughnessScale: 1.3
+    macroVariation: 0.15
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: BirchLog
+    blocksPerTile: 1.5
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.1
+    tint: {r: 1.55, g: 1.52, b: 1.45, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: SpruceLog
+    blocksPerTile: 1.5
+    normalStrength: 1.15
+    roughnessScale: 1.3
+    macroVariation: 0.15
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: JungleLog
+    blocksPerTile: 1.5
+    normalStrength: 1.15
+    roughnessScale: 1.3
+    macroVariation: 0.15
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: LogTop
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.05
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: Leaves
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.5
+    macroVariation: 0.25
+    tint: {r: 0.62, g: 0.78, b: 0.48, a: 1}
+    specular: 0.3
+    emission: 0
+    translucency: 0.9
+    biomeTint: 1
+    cutout: 1
+  - name: Needles
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.2
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 0.3
+    emission: 0
+    translucency: 0.5
+    biomeTint: 1
+    cutout: 1
+  - name: Sandstone
+    blocksPerTile: 2
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.4
+    tint: {r: 1.1, g: 1.02, b: 0.9, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: RedSandstone
+    blocksPerTile: 3
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.4
+    tint: {r: 1.15, g: 0.92, b: 0.8, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: Mud
+    blocksPerTile: 2.5
+    normalStrength: 1.15
+    roughnessScale: 0.8
+    macroVariation: 0.4
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: Moss
+    blocksPerTile: 2
+    normalStrength: 1.15
+    roughnessScale: 1.3
+    macroVariation: 0.4
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 0.3
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: Ice
+    blocksPerTile: 2
+    normalStrength: 1.15
+    roughnessScale: 0.5
+    macroVariation: 0.1
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: CoalOre
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.2
+    tint: {r: 1.45, g: 1.42, b: 1.38, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: IronOre
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.2
+    tint: {r: 1.45, g: 1.42, b: 1.38, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: GoldOre
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.2
+    tint: {r: 1.45, g: 1.42, b: 1.38, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: DiamondOre
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.2
+    tint: {r: 1.45, g: 1.42, b: 1.38, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: GrassTuft
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.3
+    macroVariation: 0.2
+    tint: {r: 0.9, g: 1, b: 0.85, a: 1}
+    specular: 0.3
+    emission: 0
+    translucency: 1
+    biomeTint: 1
+    cutout: 1
+  - name: FlowerRed
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 0.5
+    emission: 0
+    translucency: 0.7
+    biomeTint: 0
+    cutout: 1
+  - name: FlowerYellow
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 0.5
+    emission: 0
+    translucency: 0.7
+    biomeTint: 0
+    cutout: 1
+  - name: DeadBush
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 0.5
+    emission: 0
+    translucency: 0.7
+    biomeTint: 0
+    cutout: 1
+  - name: Glowcap
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 5
+    translucency: 0.4
+    biomeTint: 0
+    cutout: 1
+  - name: Torch
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 9
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: TorchTop
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 9
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: Cactus
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.1
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0
+  - name: CactusTop
+    blocksPerTile: 1
+    normalStrength: 1.15
+    roughnessScale: 1.15
+    macroVariation: 0.1
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    specular: 1
+    emission: 0
+    translucency: 0
+    biomeTint: 0
+    cutout: 0

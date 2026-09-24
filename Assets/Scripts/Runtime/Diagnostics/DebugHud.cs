@@ -89,7 +89,7 @@ namespace Voxelwild.Diagnostics
                 $"pos {p.x:0.0} {p.y:0.0} {p.z:0.0}   yaw {player.Yaw:0} pitch {player.Pitch:0}\n" +
                 $"{(player.Flying ? "flying" : player.InWater ? "swimming" : player.Body.Grounded ? "grounded" : "airborne")}\n" +
                 $"columns {world.LoadedColumns} (generating {world.GeneratingColumns})  mesh jobs {world.MeshJobsInFlight}\n" +
-                $"sections drawn {world.RenderedSections}  tris {world.RenderedTriangles / 1000}k  edited {world.ModifiedSections}\n" +
+                $"sections drawn {world.RenderedSections} (occlusion-culled {world.OcclusionCulledSections})  tris {world.RenderedTriangles / 1000}k  edited {world.ModifiedSections}\n" +
                 $"target {target}\n" +
                 "<size=12>WASD move · Space jump (double-tap: fly) · Ctrl sprint · Shift descend · F fly\n" +
                 "LMB break · RMB place · 1-9/scroll select · Esc release mouse · F3 stats · F1 hide HUD</size>";
