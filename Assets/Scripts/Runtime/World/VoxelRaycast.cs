@@ -11,7 +11,8 @@ namespace Voxelwild.World
         public ushort Id;
     }
 
-    /// <summary>Amanatides-Woo grid traversal. Hits breakable/solid blocks, passes through air and liquids.</summary>
+    /// <summary>Amanatides-Woo grid traversal. Hits solid or breakable blocks (including plants and torches),
+    /// passes through air and liquids.</summary>
     public static class VoxelRaycast
     {
         public static bool Cast(IVoxelQuery world, float3 origin, float3 direction, float maxDistance, out VoxelHit hit)
@@ -39,7 +40,7 @@ namespace Voxelwild.World
                 if (world.TryGetBlock(cell, out var id) && id != BlockId.Air)
                 {
                     var def = BlockRegistry.Get(id);
-                    if (def.Has(BlockFlags.Solid))
+                    if (!def.Has(BlockFlags.Liquid) && (def.Has(BlockFlags.Solid) || def.Has(BlockFlags.Breakable)))
                     {
                         hit = new VoxelHit { Block = cell, Normal = normal, Distance = t, Id = id };
                         return true;
