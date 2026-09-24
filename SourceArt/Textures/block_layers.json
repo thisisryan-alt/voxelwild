@@ -1,0 +1,16 @@
+{
+  "comment": "Ordered texture layers for the terrain Texture2DArrays. Order MUST match Voxelwild.World.TextureLayer. Sources are CC0 from ambientCG.com (see CREDITS.md).",
+  "resolution": 1024,
+  "layers": [
+    { "name": "Stone",       "source": "ambientCG", "id": "Rock058" },
+    { "name": "Dirt",        "source": "ambientCG", "id": "Ground103" },
+    { "name": "GrassTop",    "source": "ambientCG", "id": "Grass004" },
+    { "name": "Sand",        "source": "ambientCG", "id": "Ground080" },
+    { "name": "Gravel",      "source": "ambientCG", "id": "Ground110" },
+    { "name": "Snow",        "source": "ambientCG", "id": "Snow010A" },
+    { "name": "Bedrock",     "source": "ambientCG", "id": "Rock035" },
+    { "name": "Cobblestone", "source": "ambientCG", "id": "PavingStones151" },
+    { "name": "Planks",      "source": "ambientCG", "id": "Planks037A" },
+    { "name": "Bricks",      "source": "ambientCG", "id": "Bricks097" }
+  ]
+}
