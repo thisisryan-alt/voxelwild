@@ -17,6 +17,21 @@ Block materials are photoscanned PBR sets from [ambientCG](https://ambientcg.com
 | Cobblestone | PavingStones151   |
 | Planks      | Planks037A        |
 | Bricks      | Bricks097         |
+| Oak log     | Bark014           |
+| Birch log   | Bark001 (lightened) |
+| Spruce log  | Bark012           |
+| Jungle log  | Bark015           |
+| Sandstone   | Rock053           |
+| Red sandstone | Rock061         |
+| Mud         | Ground036         |
+| Moss        | Moss002           |
+| Ice         | Ice002            |
+
+Generator inputs: **Leaf001** (composited into the leaves texture), **TreeEnd002** (log tops) and
+**Rock058** (base for the four ore textures).
+
+Needles, grass tufts, flowers, dead bush, glowcaps, cactus and torch are generated procedurally by
+`tools/generate_textures.py` (original to this project).
 
 The source maps live in `SourceArt/Textures/ambientCG/` (Git LFS) and are packed into Texture2DArrays by
 `Voxelwild ▸ Art ▸ Build Block Texture Arrays`. See [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md).
