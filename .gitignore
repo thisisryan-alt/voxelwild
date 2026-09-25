@@ -62,3 +62,6 @@ __pycache__/
 # dotnet test harness output
 tools/dotnet-tests/bin/
 tools/dotnet-tests/obj/
+
+# shader check downloads (Graphics checkout, DXC)
+tools/shadercheck/.cache/
