@@ -64,6 +64,8 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); b
 #crosshair::before, #crosshair::after { content: ""; position: absolute; background: rgba(255, 255, 255, 0.85); mix-blend-mode: difference; }
 #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
 #crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
+#mineBar { position: absolute; left: 50%; top: calc(50% + 16px); width: 44px; height: 4px; transform: translateX(-50%); background: rgba(0, 0, 0, 0.5); border-radius: 2px; overflow: hidden; }
+#mineBar i { display: block; height: 100%; width: 0; background: var(--accent); }
 #bottom { position: absolute; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: calc(100% - 20px); }
 #stats { display: flex; justify-content: space-between; width: 100%; gap: 12px; }
 .meter { display: flex; gap: 1px; }
@@ -136,6 +138,7 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); b
 
   <div id="hud" hidden>
     <div id="crosshair"></div>
+    <div id="mineBar" hidden><i></i></div>
     <div id="modeTag"></div>
     <div id="debug" hidden></div>
     <div id="toast"></div>
@@ -159,6 +162,7 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); b
       <div class="stack" id="titleButtons">
         <button class="primary" id="btnContinue" hidden>Continue</button>
         <button id="btnNew">New world</button>
+        <button id="btnSandbox">Creative sandbox <span class="tip">(not saved)</span></button>
         <button id="btnSettingsT">Settings</button>
       </div>
       <div class="stack" id="worldListWrap" hidden>

@@ -111,7 +111,7 @@ export class Game {
     this.creative = meta.mode === 'creative';
     this.player.canFly = this.creative;
     this.player.onLand = (h, water) => {
-      if (water) { if (h > 1.5) this.audio.splash(); return; }
+      if (water) { if (h > 1.5) { this.audio.splash(); this.spawnSplash(Math.min(1, h / 8)); } return; }
       if (h > 0.6) this.audio.step(this.blockUnderFeet(), 0.55);
       if (!this.creative) this.stats.land(h, water);
     };
@@ -218,13 +218,13 @@ export class Game {
     this.weather.frozen = true;
   }
 
-  async save() {
-    if (!this.world || this.state === 'loading' || this.meta.menu) return;
+  async save(manual = false) {
+    if (!this.world || this.state === 'loading' || this.meta.menu || this.meta.unsaved) return;
     try {
       const meta = this.metaSnapshot();
       await this.store.saveWorld(meta, this.world.editedSections());
       this.meta = meta;
-      this.emit('saved');
+      this.emit('saved', manual);
     } catch (e) { console.error('save failed', e); this.emit('toast', 'Saving failed: ' + (e && e.message)); }
   }
 
@@ -573,9 +573,55 @@ export class Game {
     if (list.length > 600) list.splice(0, list.length - 600);
   }
 
+  /** Spray and droplets where the player hit the water. */
+  spawnSplash(strength) {
+    const p = this.player.body.pos, list = this.particles.break;
+    const s = this.tod.state, amb = s.ambUp;
+    const y = Math.floor(p[1]) + 1;
+    for (let i = 0; i < 20 + strength * 40; i++) {
+      const a = Math.random() * Math.PI * 2, r = Math.random() * 0.6, up = 2 + Math.random() * 4 * (0.5 + strength);
+      list.push({ p: [p[0] + Math.cos(a) * r, y, p[2] + Math.sin(a) * r], v: [Math.cos(a) * (1 + Math.random() * 2), up, Math.sin(a) * (1 + Math.random() * 2)],
+        life: 0.5 + Math.random() * 0.6, size: 0.02 + Math.random() * 0.03, c: [0.75, 0.85, 0.9], sky: 1, blk: 0, water: true });
+    }
+  }
+
+  /** Now and then a leaf lets go of a canopy near the player and drifts down. */
+  spawnLeaves(dt) {
+    const w = this.world, e = this.player.eye(), list = this.particles.leaves || (this.particles.leaves = []);
+    this.leafTimer = (this.leafTimer || 0) - dt;
+    if (this.leafTimer > 0 || list.length > 60) return;
+    this.leafTimer = 0.06;
+    for (let tries = 0; tries < 4; tries++) {
+      const x = Math.floor(e[0] + (Math.random() - 0.5) * 28), z = Math.floor(e[2] + (Math.random() - 0.5) * 28);
+      const y = Math.floor(e[1] + (Math.random() - 0.3) * 16);
+      const b = w.getBlock(x, y, z);
+      if (b < B.OakLeaves || b > B.JungleLeaves || w.getBlock(x, y - 1, z) !== B.Air) continue;
+      const clim = w.climateAt(x, z);
+      const base = this.layerColor(BLOCKS[b].side), t = clim ? clim.temp : 0.5;
+      const tint = b === B.BirchLeaves ? [1.1, 1.08, 0.7] : b === B.SpruceLeaves ? [0.8, 0.9, 0.85] : [0.85 + t * 0.3, 1, 0.75];
+      list.push({ p: [x + Math.random(), y - 0.05, z + Math.random()], v: [0, -0.6, 0], life: 9, size: 0.05 + Math.random() * 0.03,
+        c: base.map((v, i) => v * tint[i] * 1.2), sky: 1, blk: 0, ph: Math.random() * 6.28, spin: 0.8 + Math.random() * 1.5 });
+      break;
+    }
+  }
+
   updateParticles(dt) {
     const w = this.world;
     const br = this.particles.break;
+    // drifting leaves: sway down on the wind, settle on the ground and fade
+    if (dt > 0) this.spawnLeaves(dt);
+    const lv = this.particles.leaves || [];
+    const wind = this.windVec || [0, 0];
+    for (let i = lv.length - 1; i >= 0; i--) {
+      const p = lv[i];
+      p.life -= dt;
+      if (p.life <= 0) { lv.splice(i, 1); continue; }
+      if (p.landed) continue;
+      p.ph += dt * p.spin;
+      const nx = p.p[0] + (Math.sin(p.ph) * 0.6 + wind[0] * 0.05) * dt, ny = p.p[1] - (0.55 + Math.cos(p.ph * 2) * 0.25) * dt, nz = p.p[2] + (Math.cos(p.ph * 0.7) * 0.5 + wind[1] * 0.05) * dt;
+      if (w.isSolidAt(Math.floor(nx), Math.floor(ny), Math.floor(nz)) || isWater(w.getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz)))) { p.landed = true; p.life = Math.min(p.life, 3); continue; }
+      p.p[0] = nx; p.p[1] = ny; p.p[2] = nz;
+    }
     for (let i = br.length - 1; i >= 0; i--) {
       const p = br[i];
       p.life -= dt;
@@ -594,7 +640,6 @@ export class Game {
     const rain = this.particles.rain, snow = this.particles.snow;
     const arr = cold ? snow : rain, other = cold ? rain : snow;
     if (other.length) other.length = Math.max(0, other.length - 20);
-    const wind = this.windVec || [0, 0];
     const spawn = (p) => {
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 22;
       p.p = [eye[0] + Math.cos(a) * r + wind[0] * 3, eye[1] + 8 + Math.random() * 14, eye[2] + Math.sin(a) * r + wind[1] * 3];
@@ -632,9 +677,14 @@ export class Game {
       }
       groups.push({ data: buf, count: n, stretch, round });
     };
-    pack(this.particles.break, (p) => {
-      const k = p.sky * p.sky, b = p.blk * p.blk;
-      return [p.c[0] * (amb[0] * k + 2.4 * b + 0.01), p.c[1] * (amb[1] * k + 1.5 * b + 0.01), p.c[2] * (amb[2] * k + 0.7 * b + 0.01), 1];
+    const lv = this.particles.leaves || [];
+    if (lv.length) {
+      const all = this.particles.break.concat(lv);
+      this.particles.breakAll = all;
+    } else this.particles.breakAll = this.particles.break;
+    pack(this.particles.breakAll, (p) => {
+      const k = p.sky * p.sky, b = p.blk * p.blk, a = p.water ? 0.7 : p.landed ? Math.min(1, p.life / 2) : 1;
+      return [p.c[0] * (amb[0] * k + 2.4 * b + 0.01), p.c[1] * (amb[1] * k + 1.5 * b + 0.01), p.c[2] * (amb[2] * k + 0.7 * b + 0.01), a];
     }, 0.05, null, false);
     const wind = this.windVec || [0, 0];
     pack(this.particles.rain, () => [amb[0] * 0.55, amb[1] * 0.6, amb[2] * 0.7, 0.32], 0.012, [-wind[0] * 0.03 * 3, 0.42, -wind[1] * 0.03 * 3], false);

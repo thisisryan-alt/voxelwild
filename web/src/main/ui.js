@@ -63,7 +63,7 @@ export class UI {
     g.on('toast', (t) => this.toast(t));
     g.on('pickup', (item, n) => this.pickup(item, n));
     g.on('loading', (p) => this.loadingProgress(p));
-    g.on('saved', () => {});
+    g.on('saved', (manual) => { if (manual) this.toast('Saved'); });
     await this.refreshWorlds();
     requestAnimationFrame((t) => this.loop(t));
     // the title backdrop, unless a world was already started while the saved-world list loaded
@@ -149,7 +149,8 @@ export class UI {
     g.keys.clear();
     g.mouse.left = g.mouse.right = false;
     const p = g.player.body.pos;
-    $('pauseInfo').textContent = `${g.meta.name} · x ${p[0].toFixed(0)} y ${p[1].toFixed(0)} z ${p[2].toFixed(0)}`;
+    $('pauseInfo').textContent = `${g.meta.name} · x ${p[0].toFixed(0)} y ${p[1].toFixed(0)} z ${p[2].toFixed(0)}${g.meta.unsaved ? ' · not saved' : ''}`;
+    $('btnQuit').textContent = g.meta.unsaved ? 'Quit to title' : 'Save and quit to title';
     $('btnMode').textContent = g.creative ? 'Switch to survival' : 'Switch to creative';
     this.show('pause');
     g.save();
@@ -216,6 +217,8 @@ export class UI {
     const g = this.game, c = $('view');
     $('btnNew').onclick = () => { g.audio.start(); g.audio.click(); this.show('newWorld'); $('nwName').focus(); };
     $('btnContinue').onclick = () => this.worlds && this.worlds[0] && this.play(this.worlds[0], false);
+    $('btnSandbox').onclick = () => this.play({ id: `sandbox${Date.now().toString(36)}`, name: 'Creative sandbox', seed: (Math.random() * 4294967296) >>> 0,
+      mode: 'creative', unsaved: true, created: Date.now(), lastPlayed: Date.now() }, true);
     $('btnSettingsT').onclick = () => { this.settingsBack = 'title'; this.openSettings(); };
     $('btnSettingsP').onclick = () => { this.settingsBack = 'pause'; this.openSettings(); };
     $('btnSettingsDone').onclick = () => { storeSettings(this.settings); this.show(this.settingsBack); };
@@ -237,7 +240,7 @@ export class UI {
     };
     $('btnResume').onclick = () => this.resume();
     $('btnMode').onclick = () => { g.setMode(!g.creative); $('btnMode').textContent = g.creative ? 'Switch to survival' : 'Switch to creative'; this.renderStats(); };
-    $('btnQuit').onclick = async () => { await g.save(); this.toTitle(); };
+    $('btnQuit').onclick = async () => { await g.save(true); this.toTitle(); };
     $('btnRespawn').onclick = () => g.respawn();
     $('btnDeathQuit').onclick = async () => { g.stats.reset(); g.player.teleport(g.spawn); await g.save(); this.toTitle(); };
     this.renderControls();
@@ -278,11 +281,11 @@ export class UI {
       if (e.repeat) { if (this.screen === 'playing') g.keys.add(k); return; }
       if (this.screen === 'playing') {
         g.keys.add(k); g.pressed.add(k);
-        if (k === 'KeyE') this.openInventory();
+        if (k === 'KeyE' || k === 'Tab') this.openInventory();
         else if (k === 'Escape' || k === 'KeyP') this.pause();
         else if (k === 'F3') { this.debug = !this.debug; $('debug').hidden = !this.debug; }
       } else if (this.screen === 'inventory') {
-        if (k === 'KeyE' || k === 'Escape') this.closeInventory();
+        if (k === 'KeyE' || k === 'Tab' || k === 'Escape') this.closeInventory();
         else if (/^Digit[1-9]$/.test(k) && this.hoverSlot != null) { g.inventory.move(this.hoverSlot, +k.slice(5) - 1); }
       } else if (this.screen === 'pause' && (k === 'Escape' || k === 'KeyP')) this.resume();
       else if (this.screen === 'settings' && k === 'Escape') { storeSettings(this.settings); this.show(this.settingsBack); }
@@ -567,6 +570,10 @@ export class UI {
     }
     g.frameMs = g.frameMs * 0.9 + (performance.now() - t0) * 0.1;
     this.governResolution(dt);
+    // mining progress under the crosshair (survival: blocks take time)
+    const m = g.mining, show = this.screen === 'playing' && m && !g.creative && m.time > 0.15 && m.progress > 0;
+    if (show !== !$('mineBar').hidden) $('mineBar').hidden = !show;
+    if (show) $('mineBar').firstChild.style.width = `${Math.min(100, m.progress * 100).toFixed(0)}%`;
   }
 
   /** Dynamic resolution: trade pixels for frame rate when the GPU falls behind, recover when it has headroom. */
