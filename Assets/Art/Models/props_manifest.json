@@ -1,0 +1,1795 @@
+{
+  "version": 1,
+  "generator": "tools/blender/build_props.py",
+  "blender": "5.0.1",
+  "assets": [
+    {
+      "name": "Cave_Stalactite_00",
+      "kind": "Cave_Stalactite",
+      "variant": 0,
+      "category": "Cave",
+      "fbx": "Assets/Art/Models/Cave/Cave_Stalactite_00.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Cave/Textures/Cave_Stalactite_00_Normal.png",
+        "mask": "Assets/Art/Models/Cave/Textures/Cave_Stalactite_00_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Cave_Stalactite_00_LOD0",
+          "triangles": 380
+        },
+        {
+          "mesh": "Cave_Stalactite_00_LOD1",
+          "triangles": 150
+        },
+        {
+          "mesh": "Cave_Stalactite_00_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.2863,
+        "top": 0.098,
+        "bottom": -0.663
+      },
+      "hang": true,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Sandstone",
+          "mapping": "triplanar",
+          "tiling": 0.7,
+          "moss": 0.0,
+          "tint": [
+            1.05,
+            1.02,
+            0.97
+          ],
+          "roughness": 0.6,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "length": 0.661
+      }
+    },
+    {
+      "name": "Cave_Stalactite_01",
+      "kind": "Cave_Stalactite",
+      "variant": 1,
+      "category": "Cave",
+      "fbx": "Assets/Art/Models/Cave/Cave_Stalactite_01.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Cave/Textures/Cave_Stalactite_01_Normal.png",
+        "mask": "Assets/Art/Models/Cave/Textures/Cave_Stalactite_01_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Cave_Stalactite_01_LOD0",
+          "triangles": 380
+        },
+        {
+          "mesh": "Cave_Stalactite_01_LOD1",
+          "triangles": 150
+        },
+        {
+          "mesh": "Cave_Stalactite_01_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.3272,
+        "top": 0.0996,
+        "bottom": -1.2172
+      },
+      "hang": true,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Sandstone",
+          "mapping": "triplanar",
+          "tiling": 0.7,
+          "moss": 0.0,
+          "tint": [
+            1.05,
+            1.02,
+            0.97
+          ],
+          "roughness": 0.6,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "length": 1.21
+      }
+    },
+    {
+      "name": "Cave_Stalactite_02",
+      "kind": "Cave_Stalactite",
+      "variant": 2,
+      "category": "Cave",
+      "fbx": "Assets/Art/Models/Cave/Cave_Stalactite_02.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Cave/Textures/Cave_Stalactite_02_Normal.png",
+        "mask": "Assets/Art/Models/Cave/Textures/Cave_Stalactite_02_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Cave_Stalactite_02_LOD0",
+          "triangles": 380
+        },
+        {
+          "mesh": "Cave_Stalactite_02_LOD1",
+          "triangles": 150
+        },
+        {
+          "mesh": "Cave_Stalactite_02_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.4417,
+        "top": 0.0972,
+        "bottom": -1.8227
+      },
+      "hang": true,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Sandstone",
+          "mapping": "triplanar",
+          "tiling": 0.7,
+          "moss": 0.0,
+          "tint": [
+            1.05,
+            1.02,
+            0.97
+          ],
+          "roughness": 0.6,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "length": 1.85
+      }
+    },
+    {
+      "name": "Cave_Stalactite_03",
+      "kind": "Cave_Stalactite",
+      "variant": 3,
+      "category": "Cave",
+      "fbx": "Assets/Art/Models/Cave/Cave_Stalactite_03.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Cave/Textures/Cave_Stalactite_03_Normal.png",
+        "mask": "Assets/Art/Models/Cave/Textures/Cave_Stalactite_03_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Cave_Stalactite_03_LOD0",
+          "triangles": 380
+        },
+        {
+          "mesh": "Cave_Stalactite_03_LOD1",
+          "triangles": 150
+        },
+        {
+          "mesh": "Cave_Stalactite_03_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.5874,
+        "top": 0.0963,
+        "bottom": -3.0108
+      },
+      "hang": true,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Sandstone",
+          "mapping": "triplanar",
+          "tiling": 0.7,
+          "moss": 0.0,
+          "tint": [
+            1.05,
+            1.02,
+            0.97
+          ],
+          "roughness": 0.6,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "length": 3.012
+      }
+    },
+    {
+      "name": "Cave_Stalagmite_00",
+      "kind": "Cave_Stalagmite",
+      "variant": 0,
+      "category": "Cave",
+      "fbx": "Assets/Art/Models/Cave/Cave_Stalagmite_00.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Cave/Textures/Cave_Stalagmite_00_Normal.png",
+        "mask": "Assets/Art/Models/Cave/Textures/Cave_Stalagmite_00_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Cave_Stalagmite_00_LOD0",
+          "triangles": 380
+        },
+        {
+          "mesh": "Cave_Stalagmite_00_LOD1",
+          "triangles": 150
+        },
+        {
+          "mesh": "Cave_Stalagmite_00_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.4017,
+        "top": 0.4823,
+        "bottom": -0.1025
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Sandstone",
+          "mapping": "triplanar",
+          "tiling": 0.7,
+          "moss": 0.0,
+          "tint": [
+            1.05,
+            1.02,
+            0.97
+          ],
+          "roughness": 0.6,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "length": 0.475
+      }
+    },
+    {
+      "name": "Cave_Stalagmite_01",
+      "kind": "Cave_Stalagmite",
+      "variant": 1,
+      "category": "Cave",
+      "fbx": "Assets/Art/Models/Cave/Cave_Stalagmite_01.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Cave/Textures/Cave_Stalagmite_01_Normal.png",
+        "mask": "Assets/Art/Models/Cave/Textures/Cave_Stalagmite_01_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Cave_Stalagmite_01_LOD0",
+          "triangles": 380
+        },
+        {
+          "mesh": "Cave_Stalagmite_01_LOD1",
+          "triangles": 150
+        },
+        {
+          "mesh": "Cave_Stalagmite_01_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.4818,
+        "top": 0.85,
+        "bottom": -0.104
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Sandstone",
+          "mapping": "triplanar",
+          "tiling": 0.7,
+          "moss": 0.0,
+          "tint": [
+            1.05,
+            1.02,
+            0.97
+          ],
+          "roughness": 0.6,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "length": 0.85
+      }
+    },
+    {
+      "name": "Cave_Stalagmite_02",
+      "kind": "Cave_Stalagmite",
+      "variant": 2,
+      "category": "Cave",
+      "fbx": "Assets/Art/Models/Cave/Cave_Stalagmite_02.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Cave/Textures/Cave_Stalagmite_02_Normal.png",
+        "mask": "Assets/Art/Models/Cave/Textures/Cave_Stalagmite_02_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Cave_Stalagmite_02_LOD0",
+          "triangles": 380
+        },
+        {
+          "mesh": "Cave_Stalagmite_02_LOD1",
+          "triangles": 150
+        },
+        {
+          "mesh": "Cave_Stalagmite_02_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.5054,
+        "top": 1.5053,
+        "bottom": -0.0989
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Sandstone",
+          "mapping": "triplanar",
+          "tiling": 0.7,
+          "moss": 0.0,
+          "tint": [
+            1.05,
+            1.02,
+            0.97
+          ],
+          "roughness": 0.6,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "length": 1.507
+      }
+    },
+    {
+      "name": "Cave_Stalagmite_03",
+      "kind": "Cave_Stalagmite",
+      "variant": 3,
+      "category": "Cave",
+      "fbx": "Assets/Art/Models/Cave/Cave_Stalagmite_03.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Cave/Textures/Cave_Stalagmite_03_Normal.png",
+        "mask": "Assets/Art/Models/Cave/Textures/Cave_Stalagmite_03_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Cave_Stalagmite_03_LOD0",
+          "triangles": 380
+        },
+        {
+          "mesh": "Cave_Stalagmite_03_LOD1",
+          "triangles": 150
+        },
+        {
+          "mesh": "Cave_Stalagmite_03_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.6932,
+        "top": 2.0458,
+        "bottom": -0.1008
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Sandstone",
+          "mapping": "triplanar",
+          "tiling": 0.7,
+          "moss": 0.0,
+          "tint": [
+            1.05,
+            1.02,
+            0.97
+          ],
+          "roughness": 0.6,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "length": 2.04
+      }
+    },
+    {
+      "name": "Plant_FlowerClump_00",
+      "kind": "Plant_FlowerClump",
+      "variant": 0,
+      "category": "Plants",
+      "fbx": "Assets/Art/Models/Plants/Plant_FlowerClump_00.fbx",
+      "textures": {
+        "normal": null,
+        "mask": null
+      },
+      "lods": [
+        {
+          "mesh": "Plant_FlowerClump_00_LOD0",
+          "triangles": 192
+        },
+        {
+          "mesh": "Plant_FlowerClump_00_LOD1",
+          "triangles": 100
+        }
+      ],
+      "extents": {
+        "radius": 0.3585,
+        "top": 0.5192,
+        "bottom": -0.02
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Foliage",
+          "layer": null,
+          "mapping": "vertex",
+          "tiling": 0.5,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 0.9,
+          "foliage": true
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Plant_FlowerClump_01",
+      "kind": "Plant_FlowerClump",
+      "variant": 1,
+      "category": "Plants",
+      "fbx": "Assets/Art/Models/Plants/Plant_FlowerClump_01.fbx",
+      "textures": {
+        "normal": null,
+        "mask": null
+      },
+      "lods": [
+        {
+          "mesh": "Plant_FlowerClump_01_LOD0",
+          "triangles": 192
+        },
+        {
+          "mesh": "Plant_FlowerClump_01_LOD1",
+          "triangles": 100
+        }
+      ],
+      "extents": {
+        "radius": 0.4371,
+        "top": 0.5958,
+        "bottom": -0.02
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Foliage",
+          "layer": null,
+          "mapping": "vertex",
+          "tiling": 0.5,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 0.9,
+          "foliage": true
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Plant_GrassClump_00",
+      "kind": "Plant_GrassClump",
+      "variant": 0,
+      "category": "Plants",
+      "fbx": "Assets/Art/Models/Plants/Plant_GrassClump_00.fbx",
+      "textures": {
+        "normal": null,
+        "mask": null
+      },
+      "lods": [
+        {
+          "mesh": "Plant_GrassClump_00_LOD0",
+          "triangles": 240
+        },
+        {
+          "mesh": "Plant_GrassClump_00_LOD1",
+          "triangles": 60
+        }
+      ],
+      "extents": {
+        "radius": 0.4968,
+        "top": 0.6043,
+        "bottom": -0.02
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Foliage",
+          "layer": null,
+          "mapping": "vertex",
+          "tiling": 0.5,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 0.9,
+          "foliage": true
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Plant_GrassClump_01",
+      "kind": "Plant_GrassClump",
+      "variant": 1,
+      "category": "Plants",
+      "fbx": "Assets/Art/Models/Plants/Plant_GrassClump_01.fbx",
+      "textures": {
+        "normal": null,
+        "mask": null
+      },
+      "lods": [
+        {
+          "mesh": "Plant_GrassClump_01_LOD0",
+          "triangles": 240
+        },
+        {
+          "mesh": "Plant_GrassClump_01_LOD1",
+          "triangles": 60
+        }
+      ],
+      "extents": {
+        "radius": 0.407,
+        "top": 0.5771,
+        "bottom": -0.02
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Foliage",
+          "layer": null,
+          "mapping": "vertex",
+          "tiling": 0.5,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 0.9,
+          "foliage": true
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Plant_Mushrooms_00",
+      "kind": "Plant_Mushrooms",
+      "variant": 0,
+      "category": "Plants",
+      "fbx": "Assets/Art/Models/Plants/Plant_Mushrooms_00.fbx",
+      "textures": {
+        "normal": null,
+        "mask": null
+      },
+      "lods": [
+        {
+          "mesh": "Plant_Mushrooms_00_LOD0",
+          "triangles": 1680
+        },
+        {
+          "mesh": "Plant_Mushrooms_00_LOD1",
+          "triangles": 1008
+        },
+        {
+          "mesh": "Plant_Mushrooms_00_LOD2",
+          "triangles": 288
+        }
+      ],
+      "extents": {
+        "radius": 0.2639,
+        "top": 0.1333,
+        "bottom": -0.03
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Fungus",
+          "layer": null,
+          "mapping": "vertex",
+          "tiling": 0.5,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 0.8,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Plant_Mushrooms_01",
+      "kind": "Plant_Mushrooms",
+      "variant": 1,
+      "category": "Plants",
+      "fbx": "Assets/Art/Models/Plants/Plant_Mushrooms_01.fbx",
+      "textures": {
+        "normal": null,
+        "mask": null
+      },
+      "lods": [
+        {
+          "mesh": "Plant_Mushrooms_01_LOD0",
+          "triangles": 240
+        },
+        {
+          "mesh": "Plant_Mushrooms_01_LOD1",
+          "triangles": 144
+        },
+        {
+          "mesh": "Plant_Mushrooms_01_LOD2",
+          "triangles": 96
+        }
+      ],
+      "extents": {
+        "radius": 0.0962,
+        "top": 0.1787,
+        "bottom": -0.03
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Fungus",
+          "layer": null,
+          "mapping": "vertex",
+          "tiling": 0.5,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 0.8,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Plant_Mushrooms_02",
+      "kind": "Plant_Mushrooms",
+      "variant": 2,
+      "category": "Plants",
+      "fbx": "Assets/Art/Models/Plants/Plant_Mushrooms_02.fbx",
+      "textures": {
+        "normal": null,
+        "mask": null
+      },
+      "lods": [
+        {
+          "mesh": "Plant_Mushrooms_02_LOD0",
+          "triangles": 1200
+        },
+        {
+          "mesh": "Plant_Mushrooms_02_LOD1",
+          "triangles": 720
+        },
+        {
+          "mesh": "Plant_Mushrooms_02_LOD2",
+          "triangles": 288
+        }
+      ],
+      "extents": {
+        "radius": 0.1987,
+        "top": 0.1788,
+        "bottom": -0.03
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Fungus",
+          "layer": null,
+          "mapping": "vertex",
+          "tiling": 0.5,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 0.8,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Rock_Boulder_00",
+      "kind": "Rock_Boulder",
+      "variant": 0,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Boulder_00.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Boulder_00_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Boulder_00_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Boulder_00_LOD0",
+          "triangles": 1400
+        },
+        {
+          "mesh": "Rock_Boulder_00_LOD1",
+          "triangles": 520
+        },
+        {
+          "mesh": "Rock_Boulder_00_LOD2",
+          "triangles": 160
+        }
+      ],
+      "extents": {
+        "radius": 1.2563,
+        "top": 1.6656,
+        "bottom": -0.327
+      },
+      "hang": false,
+      "core": true,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.45,
+          "moss": 0.55,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "coreVerticesPushed": 1940
+      }
+    },
+    {
+      "name": "Rock_Boulder_01",
+      "kind": "Rock_Boulder",
+      "variant": 1,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Boulder_01.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Boulder_01_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Boulder_01_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Boulder_01_LOD0",
+          "triangles": 1400
+        },
+        {
+          "mesh": "Rock_Boulder_01_LOD1",
+          "triangles": 520
+        },
+        {
+          "mesh": "Rock_Boulder_01_LOD2",
+          "triangles": 160
+        }
+      ],
+      "extents": {
+        "radius": 1.2893,
+        "top": 1.5221,
+        "bottom": -0.2992
+      },
+      "hang": false,
+      "core": true,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.45,
+          "moss": 0.55,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "coreVerticesPushed": 1780
+      }
+    },
+    {
+      "name": "Rock_Boulder_02",
+      "kind": "Rock_Boulder",
+      "variant": 2,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Boulder_02.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Boulder_02_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Boulder_02_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Boulder_02_LOD0",
+          "triangles": 1400
+        },
+        {
+          "mesh": "Rock_Boulder_02_LOD1",
+          "triangles": 520
+        },
+        {
+          "mesh": "Rock_Boulder_02_LOD2",
+          "triangles": 160
+        }
+      ],
+      "extents": {
+        "radius": 1.2048,
+        "top": 1.7302,
+        "bottom": -0.2952
+      },
+      "hang": false,
+      "core": true,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.45,
+          "moss": 0.55,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "coreVerticesPushed": 1320
+      }
+    },
+    {
+      "name": "Rock_Boulder_03",
+      "kind": "Rock_Boulder",
+      "variant": 3,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Boulder_03.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Boulder_03_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Boulder_03_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Boulder_03_LOD0",
+          "triangles": 1400
+        },
+        {
+          "mesh": "Rock_Boulder_03_LOD1",
+          "triangles": 520
+        },
+        {
+          "mesh": "Rock_Boulder_03_LOD2",
+          "triangles": 160
+        }
+      ],
+      "extents": {
+        "radius": 1.2761,
+        "top": 1.6463,
+        "bottom": -0.288
+      },
+      "hang": false,
+      "core": true,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.45,
+          "moss": 0.55,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "coreVerticesPushed": 1017
+      }
+    },
+    {
+      "name": "Rock_Pebbles_00",
+      "kind": "Rock_Pebbles",
+      "variant": 0,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Pebbles_00.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Pebbles_00_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Pebbles_00_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Pebbles_00_LOD0",
+          "triangles": 420
+        },
+        {
+          "mesh": "Rock_Pebbles_00_LOD1",
+          "triangles": 160
+        },
+        {
+          "mesh": "Rock_Pebbles_00_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.5769,
+        "top": 0.2053,
+        "bottom": -0.06
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.6,
+          "moss": 0.2,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Rock_Pebbles_01",
+      "kind": "Rock_Pebbles",
+      "variant": 1,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Pebbles_01.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Pebbles_01_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Pebbles_01_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Pebbles_01_LOD0",
+          "triangles": 420
+        },
+        {
+          "mesh": "Rock_Pebbles_01_LOD1",
+          "triangles": 160
+        },
+        {
+          "mesh": "Rock_Pebbles_01_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.5823,
+        "top": 0.1789,
+        "bottom": -0.0609
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.6,
+          "moss": 0.2,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Rock_Pebbles_02",
+      "kind": "Rock_Pebbles",
+      "variant": 2,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Pebbles_02.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Pebbles_02_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Pebbles_02_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Pebbles_02_LOD0",
+          "triangles": 418
+        },
+        {
+          "mesh": "Rock_Pebbles_02_LOD1",
+          "triangles": 160
+        },
+        {
+          "mesh": "Rock_Pebbles_02_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.5755,
+        "top": 0.212,
+        "bottom": -0.0598
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.6,
+          "moss": 0.2,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Rock_Pebbles_03",
+      "kind": "Rock_Pebbles",
+      "variant": 3,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Pebbles_03.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Pebbles_03_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Pebbles_03_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Pebbles_03_LOD0",
+          "triangles": 420
+        },
+        {
+          "mesh": "Rock_Pebbles_03_LOD1",
+          "triangles": 160
+        },
+        {
+          "mesh": "Rock_Pebbles_03_LOD2",
+          "triangles": 48
+        }
+      ],
+      "extents": {
+        "radius": 0.5707,
+        "top": 0.1598,
+        "bottom": -0.0616
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.6,
+          "moss": 0.2,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Rock_Stone_00",
+      "kind": "Rock_Stone",
+      "variant": 0,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Stone_00.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Stone_00_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Stone_00_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Stone_00_LOD0",
+          "triangles": 560
+        },
+        {
+          "mesh": "Rock_Stone_00_LOD1",
+          "triangles": 200
+        },
+        {
+          "mesh": "Rock_Stone_00_LOD2",
+          "triangles": 60
+        }
+      ],
+      "extents": {
+        "radius": 0.4736,
+        "top": 0.5307,
+        "bottom": -0.12
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.45,
+          "moss": 0.45,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Rock_Stone_01",
+      "kind": "Rock_Stone",
+      "variant": 1,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Stone_01.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Stone_01_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Stone_01_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Stone_01_LOD0",
+          "triangles": 560
+        },
+        {
+          "mesh": "Rock_Stone_01_LOD1",
+          "triangles": 200
+        },
+        {
+          "mesh": "Rock_Stone_01_LOD2",
+          "triangles": 60
+        }
+      ],
+      "extents": {
+        "radius": 0.4677,
+        "top": 0.5466,
+        "bottom": -0.1204
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.45,
+          "moss": 0.45,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Rock_Stone_02",
+      "kind": "Rock_Stone",
+      "variant": 2,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Stone_02.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Stone_02_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Stone_02_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Stone_02_LOD0",
+          "triangles": 560
+        },
+        {
+          "mesh": "Rock_Stone_02_LOD1",
+          "triangles": 200
+        },
+        {
+          "mesh": "Rock_Stone_02_LOD2",
+          "triangles": 60
+        }
+      ],
+      "extents": {
+        "radius": 0.3978,
+        "top": 0.3648,
+        "bottom": -0.1203
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.45,
+          "moss": 0.45,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Rock_Stone_03",
+      "kind": "Rock_Stone",
+      "variant": 3,
+      "category": "Rocks",
+      "fbx": "Assets/Art/Models/Rocks/Rock_Stone_03.fbx",
+      "textures": {
+        "normal": "Assets/Art/Models/Rocks/Textures/Rock_Stone_03_Normal.png",
+        "mask": "Assets/Art/Models/Rocks/Textures/Rock_Stone_03_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Rock_Stone_03_LOD0",
+          "triangles": 560
+        },
+        {
+          "mesh": "Rock_Stone_03_LOD1",
+          "triangles": 200
+        },
+        {
+          "mesh": "Rock_Stone_03_LOD2",
+          "triangles": 60
+        }
+      ],
+      "extents": {
+        "radius": 0.5591,
+        "top": 0.5078,
+        "bottom": -0.1202
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Rock",
+          "layer": "Stone",
+          "mapping": "triplanar",
+          "tiling": 0.45,
+          "moss": 0.45,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {}
+    },
+    {
+      "name": "Tree_Dead_00",
+      "kind": "Tree_Dead",
+      "variant": 0,
+      "category": "Wood",
+      "fbx": "Assets/Art/Models/Wood/Tree_Dead_00.fbx",
+      "textures": {
+        "normal": null,
+        "mask": "Assets/Art/Models/Wood/Textures/Tree_Dead_00_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Tree_Dead_00_LOD0",
+          "triangles": 1208
+        },
+        {
+          "mesh": "Tree_Dead_00_LOD1",
+          "triangles": 648
+        },
+        {
+          "mesh": "Tree_Dead_00_LOD2",
+          "triangles": 220
+        }
+      ],
+      "extents": {
+        "radius": 1.4761,
+        "top": 3.3871,
+        "bottom": -0.3141
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Bark",
+          "layer": "OakLog",
+          "mapping": "uv",
+          "tiling": 0.6667,
+          "moss": 0.35,
+          "tint": [
+            0.92,
+            0.9,
+            0.86
+          ],
+          "roughness": 1.1,
+          "foliage": false
+        },
+        {
+          "name": "EndGrain",
+          "layer": "LogTop",
+          "mapping": "uv",
+          "tiling": 1.0,
+          "moss": 0.0,
+          "tint": [
+            0.92,
+            0.9,
+            0.86
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "height": 3.459
+      }
+    },
+    {
+      "name": "Tree_Dead_01",
+      "kind": "Tree_Dead",
+      "variant": 1,
+      "category": "Wood",
+      "fbx": "Assets/Art/Models/Wood/Tree_Dead_01.fbx",
+      "textures": {
+        "normal": null,
+        "mask": "Assets/Art/Models/Wood/Textures/Tree_Dead_01_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Tree_Dead_01_LOD0",
+          "triangles": 1726
+        },
+        {
+          "mesh": "Tree_Dead_01_LOD1",
+          "triangles": 650
+        },
+        {
+          "mesh": "Tree_Dead_01_LOD2",
+          "triangles": 220
+        }
+      ],
+      "extents": {
+        "radius": 1.9893,
+        "top": 4.0178,
+        "bottom": -0.3116
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Bark",
+          "layer": "OakLog",
+          "mapping": "uv",
+          "tiling": 0.6667,
+          "moss": 0.35,
+          "tint": [
+            0.92,
+            0.9,
+            0.86
+          ],
+          "roughness": 1.1,
+          "foliage": false
+        },
+        {
+          "name": "EndGrain",
+          "layer": "LogTop",
+          "mapping": "uv",
+          "tiling": 1.0,
+          "moss": 0.0,
+          "tint": [
+            0.92,
+            0.9,
+            0.86
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "height": 4.466
+      }
+    },
+    {
+      "name": "Tree_Dead_02",
+      "kind": "Tree_Dead",
+      "variant": 2,
+      "category": "Wood",
+      "fbx": "Assets/Art/Models/Wood/Tree_Dead_02.fbx",
+      "textures": {
+        "normal": null,
+        "mask": "Assets/Art/Models/Wood/Textures/Tree_Dead_02_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Tree_Dead_02_LOD0",
+          "triangles": 1438
+        },
+        {
+          "mesh": "Tree_Dead_02_LOD1",
+          "triangles": 649
+        },
+        {
+          "mesh": "Tree_Dead_02_LOD2",
+          "triangles": 219
+        }
+      ],
+      "extents": {
+        "radius": 2.329,
+        "top": 4.5041,
+        "bottom": -0.3129
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Bark",
+          "layer": "OakLog",
+          "mapping": "uv",
+          "tiling": 0.6667,
+          "moss": 0.35,
+          "tint": [
+            0.92,
+            0.9,
+            0.86
+          ],
+          "roughness": 1.1,
+          "foliage": false
+        },
+        {
+          "name": "EndGrain",
+          "layer": "LogTop",
+          "mapping": "uv",
+          "tiling": 1.0,
+          "moss": 0.0,
+          "tint": [
+            0.92,
+            0.9,
+            0.86
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "height": 4.65
+      }
+    },
+    {
+      "name": "Tree_FallenLog_00",
+      "kind": "Tree_FallenLog",
+      "variant": 0,
+      "category": "Wood",
+      "fbx": "Assets/Art/Models/Wood/Tree_FallenLog_00.fbx",
+      "textures": {
+        "normal": null,
+        "mask": "Assets/Art/Models/Wood/Textures/Tree_FallenLog_00_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Tree_FallenLog_00_LOD0",
+          "triangles": 504
+        },
+        {
+          "mesh": "Tree_FallenLog_00_LOD1",
+          "triangles": 400
+        },
+        {
+          "mesh": "Tree_FallenLog_00_LOD2",
+          "triangles": 120
+        }
+      ],
+      "extents": {
+        "radius": 1.6221,
+        "top": 0.5281,
+        "bottom": -0.0707
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Bark",
+          "layer": "OakLog",
+          "mapping": "uv",
+          "tiling": 0.6667,
+          "moss": 0.35,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.1,
+          "foliage": false
+        },
+        {
+          "name": "EndGrain",
+          "layer": "LogTop",
+          "mapping": "uv",
+          "tiling": 1.0,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "length": 3.153,
+        "axis": "x"
+      }
+    },
+    {
+      "name": "Tree_FallenLog_01",
+      "kind": "Tree_FallenLog",
+      "variant": 1,
+      "category": "Wood",
+      "fbx": "Assets/Art/Models/Wood/Tree_FallenLog_01.fbx",
+      "textures": {
+        "normal": null,
+        "mask": "Assets/Art/Models/Wood/Textures/Tree_FallenLog_01_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Tree_FallenLog_01_LOD0",
+          "triangles": 504
+        },
+        {
+          "mesh": "Tree_FallenLog_01_LOD1",
+          "triangles": 400
+        },
+        {
+          "mesh": "Tree_FallenLog_01_LOD2",
+          "triangles": 120
+        }
+      ],
+      "extents": {
+        "radius": 1.8602,
+        "top": 0.492,
+        "bottom": -0.0765
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Bark",
+          "layer": "BirchLog",
+          "mapping": "uv",
+          "tiling": 0.6667,
+          "moss": 0.35,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.1,
+          "foliage": false
+        },
+        {
+          "name": "EndGrain",
+          "layer": "LogTop",
+          "mapping": "uv",
+          "tiling": 1.0,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "length": 3.65,
+        "axis": "x"
+      }
+    },
+    {
+      "name": "Tree_Stump_00",
+      "kind": "Tree_Stump",
+      "variant": 0,
+      "category": "Wood",
+      "fbx": "Assets/Art/Models/Wood/Tree_Stump_00.fbx",
+      "textures": {
+        "normal": null,
+        "mask": "Assets/Art/Models/Wood/Textures/Tree_Stump_00_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Tree_Stump_00_LOD0",
+          "triangles": 670
+        },
+        {
+          "mesh": "Tree_Stump_00_LOD1",
+          "triangles": 319
+        },
+        {
+          "mesh": "Tree_Stump_00_LOD2",
+          "triangles": 99
+        }
+      ],
+      "extents": {
+        "radius": 0.7592,
+        "top": 0.6471,
+        "bottom": -0.25
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Bark",
+          "layer": "OakLog",
+          "mapping": "uv",
+          "tiling": 0.6667,
+          "moss": 0.35,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.1,
+          "foliage": false
+        },
+        {
+          "name": "EndGrain",
+          "layer": "LogTop",
+          "mapping": "uv",
+          "tiling": 1.0,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "height": 0.603
+      }
+    },
+    {
+      "name": "Tree_Stump_01",
+      "kind": "Tree_Stump",
+      "variant": 1,
+      "category": "Wood",
+      "fbx": "Assets/Art/Models/Wood/Tree_Stump_01.fbx",
+      "textures": {
+        "normal": null,
+        "mask": "Assets/Art/Models/Wood/Textures/Tree_Stump_01_Mask.png"
+      },
+      "lods": [
+        {
+          "mesh": "Tree_Stump_01_LOD0",
+          "triangles": 670
+        },
+        {
+          "mesh": "Tree_Stump_01_LOD1",
+          "triangles": 319
+        },
+        {
+          "mesh": "Tree_Stump_01_LOD2",
+          "triangles": 100
+        }
+      ],
+      "extents": {
+        "radius": 0.7627,
+        "top": 0.8262,
+        "bottom": -0.25
+      },
+      "hang": false,
+      "core": false,
+      "slots": [
+        {
+          "name": "Bark",
+          "layer": "SpruceLog",
+          "mapping": "uv",
+          "tiling": 0.6667,
+          "moss": 0.35,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.1,
+          "foliage": false
+        },
+        {
+          "name": "EndGrain",
+          "layer": "LogTop",
+          "mapping": "uv",
+          "tiling": 1.0,
+          "moss": 0.0,
+          "tint": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "roughness": 1.0,
+          "foliage": false
+        }
+      ],
+      "notes": {
+        "height": 0.78
+      }
+    }
+  ]
+}
