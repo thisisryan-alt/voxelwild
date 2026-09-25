@@ -3,10 +3,11 @@
 import { ITEMS, Kind, itemName, RECIPES } from '../shared/blocks.js';
 import { canCraft, craft, HOTBAR, INV_SIZE, MAX_AIR } from './gameplay.js';
 import { loadSettings, storeSettings } from './save.js';
+import { PACK_NAMES } from './respack.js';
 
 const $ = (id) => document.getElementById(id);
 const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, volume: 0.8, sfx: 1, ambience: 0.7, particles: 1,
-  shadows: true, bloom: true, godRays: true, invertY: false };
+  shadows: true, bloom: true, godRays: true, invertY: false, pom: 1 };
 const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'KeyE', 'KeyQ', 'KeyF',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F3', 'Tab', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9']);
 const CAUSES = { fall: 'You hit the ground too hard.', drowning: 'You ran out of air.', starvation: 'You starved.', void: 'You fell out of the world.' };
@@ -244,6 +245,7 @@ export class UI {
     $('btnRespawn').onclick = () => g.respawn();
     $('btnDeathQuit').onclick = async () => { g.stats.reset(); g.player.teleport(g.spawn); await g.save(); this.toTitle(); };
     this.renderControls();
+    this.bindPack();
 
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === c;
@@ -338,7 +340,72 @@ export class UI {
     bind('sensitivity', (x) => x.toFixed(2));
     for (const k of ['volume', 'sfx', 'ambience', 'particles']) bind(k, (x) => `${Math.round(x * 100)}%`);
     for (const k of ['shadows', 'bloom', 'godRays', 'invertY']) bind(k);
+    bind('pom', (x) => (x ? `${Math.round(x * 100)}%` : 'off'));
+    this.renderPack();
     this.show('settings');
+  }
+
+  // ---------------------------------------------------------------- resource pack
+
+  bindPack() {
+    const g = this.game;
+    const opts = () => ({ normalYDown: $('sPackDX').checked, oldPbr: $('sPackOld').checked });
+    $('sPackDX').checked = true;
+    $('btnPackLoad').onclick = () => $('packFile').click();
+    $('packFile').onchange = () => { const f = $('packFile').files[0]; $('packFile').value = ''; if (f) this.loadPack(f); };
+    $('btnPackRemove').onclick = async () => { await g.removePack(); this.paletteBuilt = false; this.renderPack(); this.renderHotbar(); $('packStatus').textContent = 'Back to the built-in textures.'; };
+    for (const id of ['sPackDX', 'sPackOld']) $(id).onchange = async () => {
+      if (!g.pack) return;
+      $('packStatus').textContent = 'Converting…';
+      try { await g.repackWith(opts()); $('packStatus').textContent = 'Updated.'; } catch (e) { $('packStatus').textContent = e.message; }
+      this.renderPack();
+    };
+    // drag a pack onto the page
+    let depth = 0;
+    const isZip = (e) => [...(e.dataTransfer && e.dataTransfer.items || [])].some((i) => i.kind === 'file');
+    window.addEventListener('dragenter', (e) => { if (!isZip(e)) return; depth++; $('dropHint').hidden = false; e.preventDefault(); });
+    window.addEventListener('dragover', (e) => { if (isZip(e)) e.preventDefault(); });
+    window.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; $('dropHint').hidden = true; } });
+    window.addEventListener('drop', (e) => {
+      depth = 0; $('dropHint').hidden = true;
+      const f = e.dataTransfer && e.dataTransfer.files[0];
+      if (!f) return;
+      e.preventDefault();
+      if (this.screen === 'playing') this.pause();
+      if (this.screen !== 'settings') { this.settingsBack = this.game.world && !(this.game.meta && this.game.meta.menu) ? 'pause' : 'title'; this.openSettings(); }
+      this.loadPack(f);
+    });
+    this.packOpts = opts;
+  }
+
+  async loadPack(file) {
+    const g = this.game;
+    $('packStatus').textContent = `Reading ${file.name} (${(file.size / 1048576).toFixed(1)} MB)…`;
+    $('btnPackLoad').disabled = true;
+    try {
+      const info = await g.loadPackFile(file, this.packOpts());
+      this.paletteBuilt = false;
+      this.renderHotbar();
+      $('packStatus').textContent = `Using ${info.found.length} of ${Object.keys(PACK_NAMES).length} block textures at ${info.source}×${info.source}` +
+        (info.source > info.size ? ` (shown at ${info.size}×${info.size} to fit GPU memory)` : '') + (info.stored ? '. Kept in this browser.' : '. Storage is blocked here, so load it again next time.');
+    } catch (e) {
+      console.warn(e);
+      $('packStatus').textContent = `Could not use that pack: ${e.message}`;
+    }
+    $('btnPackLoad').disabled = false;
+    this.renderPack();
+  }
+
+  renderPack() {
+    const p = this.game.pack;
+    $('packName').textContent = p ? p.name : 'Built-in textures';
+    $('btnPackRemove').hidden = !p;
+    if (p) {
+      $('packInfo').textContent = `${p.description ? p.description + ' · ' : ''}${p.found.length} block textures from the pack; the rest stay built-in.`;
+      $('sPackDX').checked = p.opts.normalYDown !== false; $('sPackOld').checked = !!p.opts.oldPbr;
+    }
+    const icon = p && this.game.packIcon;
+    $('packIcon').style.backgroundImage = icon ? `url(${icon})` : '';
   }
 
   // ---------------------------------------------------------------- HUD

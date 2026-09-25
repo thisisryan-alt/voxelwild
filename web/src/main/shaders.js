@@ -179,6 +179,8 @@ uniform sampler2DArray uAlbedo, uNormal, uMask;
 uniform vec4 uLP[35];     // 1/tile, normal strength, roughness scale, macro variation
 uniform vec4 uLT[35];     // tint rgb, specular
 uniform vec4 uLP2[35];    // emission, translucency, biome tint, cutout
+uniform vec4 uLP3[35];    // relief depth in blocks (parallax occlusion mapping)
+uniform float uPom, uPomDist;   // relief multiplier (0 = off), fade-out distance
 uniform mat3 uModelRot;
 uniform float uBevelWidth, uBevelStrength, uEdgeWear, uAOStrength, uAODirect, uOverhang, uCutoff;
 uniform float uFlash;     // lightning
@@ -205,10 +207,10 @@ vec3 biomeTint(int mode, float t, float h) {
 }
 
 struct Layer { vec3 albedo; float alpha; vec3 nts; float ao; float rough; float metal; float emis; };
-Layer sampleLayer(int layer, vec2 uv) {
-  vec4 a = texture(uAlbedo, vec3(uv, float(layer)));
-  vec4 n = texture(uNormal, vec3(uv, float(layer)));
-  vec4 m = texture(uMask, vec3(uv, float(layer)));
+Layer sampleLayer(int layer, vec2 uv, vec2 gx, vec2 gy) {
+  vec4 a = textureGrad(uAlbedo, vec3(uv, float(layer)), gx, gy);
+  vec4 n = textureGrad(uNormal, vec3(uv, float(layer)), gx, gy);
+  vec4 m = textureGrad(uMask, vec3(uv, float(layer)), gx, gy);
   Layer s;
   s.albedo = pow(a.rgb, vec3(2.2)) * uLT[layer].rgb;
   if (uLP2[layer].z > 0.5) s.albedo *= biomeTint(int(vClim.z + 0.5), vClim.x, vClim.y);
@@ -229,7 +231,54 @@ void main() {
   vec3 local = vTexPos - cell;
   float u = dot(local - 0.5, T) + 0.5, w = dot(local - 0.5, B) + 0.5;
 
-  Layer s = sampleLayer(layer, uv);
+  vec2 gx = dFdx(uv), gy = dFdy(uv);
+  vec2 ogx = dFdx(uvBlocks), ogy = dFdy(uvBlocks);
+  float pomShadow = 1.0;
+#ifndef CUTOUT
+  // parallax occlusion mapping: march the view ray through the height field (albedo alpha, 1 = surface)
+  float vdist = distance(uCamPos, vPos);
+  float depthBlocks = uLP3[layer].x * uPom;
+  if (!plant && depthBlocks > 0.0 && vdist < uPomDist && uLP2[layer].w < 0.5) {
+    vec3 V = normalize(uCamPos - vPos);
+    vec3 Nw = normalize(uModelRot * N), Tw = normalize(uModelRot * T), Bw = normalize(uModelRot * B);
+    float ndv = max(dot(V, Nw), 0.02);
+    float fade = 1.0 - smoothstep(uPomDist * 0.6, uPomDist, vdist);
+    float k = uLP[layer].x * depthBlocks * fade;
+    vec2 dir = vec2(-dot(V, Tw), dot(V, Bw)) / max(ndv, 0.2) * k;
+    int steps = int(mix(40.0, 10.0, ndv));
+    float stepD = 1.0 / float(steps);
+    float L = float(layer);
+    vec2 cur = uv, prevUV = uv;
+    float depth = 0.0, prevDepth = 0.0;
+    float h = textureGrad(uAlbedo, vec3(cur, L), gx, gy).a, prevH = h;
+    for (int i = 0; i < 40; i++) {
+      if (i >= steps || depth >= 1.0 - h) break;
+      prevUV = cur; prevH = h; prevDepth = depth;
+      cur += dir * stepD; depth += stepD;
+      h = textureGrad(uAlbedo, vec3(cur, L), gx, gy).a;
+    }
+    float after = (1.0 - h) - depth, before = (1.0 - prevH) - prevDepth;
+    float wgt = clamp(after / (after - before - 1e-5), 0.0, 1.0);
+    cur = mix(cur, prevUV, wgt);
+    float d0 = mix(depth, prevDepth, wgt);
+    // soft self-shadowing: does the height field rise above the ray toward the sun?
+    float ndl = dot(uLightDir, Nw);
+    if (ndl > 0.02 && d0 > 0.01 && vdist < uPomDist * 0.7) {
+      vec2 ldir = vec2(dot(uLightDir, Tw), -dot(uLightDir, Bw)) / max(ndl, 0.2) * k;
+      float occ = 0.0;
+      for (int j = 1; j <= 10; j++) {
+        float t = float(j) / 10.0;
+        float dj = d0 * (1.0 - t);
+        float hj = textureGrad(uAlbedo, vec3(cur + ldir * (d0 - dj), L), gx, gy).a;
+        occ = max(occ, (hj - (1.0 - dj)) * 6.0 * (1.0 - t));
+      }
+      pomShadow = 1.0 - clamp(occ, 0.0, 1.0) * fade * 0.85;
+    }
+    uvBlocks += (cur - uv) / uLP[layer].x;
+    uv = cur;
+  }
+#endif
+  Layer s = sampleLayer(layer, uv, gx, gy);
   float alpha = uLP2[layer].w > 0.5 ? s.alpha : 1.0;
 #ifdef CUTOUT
   // keep foliage coverage in distant mips
@@ -237,7 +286,7 @@ void main() {
   if (alpha * (1.0 + lod * 0.18) < uCutoff) discard;
 #endif
   if (overlay != 255) {
-    Layer o = sampleLayer(overlay, uvBlocks * uLP[overlay].x);
+    Layer o = sampleLayer(overlay, uvBlocks * uLP[overlay].x, ogx * uLP[overlay].x, ogy * uLP[overlay].x);
     float jitter = hash21(cell.xz + cell.y * 17.0) - 0.5;
     float edge = 1.0 - uOverhang + (o.alpha - 0.5) * 0.28 + jitter * 0.06;
     float m = smoothstep(edge - 0.035, edge + 0.035, w);
@@ -282,7 +331,7 @@ void main() {
   vao = mix(1.0, vao, uAOStrength);
   float directShade = mix(1.0, vao, uAODirect);
   vec3 col = shade(s.albedo * directShade, n, s.rough, s.metal, s.ao * vao, uLT[layer].w, s.albedo * s.emis,
-                   uLP2[layer].y, vPos, vLight.y, vLight.z, 1.0, uSkyLut);
+                   uLP2[layer].y, vPos, vLight.y, vLight.z, pomShadow, uSkyLut);
   col += s.albedo * uFlash * vLight.y * 2.0;
   outColor = vec4(applyFog(col, vPos), 1.0);
   if (uDebug == 1) outColor = vec4(s.albedo, 1.0);

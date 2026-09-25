@@ -58,14 +58,38 @@ export class Renderer {
       prop: compile(gl, C + S.PROP_VS, C + L + S.PROP_FS, 'prop'),
       propShadow: compile(gl, C + S.PROP_SHADOW_VS, C + S.PROP_SHADOW_FS, 'prop-shadow'),
     };
-    // per-layer material tables
+    this.setTuning(LAYER_TUNING);
+  }
+
+  /** Per-layer material tables (the built-in tuning, or a resource pack's). */
+  setTuning(tuning) {
     const n = LAYER_NAMES.length;
-    this.uLP = new Float32Array(n * 4); this.uLT = new Float32Array(n * 4); this.uLP2 = new Float32Array(n * 4);
-    LAYER_TUNING.forEach((t, i) => {
+    this.uLP = new Float32Array(n * 4); this.uLT = new Float32Array(n * 4); this.uLP2 = new Float32Array(n * 4); this.uLP3 = new Float32Array(n * 4);
+    tuning.forEach((t, i) => {
       this.uLP.set([1 / t.tile, t.normal, t.rough, t.macro], i * 4);
       this.uLT.set([t.tint[0], t.tint[1], t.tint[2], t.spec], i * 4);
       this.uLP2.set([t.emission, t.trans, t.biome, t.cutout], i * 4);
+      this.uLP3.set([t.pom ?? (t.cutout ? 0 : 0.12), 0, 0, 0], i * 4);
     });
+  }
+
+  /** Replaces one material array with raw RGBA strips (a resource pack), keeping mipmaps and filtering. */
+  uploadLayersRaw(which, data, size, layers) {
+    const gl = this.gl;
+    const tx = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, tx);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, Math.floor(Math.log2(size)) + 1, gl.RGBA8, size, size, layers);
+    gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, 0, size, size, layers, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    if (this.aniso) gl.texParameterf(gl.TEXTURE_2D_ARRAY, this.aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, gl.getParameter(this.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+    gl.deleteTexture(this[which]);
+    this[which] = tx;
   }
 
   buildStatic() {
@@ -481,7 +505,7 @@ export class Renderer {
       uShadow0: 4, uShadow1: 5, uCloudTex: 6, uSkyLut: 3, uAlbedo: 0, uNormal: 1, uMask: 2, uSceneColor: 7, uSceneDepth: 8, uAtlas: 9, uBakeN: 14, uBakeM: 15,
       uCloud: [wth.cloudCover, 1 / 5200, 420, 0.55 * wth.cloudCover + 0.1], uCloudOff: [this.cloudOff[0], this.cloudOff[1], 2.2, 1 - wth.storm * 0.55],
       uWet: wth.wetness, uSnow: wth.snowCover,
-      uLP: this.uLP, uLT: this.uLT, uLP2: this.uLP2,
+      uLP: this.uLP, uLT: this.uLT, uLP2: this.uLP2, uLP3: this.uLP3, uPom: this.settings.pom ?? 1, uPomDist: 28,
       uBevelWidth: 0.07, uBevelStrength: 0.55, uEdgeWear: 0.3, uAOStrength: 1, uAODirect: 0.55, uOverhang: 0.2, uCutoff: 0.45,
       uFlash: f.flash || 0, uEntityLight: [-1, 0], uModelRot: [1, 0, 0, 0, 1, 0, 0, 0, 1],
       uNearFar: [near, far], uViewport: [W, H], uDebug: this.debugView | 0,

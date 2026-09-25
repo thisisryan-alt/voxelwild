@@ -109,6 +109,10 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); b
 /* settings */
 .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; }
 .settings .full { grid-column: 1 / -1; }
+.pack { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; border-top: 1px solid var(--line); }
+.pack-row { display: flex; gap: 12px; align-items: center; }
+.pack-icon { width: 48px; height: 48px; flex: none; border-radius: 4px; background: rgba(0, 0, 0, 0.35) center / cover no-repeat; border: 1px solid var(--line); image-rendering: pixelated; }
+#dropHint { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(8, 12, 10, 0.72); font: 600 20px var(--body); z-index: 20; border: 3px dashed var(--accent); }
 .check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 14px; }
 .check input { width: 16px; height: 16px; accent-color: var(--accent); }
 .val { font-family: var(--mono); color: var(--text); }
@@ -224,6 +228,27 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); b
         <label class="check"><input type="checkbox" id="sBloom"> Bloom</label>
         <label class="check"><input type="checkbox" id="sGodRays"> Light shafts</label>
         <label class="check"><input type="checkbox" id="sInvertY"> Invert mouse Y</label>
+        <label>Surface relief (parallax) <span class="val" id="vPom"></span><input type="range" id="sPom" min="0" max="2" step="0.1"></label>
+        <div class="full pack">
+          <span class="eyebrow">Block textures</span>
+          <div class="pack-row">
+            <div class="pack-icon" id="packIcon"></div>
+            <div class="stack" style="gap:4px;min-width:0">
+              <b id="packName">Built-in textures</b>
+              <span class="hint" id="packInfo">Load a Minecraft Java resource pack (.zip), for example a 128x LabPBR pack with normal, height and specular maps. It stays in this browser and is not uploaded anywhere.</span>
+            </div>
+          </div>
+          <div class="row">
+            <button id="btnPackLoad">Load resource pack…</button>
+            <button id="btnPackRemove" hidden>Use built-in textures</button>
+            <input type="file" id="packFile" accept=".zip,application/zip" hidden>
+          </div>
+          <div class="row">
+            <label class="check"><input type="checkbox" id="sPackDX"> Normal maps are DirectX-style (LabPBR packs)</label>
+            <label class="check"><input type="checkbox" id="sPackOld"> Old PBR specular (SEUS-style packs)</label>
+          </div>
+          <span class="hint mono" id="packStatus"></span>
+        </div>
       </div>
       <div class="row"><button class="primary" id="btnSettingsDone">Done</button><span class="hint">Lower the view distance or render scale if the game stutters.</span></div>
     </div>
@@ -256,6 +281,7 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); b
     </div>
   </div>
 
+  <div id="dropHint" hidden>Drop the resource pack .zip to use its textures</div>
   <div id="cursorStack" hidden><div class="ico"></div><span class="n"></span></div>
   <div id="fatal" class="layer" hidden><div class="panel stack"><h2>Voxelwild could not start</h2><p class="hint" id="fatalMsg" style="white-space:pre-wrap"></p></div></div>
 </div>

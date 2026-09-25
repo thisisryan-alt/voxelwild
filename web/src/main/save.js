@@ -112,6 +112,38 @@ export class SaveStore {
   }
 }
 
+/** The player's resource pack (the few textures the game uses), kept only in this browser. */
+export const PackStore = {
+  async open() {
+    if (this.db !== undefined) return this.db;
+    try {
+      this.db = await new Promise((resolve, reject) => {
+        const req = indexedDB.open('voxelwild-packs', 1);
+        req.onupgradeneeded = () => req.result.createObjectStore('packs');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+        setTimeout(() => reject(new Error('timeout')), 4000);
+      });
+    } catch { this.db = null; }
+    return this.db;
+  },
+  async get() {
+    const db = await this.open();
+    if (!db) return null;
+    return new Promise((resolve) => { const r = db.transaction('packs').objectStore('packs').get('current'); r.onsuccess = () => resolve(r.result || null); r.onerror = () => resolve(null); });
+  },
+  async put(pack) {
+    const db = await this.open();
+    if (!db) return false;
+    return new Promise((resolve) => { const t = db.transaction('packs', 'readwrite'); t.objectStore('packs').put(pack, 'current'); t.oncomplete = () => resolve(true); t.onerror = () => resolve(false); });
+  },
+  async clear() {
+    const db = await this.open();
+    if (!db) return;
+    await new Promise((resolve) => { const t = db.transaction('packs', 'readwrite'); t.objectStore('packs').delete('current'); t.oncomplete = resolve; t.onerror = resolve; });
+  },
+};
+
 export function loadSettings(defaults) {
   try { const s = JSON.parse(localStorage.getItem('voxelwild.settings') || '{}'); return { ...defaults, ...s }; } catch { return { ...defaults }; }
 }

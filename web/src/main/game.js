@@ -7,7 +7,9 @@ import { Player, raycast, targetable } from './player.js';
 import { Inventory, SurvivalStats, Weather, CREATIVE_HOTBAR, HOTBAR, WEATHER_NAMES } from './gameplay.js';
 import { GameAudio } from './audio.js';
 import { Icons } from './icons.js';
-import { SaveStore } from './save.js';
+import { SaveStore, PackStore } from './save.js';
+import { readPackZip, convertPack, decodeBitmap } from './respack.js';
+import { LAYER_TUNING, LAYER_NAMES } from '../shared/blocks.js';
 import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, breakSeconds, drops, canHarvest, itemName, layerFor } from '../shared/blocks.js';
 import { terrainFor } from '../shared/gen.js';
 import { Biome, BIOME_NAMES } from '../shared/terrain.js';
@@ -70,18 +72,83 @@ export class Game {
       } catch (e) { console.warn('props unavailable:', e && e.message); }
     })();
     progress && progress('Preparing materials', 0.6);
+    this.builtin = { albedo, normal, mask };
     this.renderer.uploadLayers('albedo', albedo);
     this.renderer.uploadLayers('normal', normal);
     this.renderer.uploadLayers('mask', mask);
     this.icons = new Icons(albedo);
     this.renderer.uploadAtlas(this.icons.canvas);
+    // a resource pack the player loaded earlier
+    try {
+      const saved = await PackStore.get();
+      if (saved) { progress && progress('Applying your resource pack', 0.8); await this.applyPack(saved, false); }
+    } catch (e) { console.warn('saved resource pack could not be applied:', e); }
     progress && progress('Ready', 1);
+  }
+
+  // ---------------------------------------------------------------- resource packs
+
+  /** Reads a pack ZIP the player chose, applies it and keeps it in this browser. */
+  async loadPackFile(file, opts) {
+    const pack = await readPackZip(await file.arrayBuffer(), file.name);
+    pack.opts = opts;
+    const info = await this.applyPack(pack, true);
+    pack.info = info;
+    const stored = await PackStore.put(pack);
+    return { ...info, stored };
+  }
+
+  /** Converts a pack (from a ZIP or from storage) into the block materials. */
+  async applyPack(pack, fresh) {
+    if (!this.builtinRaw) {
+      const d = (bmp) => decodeBitmap(bmp).data;
+      this.builtinRaw = { size: this.builtin.albedo.width, albedo: d(this.builtin.albedo), normal: d(this.builtin.normal), mask: d(this.builtin.mask) };
+    }
+    const conv = await convertPack(pack, this.builtinRaw, pack.opts || {});
+    const n = LAYER_NAMES.length;
+    this.renderer.uploadLayersRaw('albedo', conv.albedo, conv.size, n);
+    this.renderer.uploadLayersRaw('normal', conv.normal, conv.size, n);
+    this.renderer.uploadLayersRaw('mask', conv.mask, conv.size, n);
+    this.renderer.setTuning(conv.tuning);
+    // item icons from the pack's colours (opaque copy: heights live in the alpha channel)
+    const flat = new Uint8ClampedArray(conv.albedo);
+    for (let i = 0; i < n; i++) if (!conv.tuning[i].cutout) for (let p = i * conv.size * conv.size * 4 + 3; p < (i + 1) * conv.size * conv.size * 4; p += 4) flat[p] = 255;
+    const c = document.createElement('canvas'); c.width = conv.size; c.height = conv.size * n;
+    c.getContext('2d').putImageData(new ImageData(flat, conv.size, conv.size * n), 0, 0);
+    this.icons = new Icons(await createImageBitmap(c));
+    this.renderer.uploadAtlas(this.icons.canvas);
+    if (this.packIcon) URL.revokeObjectURL(this.packIcon);
+    this.packIcon = pack.icon ? URL.createObjectURL(new Blob([pack.icon], { type: 'image/png' })) : null;
+    this.pack = { name: pack.name, description: pack.description, found: conv.found, size: conv.size, source: conv.source, opts: pack.opts || {} };
+    this.emit('inventory'); this.emit('pack', this.pack);
+    return this.pack;
+  }
+
+  async removePack() {
+    this.renderer.uploadLayers('albedo', this.builtin.albedo);
+    this.renderer.uploadLayers('normal', this.builtin.normal);
+    this.renderer.uploadLayers('mask', this.builtin.mask);
+    this.renderer.setTuning(LAYER_TUNING);
+    this.icons = new Icons(this.builtin.albedo);
+    this.renderer.uploadAtlas(this.icons.canvas);
+    this.pack = null;
+    await PackStore.clear();
+    this.emit('inventory'); this.emit('pack', null);
+  }
+
+  /** Re-applies the stored pack with other options (normal convention, specular format). */
+  async repackWith(opts) {
+    const saved = await PackStore.get();
+    if (!saved) return null;
+    saved.opts = opts;
+    await PackStore.put(saved);
+    return this.applyPack(saved, false);
   }
 
   applySettings(s) {
     this.settings = s;
     const r = this.renderer.settings;
-    r.renderScale = s.renderScale; r.shadows = s.shadows; r.bloom = s.bloom; r.godRays = s.godRays; r.fov = s.fov;
+    r.renderScale = s.renderScale; r.shadows = s.shadows; r.bloom = s.bloom; r.godRays = s.godRays; r.fov = s.fov; r.pom = s.pom;
     if (this.world) this.world.viewDistance = s.viewDistance;
     this.audio.volumes = { master: s.volume, sfx: s.sfx, ambience: s.ambience };
     this.audio.applyVolumes();

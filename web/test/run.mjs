@@ -348,6 +348,33 @@ await step('save and reload', async () => {
   return { worlds };
 });
 
+await step('resource pack: load a LabPBR pack ZIP', async () => {
+  await G(async () => {
+    const g = window.voxelwild.game, w = g.world;
+    g.setMode(true); g.player.flying = true;
+    const p = g.player.body.pos.map(Math.floor);
+    // a small wall of stone and cobblestone to look at
+    for (let dx = -2; dx <= 2; dx++) for (let dy = 0; dy < 3; dy++) w.setBlock(p[0] + dx, p[1] + dy, p[2] - 3, (dx + dy) & 1 ? 1 : 9);
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 0; dz++) w.setBlock(p[0] + dx, p[1] - 1, p[2] + dz, 3);
+    g.player.teleport([p[0] + 0.5, p[1] + 0.2, p[2] + 0.5], 0.35, -0.3);
+  });
+  await page.keyboard.press('Escape');
+  await page.click('#btnSettingsP');
+  const input = await page.$('#packFile');
+  await input.uploadFile(join(root, 'test', 'fixtures', 'labpbr-test-pack.zip'));
+  await waitFor(() => /Using|Could not/.test(document.getElementById('packStatus').textContent), 30000, 'pack import');
+  const status = await G(() => document.getElementById('packStatus').textContent);
+  if (!/^Using/.test(status)) throw new Error(status);
+  await shot('13-pack-settings');
+  await page.click('#btnSettingsDone');
+  await page.click('#btnResume');
+  await new Promise((r) => setTimeout(r, 2500));
+  await shot('14-pack-pom');
+  const pack = await G(() => window.voxelwild.game.pack);
+  for (const l of ['Stone', 'Cobblestone', 'GrassTop', 'Leaves', 'Dirt']) if (!pack.found.includes(l)) throw new Error(`layer ${l} not taken from the pack: ${pack.found}`);
+  return { status, found: pack.found, size: pack.size };
+});
+
 await step('edits persist across a page reload', async () => {
   const mark = await G(async () => {
     const g = window.voxelwild.game, w = g.world;
@@ -363,7 +390,10 @@ await step('edits persist across a page reload', async () => {
   await waitFor(() => window.voxelwild.game.state === 'playing', 120000, 'reload into world');
   const b = await G((at) => window.voxelwild.game.world.getBlock(at[0], at[1], at[2]), mark);
   if (b !== 11) throw new Error(`expected bricks at ${mark}, found ${b}`);
-  return { bricksAt: mark };
+  const pack = await G(() => window.voxelwild.game.pack && window.voxelwild.game.pack.name);
+  if (pack !== 'labpbr-test-pack') throw new Error('resource pack not restored after reload: ' + pack);
+  await G(() => window.voxelwild.game.removePack());
+  return { bricksAt: mark, packRestored: pack };
 });
 
 await step('no console errors', async () => {
