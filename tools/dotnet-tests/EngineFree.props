@@ -7,7 +7,14 @@
     <EngineFree Include="$(Assets)/Scripts/Runtime/World/BlockId.cs" />
     <EngineFree Include="$(Assets)/Scripts/Runtime/World/Water/WaterSimulation.cs" />
     <EngineFree Include="$(Assets)/Scripts/Runtime/Environment/WeatherModel.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/World/BlockDefinition.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/World/Faces.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/Gameplay/Items.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/Gameplay/Inventory.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/Gameplay/Survival.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/Gameplay/RegionFile.cs" />
     <EngineFree Include="$(Assets)/Tests/EditMode/EnvironmentTests.cs" />
+    <EngineFree Include="$(Assets)/Tests/EditMode/GameplayTests.cs" />
     <EngineFree Include="$(Assets)/Tests/EditMode/WeatherTests.cs" />
     <EngineFree Include="$(Assets)/Tests/EditMode/WaterSimulationTests.cs" />
     <EngineFree Include="$(Assets)/Tests/EditMode/QualityPresetTests.cs" />

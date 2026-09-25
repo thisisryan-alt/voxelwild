@@ -6,7 +6,7 @@ namespace Voxelwild.World
 {
     /// <summary>
     /// Keeps player-edited sections alive across unload/reload, run-length encoded.
-    /// This is the in-memory half of world saving; writing it to disk arrives with world save/load.
+    /// The in-memory half of world saving; GameSession writes it to region files (Gameplay/RegionFile.cs).
     /// </summary>
     public sealed class ModifiedChunkStore
     {
@@ -15,6 +15,14 @@ namespace Voxelwild.World
         public int Count => _rle.Count;
 
         public bool Contains(int3 section) => _rle.ContainsKey(section);
+
+        /// <summary>Every stored section as (run length, block) pairs, for saving.</summary>
+        public IEnumerable<KeyValuePair<int3, ushort[]>> Entries => _rle;
+
+        /// <summary>Adds a section loaded from disk (runs as written by <see cref="Store"/>).</summary>
+        public void Import(int3 section, ushort[] runs) => _rle[section] = runs;
+
+        public void Clear() => _rle.Clear();
 
         public void Store(int3 section, NativeArray<ushort> voxels)
         {

@@ -4,9 +4,12 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.UIElements;
 using Voxelwild.Diagnostics;
+using Voxelwild.Gameplay;
 using Voxelwild.Player;
 using Voxelwild.Rendering;
+using Voxelwild.UI;
 using Voxelwild.World;
 using Voxelwild.World.Props;
 
@@ -21,6 +24,9 @@ namespace Voxelwild.EditorTools
         public const string ScenePath = "Assets/Scenes/World.unity";
         const string MaterialsFolder = "Assets/Art/Materials";
         const string RenderingSettingsFolder = "Assets/Settings/Rendering";
+        const string UIFolder = "Assets/UI";
+        /// <summary>Layer the item icon camera renders on; the player camera never draws it.</summary>
+        const int IconLayer = 31;
 
         /// <summary>Batch entry: texture arrays, then the scene that references them.</summary>
         [MenuItem("Voxelwild/Build All (Textures + Props + Scene)")]
@@ -36,6 +42,8 @@ namespace Voxelwild.EditorTools
         {
             Directory.CreateDirectory(MaterialsFolder);
             Directory.CreateDirectory(RenderingSettingsFolder);
+            Directory.CreateDirectory(UIFolder);
+            WriteTheme();
             AssetDatabase.Refresh();
 
             // New scene first: NewScene(Single) unloads unreferenced assets, which would
@@ -64,6 +72,10 @@ namespace Voxelwild.EditorTools
             var outline = MaterialAt(MaterialsFolder + "/SelectionOutline.mat", "Voxelwild/SelectionOutline");
             var sky = SkyMaterial();
             var volumeProfile = PostProfile();
+            var token = MaterialAt(MaterialsFolder + "/ItemToken.mat", "Universal Render Pipeline/Lit");
+            token.SetFloat("_Smoothness", 0.35f);
+            EditorUtility.SetDirty(token);
+            var panel = HudPanelSettings();
             AssetDatabase.SaveAssets();
 
             // Re-resolve everything from disk: objects created this call can be replaced on save/import,
@@ -75,6 +87,8 @@ namespace Voxelwild.EditorTools
             outline = Reload(outline);
             sky = Reload(sky);
             volumeProfile = Reload(volumeProfile);
+            token = Reload(token);
+            panel = Reload(panel);
 
             // --- sun & environment
             var sunGo = new GameObject("Sun");
@@ -130,6 +144,7 @@ namespace Voxelwild.EditorTools
             cam.farClipPlane = 1500f;
             cam.fieldOfView = 72f;
             cam.allowHDR = true;
+            cam.cullingMask = ~(1 << IconLayer);
             var camData = camGo.AddComponent<UniversalAdditionalCameraData>();
             camData.renderPostProcessing = true;
             camData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
@@ -148,8 +163,22 @@ namespace Voxelwild.EditorTools
             var underwater = playerGo.AddComponent<UnderwaterEffects>();
             Assign(underwater, ("player", controller), ("waterMaterial", water));
 
+            // --- game rules (Phase 7): survival stats and inventory, dropped items, saving
+            var survival = playerGo.AddComponent<PlayerSurvival>();
+            Assign(survival, ("player", controller));
+
+            var gameGo = new GameObject("Game");
+            var items = gameGo.AddComponent<ItemEntities>();
+            Assign(items, ("world", world), ("survival", survival), ("terrainMaterial", terrain), ("foliageMaterial", foliage),
+                ("tokenMaterial", token));
+            var icons = gameGo.AddComponent<ItemIcons>();
+            Assign(icons, ("terrainMaterial", terrain), ("foliageMaterial", foliage));
+            SetInt(icons, "iconLayer", IconLayer);
+            var session = gameGo.AddComponent<GameSession>();
+            Assign(session, ("world", world), ("player", controller), ("survival", survival), ("items", items), ("dayNight", dayNight));
+
             var interactor = playerGo.AddComponent<BlockInteractor>();
-            Assign(interactor, ("world", world), ("player", controller), ("outline", selection));
+            Assign(interactor, ("world", world), ("player", controller), ("outline", selection), ("survival", survival), ("items", items));
 
             // --- diagnostics
             var diagGo = new GameObject("Diagnostics");
@@ -173,6 +202,15 @@ namespace Voxelwild.EditorTools
             Assign(weather, ("dayNight", dayNight), ("environment", sunGo.GetComponent<EnvironmentLighting>()), ("quality", quality),
                 ("player", controller), ("world", world), ("sun", sun), ("precipitationShader", precipitation));
             Assign(hud, ("weather", weather));
+            Assign(session, ("weather", weather));
+
+            // --- UI
+            var uiGo = new GameObject("UI");
+            var doc = uiGo.AddComponent<UIDocument>();
+            doc.panelSettings = panel;
+            var gameHud = uiGo.AddComponent<GameHud>();
+            Assign(gameHud, ("player", controller), ("survival", survival), ("interactor", interactor), ("session", session),
+                ("icons", icons), ("debugHud", hud));
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -181,6 +219,36 @@ namespace Voxelwild.EditorTools
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
             Debug.Log("[WorldSceneBuilder] World scene rebuilt");
+        }
+
+        static void WriteTheme()
+        {
+            // runtime theme: Unity's default controls and font, nothing else (the HUD styles itself in code)
+            string path = UIFolder + "/VoxelwildTheme.tss";
+            const string content = "@import url(\"unity-theme://default\");\n";
+            if (!File.Exists(path) || File.ReadAllText(path) != content) File.WriteAllText(path, content);
+        }
+
+        static PanelSettings HudPanelSettings()
+        {
+            const string path = UIFolder + "/HudPanelSettings.asset";
+            var panel = AssetDatabase.LoadAssetAtPath<PanelSettings>(path);
+            if (panel == null)
+            {
+                panel = ScriptableObject.CreateInstance<PanelSettings>();
+                AssetDatabase.CreateAsset(panel, path);
+            }
+            AssetDatabase.ImportAsset(UIFolder + "/VoxelwildTheme.tss");
+            panel.themeStyleSheet = AssetDatabase.LoadAssetAtPath<ThemeStyleSheet>(UIFolder + "/VoxelwildTheme.tss");
+            if (panel.themeStyleSheet == null) Debug.LogError("[WorldSceneBuilder] UI theme did not import");
+            // layouts are authored at 1600×900 and scale with the window
+            panel.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+            panel.referenceResolution = new Vector2Int(1600, 900);
+            panel.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
+            panel.match = 0.5f;
+            panel.sortingOrder = 0;
+            EditorUtility.SetDirty(panel);
+            return panel;
         }
 
         static void BakeEnvironment()
@@ -428,6 +496,14 @@ namespace Voxelwild.EditorTools
             var loaded = string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<T>(path);
             if (loaded == null) throw new System.Exception($"asset {typeof(T).Name} at '{path}' could not be reloaded");
             return loaded;
+        }
+
+        static void SetInt(Object target, string field, int value)
+        {
+            var so = new SerializedObject(target);
+            var p = so.FindProperty(field) ?? throw new System.Exception($"{target.GetType().Name}.{field} not found");
+            p.intValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         static void Assign(Object target, params (string field, Object value)[] values)

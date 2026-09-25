@@ -4,6 +4,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using Voxelwild.Gameplay;
 using Voxelwild.Player;
 using Voxelwild.World;
 
@@ -104,6 +105,22 @@ namespace Voxelwild.Tests
             Assert.IsTrue(_interactor.TryBreak(ground));
             Assert.AreEqual(BlockId.Air, _world.GetBlockOrAir(torch), "torch drops when its support is broken");
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator DroppedItem_FallsAndIsPickedUp()
+        {
+            var items = Object.FindAnyObjectByType<ItemEntities>();
+            var survival = Object.FindAnyObjectByType<PlayerSurvival>();
+            Assert.IsNotNull(items);
+            Assert.IsNotNull(survival);
+            _player.InputEnabled = true;   // gravity only (no devices)
+            int before = survival.Inventory.Count(ItemId.Stick);
+            items.Spawn(ItemStack.Of(ItemId.Stick, 3), _player.Body.Position + new float3(0, 2f, 0), float3.zero);
+            float start = Time.time;
+            while (survival.Inventory.Count(ItemId.Stick) == before && Time.time - start < 5f) yield return null;
+            Assert.AreEqual(before + 3, survival.Inventory.Count(ItemId.Stick), "the dropped sticks should be picked up");
+            Assert.AreEqual(0, items.Count);
         }
 
         int SectionTriangles(int3 world)

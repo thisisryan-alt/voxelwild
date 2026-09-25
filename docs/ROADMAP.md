@@ -131,11 +131,26 @@ type-checked but not yet run in Unity.
 
 Y cycles the weather. Captures hold clear weather unless `-vwWeather Storm` (etc.) is given.
 
-## Phase 7 — Gameplay ⬜
+## Phase 7 — Gameplay 🟡
 
-- Mining time per block and tool, item drops, inventory and crafting.
-- World save/load to disk (region files holding the RLE sections), world creation UI.
-- Health, hunger and survival loop.
+The rules (items, mining times, inventory, crafting, survival stats, region files) are unit-tested outside
+Unity. The Unity side (session, dropped items, icons, HUD) is written and type-checked but not yet run in
+Unity. There is one new PlayMode test: dropped items are picked up.
+
+| Item | Status | Notes |
+|---|---|---|
+| Items | 🟡 | `ItemRegistry`: every block is an item (same id), plus sticks, coal, iron and gold chunks, diamonds, apples, berries, and wooden/stone/iron/diamond pickaxes, axes and shovels (ids 256+) |
+| Mining | 🟡 | `Mining.BreakSeconds` from block hardness, the right tool type and its tier; ores need a high enough pickaxe tier to drop anything; tools wear out |
+| Drops | 🟡 | `Drops`: stone → cobblestone, ores → chunks/coal/diamond, leaves sometimes drop apples, bushes drop berries, props drop logs. Items fall, settle and are picked up within 1.6 m; they despawn after 5 minutes |
+| Inventory | 🟡 | 36 slots with a 9-slot hotbar, stacks of 64 (tools don't stack). The E/Tab screen has click-to-move slots |
+| Crafting | 🟡 | shapeless recipes: planks from any log, sticks, torches, sandstone, bricks, and 12 tools. Recipes you can't make yet are greyed out |
+| Survival | 🟡 | Health 20, hunger 20 and breath 10. Walking, sprinting and jumping drain hunger. A full belly regenerates health and an empty one starves you. Falls further than 3 blocks hurt unless you land in water, and you drown once your breath runs out. On death you drop everything and respawn at your spawn point |
+| Creative | 🟡 | no damage or hunger, flying allowed, instant breaking, infinite blocks. The inventory screen becomes a block palette |
+| Saves | 🟡 | `{persistentDataPath}/saves/{name}/`: `world.json` (seed, mode, time, weather, player, inventory, removed props) and `regions/r.X.Z.bin` (32×32-column regions of edited sections, `VWRG` v1). Writes are atomic (temp file then replace). F5 saves; it also autosaves every 5 minutes and on quit |
+| HUD | 🟡 | UI Toolkit (`GameHud`): icon hotbar with counts and tool wear, health/hunger/breath bars, mining progress, toasts, death screen. Block icons are rendered from the real terrain materials |
+
+Editor Play, tests and captures run an unsaved creative sandbox, as before. `-vwWorld name [-vwNew] [-vwSeed n]
+[-vwMode Survival|Creative]` plays a saved world. The world select screen comes with the Phase 8 menus.
 
 ## Phase 8 — Polish ⬜
 

@@ -1,5 +1,4 @@
 using System;
-using Unity.Collections;
 
 namespace Voxelwild.World
 {
@@ -70,7 +69,7 @@ namespace Voxelwild.World
             face == Faces.PosY ? Top : face == Faces.NegY ? Bottom : Side;
     }
 
-    public static class BlockRegistry
+    public static partial class BlockRegistry
     {
         const BlockFlags Terrain = BlockFlags.Solid | BlockFlags.Opaque | BlockFlags.Breakable;
         const BlockFlags Plant = BlockFlags.Replaceable | BlockFlags.Breakable | BlockFlags.NeedsSupport;
@@ -174,11 +173,5 @@ namespace Voxelwild.World
 
         public static BlockDefinition Get(ushort id) => id < Table.Length ? Table[id].def : Table[0].def;
 
-        public static NativeArray<BlockDefinition> CreateNative(Allocator allocator)
-        {
-            var arr = new NativeArray<BlockDefinition>(Table.Length, allocator);
-            for (int i = 0; i < Table.Length; i++) arr[i] = Table[i].def;
-            return arr;
-        }
     }
 }

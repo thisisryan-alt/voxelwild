@@ -52,7 +52,16 @@ namespace Voxelwild.World
         [Tooltip("Sections within this many sections of the camera keep inner leaf faces.")]
         [SerializeField, Range(0, 8)] int fancyLeavesDistance = 2;
 
-        public uint Seed => seed;
+        /// <summary>World seed. Can only change before any terrain has been generated (GameSession sets it on load).</summary>
+        public uint Seed
+        {
+            get => seed;
+            set
+            {
+                if (_columns.Count > 0) { Debug.LogError("[VoxelWorld] the seed can't change once terrain exists", this); return; }
+                seed = value;
+            }
+        }
         public int ViewDistance { get => viewDistance; set => viewDistance = Mathf.Clamp(value, 3, 32); }
         public Transform Viewer { get => viewer; set => viewer = value; }
 
@@ -126,6 +135,7 @@ namespace Voxelwild.World
             _blocks = BlockRegistry.CreateNative(Allocator.Persistent);
             _propRules = PropRegistry.CreateNative(Allocator.Persistent);
             _props = new PropField(propLibrary);
+            _props.ImportRemoved(_pendingRemovedProps);
             _waterGrid = new WaterGrid(this);
             if (!_props.HasArt)
                 Debug.LogWarning("[VoxelWorld] no prop library: props are placed (cores, barriers) but not drawn. " +
@@ -203,6 +213,37 @@ namespace Voxelwild.World
             StartMeshing();
             JobHandle.ScheduleBatchedJobs();
         }
+
+        // ------------------------------------------------------------------ saving
+
+        /// <summary>
+        /// Every section the player changed, loaded or not, as run-length pairs. Loaded sections are encoded fresh,
+        /// so the result is current.
+        /// </summary>
+        public IEnumerable<KeyValuePair<int3, ushort[]>> ExportEdits()
+        {
+            foreach (var col in _columns.Values)
+            {
+                if (col.State != ColumnState.Ready) continue;
+                foreach (var s in col.Sections)
+                    if (s != null && s.Modified && !s.IsUniform) _modified.Store(s.Coord, s.Voxels);
+            }
+            return _modified.Entries;
+        }
+
+        /// <summary>Loads saved edits; call before terrain streams in (they apply as columns load).</summary>
+        public void ImportEdits(IEnumerable<KeyValuePair<int3, ushort[]>> sections)
+        {
+            foreach (var kv in sections) _modified.Import(kv.Key, kv.Value);
+        }
+
+        public IEnumerable<int3> RemovedProps => _props != null ? _props.Removed : System.Array.Empty<int3>();
+        public void ImportRemovedProps(IEnumerable<int3> anchors)
+        {
+            _pendingRemovedProps.AddRange(anchors);
+            _props?.ImportRemoved(anchors);
+        }
+        readonly List<int3> _pendingRemovedProps = new List<int3>();
 
         // ------------------------------------------------------------------ water
 

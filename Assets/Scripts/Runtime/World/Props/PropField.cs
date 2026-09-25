@@ -64,6 +64,10 @@ namespace Voxelwild.World.Props
         /// <summary>Multiplies every draw and LOD distance (quality presets).</summary>
         public float DistanceScale { get; set; } = 1f;
         public int Loaded { get; private set; }
+
+        /// <summary>Anchors of props the player removed, so they stay gone (saved with the world).</summary>
+        public IEnumerable<int3> Removed => _removed;
+        public void ImportRemoved(IEnumerable<int3> anchors) { foreach (var a in anchors) _removed.Add(a); }
         public int Drawn { get; private set; }
         public bool HasArt => _entries.Count > 0;
 

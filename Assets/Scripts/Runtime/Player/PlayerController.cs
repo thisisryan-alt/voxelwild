@@ -38,13 +38,36 @@ namespace Voxelwild.Player
         public float Yaw { get; private set; }
         public float Pitch { get; private set; }
         public Transform CameraPivot => cameraPivot;
+
+        /// <summary>Where to appear instead of the generated spawn point (a loaded save); set before Start.</summary>
+        public float3? SpawnOverride { get; set; }
+        public float2 SpawnLook { get; set; }
+        /// <summary>Creative allows flying (F, double-tap space); survival doesn't.</summary>
+        public bool CanFly { get; set; } = true;
+        public bool Sprinting { get; private set; }
+        /// <summary>Jumps and horizontal metres travelled since the last <see cref="ConsumeActivity"/> (hunger).</summary>
+        public int Jumps { get; private set; }
+        public float Distance { get; private set; }
+        /// <summary>Raised on landing: fall height in blocks, and whether the landing was in water.</summary>
+        public event System.Action<float, bool> Landed;
+
+        float _fallStart = float.NaN;
+
+        public (int jumps, float distance) ConsumeActivity()
+        {
+            var r = (Jumps, Distance);
+            Jumps = 0;
+            Distance = 0f;
+            return r;
+        }
         public float3 EyePosition => Body.Position + new float3(0, eyeHeight, 0);
 
         float _lastSpaceTap = -1f;
 
         void Start()
         {
-            Body.Position = world.FindSpawnPoint();
+            Body.Position = SpawnOverride ?? world.FindSpawnPoint();
+            if (SpawnOverride.HasValue) { Yaw = SpawnLook.x; Pitch = SpawnLook.y; }
             world.Viewer = transform;
             SyncTransform();
         }
@@ -116,10 +139,10 @@ namespace Voxelwild.Player
                 sprint = kb.leftCtrlKey.isPressed;
                 descend = kb.leftShiftKey.isPressed;
 
-                if (kb.fKey.wasPressedThisFrame) Flying = !Flying;
+                if (CanFly && kb.fKey.wasPressedThisFrame) Flying = !Flying;
                 if (kb.spaceKey.wasPressedThisFrame)
                 {
-                    if (Time.unscaledTime - _lastSpaceTap < 0.3f) Flying = !Flying;
+                    if (CanFly && Time.unscaledTime - _lastSpaceTap < 0.3f) Flying = !Flying;
                     _lastSpaceTap = Time.unscaledTime;
                 }
             }
@@ -161,12 +184,42 @@ namespace Voxelwild.Player
                 float k = 1f - math.exp(-accel * dt);
                 v.x = math.lerp(v.x, wish.x * speed, k);
                 v.z = math.lerp(v.z, wish.z * speed, k);
-                if (grounded && jump && v.y <= 0.01f) v.y = math.sqrt(2f * gravity * jumpHeight);
+                if (grounded && jump && v.y <= 0.01f) { v.y = math.sqrt(2f * gravity * jumpHeight); Jumps++; }
                 v.y = math.max(v.y - gravity * dt, -60f);
             }
+            if (!CanFly) Flying = false;
+            Sprinting = sprint && math.lengthsq(input) > 0 && !Flying;
 
+            float3 before = Body.Position;
             Body.Move(world, v * dt);
+            Distance += math.length((Body.Position - before).xz);
             if (Flying && Body.Grounded && !jump) Flying = false;   // landing ends flight
+            TrackFall();
+        }
+
+        /// <summary>Measures falls from the highest point since leaving the ground; water and flight cancel them.</summary>
+        void TrackFall()
+        {
+            if (Flying || InWater)
+            {
+                if (!float.IsNaN(_fallStart) && InWater) Landed?.Invoke(_fallStart - Body.Position.y, true);
+                _fallStart = float.NaN;
+                return;
+            }
+            if (Body.Grounded)
+            {
+                if (!float.IsNaN(_fallStart)) Landed?.Invoke(_fallStart - Body.Position.y, false);
+                _fallStart = float.NaN;
+            }
+            else _fallStart = float.IsNaN(_fallStart) ? Body.Position.y : math.max(_fallStart, Body.Position.y);
+        }
+
+        /// <summary>Back to a spawn point after death.</summary>
+        public void Respawn(float3 feet)
+        {
+            Teleport(feet, Yaw, 0f);
+            Flying = false;
+            _fallStart = float.NaN;
         }
 
         void SyncTransform()
