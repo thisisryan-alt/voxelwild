@@ -17,6 +17,7 @@ namespace Voxelwild.Diagnostics
         [SerializeField] BlockInteractor interactor;
         [SerializeField] Voxelwild.Rendering.DayNightCycle dayNight;
         [SerializeField] Voxelwild.Rendering.QualityManager quality;
+        [SerializeField] Voxelwild.Rendering.WeatherSystem weather;
         [SerializeField] bool showStats = true;
 
         public bool Hidden { get; set; }
@@ -57,6 +58,15 @@ namespace Voxelwild.Diagnostics
             var st = dayNight.State;
             return $"day {(int)dayNight.Days}  {(int)h:00}:{(int)(h % 1f * 60f):00}{(dayNight.Paused ? " (paused)" : "")}  " +
                    $"sun {st.SunElevationDeg:0}°  moon {st.MoonIllumination * 100f:0}%";
+        }
+
+        string WeatherLine()
+        {
+            if (weather == null || weather.Model == null) return "weather -";
+            var m = weather.Model;
+            string fall = m.Params.Precipitation > 0.05f ? (weather.Cold ? " snowing" : " raining") : "";
+            return $"weather {m.Current}{fall}{(weather.Covered ? " (under cover)" : "")}  wet {m.Wetness * 100f:0}%  " +
+                   $"puddles {m.Puddles * 100f:0}%  snow {m.SnowCover * 100f:0}%";
         }
 
         void OnGUI()
@@ -103,14 +113,15 @@ namespace Voxelwild.Diagnostics
                 $"sections drawn {world.RenderedSections} (occlusion-culled {world.OcclusionCulledSections})  tris {world.RenderedTriangles / 1000}k  edited {world.ModifiedSections}\n" +
                 $"props drawn {world.PropsDrawn} of {world.PropsLoaded}  water cells pending {world.WaterPending}\n" +
                 $"{Clock()}  quality {(quality != null ? quality.Current.Name : "-")}\n" +
+                $"{WeatherLine()}\n" +
                 $"target {target}\n" +
                 "<size=12>WASD move · Space jump (double-tap: fly) · Ctrl sprint · Shift descend · F fly\n" +
                 "LMB break · RMB place · 1-9/scroll select · Esc release mouse · F3 stats · F1 hide HUD\n" +
-                "T +1 hour (Shift: −1) · P pause time · F4 quality preset</size>";
+                "T +1 hour (Shift: −1) · P pause time · F4 quality preset · Y next weather</size>";
             GUI.color = new Color(0, 0, 0, 0.45f);
-            GUI.DrawTexture(new Rect(8, 8, 560, 239), _white);
+            GUI.DrawTexture(new Rect(8, 8, 560, 256), _white);
             GUI.color = Color.white;
-            GUI.Label(new Rect(16, 12, 548, 235), text, _label);
+            GUI.Label(new Rect(16, 12, 548, 252), text, _label);
         }
     }
 }

@@ -115,11 +115,21 @@ type-checked but not yet run in Unity.
 | Underwater | 🟡 | `UnderwaterEffects`: close fog in the water's colour, dimmed at night |
 | Splashes and ripples from entities | ⬜ | with the VFX work in Phase 8 |
 
-## Phase 6 — Weather ⬜
+## Phase 6 — Weather 🟡
 
-- Clear, cloudy, rain, heavy rain, storm, snow, fog, thunder and wind states with blended transitions.
-- Wetness and puddles in the terrain shader, snow accumulation, and wind (already a global:
-  `_VoxelWind`) driven by weather.
+The weather model is unit-tested outside Unity; the system, particles and shader hooks are written and
+type-checked but not yet run in Unity.
+
+| Item | Status | Notes |
+|---|---|---|
+| Weather states | 🟡 | `WeatherModel`: clear, cloudy, rain, heavy rain, storm, fog as a seeded Markov chain (4–12 minutes each), blended over a minute |
+| Snow | 🟡 | precipitation falls as snow where the local biome temperature or altitude is cold |
+| Clouds, light, fog, wind | 🟡 | weather drives cloud cover and density, sun/moon strength, height fog and fog range, wind and gusts (foliage sway and cloud drift follow) |
+| Wetness, puddles, snow cover | 🟡 | lag the sky: wet after a minute of rain, puddles only on soaked ground, snow settles and melts with warmth and sun; terrain and props darken, gloss, pool and whiten (Phase 4 shader hooks) |
+| Rain and snow particles | 🟡 | around the camera, drifting with the wind, stopped under roofs and canopies (sky heightmap) |
+| Thunder and lightning | 🟡 | strikes every ~14 s in storms: ambient and light flash; the thunder sound comes with the Phase 8 audio |
+
+Y cycles the weather. Captures hold clear weather unless `-vwWeather Storm` (etc.) is given.
 
 ## Phase 7 — Gameplay ⬜
 

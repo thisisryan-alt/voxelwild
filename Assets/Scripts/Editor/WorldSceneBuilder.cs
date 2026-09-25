@@ -166,6 +166,14 @@ namespace Voxelwild.EditorTools
             if (pcRenderer != null) Assign(quality, ("rendererData", pcRenderer));
             Assign(hud, ("dayNight", dayNight), ("quality", quality));
 
+            var weatherGo = new GameObject("Weather");
+            var weather = weatherGo.AddComponent<WeatherSystem>();
+            var precipitation = Shader.Find("Voxelwild/Precipitation");
+            if (precipitation == null) throw new System.Exception("shader Voxelwild/Precipitation not found");
+            Assign(weather, ("dayNight", dayNight), ("environment", sunGo.GetComponent<EnvironmentLighting>()), ("quality", quality),
+                ("player", controller), ("world", world), ("sun", sun), ("precipitationShader", precipitation));
+            Assign(hud, ("weather", weather));
+
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
 
