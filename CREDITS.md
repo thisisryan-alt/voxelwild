@@ -41,3 +41,18 @@ The source maps live in `SourceArt/Textures/ambientCG/` (Git LFS) and are packed
 The Phase 3 props (rocks, cave formations, dead wood, plant and mushroom clumps) are generated procedurally
 by `tools/blender/` (original to this project). In-game they are textured with the scans above: rock with
 Rock058, cave formations with Rock053, wood with the bark scans and the log-top set, moss with Moss002.
+
+## Built-in resource packs (browser build)
+
+Selectable in Settings ▸ Block textures. Built by `web/tools/build_packs.py`.
+
+- **Voxelwild Photoreal**: photogrammetry scans from [Poly Haven](https://polyhaven.com), all **CC0**:
+  rock_surface, dirt, leafy_grass, sand_01, river_small_rocks, snow_02, dark_rock, cobblestone_floor_08,
+  wood_planks, red_brick, bark_brown_02, tree_bark_03, pine_bark, jolcham_oak_bark_01, old_sandstone_02,
+  red_laterite_soil_stones, brown_mud_02. The ore textures are composed from rock_surface in this project.
+- **Soothing 32** by **Zughy**, licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+  ([ContentDB](https://content.luanti.org/packages/Zughy/soothing32/),
+  [source](https://gitlab.com/zughy-friends-minetest/soothing-32)). Changes: renamed to Minecraft texture
+  names, upscaled 16× with nearest-neighbour; bedrock and mud are darkened copies of its stone and dirt; the
+  ores are its mineral overlays composited on its stone. The adapted textures
+  (`web/assets/pack_soothing32_color.webp`) are shared under the same licence.

@@ -3,7 +3,7 @@
 import { ITEMS, Kind, itemName, RECIPES } from '../shared/blocks.js';
 import { canCraft, craft, HOTBAR, INV_SIZE, MAX_AIR } from './gameplay.js';
 import { loadSettings, storeSettings } from './save.js';
-import { PACK_NAMES } from './respack.js';
+import { PACK_NAMES, listBuiltinPacks } from './respack.js';
 
 const $ = (id) => document.getElementById(id);
 const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, volume: 0.8, sfx: 1, ambience: 0.7, particles: 1,
@@ -376,6 +376,17 @@ export class UI {
       this.loadPack(f);
     });
     this.packOpts = opts;
+    // the packs that ship with the game: one button each, plus Default (the game's own textures)
+    listBuiltinPacks(g.assetBase).then((list) => {
+      const row = $('builtinPacks');
+      for (const p of list) {
+        const b = document.createElement('button');
+        b.dataset.pack = p.id; b.textContent = p.name; b.title = `${p.description}\n${p.credit}`;
+        row.appendChild(b);
+      }
+      for (const b of row.querySelectorAll('button')) b.onclick = () => this.useBuiltin(b.dataset.pack);
+      this.renderPack();
+    });
   }
 
   async loadPack(file) {
@@ -396,8 +407,26 @@ export class UI {
     this.renderPack();
   }
 
+  async useBuiltin(id) {
+    const g = this.game;
+    const buttons = $('builtinPacks').querySelectorAll('button');
+    buttons.forEach((b) => { b.disabled = true; });
+    $('packStatus').textContent = id ? 'Loading the pack…' : '';
+    try {
+      if (id) {
+        const info = await g.useBuiltinPack(id);
+        $('packStatus').textContent = `Using ${info.found.length} block textures at ${info.source}×${info.source}. ${info.credit}`;
+      } else if (g.pack) { await g.removePack(); $('packStatus').textContent = 'Back to the default textures.'; }
+    } catch (e) { $('packStatus').textContent = `Could not load the pack: ${e.message}`; }
+    buttons.forEach((b) => { b.disabled = false; });
+    this.paletteBuilt = false; this.renderPack(); this.renderHotbar();
+  }
+
   renderPack() {
     const p = this.game.pack;
+    const current = p ? (p.builtin || '#file') : '';
+    for (const b of $('builtinPacks').querySelectorAll('button')) b.classList.toggle('on', b.dataset.pack === current);
+    $('sPackDX').disabled = $('sPackOld').disabled = !!(p && p.builtin);
     $('packName').textContent = p ? p.name : 'Built-in textures';
     $('btnPackRemove').hidden = !p;
     if (p) {

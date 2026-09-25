@@ -1,0 +1,95 @@
+[
+ {
+  "id": "photoreal",
+  "name": "Voxelwild Photoreal",
+  "description": "Photo-scanned rock, soil, wood and brick at 512x512 with height, normal, AO and roughness maps.",
+  "credit": "Scans: Poly Haven (polyhaven.com), CC0. Ores composed from the stone scan.",
+  "license": "CC0",
+  "size": 512,
+  "names": [
+   "stone",
+   "dirt",
+   "grass_block_top",
+   "sand",
+   "gravel",
+   "snow",
+   "bedrock",
+   "cobblestone",
+   "oak_planks",
+   "bricks",
+   "oak_log",
+   "birch_log",
+   "spruce_log",
+   "jungle_log",
+   "sandstone",
+   "red_sandstone",
+   "mud",
+   "coal_ore",
+   "iron_ore",
+   "gold_ore",
+   "diamond_ore"
+  ],
+  "opts": {
+   "normalYDown": false,
+   "oldPbr": false
+  },
+  "strips": {
+   "color": "pack_photoreal_color.webp",
+   "data": "pack_photoreal_data.webp"
+  },
+  "dataChannels": [
+   "nx",
+   "ny",
+   "ao",
+   "height",
+   "smooth",
+   "f0"
+  ]
+ },
+ {
+  "id": "soothing32",
+  "name": "Soothing 32",
+  "description": "Clean 16x pixel art in a 32-colour palette: the top-rated pack on ContentDB.",
+  "credit": "Soothing 32 by Zughy, CC BY-SA 4.0 (content.luanti.org/packages/Zughy/soothing32). Bedrock, mud and ores composed from its stone and dirt.",
+  "license": "CC-BY-SA-4.0",
+  "size": 256,
+  "names": [
+   "stone",
+   "dirt",
+   "grass_block_top",
+   "sand",
+   "gravel",
+   "snow",
+   "cobblestone",
+   "oak_planks",
+   "bricks",
+   "oak_log",
+   "birch_log",
+   "spruce_log",
+   "jungle_log",
+   "oak_log_top",
+   "oak_leaves",
+   "spruce_leaves",
+   "sandstone",
+   "red_sandstone",
+   "ice",
+   "short_grass",
+   "poppy",
+   "dandelion",
+   "dead_bush",
+   "bedrock",
+   "mud",
+   "coal_ore",
+   "iron_ore",
+   "gold_ore",
+   "diamond_ore"
+  ],
+  "opts": {
+   "normalYDown": false,
+   "oldPbr": false
+  },
+  "strips": {
+   "color": "pack_soothing32_color.webp"
+  }
+ }
+]

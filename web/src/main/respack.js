@@ -27,6 +27,51 @@ const MC_TINT = { GrassTop: [0x91, 0xbd, 0x59], GrassTuft: [0x91, 0xbd, 0x59], L
 
 export const MAX_RES = 512;
 
+// ---------------------------------------------------------------- built-in packs (assets/packs.json)
+
+/**
+ * Fetches one of the packs that ship with the page (built by web/tools/build_packs.py) and returns it in the
+ * same shape readPackZip gives, with the textures already decoded: colour strip -> <name>, and for PBR packs
+ * the greyscale data strip's columns (normal x/y, AO, height, smoothness, F0) -> <name>_n and <name>_s.
+ */
+export async function fetchBuiltinPack(assetBase, id) {
+  const list = await (await fetch(assetBase + 'packs.json')).json();
+  const def = list.find((p) => p.id === id);
+  if (!def) throw new Error(`No built-in pack "${id}"`);
+  const bitmap = async (file) => {
+    const res = await fetch(assetBase + file);
+    if (!res.ok) throw new Error(`Could not load ${file} (${res.status})`);
+    return decodeLarge(await createImageBitmap(await res.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }));
+  };
+  const S = def.size, T = S * S * 4;
+  const color = await bitmap(def.strips.color);
+  const data = def.strips.data ? await bitmap(def.strips.data) : null;
+  const ch = def.dataChannels || [];
+  const images = {};
+  def.names.forEach((name, i) => {
+    images[name] = { w: S, h: S, data: color.data.slice(i * T, (i + 1) * T) };
+    if (!data) return;
+    const n = new Uint8Array(T), sp = new Uint8Array(T), W = data.w;
+    const col = (k) => ch.indexOf(k) * S;
+    for (let y = 0; y < S; y++) {
+      const row = (i * S + y) * W;
+      for (let x = 0; x < S; x++) {
+        const o = (x + y * S) * 4, at = (c) => data.data[(row + col(c) + x) * 4];
+        n[o] = at('nx'); n[o + 1] = at('ny'); n[o + 2] = at('ao'); n[o + 3] = at('height');
+        sp[o] = at('smooth'); sp[o + 1] = at('f0'); sp[o + 2] = 0; sp[o + 3] = 255;
+      }
+    }
+    images[`${name}_n`] = { w: S, h: S, data: n };
+    images[`${name}_s`] = { w: S, h: S, data: sp };
+  });
+  return { name: def.name, description: def.description, credit: def.credit, builtin: def.id, images, opts: def.opts, icon: null };
+}
+
+/** The list of built-in packs (id, name, description, credit), or [] when the page ships none. */
+export async function listBuiltinPacks(assetBase) {
+  try { const r = await fetch(assetBase + 'packs.json'); return r.ok ? await r.json() : []; } catch { return []; }
+}
+
 // ---------------------------------------------------------------- reading
 
 /** Reads the block textures (+ _n/_s maps, pack.mcmeta, pack.png) out of a pack ZIP. */
@@ -66,6 +111,23 @@ function decoder() {
 export async function decodePNG(bytes) {
   const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/png' }), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
   return decodeBitmap(bmp);
+}
+/**
+ * Like decodeBitmap, for images of any size: taller than the GPU's texture limit (8192 on many GPUs; the game's
+ * texture strips are ~9000-11000 px tall) it decodes horizontal bands and joins them.
+ */
+export async function decodeLarge(bmp) {
+  const { gl } = decoder();
+  const max = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  if (bmp.height <= max && bmp.width <= max) return decodeBitmap(bmp);
+  if (bmp.width > max) throw new Error(`Image is ${bmp.width} px wide; this GPU allows ${max}.`);
+  const w = bmp.width, h = bmp.height, data = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y += max) {
+    const band = await createImageBitmap(bmp, 0, y, w, Math.min(max, h - y), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+    data.set(decodeBitmap(band).data, y * w * 4);
+    band.close && band.close();
+  }
+  return { w, h, data };
 }
 export function decodeBitmap(bmp) {
   const { gl, tex, fb } = decoder();
@@ -115,11 +177,14 @@ export async function convertPack(pack, builtin, opts = {}) {
   let res = 0;
   for (let i = 0; i < n; i++) {
     const names = PACK_NAMES[LAYER_NAMES[i]] || [];
-    const name = names.find((nm) => pack.files[nm]);
+    // built-in packs arrive already decoded (pack.images); a player's ZIP as PNG bytes (pack.files)
+    const has = (nm) => !!((pack.images && pack.images[nm]) || (pack.files && pack.files[nm]));
+    const get = async (nm) => (pack.images && pack.images[nm]) || (pack.files && pack.files[nm] ? decodePNG(pack.files[nm]) : null);
+    const name = names.find(has);
     if (!name) { layers.push(null); continue; }
-    const albedo = await decodePNG(pack.files[name]);
-    const normal = pack.files[`${name}_n`] ? await decodePNG(pack.files[`${name}_n`]) : null;
-    const spec = pack.files[`${name}_s`] ? await decodePNG(pack.files[`${name}_s`]) : null;
+    const albedo = await get(name);
+    const normal = await get(`${name}_n`);
+    const spec = await get(`${name}_s`);
     layers.push({ name, albedo, normal, spec });
     found.push(LAYER_NAMES[i]);
     res = Math.max(res, albedo.w);

@@ -111,6 +111,7 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); b
 .settings .full { grid-column: 1 / -1; }
 .pack { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; border-top: 1px solid var(--line); }
 .pack-row { display: flex; gap: 12px; align-items: center; }
+.pack button.on { border-color: var(--accent, #ffed99); color: var(--accent, #ffed99); }
 .pack-icon { width: 48px; height: 48px; flex: none; border-radius: 4px; background: rgba(0, 0, 0, 0.35) center / cover no-repeat; border: 1px solid var(--line); image-rendering: pixelated; }
 #dropHint { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(8, 12, 10, 0.72); font: 600 20px var(--body); z-index: 20; border: 3px dashed var(--accent); }
 .check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 14px; }
@@ -237,6 +238,9 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); b
               <b id="packName">Built-in textures</b>
               <span class="hint" id="packInfo">Load a Minecraft Java resource pack (.zip), for example a 128x LabPBR pack with normal, height and specular maps. It stays in this browser and is not uploaded anywhere.</span>
             </div>
+          </div>
+          <div class="row" id="builtinPacks">
+            <button data-pack="">Default</button>
           </div>
           <div class="row">
             <button id="btnPackLoad">Load resource pack…</button>

@@ -5,7 +5,8 @@
   "description": "Browser build of Voxelwild (WebGL2 + Web Workers), published as a Claude artifact",
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node test/run.mjs"
+    "test": "node test/run.mjs",
+    "test:packs": "node test/packs.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.10",

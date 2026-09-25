@@ -31,6 +31,21 @@ node test/shots.mjs      # screenshots into test/out/
 blender -b -P web/tools/export_props.py   # re-export props after changing the Blender assets
 ```
 
+## Resource packs
+
+Settings ▸ Block textures switches between the game's own textures and two built-in packs, and can load any
+Minecraft Java resource pack ZIP (LabPBR normals, height and specular are used; it stays in the browser).
+
+| Pack | What it is | Licence |
+| --- | --- | --- |
+| Voxelwild Photoreal | Poly Haven photo scans at 512×512 with normal, AO, height (parallax) and roughness; ores composed from the stone scan | CC0 |
+| Soothing 32 | Zughy's pixel-art pack, the top-rated pack on ContentDB, upscaled with hard edges | CC BY-SA 4.0 |
+
+`python web/tools/build_packs.py` downloads the sources and rebuilds `assets/pack_*.webp` and `assets/packs.json`;
+`node test/packs.mjs` switches through every pack in Chrome, screenshots each and checks the choice survives a
+reload. Famous commercial packs (Faithful, Patrix, Stratum, ...) can't be shipped with the game, but players who
+own them can load them with *Load resource pack…*.
+
 ## Controls
 
 WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·

@@ -8,7 +8,7 @@ import { Inventory, SurvivalStats, Weather, CREATIVE_HOTBAR, HOTBAR, WEATHER_NAM
 import { GameAudio } from './audio.js';
 import { Icons } from './icons.js';
 import { SaveStore, PackStore } from './save.js';
-import { readPackZip, convertPack, decodeBitmap } from './respack.js';
+import { readPackZip, convertPack, decodeLarge, fetchBuiltinPack } from './respack.js';
 import { LAYER_TUNING, LAYER_NAMES } from '../shared/blocks.js';
 import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, breakSeconds, drops, canHarvest, itemName, layerFor } from '../shared/blocks.js';
 import { terrainFor } from '../shared/gen.js';
@@ -81,7 +81,11 @@ export class Game {
     // a resource pack the player loaded earlier
     try {
       const saved = await PackStore.get();
-      if (saved) { progress && progress('Applying your resource pack', 0.8); await this.applyPack(saved, false); }
+      if (saved) {
+        progress && progress('Applying your resource pack', 0.8);
+        // built-in packs are stored by id only and fetched again from the page's assets
+        await this.applyPack(saved.builtin ? await fetchBuiltinPack(this.assetBase, saved.builtin) : saved, false);
+      }
     } catch (e) { console.warn('saved resource pack could not be applied:', e); }
     progress && progress('Ready', 1);
   }
@@ -98,11 +102,19 @@ export class Game {
     return { ...info, stored };
   }
 
+  /** Switches to one of the packs that ship with the game (Settings > Block textures). */
+  async useBuiltinPack(id) {
+    const pack = await fetchBuiltinPack(this.assetBase, id);
+    const info = await this.applyPack(pack, true);
+    await PackStore.put({ builtin: id, name: pack.name, opts: pack.opts });
+    return info;
+  }
+
   /** Converts a pack (from a ZIP or from storage) into the block materials. */
   async applyPack(pack, fresh) {
     if (!this.builtinRaw) {
-      const d = (bmp) => decodeBitmap(bmp).data;
-      this.builtinRaw = { size: this.builtin.albedo.width, albedo: d(this.builtin.albedo), normal: d(this.builtin.normal), mask: d(this.builtin.mask) };
+      const d = async (bmp) => (await decodeLarge(bmp)).data;   // the strips are taller than some GPUs' texture limit
+      this.builtinRaw = { size: this.builtin.albedo.width, albedo: await d(this.builtin.albedo), normal: await d(this.builtin.normal), mask: await d(this.builtin.mask) };
     }
     const conv = await convertPack(pack, this.builtinRaw, pack.opts || {});
     const n = LAYER_NAMES.length;
@@ -119,7 +131,7 @@ export class Game {
     this.renderer.uploadAtlas(this.icons.canvas);
     if (this.packIcon) URL.revokeObjectURL(this.packIcon);
     this.packIcon = pack.icon ? URL.createObjectURL(new Blob([pack.icon], { type: 'image/png' })) : null;
-    this.pack = { name: pack.name, description: pack.description, found: conv.found, size: conv.size, source: conv.source, opts: pack.opts || {} };
+    this.pack = { name: pack.name, description: pack.description, credit: pack.credit || '', builtin: pack.builtin || null, found: conv.found, size: conv.size, source: conv.source, opts: pack.opts || {} };
     this.emit('inventory'); this.emit('pack', this.pack);
     return this.pack;
   }
@@ -139,7 +151,7 @@ export class Game {
   /** Re-applies the stored pack with other options (normal convention, specular format). */
   async repackWith(opts) {
     const saved = await PackStore.get();
-    if (!saved) return null;
+    if (!saved || saved.builtin) return null;   // built-in packs carry their own conventions
     saved.opts = opts;
     await PackStore.put(saved);
     return this.applyPack(saved, false);
