@@ -144,9 +144,11 @@ export class Icons {
       const [dark, light] = matCol(def.tier);
       handle();
       if (def.tool === ToolType.Pickaxe) {
-        const head = [[3, 2], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 2], [11, 2], [12, 3], [12, 4], [13, 5], [13, 6], [14, 7], [14, 8], [2, 3], [1, 4]];
-        for (const [x, y] of head) px(x, y, 1, 2, light);
-        for (const [x, y] of head.slice(0, 8)) px(x, y + 1, 1, 1, dark);
+        // a curved head centred on the handle's tip, bulging away from it
+        const outer = [[4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 2], [10, 2], [11, 3], [12, 4], [13, 5], [13, 6], [14, 7], [14, 8], [14, 9], [14, 10]];
+        const inner = [[5, 2], [6, 2], [7, 2], [8, 2], [9, 3], [10, 3], [11, 4], [12, 5], [12, 6], [13, 7], [13, 8], [13, 9]];
+        for (const [x, y] of outer) px(x, y, 1, 1, light);
+        for (const [x, y] of inner) px(x, y, 1, 1, dark);
       } else if (def.tool === ToolType.Axe) {
         for (let y = 1; y < 8; y++) px(7, y, 5 - Math.abs(4 - y) + 2, 1, y < 3 ? light : dark);
         px(12, 2, 1, 5, light);

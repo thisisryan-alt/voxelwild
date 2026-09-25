@@ -56,6 +56,8 @@ const hold = async (setup, ms, teardown) => { await G(setup); await new Promise(
 await step('boot', async () => {
   await page.goto(url, { waitUntil: 'load' });
   await waitFor(() => window.voxelwild && window.voxelwild.game.icons, 30000, 'textures');
+  await waitFor(() => window.voxelwild.game.state === 'menu', 60000, 'title backdrop');
+  await new Promise((r) => setTimeout(r, 1500));
   const gl = await G(() => { const r = window.voxelwild.game.renderer.gl; const d = r.getExtension('WEBGL_debug_renderer_info'); return d ? r.getParameter(d.UNMASKED_RENDERER_WEBGL) : 'unknown'; });
   await shot('01-title');
   return { gl };
@@ -193,11 +195,151 @@ await step('creative flight and far streaming', async () => {
   return await G(() => window.voxelwild.game.debugInfo());
 });
 
+await step('creative palette and pause menu', async () => {
+  await page.keyboard.press('KeyE');
+  await new Promise((r) => setTimeout(r, 300));
+  const r = await G(() => {
+    const pal = document.getElementById('palette');
+    if (pal.hidden) return 'palette hidden in creative';
+    const cell = pal.querySelector('[data-item="11"]');
+    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    const slot = document.querySelector('#invMain .slot[data-slot="20"]');
+    slot.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    const s = window.voxelwild.game.inventory.slots[20];
+    return s ? { item: s.item, count: s.count } : 'nothing placed in slot';
+  });
+  await shot('11-creative-inventory');
+  await page.keyboard.press('KeyE');
+  if (typeof r === 'string') throw new Error(r);
+  await page.keyboard.press('Escape');
+  await new Promise((r) => setTimeout(r, 300));
+  const paused = await G(() => window.voxelwild.ui.screen);
+  await shot('12-pause');
+  await page.click('#btnResume');
+  const resumed = await G(() => window.voxelwild.ui.screen);
+  if (paused !== 'pause' || resumed !== 'playing') throw new Error(`pause flow: ${paused} -> ${resumed}`);
+  return { ...r, paused, resumed };
+});
+
+await step('tool tiers: stone needs a pickaxe', async () => {
+  const r = await G(async () => {
+    const g = window.voxelwild.game, w = g.world;
+    g.setMode(false); g.player.flying = false;
+    g.player.teleport(g.spawn, 0, 0);
+    await new Promise((res) => setTimeout(res, 1500));
+    // a stone block right in front of the player, at eye level
+    const eye = g.player.eye();
+    const bx = Math.floor(eye[0]), by = Math.floor(eye[1]), bz = Math.floor(eye[2]) - 2;
+    w.setBlock(bx, by, bz, 1); w.setBlock(bx, by, bz + 1, 0);
+    g.player.yaw = 0; g.player.pitch = 0;
+    await new Promise((res) => setTimeout(res, 600));
+    const hit = g.target && g.target.hit.join(',');
+    const mineFor = async (ms) => { g.mouse.left = true; await new Promise((res) => setTimeout(res, ms)); g.mouse.left = false; await new Promise((res) => setTimeout(res, 900)); };
+    g.inventory.slots[2] = null; g.select(2);
+    const c0 = g.inventory.count(9);
+    await mineFor(8000);
+    const handBroke = w.getBlock(bx, by, bz) === 0, handDrop = g.inventory.count(9) - c0;
+    w.setBlock(bx, by, bz, 1);
+    await new Promise((res) => setTimeout(res, 500));
+    g.inventory.slots[2] = { item: 270, count: 1, wear: 0 }; g.select(2);
+    const t0 = performance.now();
+    await mineFor(1400);
+    const pickBroke = w.getBlock(bx, by, bz) === 0, pickDrop = g.inventory.count(9) - c0, wear = g.inventory.slots[2] && g.inventory.slots[2].wear;
+    return { hit, handBroke, handDrop, pickBroke, pickDrop, wear };
+  });
+  if (!r.handBroke || r.handDrop !== 0) throw new Error('hand should break stone slowly with no drop: ' + JSON.stringify(r));
+  if (!r.pickBroke || r.pickDrop !== 1 || r.wear !== 1) throw new Error('wooden pickaxe should drop cobblestone and wear: ' + JSON.stringify(r));
+  return r;
+});
+
+await step('torch lights a dark spot', async () => {
+  const r = await G(async () => {
+    const g = window.voxelwild.game, w = g.world;
+    const p = g.player.body.pos.map(Math.floor);
+    const before = g.blockLightNear(p[0] + 0.5, p[1] + 0.5, p[2] + 0.5);
+    w.setBlock(p[0] + 2, p[1], p[2], 34);
+    await new Promise((res) => setTimeout(res, 400));
+    const after = g.blockLightNear(p[0] + 0.5, p[1] + 0.5, p[2] + 0.5);
+    const placed = w.getBlock(p[0] + 2, p[1], p[2]);
+    w.setBlock(p[0] + 2, p[1], p[2], 0);
+    return { before, after, placed };
+  });
+  if (!(r.after > r.before)) throw new Error(JSON.stringify(r));
+  return r;
+});
+
+await step('drowning and death, then respawn', async () => {
+  const r = await G(async () => {
+    const g = window.voxelwild.game, w = g.world;
+    const p = g.player.body.pos.map(Math.floor);
+    // a sealed water column over the player's head
+    for (let y = p[1]; y <= p[1] + 3; y++) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) w.setBlock(p[0] + dx, y, p[2] + dz, dx || dz ? 1 : 8, false);
+    g.player.teleport([p[0] + 0.5, p[1] + 0.01, p[2] + 0.5]);
+    g.stats.air = 1.5; g.stats.health = 4;
+    await new Promise((res) => setTimeout(res, 5000));
+    const dead = g.state === 'dead', screen = window.voxelwild.ui.screen;
+    document.getElementById('btnRespawn').click();
+    await new Promise((res) => { const t = setInterval(() => { if (g.state === 'playing') { clearInterval(t); res(); } }, 100); setTimeout(res, 15000); });
+    for (let y = p[1]; y <= p[1] + 3; y++) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) w.setBlock(p[0] + dx, y, p[2] + dz, 0, false);
+    return { dead, screen, after: g.state, health: g.stats.health, dropped: g.entities.length };
+  });
+  if (!r.dead || r.screen !== 'death' || r.after !== 'playing' || r.health !== 20) throw new Error(JSON.stringify(r));
+  return r;
+});
+
+await step('water flows into a dug channel', async () => {
+  const r = await G(async () => {
+    const g = window.voxelwild.game, w = g.world;
+    const p = g.player.body.pos.map(Math.floor);
+    const y = p[1] + 6, x = p[0] + 3, z = p[2];
+    // a stone trough with a source at one end
+    for (let dx = -1; dx <= 6; dx++) for (let dz = -1; dz <= 1; dz++) { w.setBlock(x + dx, y - 1, z + dz, 1, false); w.setBlock(x + dx, y, z + dz, dz ? 1 : 0, false); }
+    w.setBlock(x - 1, y, z, 1, false); w.setBlock(x + 6, y, z, 1, false);
+    w.setBlock(x, y, z, 8);
+    await new Promise((res) => setTimeout(res, 3500));
+    const row = []; for (let dx = 0; dx <= 5; dx++) row.push(w.getBlock(x + dx, y, z));
+    return { row };
+  });
+  const flowing = r.row.slice(1).filter((b) => b >= 38 && b <= 44).length;
+  if (flowing < 4) throw new Error('water did not spread: ' + JSON.stringify(r));
+  return r;
+});
+
+await step('drops and cracks render', async () => {
+  await G(async () => {
+    const g = window.voxelwild.game;
+    g.player.teleport(g.spawn, 0.8, -0.35);
+    const e = g.player.eye(), f = g.player.forward();
+    for (const [i, item] of [[0, 3], [1, 12], [2, 257], [3, 271], [4, 261], [5, 30]].entries()) g.spawnItem(item[1], 1, [e[0] + f[0] * 2.5 + (i - 2.5) * 0.4, e[1], e[2] + f[2] * 2.5], [0, 0, 0], 0, 60);
+    await new Promise((res) => setTimeout(res, 1500));
+  });
+  await shot('10-drops');
+  return await G(() => ({ entities: window.voxelwild.game.entities.length }));
+});
+
 await step('save and reload', async () => {
   await G(() => window.voxelwild.game.save());
   const worlds = await G(() => window.voxelwild.game.store.listWorlds().then((w) => w.length));
   if (!worlds) throw new Error('no saved world listed');
   return { worlds };
+});
+
+await step('edits persist across a page reload', async () => {
+  const mark = await G(async () => {
+    const g = window.voxelwild.game, w = g.world;
+    const p = g.player.body.pos.map(Math.floor);
+    const at = [p[0] + 1, p[1] + 3, p[2] + 1];
+    w.setBlock(at[0], at[1], at[2], 11);
+    await g.save();
+    return at;
+  });
+  await page.reload({ waitUntil: 'load' });
+  await waitFor(() => window.voxelwild && window.voxelwild.game.icons && !document.getElementById('btnContinue').hidden, 30000, 'title with a saved world');
+  await page.click('#btnContinue');
+  await waitFor(() => window.voxelwild.game.state === 'playing', 120000, 'reload into world');
+  const b = await G((at) => window.voxelwild.game.world.getBlock(at[0], at[1], at[2]), mark);
+  if (b !== 11) throw new Error(`expected bricks at ${mark}, found ${b}`);
+  return { bricksAt: mark };
 });
 
 await step('no console errors', async () => {

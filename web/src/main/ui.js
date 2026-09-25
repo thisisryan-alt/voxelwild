@@ -66,6 +66,7 @@ export class UI {
     g.on('saved', () => {});
     await this.refreshWorlds();
     requestAnimationFrame((t) => this.loop(t));
+    g.startMenuWorld().catch((e) => console.warn('menu world', e));
     window.addEventListener('pagehide', () => g.save());
     document.addEventListener('visibilitychange', () => { if (document.hidden) { g.save(); if (this.screen === 'playing') this.pause(); } });
   }
@@ -80,7 +81,7 @@ export class UI {
 
   show(name) {
     for (const id of ['title', 'newWorld', 'loading', 'pause', 'settings', 'inventory', 'death', 'fatal']) $(id).hidden = id !== name;
-    $('hud').hidden = !['playing', 'inventory', 'pause', 'settings', 'death'].includes(name) || !this.game.world;
+    $('hud').hidden = !['playing', 'inventory', 'pause', 'death'].includes(name) || !this.game.world || !!(this.game.meta && this.game.meta.menu);
     $('touch').hidden = !(this.touchMode && name === 'playing');
     this.screen = name;
     $('cursorStack').hidden = !(name === 'inventory' && this.cursor);
@@ -88,6 +89,7 @@ export class UI {
 
   onState(s, cause) {
     const g = this.game;
+    if (g.meta && g.meta.menu) return;
     if (s === 'loading') { this.show('loading'); $('loadTitle').textContent = g.meta.name; }
     else if (s === 'playing') { this.show('playing'); this.renderHotbar(); this.renderStats(); this.lock(); }
     else if (s === 'dead') {
@@ -182,17 +184,29 @@ export class UI {
 
   // ---------------------------------------------------------------- pointer lock
 
-  lock() {
+  /** fromClick: called inside a click, where the browser is allowed to capture the mouse. */
+  lock(fromClick = false) {
     const c = $('view');
-    if (this.touchMode) return;
+    if (this.touchMode || this.lockUnavailable) return;
     if (document.pointerLockElement === c) return;
+    this.lockFromClick = fromClick;
     try {
-      const r = c.requestPointerLock({ unadjustedMovement: false });
-      if (r && r.catch) r.catch(() => { this.lockFailed(); });
+      const r = c.requestPointerLock();
+      if (r && r.catch) r.catch(() => this.lockFailed());
     } catch { this.lockFailed(); }
     c.focus();
   }
-  lockFailed() { if (this.screen === 'playing') $('clickHint').hidden = false; }
+  lockFailed() {
+    if (this.lockFromClick) {
+      // capture refused even from a click: play with the free cursor (mouse movement looks, arrows turn)
+      this.lockUnavailable = true;
+      $('clickHint').textContent = 'Mouse capture is blocked here. Move the mouse to look; arrow keys turn.';
+      $('clickHint').hidden = false;
+      setTimeout(() => { $('clickHint').hidden = true; }, 5000);
+      return;
+    }
+    if (this.screen === 'playing') { $('clickHint').textContent = 'Click to look around'; $('clickHint').hidden = false; }
+  }
   unlock() { this.expectUnlock = true; if (document.pointerLockElement) document.exitPointerLock(); }
 
   // ---------------------------------------------------------------- input
@@ -222,9 +236,9 @@ export class UI {
     };
     $('btnResume').onclick = () => this.resume();
     $('btnMode').onclick = () => { g.setMode(!g.creative); $('btnMode').textContent = g.creative ? 'Switch to survival' : 'Switch to creative'; this.renderStats(); };
-    $('btnQuit').onclick = async () => { await g.save(); g.stopWorld(); g.state = 'title'; this.show('title'); this.refreshWorlds(); };
+    $('btnQuit').onclick = async () => { await g.save(); this.toTitle(); };
     $('btnRespawn').onclick = () => g.respawn();
-    $('btnDeathQuit').onclick = async () => { g.stats.reset(); g.player.teleport(g.spawn); await g.save(); g.stopWorld(); g.state = 'title'; this.show('title'); this.refreshWorlds(); };
+    $('btnDeathQuit').onclick = async () => { g.stats.reset(); g.player.teleport(g.spawn); await g.save(); this.toTitle(); };
     this.renderControls();
 
     document.addEventListener('pointerlockchange', () => {
@@ -234,11 +248,12 @@ export class UI {
       if (this.screen === 'playing') this.pause();   // Esc released the mouse
     });
     document.addEventListener('pointerlockerror', () => this.lockFailed());
+    c.addEventListener('click', () => { if (this.screen === 'playing' && !this.locked && !this.touchMode && !this.lockUnavailable) this.lock(true); });
 
     c.addEventListener('mousedown', (e) => {
       if (this.screen !== 'playing') return;
       g.audio.start();
-      if (!this.locked && !this.touchMode) { this.lock(); if (e.button !== 0) return; }
+      if (!this.locked && !this.touchMode && !this.lockUnavailable) { this.lock(true); e.preventDefault(); return; }   // this click only captures the mouse
       if (e.button === 0) { g.mouse.left = true; g.mouse.leftClicked = true; }
       if (e.button === 2) { g.mouse.right = true; g.mouse.rightClicked = true; }
       if (e.button === 1) this.pickBlock();
@@ -249,7 +264,7 @@ export class UI {
     window.addEventListener('mousemove', (e) => {
       if (this.screen === 'inventory') { this.moveCursor(e.clientX, e.clientY); return; }
       if (this.screen !== 'playing' || !g.player) return;
-      if (!this.locked && e.target !== c) return;
+      if (!this.locked && !(this.lockUnavailable && e.target === c)) return;
       const s = 0.0022 * this.settings.sensitivity;
       g.player.look(e.movementX || 0, (e.movementY || 0) * (this.settings.invertY ? -1 : 1), s);
     });
@@ -275,6 +290,14 @@ export class UI {
     window.addEventListener('blur', () => { g.keys.clear(); g.mouse.left = g.mouse.right = false; });
 
     if (this.touchMode) this.bindTouch();
+  }
+
+  toTitle() {
+    const g = this.game;
+    g.stopWorld(); g.state = 'title';
+    this.show('title');
+    this.refreshWorlds();
+    g.startMenuWorld().catch((e) => console.warn('menu world', e));
   }
 
   pickBlock() {
@@ -542,5 +565,21 @@ export class UI {
       if (!this.frameError) { this.frameError = true; console.error(e); this.toast('Something went wrong: ' + e.message); }
     }
     g.frameMs = g.frameMs * 0.9 + (performance.now() - t0) * 0.1;
+    this.governResolution(dt);
+  }
+
+  /** Dynamic resolution: trade pixels for frame rate when the GPU falls behind, recover when it has headroom. */
+  governResolution(dt) {
+    const r = this.game.renderer;
+    if (!r || this.screen !== 'playing' || document.hidden) return;
+    this.avgDt = this.avgDt ? this.avgDt * 0.95 + dt * 0.05 : dt;
+    this.govTimer = (this.govTimer || 0) + dt;
+    if (this.govTimer < 1.5) return;
+    this.govTimer = 0;
+    const fps = 1 / this.avgDt, cur = r.dynScale || 1;
+    let next = cur;
+    if (fps < 42) next = Math.max(0.55, cur - 0.1);
+    else if (fps > 57 && cur < 1) next = Math.min(1, cur + 0.05);
+    if (next !== cur) r.dynScale = Math.round(next * 100) / 100;
   }
 }

@@ -16,6 +16,7 @@ import { MIN_Y, MAX_Y, SEA } from '../shared/const.js';
 
 const REACH = 6;
 const EMITTERS = BLOCKS.map((d) => d.emission || 0);
+const OPACITY = BLOCKS.map((d) => d.opacity || 0);
 
 export class Game {
   constructor(canvas, workerUrl, assetBase = 'assets/') {
@@ -192,8 +193,15 @@ export class Game {
     };
   }
 
+  /** The title screen's backdrop: a world that loads behind the menu and slowly turns at golden hour. */
+  async startMenuWorld() {
+    await this.startWorld({ id: 'menu', name: 'Voxelwild', seed: 20260925, mode: 'creative', menu: true }, true);
+    this.tod.hour = 17.35; this.tod.running = false;
+    this.weather.frozen = true;
+  }
+
   async save() {
-    if (!this.world || this.state === 'loading') return;
+    if (!this.world || this.state === 'loading' || this.meta.menu) return;
     try {
       const meta = this.metaSnapshot();
       await this.store.saveWorld(meta, this.world.editedSections());
@@ -246,11 +254,15 @@ export class Game {
 
   /** Approximate sky + block light at a point (entities, the held item, camera exposure). */
   lightAt(x, y, z) {
-    const w = this.world;
-    const h = w.heightmapAt(Math.floor(x), Math.floor(z));
-    let sky = 1;
-    if (h != null && y < h + 1) sky = Math.max(0, 1 - (h + 1 - y) / 10) ** 2;
-    return { sky, block: this.blockLightNear(x, y, z) };
+    // sky light: 15 minus the opacity stacked above (leaves dim it, rock blocks it), like the mesher's column pass
+    const w = this.world, bx = Math.floor(x), bz = Math.floor(z);
+    const h = w.heightmapAt(bx, bz);
+    let light = 15;
+    if (h != null) for (let yy = Math.floor(y) + 1; yy <= h && light > 0; yy++) {
+      const b = w.getBlock(bx, yy, bz);
+      if (b > 0) light -= Math.max(1, OPACITY[b] === 15 ? 15 : OPACITY[b]);
+    }
+    return { sky: Math.max(0, light) / 15, block: this.blockLightNear(x, y, z) };
   }
   blockLightNear(x, y, z) {
     const w = this.world, bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
@@ -274,7 +286,20 @@ export class Game {
     w.setViewer(eye[0], eye[1], eye[2]);
     w.update(this.state === 'playing' || this.state === 'loading' || this.state === 'inventory' ? dt : 0);
 
-    if (this.state === 'loading') {
+    if (this.meta.menu) {
+      // title backdrop: no player, just a slow turn above the spawn
+      if (this.state === 'loading' && this.loadingProgress() >= 1) {
+        if (this.needGround) { this.settleOnGround(); this.needGround = false; }
+        this.menuBase = [...this.player.body.pos];
+        this.state = 'menu';
+        this.emit('menuReady');
+      }
+      if (this.state === 'menu') {
+        this.menuAngle = (this.menuAngle ?? 2.2) + dt * 0.025;
+        const b = this.menuBase;
+        this.player.teleport([b[0] + Math.sin(this.menuAngle) * 6, b[1] + 26, b[2] + Math.cos(this.menuAngle) * 6], this.menuAngle + Math.PI, -0.16);
+      }
+    } else if (this.state === 'loading') {
       const prog = this.loadingProgress();
       this.emit('loading', prog);
       const c = w.column(Math.floor(pl.body.pos[0]) >> 5, Math.floor(pl.body.pos[2]) >> 5);
@@ -287,7 +312,7 @@ export class Game {
     }
     const active = this.state === 'playing' || this.state === 'inventory';
     if (active) this.update(dt);
-    this.updateEnvironment(active ? dt : 0);
+    this.updateEnvironment(active || this.state === 'menu' ? dt : 0);
     w.updateVisibility(pl.eye());
     this.draw(dt);
     this.pressed.clear();
@@ -677,12 +702,24 @@ export class Game {
         fog: (wp.fog - 1) * 0.02 + (1 - wp.fogDist) * 0.3, storm: Math.max(0, (wp.precip - 0.5) * 2), wetness: this.weather.wetness,
         snowCover: this.weather.snowCover * (clim && clim.temp < 0.25 ? 1 : 0) },
       viewDistance: this.world.viewDistance, camSky: this.camSky, underwater: pl.headInWater,
-      selection: this.target && (this.state === 'playing') ? this.target.hit : null,
+      selection: this.target && this.state === 'playing' ? this.target.hit : null,
       crack: this.mining && this.mining.progress > 0 ? { pos: this.mining.pos, progress: Math.min(1, this.mining.progress) } : null,
       entities,
       sprites, particles: this.packParticles(), hand, damage: this.damageFlash * 0.6, flash: this.flash,
     };
     this.renderer.render(f);
+  }
+
+  /** Debug/test helper: the nearest column of a biome (by name) on a spiral from the player. */
+  findBiome(name, maxRadius = 4000) {
+    const T = terrainFor(this.meta.seed), want = Biome[name], tmp = {};
+    const p = this.player.body.pos;
+    for (let r = 0; r <= maxRadius; r += 24) for (let i = 0, n = Math.max(1, Math.floor(r / 8)); i < n; i++) {
+      const a = (i / n) * Math.PI * 2, x = Math.floor(p[0] + Math.cos(a) * r), z = Math.floor(p[2] + Math.sin(a) * r);
+      const s = T.sample(x + 0.5, z + 0.5, tmp);
+      if (s.biome === want) return [x + 0.5, Math.floor(s.height) + 1, z + 0.5];
+    }
+    return null;
   }
 
   debugInfo() {

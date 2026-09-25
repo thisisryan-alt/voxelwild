@@ -8,3 +8,5 @@ const game = new Game(document.getElementById('view'), workerUrl, window.VOXELWI
 const ui = new UI(game);
 window.voxelwild = { game, ui };
 ui.boot().catch((e) => ui.fatal(e));
+// when a new version of the page is published while it is open, save the world first
+try { window.claude?.hot?.snapshot?.(() => { game.save(); return {}; }); } catch { /* not in the viewer */ }

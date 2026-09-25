@@ -275,9 +275,12 @@ export class Renderer {
 
   resize() {
     const gl = this.gl;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(64, Math.floor(this.canvas.clientWidth * dpr * this.settings.renderScale));
-    const h = Math.max(64, Math.floor(this.canvas.clientHeight * dpr * this.settings.renderScale));
+    // device pixels, capped so a 4K/retina screen does not quadruple the shading cost; dynScale is set by the
+    // frame-time governor in ui.js
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const k = dpr * this.settings.renderScale * (this.dynScale || 1);
+    const w = Math.max(64, Math.floor(this.canvas.clientWidth * k));
+    const h = Math.max(64, Math.floor(this.canvas.clientHeight * k));
     if (w === this.width && h === this.height) return;
     this.width = w; this.height = h;
     this.canvas.width = w; this.canvas.height = h;
