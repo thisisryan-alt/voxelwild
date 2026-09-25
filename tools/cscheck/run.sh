@@ -14,5 +14,6 @@ if [ -n "$unexpected" ]; then
   echo "type check: $(printf '%s\n' "$unexpected" | wc -l) unexpected error(s)"
   exit 1
 fi
-if ! printf '%s\n' "$out" | grep -qE 'Build succeeded|error'; then printf '%s\n' "$out" | tail -20; exit 1; fi
+# (here-strings, not pipes: grep -q exits early and pipefail would report the writer's broken pipe)
+if ! grep -qE 'Build succeeded|error' <<< "$out"; then tail -20 <<< "$out"; exit 1; fi
 echo "type check: clean (${known} known Unity 6-only API errors ignored)"
