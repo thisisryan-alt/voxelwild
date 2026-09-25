@@ -61,6 +61,8 @@ namespace Voxelwild.World.Props
         readonly int[] _variantCount;
         readonly float _maxDrawDistance;
 
+        /// <summary>Multiplies every draw and LOD distance (quality presets).</summary>
+        public float DistanceScale { get; set; } = 1f;
         public int Loaded { get; private set; }
         public int Drawn { get; private set; }
         public bool HasArt => _entries.Count > 0;
@@ -318,7 +320,8 @@ namespace Voxelwild.World.Props
             if (camera == null || _entries.Count == 0) return;
             GeometryUtility.CalculateFrustumPlanes(camera, _frustum);
             Vector3 cam = camera.transform.position;
-            float maxSq = _maxDrawDistance * _maxDrawDistance;
+            float scale2 = DistanceScale * DistanceScale;
+            float maxSq = _maxDrawDistance * _maxDrawDistance * scale2;
 
             foreach (var sp in _sections.Values)
             {
@@ -334,7 +337,7 @@ namespace Voxelwild.World.Props
                 {
                     int e = sp.Entry[i];
                     if (e < 0) continue;
-                    float d2 = (sp.Position[i] - cam).sqrMagnitude;
+                    float d2 = (sp.Position[i] - cam).sqrMagnitude / scale2;
                     var dists = _lodDistSq[e];
                     int lod = 0;
                     while (lod < dists.Length && d2 > dists[lod]) lod++;

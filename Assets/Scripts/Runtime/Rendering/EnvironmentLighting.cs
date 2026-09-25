@@ -20,13 +20,21 @@ namespace Voxelwild.Rendering
 
         static readonly int BlockLightId = Shader.PropertyToID("_VoxelBlockLightColor");
         static readonly int WindId = Shader.PropertyToID("_VoxelWind");
+        static readonly int WeatherId = Shader.PropertyToID("_VoxelWeather");
 
         void Start()
         {
             RenderSettings.sun = GetComponent<Light>();
             DynamicGI.UpdateEnvironment();
+            // dry and snow-free until a WeatherSystem takes over; w tells shaders which layer is snow
+            Shader.SetGlobalVector(WeatherId, new Vector4(0f, 0f, 0f, (int)Voxelwild.World.TextureLayer.Snow));
             Apply();
         }
+
+        /// <summary>Wind direction (x, z) and strength; the weather drives these.</summary>
+        public Vector2 WindDirection { get => windDirection; set { windDirection = value; Apply(); } }
+        public float WindStrength { get => windStrength; set { windStrength = value; Apply(); } }
+        public float Gustiness { get => gustiness; set { gustiness = value; Apply(); } }
 
         void OnValidate() => Apply();
 

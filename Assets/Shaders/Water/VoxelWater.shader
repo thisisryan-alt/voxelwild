@@ -121,7 +121,8 @@ Shader "Voxelwild/Water"
 
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(i.positionWS));
                 float skyAmbient = VoxelSkyAmbient(i.light.x);
-                float shadow = mainLight.shadowAttenuation * mainLight.distanceAttenuation * VoxelSkyDirect(i.light.x);
+                float shadow = mainLight.shadowAttenuation * mainLight.distanceAttenuation * VoxelSkyDirect(i.light.x)
+                             * VoxelCloudShadow(i.positionWS);
                 float ndl = saturate(dot(N, mainLight.direction));
 
                 half3 ambient = SampleSHPixel(half3(0, 0, 0), float3(0, 1, 0)) * skyAmbient + VoxelBlockIrradiance(i.light.y);
@@ -145,7 +146,7 @@ Shader "Voxelwild/Water"
 
                 half3 color = lerp(diffuse, reflection, fresnel) + spec;
                 float alpha = saturate(max(lerp(_MinAlpha, 1.0, absorb), fresnel));
-                color = MixFog(color, InitializeInputDataFog(float4(i.positionWS, 1.0), i.fogFactor));
+                color = VoxelApplyFog(color, i.positionWS, InitializeInputDataFog(float4(i.positionWS, 1.0), i.fogFactor));
                 return half4(color, alpha);
             }
             ENDHLSL

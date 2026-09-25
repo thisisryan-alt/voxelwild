@@ -99,6 +99,13 @@ namespace Voxelwild.World
         public int PropsLoaded => _props?.Loaded ?? 0;
         public int PropsDrawn => _props?.Drawn ?? 0;
         public bool DrawProps { get => drawProps; set => drawProps = value; }
+        public int FancyLeavesDistance
+        {
+            get => fancyLeavesDistance;
+            set { fancyLeavesDistance = Mathf.Clamp(value, 0, 8); _lastCameraSection = new int3(int.MinValue); }
+        }
+        /// <summary>Multiplies prop draw and LOD distances (quality presets).</summary>
+        public float PropDistanceScale { get => _props?.DistanceScale ?? 1f; set { if (_props != null) _props.DistanceScale = value; } }
         public bool OcclusionCulling { get => occlusionCulling; set { occlusionCulling = value; _visibilityDirty = true; } }
 
         readonly Queue<(ChunkSection s, int entry, int dirs)> _visQueue = new Queue<(ChunkSection, int, int)>();

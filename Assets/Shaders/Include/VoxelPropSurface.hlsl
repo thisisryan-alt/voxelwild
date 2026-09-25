@@ -215,6 +215,19 @@ PropSurface EvaluatePropSurface(PropVaryings i, bool frontFace, float4 light)
     s.albedo *= 1.0 + convex * _EdgeWear - concave * 0.25;
     s.roughness = saturate(s.roughness + convex * 0.1);
 
+    if (_Foliage < 0.5 && (_VoxelWeather.x + _VoxelWeather.y) > 0.001)
+    {
+        float3 snowAlbedo = 0;
+        [branch] if (_VoxelWeather.y > 0.001)
+        {
+            uint snowLayer = (uint)_VoxelWeather.w;
+            snowAlbedo = SAMPLE_TEXTURE2D_ARRAY(_AlbedoArray, sampler_AlbedoArray,
+                i.positionWS.xz * _VoxelLayerParams[snowLayer].x, snowLayer).rgb * _VoxelLayerTint[snowLayer].rgb;
+        }
+        VoxelWeatherSurface(i.positionWS, smoothstep(0.55, 0.95, light.x), N.y > 0.8, snowAlbedo,
+                            s.albedo, s.roughness, N, s.specular);
+    }
+
     s.normalWS = N;
     s.occlusion = baked.r * layerAO;
     return s;

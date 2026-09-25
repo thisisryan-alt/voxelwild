@@ -35,19 +35,27 @@ namespace Voxelwild.Rendering
             public bool biomeTint;
             [Tooltip("Albedo alpha is opacity (alpha-tested) instead of height.")]
             public bool cutout;
+            [Tooltip("Hide the texture's repeat with stochastic tiling (natural ground; costs extra samples, quality-dependent).")]
+            public bool stochastic;
         }
+
+        /// <summary>Current field layout. The scene builder fills in defaults for fields added since an asset's version.</summary>
+        public const int CurrentVersion = 2;
+        [HideInInspector] public int version = 1;
 
         public Layer[] layers = Array.Empty<Layer>();
 
         static readonly int ParamsId = Shader.PropertyToID("_VoxelLayerParams");
         static readonly int TintId = Shader.PropertyToID("_VoxelLayerTint");
         static readonly int Params2Id = Shader.PropertyToID("_VoxelLayerParams2");
+        static readonly int Params3Id = Shader.PropertyToID("_VoxelLayerParams3");
 
         public void ApplyGlobals()
         {
             var p = new Vector4[MaxLayers];
             var t = new Vector4[MaxLayers];
             var p2 = new Vector4[MaxLayers];
+            var p3 = new Vector4[MaxLayers];
             for (int i = 0; i < MaxLayers; i++)
             {
                 if (i < layers.Length)
@@ -57,6 +65,7 @@ namespace Voxelwild.Rendering
                     Color lin = l.tint.linear;
                     t[i] = new Vector4(lin.r, lin.g, lin.b, l.specular);
                     p2[i] = new Vector4(l.emission, l.translucency, l.biomeTint ? 1 : 0, l.cutout ? 1 : 0);
+                    p3[i] = new Vector4(l.stochastic ? 1 : 0, 0, 0, 0);
                 }
                 else
                 {
@@ -68,6 +77,7 @@ namespace Voxelwild.Rendering
             Shader.SetGlobalVectorArray(ParamsId, p);
             Shader.SetGlobalVectorArray(TintId, t);
             Shader.SetGlobalVectorArray(Params2Id, p2);
+            Shader.SetGlobalVectorArray(Params3Id, p3);
         }
 
         void OnValidate() => ApplyGlobals();

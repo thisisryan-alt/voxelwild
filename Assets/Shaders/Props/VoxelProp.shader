@@ -90,7 +90,7 @@ Shader "Voxelwild/Prop"
                 half3 blockIrr = VoxelBlockIrradiance(light.y) * s.occlusion;
                 half3 transAlbedo = s.albedo * s.translucency;
                 half4 color = VoxelFragmentPBR(inputData, surface, VoxelSkyDirect(light.x), blockIrr, transAlbedo, s.specular);
-                color.rgb = MixFog(color.rgb, inputData.fogCoord);
+                color.rgb = VoxelApplyFog(color.rgb, i.positionWS, inputData.fogCoord);
                 color.a = 1.0;
                 return color;
             }

@@ -85,10 +85,11 @@ namespace Voxelwild.EditorTools
             sunGo.transform.rotation = Quaternion.Euler(47f, -38f, 0f);
             sunGo.AddComponent<UniversalAdditionalLightData>();
             sunGo.AddComponent<EnvironmentLighting>();
+            var dayNight = sunGo.AddComponent<DayNightCycle>();
 
             RenderSettings.sun = sun;
             RenderSettings.skybox = sky;
-            // Explicit sky/horizon/ground ambient until the Phase 4 atmosphere drives it dynamically.
+            // Trilight ambient; DayNightCycle drives the colours (these are the daylight values it starts from).
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.50f, 0.62f, 0.80f) * 1.7f;
             RenderSettings.ambientEquatorColor = new Color(0.52f, 0.56f, 0.60f) * 1.35f;
@@ -151,6 +152,12 @@ namespace Voxelwild.EditorTools
             Assign(director, ("world", world), ("player", controller), ("interactor", interactor), ("captureCamera", cam), ("hud", hud), ("sun", sun));
             var pcRenderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>("Assets/Settings/PC_Renderer.asset");
             if (pcRenderer != null) Assign(director, ("rendererData", pcRenderer));
+            Assign(director, ("dayNight", dayNight));
+
+            var quality = worldGo.AddComponent<QualityManager>();
+            Assign(quality, ("world", world), ("sun", sun), ("dayNight", dayNight), ("playerCamera", cam));
+            if (pcRenderer != null) Assign(quality, ("rendererData", pcRenderer));
+            Assign(hud, ("dayNight", dayNight), ("quality", quality));
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -224,7 +231,18 @@ namespace Voxelwild.EditorTools
             const string path = RenderingSettingsFolder + "/TerrainLayerProfile.asset";
             var profile = AssetDatabase.LoadAssetAtPath<TerrainLayerProfile>(path);
             var manifest = BlockTextureArrays.LoadManifest();
-            if (profile != null && profile.layers.Length == manifest.layers.Length) return profile;
+            if (profile != null && profile.layers.Length == manifest.layers.Length)
+            {
+                if (profile.version < 2)
+                {
+                    // v2 added stochastic tiling: take the default per layer, keep all tuned values
+                    for (int i = 0; i < profile.layers.Length; i++)
+                        profile.layers[i].stochastic = DefaultLayer(profile.layers[i].name).stochastic;
+                    profile.version = TerrainLayerProfile.CurrentVersion;
+                    EditorUtility.SetDirty(profile);
+                }
+                return profile;
+            }
 
             if (profile == null)
             {
@@ -232,6 +250,7 @@ namespace Voxelwild.EditorTools
                 AssetDatabase.CreateAsset(profile, path);
             }
             // Starting values tuned against the capture screenshots; edit the asset to art-direct further.
+            profile.version = TerrainLayerProfile.CurrentVersion;
             profile.layers = new TerrainLayerProfile.Layer[manifest.layers.Length];
             for (int i = 0; i < manifest.layers.Length; i++)
                 profile.layers[i] = DefaultLayer(manifest.layers[i].name);
@@ -287,6 +306,9 @@ namespace Voxelwild.EditorTools
                     layer.blocksPerTile = 1f; layer.macroVariation = 0f; layer.emission = 9f; break;
                 case "Cactus": case "CactusTop": layer.blocksPerTile = 1f; layer.macroVariation = 0.1f; break;
             }
+            // large natural scans repeat visibly across open ground
+            layer.stochastic = n == "Stone" || n == "Dirt" || n == "GrassTop" || n == "Sand" || n == "Gravel" || n == "Snow"
+                               || n == "Sandstone" || n == "RedSandstone" || n == "Mud" || n == "Moss";
             switch (n)
             {
                 case "GrassTop": case "Leaves": case "Needles": case "GrassTuft": case "Moss": layer.specular = 0.3f; break;
@@ -315,14 +337,13 @@ namespace Voxelwild.EditorTools
 
         static Material SkyMaterial()
         {
-            var m = MaterialAt(MaterialsFolder + "/Sky.mat", "Skybox/Procedural");
-            m.SetFloat("_SunDisk", 2);
-            m.SetFloat("_SunSize", 0.035f);
-            m.SetFloat("_SunSizeConvergence", 6f);
-            m.SetFloat("_AtmosphereThickness", 0.9f);
-            m.SetColor("_SkyTint", new Color(0.46f, 0.52f, 0.62f));
-            m.SetColor("_GroundColor", new Color(0.62f, 0.70f, 0.78f));   // matches the fog so the world edge blends
-            m.SetFloat("_Exposure", 1.2f);
+            // physically based sky driven by DayNightCycle (scattering table, sun, moon, stars, clouds)
+            var m = MaterialAt(MaterialsFolder + "/Sky.mat", "Voxelwild/Sky");
+            m.SetFloat("_StarDensity", 0.9975f);
+            m.SetFloat("_StarBrightness", 2.5f);
+            m.SetFloat("_MoonSize", 1.6f);
+            m.SetFloat("_SunSize", 0.6f);
+            m.SetFloat("_HorizonFog", 0.12f);
             EditorUtility.SetDirty(m);
             return m;
         }

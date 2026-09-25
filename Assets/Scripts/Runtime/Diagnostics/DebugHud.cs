@@ -15,6 +15,8 @@ namespace Voxelwild.Diagnostics
         [SerializeField] VoxelWorld world;
         [SerializeField] PlayerController player;
         [SerializeField] BlockInteractor interactor;
+        [SerializeField] Voxelwild.Rendering.DayNightCycle dayNight;
+        [SerializeField] Voxelwild.Rendering.QualityManager quality;
         [SerializeField] bool showStats = true;
 
         public bool Hidden { get; set; }
@@ -46,6 +48,15 @@ namespace Voxelwild.Diagnostics
             _slot.normal.textColor = new Color(1, 1, 1, 0.85f);
             _slotSelected = new GUIStyle(_slot) { fontStyle = FontStyle.Bold };
             _slotSelected.normal.textColor = new Color(1f, 0.93f, 0.6f);
+        }
+
+        string Clock()
+        {
+            if (dayNight == null) return "time -";
+            float h = dayNight.TimeOfDay * 24f;
+            var st = dayNight.State;
+            return $"day {(int)dayNight.Days}  {(int)h:00}:{(int)(h % 1f * 60f):00}{(dayNight.Paused ? " (paused)" : "")}  " +
+                   $"sun {st.SunElevationDeg:0}°  moon {st.MoonIllumination * 100f:0}%";
         }
 
         void OnGUI()
@@ -91,13 +102,15 @@ namespace Voxelwild.Diagnostics
                 $"columns {world.LoadedColumns} (generating {world.GeneratingColumns})  mesh jobs {world.MeshJobsInFlight}\n" +
                 $"sections drawn {world.RenderedSections} (occlusion-culled {world.OcclusionCulledSections})  tris {world.RenderedTriangles / 1000}k  edited {world.ModifiedSections}\n" +
                 $"props drawn {world.PropsDrawn} of {world.PropsLoaded}\n" +
+                $"{Clock()}  quality {(quality != null ? quality.Current.Name : "-")}\n" +
                 $"target {target}\n" +
                 "<size=12>WASD move · Space jump (double-tap: fly) · Ctrl sprint · Shift descend · F fly\n" +
-                "LMB break · RMB place · 1-9/scroll select · Esc release mouse · F3 stats · F1 hide HUD</size>";
+                "LMB break · RMB place · 1-9/scroll select · Esc release mouse · F3 stats · F1 hide HUD\n" +
+                "T +1 hour (Shift: −1) · P pause time · F4 quality preset</size>";
             GUI.color = new Color(0, 0, 0, 0.45f);
-            GUI.DrawTexture(new Rect(8, 8, 560, 207), _white);
+            GUI.DrawTexture(new Rect(8, 8, 560, 239), _white);
             GUI.color = Color.white;
-            GUI.Label(new Rect(16, 12, 548, 203), text, _label);
+            GUI.Label(new Rect(16, 12, 548, 235), text, _label);
         }
     }
 }

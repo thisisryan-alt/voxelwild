@@ -106,7 +106,7 @@ half4 VoxelForwardFrag(VoxelVaryings i, bool frontFace : SV_IsFrontFace) : SV_Ta
 #endif
 
     half4 color = VoxelFragmentPBR(inputData, surface, skyDirect, blockIrr, transAlbedo, s.specular);
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+    color.rgb = VoxelApplyFog(color.rgb, i.positionWS, inputData.fogCoord);
     color.a = 1.0;
     return color;
 }

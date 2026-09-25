@@ -43,9 +43,9 @@ Legend: ✅ done · 🟡 partial or stopgap · ⬜ not started
 **Stopgaps still in place** (each is replaced in the phase noted):
 
 - Water is static blocks. Rivers sit at sea level. Breaking a block next to water refills it. → Phase 5
-- Ambient is a fixed trilight and the sun angle is fixed. → Phase 4
+- ~~Ambient is a fixed trilight and the sun angle is fixed.~~ Replaced by the day/night cycle (Phase 4).
 - The HUD is IMGUI. → Phase 7/8
-- The sky is Unity's procedural skybox. → Phase 4
+- ~~The sky is Unity's procedural skybox.~~ Replaced by `Voxelwild/Sky` (Phase 4).
 - Trees and plants are voxel/sprite generated. Rocks, cave formations, dead wood and plant clumps now come
   from Blender (Phase 3); hero trees with leaf cards are still to come.
 
@@ -77,17 +77,25 @@ in the editor: the gate is `./tools/unity.ps1 build`, `test -Platform EditMode`,
 Prop kinds and where they grow are data in `PropRegistry` (biomes, support blocks, density, clumping,
 scale, clearance, footprint, draw distance). The art side is the library; generation never needs it.
 
-## Phase 4 — Rendering ⬜
+## Phase 4 — Rendering 🟡
 
-- Time of day: sun and moon, moon phases, stars, colour temperature curve, ambient probe updated from
-  the sky.
-- Physically based sky (scattering LUT), cloud layer with cloud shadows, and a sun halo.
-- Volumetric lighting: god rays through forests and cave openings, height fog.
-- Terrain shader upgrades: height-blended transitions, stochastic tiling, parallax near the camera,
-  wetness, snow accumulation.
-- **Quality presets (Low → Cinematic):** render scale, shadow distance, cascades and soft-shadow
-  quality, SSAO resolution, view distance, leaf LOD distance, plant density. The capture tool's
-  `-vwToggles` already measures what each of these costs.
+Written and type-checked; the sky, time-of-day and quality maths are unit-tested outside Unity
+(`dotnet test tools/dotnet-tests`). Shaders have not been compiled by Unity yet.
+
+| Item | Status | Notes |
+|---|---|---|
+| Time of day | 🟡 | `DayNightCycle`: 20-minute days, sun path tilted 35° south, moon opposite with an 8-day phase cycle, sun ↔ moon light hand-over, trilight ambient and fog keyed for day, dusk and night. T / Shift+T / P |
+| Colour temperature | 🟡 | the sun's colour comes from atmospheric transmittance (deep orange at the horizon), blended to the Phase 2 daylight colour once it is high |
+| Physically based sky | 🟡 | `Voxelwild/Sky`: single-scattering Rayleigh + Mie table (64×64, built once at startup by `AtmosphereModel`), limb-darkened sun and halo, moon with phase, twinkling stars, horizon blended into the fog |
+| Clouds and cloud shadows | 🟡 | one density field at 300 m drawn by the sky and sampled along the sun direction by every lit shader; drifts with `_VoxelWind` |
+| Height fog | 🟡 | exponential height fog pooling around sea level, plus sun-tinted fog when looking toward the sun, on top of URP's distance fog |
+| Volumetric god rays | ⬜ | needs a URP RenderGraph pass; left for the Phase 8 renderer work |
+| Stochastic tiling | 🟡 | per layer (natural ground), switched by quality preset |
+| Wetness, puddles, snow cover | 🟡 | shader hooks on terrain and props (`_VoxelWeather`), driven by Phase 6 weather |
+| Parallax near the camera | ⬜ | not started |
+| Quality presets | 🟡 | Low → Cinematic (`QualityPresets`), F4 cycles, remembered; High is the Phase 2 reference; captures use High unless `-vwQuality` |
+
+Captures pin the clock (`-vwTime`, default 0.45: mid-morning, close to the old fixed sun).
 
 ## Phase 5 — Water ⬜
 

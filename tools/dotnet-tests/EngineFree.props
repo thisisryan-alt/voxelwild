@@ -1,0 +1,10 @@
+<!-- Source files that use only System and Unity.Mathematics, and the tests that cover them. -->
+<Project>
+  <ItemGroup>
+    <EngineFree Include="$(Assets)/Scripts/Runtime/Environment/SkyModel.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/Environment/AtmosphereModel.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/Rendering/QualityPresets.cs" />
+    <EngineFree Include="$(Assets)/Tests/EditMode/EnvironmentTests.cs" />
+    <EngineFree Include="$(Assets)/Tests/EditMode/QualityPresetTests.cs" />
+  </ItemGroup>
+</Project>

@@ -27,6 +27,7 @@ namespace Voxelwild.Diagnostics
         [SerializeField] DebugHud hud;
         [SerializeField] UnityEngine.Rendering.Universal.UniversalRendererData rendererData;
         [SerializeField] Light sun;
+        [SerializeField] Voxelwild.Rendering.DayNightCycle dayNight;
         [SerializeField] int width = 1600;
         [SerializeField] int height = 900;
 
@@ -36,6 +37,7 @@ namespace Voxelwild.Diagnostics
         string _outDir;
         string[] _shotFilter;
         string _toggles = "";
+        float _timeOfDay = 0.45f;       // mid-morning sun, close to the fixed Phase 2 sun, so captures stay comparable
         readonly StringBuilder _report = new StringBuilder();
 
         void Awake()
@@ -49,6 +51,10 @@ namespace Voxelwild.Diagnostics
             if (s >= 0 && s + 1 < args.Length) _shotFilter = args[s + 1].Split(',');
             int t = Array.IndexOf(args, "-vwToggles");
             if (t >= 0 && t + 1 < args.Length) _toggles = args[t + 1];
+            int tod = Array.IndexOf(args, "-vwTime");
+            if (tod >= 0 && tod + 1 < args.Length && float.TryParse(args[tod + 1], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float parsed))
+                _timeOfDay = Mathf.Repeat(parsed, 1f);
             // measure real frame cost, not the display's refresh interval
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = -1;
@@ -60,6 +66,12 @@ namespace Voxelwild.Diagnostics
         {
             if (!enabled) return;
             if (hud != null) hud.Hidden = true;
+            if (dayNight != null)
+            {
+                dayNight.TimeOfDay = _timeOfDay;
+                dayNight.Paused = true;
+                _report.AppendLine($"time of day {_timeOfDay:0.000} (paused)");
+            }
             ApplyDiagnosticToggles();
             // no targeting outline in captures (TryPlace/TryBreak still work with the component disabled)
             interactor.enabled = false;

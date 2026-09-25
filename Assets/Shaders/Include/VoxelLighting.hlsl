@@ -3,13 +3,14 @@
 
 // URP's UniversalFragmentPBR with two voxel-light hooks:
 //   skyDirect      scales the main (sun/moon) light by how exposed the surface is to the sky, so cave
-//                  interiors beyond shadow-map range never receive sunlight;
+//                  interiors beyond shadow-map range never receive sunlight (cloud shadows are applied too);
 //   extraDiffuse   added irradiance (voxel block light) lit through the BRDF's diffuse term;
 //   transAlbedo    albedo x translucency of thin surfaces; lit from behind by the main light (reusing its
 //                  shadow lookup) for foliage back-lighting;
 //   specularScale  per-material reflectance (vegetation scatters rather than mirrors).
 // Sky-light scaling of ambient/reflections is done by the caller through surfaceData.occlusion.
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#include "Assets/Shaders/Include/VoxelAtmosphere.hlsl"
 
 // rgb = block light colour * intensity (EnvironmentLighting)
 float4 _VoxelBlockLightColor;
@@ -26,7 +27,7 @@ half4 VoxelFragmentPBR(InputData inputData, SurfaceData surfaceData, half skyDir
     AmbientOcclusionFactor aoFactor = CreateAmbientOcclusionFactor(inputData, surfaceData);
     uint meshRenderingLayers = GetMeshRenderingLayer();
     Light mainLight = GetMainLight(inputData, shadowMask, aoFactor);
-    mainLight.shadowAttenuation *= skyDirect;
+    mainLight.shadowAttenuation *= skyDirect * VoxelCloudShadow(inputData.positionWS);
     half3 transmitted = 0;
     if (any(transAlbedo > 0))
     {

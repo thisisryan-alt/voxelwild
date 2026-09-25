@@ -58,3 +58,7 @@ mono_crash.*
 __pycache__/
 *.pyc
 /SourceArt/**/_download/
+
+# dotnet test harness output
+tools/dotnet-tests/bin/
+tools/dotnet-tests/obj/

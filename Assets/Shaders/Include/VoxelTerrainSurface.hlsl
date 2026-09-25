@@ -26,6 +26,8 @@ CBUFFER_END
 float4 _VoxelLayerParams[64];
 float4 _VoxelLayerTint[64];
 float4 _VoxelLayerParams2[64];
+float4 _VoxelLayerParams3[64];   // x = stochastic tiling (0/1)
+float _VoxelStochastic;          // quality switch for stochastic tiling
 
 struct VoxelSurface
 {
@@ -55,9 +57,33 @@ struct LayerSample
 LayerSample SampleLayer(uint layer, float2 uv, VoxelVertex v)
 {
     float4 lp = _VoxelLayerParams[layer];
-    float4 a = SAMPLE_TEXTURE2D_ARRAY(_AlbedoArray, sampler_AlbedoArray, uv, layer);
-    float4 n = SAMPLE_TEXTURE2D_ARRAY(_NormalArray, sampler_NormalArray, uv, layer);
-    float4 m = SAMPLE_TEXTURE2D_ARRAY(_MaskArray, sampler_AlbedoArray, uv, layer);
+    float4 a, n, m;
+    if (_VoxelStochastic > 0.5 && _VoxelLayerParams3[layer].x > 0.5)
+    {
+        // Stochastic tiling (after Quilez): regions of a few tiles each take a random offset, and neighbouring
+        // regions blend where their contents differ least, which hides the repeat of large natural scans.
+        float k = VoxelValueNoise(uv * 0.35);
+        float l = k * 8.0;
+        float ia = floor(l);
+        float f = frac(l);
+        float2 offA = sin(float2(3.0, 7.0) * ia);
+        float2 offB = sin(float2(3.0, 7.0) * (ia + 1.0));
+        float2 dx = ddx(uv), dy = ddy(uv);
+        float4 aA = SAMPLE_TEXTURE2D_ARRAY_GRAD(_AlbedoArray, sampler_AlbedoArray, uv + offA, layer, dx, dy);
+        float4 aB = SAMPLE_TEXTURE2D_ARRAY_GRAD(_AlbedoArray, sampler_AlbedoArray, uv + offB, layer, dx, dy);
+        float b = smoothstep(0.2, 0.8, f - 0.1 * dot(aA.rgb - aB.rgb, 1.0));
+        a = lerp(aA, aB, b);
+        n = lerp(SAMPLE_TEXTURE2D_ARRAY_GRAD(_NormalArray, sampler_NormalArray, uv + offA, layer, dx, dy),
+                 SAMPLE_TEXTURE2D_ARRAY_GRAD(_NormalArray, sampler_NormalArray, uv + offB, layer, dx, dy), b);
+        m = lerp(SAMPLE_TEXTURE2D_ARRAY_GRAD(_MaskArray, sampler_AlbedoArray, uv + offA, layer, dx, dy),
+                 SAMPLE_TEXTURE2D_ARRAY_GRAD(_MaskArray, sampler_AlbedoArray, uv + offB, layer, dx, dy), b);
+    }
+    else
+    {
+        a = SAMPLE_TEXTURE2D_ARRAY(_AlbedoArray, sampler_AlbedoArray, uv, layer);
+        n = SAMPLE_TEXTURE2D_ARRAY(_NormalArray, sampler_NormalArray, uv, layer);
+        m = SAMPLE_TEXTURE2D_ARRAY(_MaskArray, sampler_AlbedoArray, uv, layer);
+    }
 
     LayerSample s;
     s.albedo = a.rgb * _VoxelLayerTint[layer].rgb;
@@ -179,6 +205,19 @@ VoxelSurface EvaluateVoxelSurface(float3 positionWS, VoxelVertex v, float2 corne
     s.albedo = lerp(s.albedo, s.albedo * 1.3 + 0.02, wear);
     s.roughness = lerp(s.roughness, saturate(s.roughness + 0.2), wear);
 
+    float specular = _VoxelLayerTint[v.layer].w;
+    if (!plant && (_VoxelWeather.x + _VoxelWeather.y) > 0.001)
+    {
+        float3 snowAlbedo = 0;
+        [branch] if (_VoxelWeather.y > 0.001)
+        {
+            uint snowLayer = (uint)_VoxelWeather.w;
+            snowAlbedo = SampleLayer(snowLayer, positionWS.xz * _VoxelLayerParams[snowLayer].x, v).albedo;
+        }
+        VoxelWeatherSurface(positionWS, smoothstep(0.55, 0.95, v.sky), v.face == 2u, snowAlbedo,
+                            s.albedo, s.roughness, normalWS, specular);
+    }
+
     float vao = lerp(0.28, 1.0, smoothstep(0.0, 1.0, v.ao));
     vao = lerp(1.0, vao, _VoxelAOStrength);
 
@@ -192,7 +231,7 @@ VoxelSurface EvaluateVoxelSurface(float3 positionWS, VoxelVertex v, float2 corne
     o.alpha = alpha;
     o.emission = s.albedo * s.emission;
     o.translucency = _VoxelLayerParams2[v.layer].y;
-    o.specular = _VoxelLayerTint[v.layer].w;
+    o.specular = specular;
     return o;
 }
 
