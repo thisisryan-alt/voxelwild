@@ -90,13 +90,14 @@ namespace Voxelwild.Diagnostics
                 $"{(player.Flying ? "flying" : player.InWater ? "swimming" : player.Body.Grounded ? "grounded" : "airborne")}\n" +
                 $"columns {world.LoadedColumns} (generating {world.GeneratingColumns})  mesh jobs {world.MeshJobsInFlight}\n" +
                 $"sections drawn {world.RenderedSections} (occlusion-culled {world.OcclusionCulledSections})  tris {world.RenderedTriangles / 1000}k  edited {world.ModifiedSections}\n" +
+                $"props drawn {world.PropsDrawn} of {world.PropsLoaded}\n" +
                 $"target {target}\n" +
                 "<size=12>WASD move · Space jump (double-tap: fly) · Ctrl sprint · Shift descend · F fly\n" +
                 "LMB break · RMB place · 1-9/scroll select · Esc release mouse · F3 stats · F1 hide HUD</size>";
             GUI.color = new Color(0, 0, 0, 0.45f);
-            GUI.DrawTexture(new Rect(8, 8, 560, 190), _white);
+            GUI.DrawTexture(new Rect(8, 8, 560, 207), _white);
             GUI.color = Color.white;
-            GUI.Label(new Rect(16, 12, 548, 186), text, _label);
+            GUI.Label(new Rect(16, 12, 548, 203), text, _label);
         }
     }
 }

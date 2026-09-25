@@ -41,8 +41,12 @@ namespace Voxelwild.World
         public const ushort Torch = 34;
         public const ushort Cactus = 35;
         public const ushort SnowyGrass = 36;
+        // --- Phase 3
+        /// <summary>Invisible solid cell inside a prop (dead-tree trunks, fallen logs): cell-sized collision,
+        /// no mesh, no light blocking. Breaking it removes the prop.</summary>
+        public const ushort PropBarrier = 37;
 
-        public const int Count = 37;
+        public const int Count = 38;
     }
 
     /// <summary>

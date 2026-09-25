@@ -9,6 +9,7 @@ using UnityEngine.Rendering;
 using Voxelwild.Rendering;
 using Voxelwild.World.Generation;
 using Voxelwild.World.Meshing;
+using Voxelwild.World.Props;
 using static Voxelwild.World.VoxelConstants;
 
 namespace Voxelwild.World
@@ -34,6 +35,9 @@ namespace Voxelwild.World
         [SerializeField] Material waterMaterial;
         [SerializeField] TerrainLayerProfile layerProfile;
         [SerializeField] bool castShadows = true;
+        [Tooltip("Rocks, cave formations, dead wood and plants (Assets/Art/Models, built by tools/blender).")]
+        [SerializeField] PropLibrary propLibrary;
+        [SerializeField] bool drawProps = true;
 
         [Header("Budgets")]
         [SerializeField, Range(1, 64)] int maxColumnsStartedPerFrame = 6;
@@ -51,6 +55,9 @@ namespace Voxelwild.World
         public Transform Viewer { get => viewer; set => viewer = value; }
 
         NativeArray<BlockDefinition> _blocks;
+        NativeArray<PropRule> _propRules;
+        PropField _props;
+        readonly List<(int3 cell, ushort block)> _propLeftovers = new List<(int3, ushort)>();
         readonly Dictionary<int2, ChunkColumn> _columns = new Dictionary<int2, ChunkColumn>();
         readonly List<ChunkColumn> _columnJobs = new List<ChunkColumn>();
         readonly List<InFlightMesh> _meshing = new List<InFlightMesh>();
@@ -89,6 +96,9 @@ namespace Voxelwild.World
         public long RenderedTriangles { get; private set; }
         public int PendingMeshes { get; private set; }
         public int OcclusionCulledSections { get; private set; }
+        public int PropsLoaded => _props?.Loaded ?? 0;
+        public int PropsDrawn => _props?.Drawn ?? 0;
+        public bool DrawProps { get => drawProps; set => drawProps = value; }
         public bool OcclusionCulling { get => occlusionCulling; set { occlusionCulling = value; _visibilityDirty = true; } }
 
         readonly Queue<(ChunkSection s, int entry, int dirs)> _visQueue = new Queue<(ChunkSection, int, int)>();
@@ -101,6 +111,11 @@ namespace Voxelwild.World
         {
             if (_initialized) return;
             _blocks = BlockRegistry.CreateNative(Allocator.Persistent);
+            _propRules = PropRegistry.CreateNative(Allocator.Persistent);
+            _props = new PropField(propLibrary);
+            if (!_props.HasArt)
+                Debug.LogWarning("[VoxelWorld] no prop library: props are placed (cores, barriers) but not drawn. " +
+                                 "Run Voxelwild/Art/Build Prop Library.", this);
             if (layerProfile != null) layerProfile.ApplyGlobals();
             else Debug.LogError("[VoxelWorld] no TerrainLayerProfile assigned: terrain will render black", this);
             if (terrainMaterial == null || foliageMaterial == null || waterMaterial == null)
@@ -140,6 +155,8 @@ namespace Voxelwild.World
             foreach (var b in _meshBufferPool) b.Dispose();
             _meshBufferPool.Clear();
             _blocks.Dispose();
+            _propRules.Dispose();
+            _props = null;
             _initialized = false;
         }
 
@@ -225,7 +242,7 @@ namespace Voxelwild.World
                 col.Job = new DecorationJob
                 {
                     Column = col.Coord, Seed = seed, Voxels = col.Build.Voxels, Neighborhood = col.Build.Neighborhood,
-                    Blocks = _blocks, Heightmap = col.Heightmap,
+                    Blocks = _blocks, Heightmap = col.Heightmap, PropRules = _propRules, Props = col.Props,
                 }.Schedule();
                 _columnJobs.Add(col);
                 started++;
@@ -288,6 +305,7 @@ namespace Voxelwild.World
                 for (int z = 0; z < ChunkSize; z++)
                 for (int x = 0; x < ChunkSize; x++)
                     RecomputeHeight(col, x, z, MaxWorldY - 1);
+            _props.OnColumnReady(col);
         }
 
         void UnloadFarColumns()
@@ -312,6 +330,7 @@ namespace Voxelwild.World
         {
             var col = _columns[coord];
             _columns.Remove(coord);
+            _props.OnColumnUnloaded(coord);
             if (col.State == ColumnState.Ready)
             {
                 for (int i = 0; i < col.Sections.Length; i++)
@@ -403,6 +422,7 @@ namespace Voxelwild.World
             if (!empty) return false;
             ulong conn = s.UniformBlock == BlockId.Air ? ulong.MaxValue : 0ul;
             if (conn != s.Connectivity) { s.Connectivity = conn; _visibilityDirty = true; }
+            if (s.UniformBlock == BlockId.Air) _props.OnSectionTrivial(s);
             ApplyEmpty(s);
             s.NeedsMesh = false;
             s.MeshedVersion = s.Version;
@@ -469,6 +489,7 @@ namespace Voxelwild.World
             if (alive && m.Version == m.Section.Version)
             {
                 ApplyMesh(m.Section, m.Buffers);
+                _props.OnSectionLit(m.Section, m.Buffers);
                 m.Section.MeshedVersion = m.Version;
                 m.Section.HasLeaves = m.Buffers.Stats[0] > 0;
                 ulong conn = m.Buffers.Connectivity[0];
@@ -538,6 +559,7 @@ namespace Voxelwild.World
         void LateUpdate()
         {
             UpdateVisibility();
+            if (drawProps && _camera != null) _props.Draw(_camera, GetSection, gameObject.layer);
             if (Time.frameCount % 20 != 0) return;
             int sections = 0;
             long tris = 0;
@@ -736,6 +758,18 @@ namespace Voxelwild.World
             {
                 job.Handle.Complete();
                 FinishMesh(job);
+            }
+
+            // props resting on, hanging from or built into this cell go, and take their core/barrier cells along
+            _propLeftovers.Clear();
+            _props.RemoveDependents(world, _propLeftovers);
+            if (_propLeftovers.Count > 0)
+            {
+                // copy: the nested SetBlock calls reuse the list
+                var cells = _propLeftovers.ToArray();
+                foreach (var (c, owned) in cells)
+                    if (TryGetBlock(c, out var b) && b == owned)
+                        SetBlock(c, BlockId.Air);
             }
             return true;
         }

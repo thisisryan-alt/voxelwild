@@ -10,7 +10,7 @@ namespace Voxelwild.World.Generation
     public enum TreeKind : byte { Oak, BigOak, Birch, Spruce, TallSpruce, Jungle, JungleGiant, JungleBush, SwampOak }
 
     /// <summary>
-    /// Adds trees to one generated column and computes its light heightmap.
+    /// Adds trees and props (DecorationJob.Props.cs) to one generated column and computes its light heightmap.
     ///
     /// Determinism across column borders: tree positions come from a world-space jittered grid (so spacing
     /// never depends on what a neighbouring column contains) and every column applies all trees that can
@@ -19,7 +19,7 @@ namespace Voxelwild.World.Generation
     /// and regenerating a column after unload reproduces it exactly.
     /// </summary>
     [BurstCompile]
-    public struct DecorationJob : IJob
+    public partial struct DecorationJob : IJob
     {
         public int2 Column;
         public uint Seed;
@@ -46,6 +46,7 @@ namespace Voxelwild.World.Generation
 
             var w = new Writer { Voxels = Voxels, Blocks = Blocks, Origin = Column * ChunkSize };
             for (int i = 0; i < trees.Length; i++) Build(trees[i], ref w);
+            PlaceProps();       // after trees (props need open ground), before the heightmap (boulder cores block light)
 
             for (int z = 0; z < ChunkSize; z++)
             for (int x = 0; x < ChunkSize; x++)

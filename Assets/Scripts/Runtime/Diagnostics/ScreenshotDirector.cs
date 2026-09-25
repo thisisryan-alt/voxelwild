@@ -161,6 +161,7 @@ namespace Voxelwild.Diagnostics
                     case "nopost":
                         captureCamera.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>().renderPostProcessing = false;
                         break;
+                    case "noprops": world.DrawProps = false; break;
                     case "noaa":
                         captureCamera.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>().antialiasing = UnityEngine.Rendering.Universal.AntialiasingMode.None;
                         break;
@@ -379,7 +380,7 @@ namespace Voxelwild.Diagnostics
             float avg = 0;
             foreach (var s in samples) avg += s;
             avg /= samples.Count;
-            _report.AppendLine($"frame time [{label}]: avg {avg:0.00} ms, p50 {samples[samples.Count / 2]:0.00}, p95 {samples[(int)(samples.Count * 0.95f)]:0.00}, max {samples[^1]:0.00}{split}, tris {world.RenderedTriangles / 1000}k");
+            _report.AppendLine($"frame time [{label}]: avg {avg:0.00} ms, p50 {samples[samples.Count / 2]:0.00}, p95 {samples[(int)(samples.Count * 0.95f)]:0.00}, max {samples[^1]:0.00}{split}, tris {world.RenderedTriangles / 1000}k, props {world.PropsDrawn}");
         }
 
         /// <summary>A small wall of every placeable block next to spawn, placed through the real edit path.</summary>
@@ -451,7 +452,7 @@ namespace Voxelwild.Diagnostics
             string path = Path.Combine(_outDir, name + ".png");
             File.WriteAllBytes(path, tex.EncodeToPNG());
             Destroy(tex);
-            _report.AppendLine($"captured {name}: eye {player.EyePosition}, sections {world.RenderedSections}, tris {world.RenderedTriangles / 1000}k");
+            _report.AppendLine($"captured {name}: eye {player.EyePosition}, sections {world.RenderedSections}, tris {world.RenderedTriangles / 1000}k, props {world.PropsDrawn}");
         }
 
         void Fail(string reason)

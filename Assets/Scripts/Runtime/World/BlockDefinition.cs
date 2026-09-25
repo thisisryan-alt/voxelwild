@@ -128,6 +128,11 @@ namespace Voxelwild.World
             }),
             ("Cactus", Cube(TextureLayer.CactusTop, TextureLayer.Cactus, TextureLayer.CactusTop)),
             ("Snowy Grass", Cube(TextureLayer.Snow, TextureLayer.Dirt, TextureLayer.Dirt, TextureLayer.Snow)),
+            ("Prop Barrier", new BlockDefinition
+            {
+                Flags = BlockFlags.Solid | BlockFlags.Breakable, Shape = RenderShape.None,
+                Top = None, Side = None, Bottom = None, SideOverlay = None,
+            }),
         };
 
         static BlockDefinition Cube(TextureLayer top, TextureLayer side = None, TextureLayer bottom = None,

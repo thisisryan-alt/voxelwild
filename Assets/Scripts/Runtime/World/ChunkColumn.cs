@@ -2,6 +2,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Voxelwild.World.Generation;
+using Voxelwild.World.Props;
 using static Voxelwild.World.VoxelConstants;
 
 namespace Voxelwild.World
@@ -43,12 +44,15 @@ namespace Voxelwild.World
         public NativeArray<ColumnSurface> Surface;
         /// <summary>World y of the topmost light-blocking block per (x,z); sky light is 15 above it.</summary>
         public NativeArray<int> Heightmap;
+        /// <summary>Props the decoration job placed in this column (see PropField for the live set).</summary>
+        public NativeList<PropInstance> Props;
         public readonly ChunkSection[] Sections = new ChunkSection[SectionsPerColumn];
 
         public ChunkColumn()
         {
             Surface = new NativeArray<ColumnSurface>(ChunkArea, Allocator.Persistent);
             Heightmap = new NativeArray<int>(ChunkArea, Allocator.Persistent);
+            Props = new NativeList<PropInstance>(256, Allocator.Persistent);
         }
 
         public bool HasTerrain => State != ColumnState.Generating;
@@ -60,6 +64,7 @@ namespace Voxelwild.World
         {
             if (Surface.IsCreated) Surface.Dispose();
             if (Heightmap.IsCreated) Heightmap.Dispose();
+            if (Props.IsCreated) Props.Dispose();
         }
     }
 }
