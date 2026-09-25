@@ -6,7 +6,7 @@ export const B = {
   OakLog: 12, BirchLog: 13, SpruceLog: 14, JungleLog: 15, OakLeaves: 16, BirchLeaves: 17, SpruceLeaves: 18, JungleLeaves: 19,
   Sandstone: 20, RedSandstone: 21, Mud: 22, Moss: 23, Ice: 24, CoalOre: 25, IronOre: 26, GoldOre: 27, DiamondOre: 28,
   TallGrass: 29, FlowerRed: 30, FlowerYellow: 31, DeadBush: 32, Glowcap: 33, Torch: 34, Cactus: 35, SnowyGrass: 36,
-  // 37 PropBarrier is unused in the browser build
+  PropBarrier: 37,   // invisible collision inside dead trees, stumps and fallen logs (props)
   Flow1: 38, Flow7: 44,
 };
 export const BLOCK_COUNT = 45;
@@ -72,7 +72,7 @@ BLOCKS[B.Glowcap] = cross('Glowcap', L.Glowcap, 0, 11, 0);
 BLOCKS[B.Torch] = { name: 'Torch', flags: F.Breakable | F.NeedsSupport, shape: Shape.Torch, top: L.TorchTop, side: L.Torch, bottom: L.Torch, overlay: NONE, emission: 14, opacity: 0, tint: 0, wind: 0 };
 BLOCKS[B.Cactus] = cube('Cactus', L.CactusTop, L.Cactus, L.CactusTop);
 BLOCKS[B.SnowyGrass] = cube('Snowy Grass', L.Snow, L.Dirt, L.Dirt, L.Snow);
-BLOCKS[37] = BLOCKS[B.Air];
+BLOCKS[B.PropBarrier] = { name: 'Dead Wood', flags: F.Solid | F.Breakable, shape: Shape.None, top: NONE, side: NONE, bottom: NONE, overlay: NONE, emission: 0, opacity: 0, tint: 0, wind: 0 };
 for (let lv = 1; lv <= 7; lv++) BLOCKS[37 + lv] = water('Flowing Water');
 
 export const has = (id, f) => (BLOCKS[id].flags & f) !== 0;
@@ -151,7 +151,7 @@ export function mining(block) {
     case B.IronOre: return { hardness: 3, tool: ToolType.Pickaxe, required: Tier.Stone };
     case B.GoldOre: case B.DiamondOre: return { hardness: 3, tool: ToolType.Pickaxe, required: Tier.Iron };
     case B.Ice: return { hardness: 0.5, tool: ToolType.Pickaxe, required: Tier.Hand };
-    case B.OakLog: case B.BirchLog: case B.SpruceLog: case B.JungleLog: case B.Planks:
+    case B.OakLog: case B.BirchLog: case B.SpruceLog: case B.JungleLog: case B.Planks: case B.PropBarrier:
       return { hardness: 2, tool: ToolType.Axe, required: Tier.Hand };
     case B.Cactus: return { hardness: 0.4, tool: ToolType.None, required: Tier.Hand };
     case B.Dirt: case B.Grass: case B.SnowyGrass: case B.Sand: case B.Mud:
@@ -194,6 +194,7 @@ export function drops(block, held, rnd) {
     case B.GoldOre: return [[I.GoldChunk, 1]];
     case B.DiamondOre: return [[I.Diamond, 1]];
     case B.Ice: return [];
+    case B.PropBarrier: return [[B.OakLog, 3]];   // dead wood yields logs
     case B.OakLeaves: case B.JungleLeaves: return rnd < 0.06 ? [[I.Apple, 1]] : rnd < 0.14 ? [[I.Stick, 1]] : [];
     case B.BirchLeaves: case B.SpruceLeaves: return rnd < 0.1 ? [[I.Stick, 1]] : [];
     case B.TallGrass: return rnd < 0.12 ? [[I.Berries, 1]] : [];

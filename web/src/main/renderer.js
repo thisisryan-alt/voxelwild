@@ -3,10 +3,13 @@
 import { compile, setUniforms, texture2D, framebuffer, mat4, norm, frustumPlanes, boxInFrustum } from './gl.js';
 import * as S from './shaders.js';
 import { cloudNoise } from './sky.js';
-import { LAYER_TUNING, LAYER_NAMES, BLOCKS, Shape, NONE, layerFor } from '../shared/blocks.js';
+import { LAYER_TUNING, LAYER_NAMES, BLOCKS, Shape, NONE, layerFor, L as LAYER } from '../shared/blocks.js';
+import { PROP_RULES } from '../shared/props.js';
 import { CS } from '../shared/const.js';
 
 const SHADOW_SIZE = 2048;
+// LOD switch distances as fractions of each kind's draw distance (Unity PropField)
+const PROP_LOD3 = [0.22, 0.5, 1], PROP_LOD2 = [0.4, 1], PROP_LOD1 = [1];
 
 export class Renderer {
   constructor(canvas) {
@@ -52,6 +55,8 @@ export class Renderer {
       crack: compile(gl, C + S.CRACK_VS, C + S.CRACK_FS, 'crack'),
       particle: compile(gl, C + S.PARTICLE_VS, C + S.PARTICLE_FS, 'particle'),
       sprite: compile(gl, C + S.SPRITE_VS, C + L + S.SPRITE_FS, 'sprite'),
+      prop: compile(gl, C + S.PROP_VS, C + L + S.PROP_FS, 'prop'),
+      propShadow: compile(gl, C + S.PROP_SHADOW_VS, C + S.PROP_SHADOW_FS, 'prop-shadow'),
     };
     // per-layer material tables
     const n = LAYER_NAMES.length;
@@ -172,6 +177,123 @@ export class Renderer {
     gl.deleteTexture(this[which]);
     this[which] = tx;
     this.gpuBytes += size * size * 4 * layers * 1.33;
+  }
+
+  /** Blender props: one vertex/index buffer for every LOD, the per-asset bakes as two texture arrays. */
+  uploadProps(lib, bin, bakeNormal, bakeMask) {
+    const gl = this.gl;
+    this.propLib = lib;
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(bin, 0, lib.vertexBytes), gl.STATIC_DRAW);
+    const st = lib.stride;
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, st, 0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.BYTE, true, st, 12);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.BYTE, true, st, 16);
+    gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 2, gl.UNSIGNED_SHORT, true, st, 20);
+    gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 2, gl.FLOAT, false, st, 24);
+    gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 4, gl.UNSIGNED_BYTE, true, st, 32);
+    const ibo = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(bin, lib.vertexBytes, lib.indexCount), gl.STATIC_DRAW);
+    this.propInst = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.propInst);
+    for (const loc of [6, 7, 8]) { gl.enableVertexAttribArray(loc); gl.vertexAttribDivisor(loc, 1); gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, 48, (loc - 6) * 16); }
+    gl.bindVertexArray(null);
+    this.propVao = vao;
+    this.propData = new Float32Array(12 * 4096);
+    this.gpuBytes += bin.byteLength;
+    // material uniforms per asset slot
+    for (const a of lib.assets) a.mats = a.slots.map((s) => ({
+      uMapping: s.mapping === 'triplanar' ? 0 : s.mapping === 'uv' ? 1 : 2, uLayer: s.layer ? (LAYER[s.layer] ?? 0) : 0, uTiling: s.tiling ?? 1,
+      uTint: s.tint || [1, 1, 1], uRoughness: s.roughness ?? 1, uMoss: s.moss ?? 0, uFoliage: s.foliage ? 1 : 0, uBake: a.bake, uEdgeWear: 0.2,
+    }));
+    const arr = (bmp) => {
+      const tx = gl.createTexture(), size = bmp.width, n = Math.round(bmp.height / size);
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, tx);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, Math.floor(Math.log2(size)) + 1, gl.RGBA8, size, size, n);
+      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, 0, size, size, n, gl.RGBA, gl.UNSIGNED_BYTE, bmp);
+      gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      this.gpuBytes += size * size * 4 * n * 1.33;
+      return tx;
+    };
+    this.propBakeN = arr(bakeNormal); this.propBakeM = arr(bakeMask);
+  }
+
+  /** Visible prop instances batched by (asset, LOD): Map key -> { entry, lod, list: [items] }. */
+  gatherProps(field, cam, planes, shadowsOnly, maxDist) {
+    const batches = new Map();
+    if (!field || !this.propLib) return batches;
+    const lib = this.propLib, max2 = maxDist * maxDist;
+    for (const sp of field.sections.values()) {
+      if (!sp.lit || !sp.render || sp.render.dead || !sp.items.length) continue;
+      if (!shadowsOnly && !sp.render.visible) continue;
+      const dx0 = Math.max(sp.x0 - cam[0], 0, cam[0] - sp.x0 - CS), dz0 = Math.max(sp.z0 - cam[2], 0, cam[2] - sp.z0 - CS);
+      if (dx0 * dx0 + dz0 * dz0 > max2) continue;
+      if (!boxInFrustum(planes, sp.x0 - 4, sp.y0 - 4, sp.z0 - 4, sp.x0 + CS + 4, sp.y0 + CS + 4, sp.z0 + CS + 4)) continue;
+      for (const it of sp.items) {
+        if (it.entry < 0) continue;
+        const rule = PROP_RULES[it.kind];
+        if (shadowsOnly && !rule.shadows) continue;
+        const dx = it.px - cam[0], dy = it.py - cam[1], dz = it.pz - cam[2];
+        const d2 = dx * dx + dy * dy + dz * dz, dd = rule.drawDistance;
+        if (d2 > dd * dd || d2 > max2) continue;
+        if (!boxInFrustum(planes, it.px - it.radius, it.py + it.bottom, it.pz - it.radius, it.px + it.radius, it.py + it.top, it.pz + it.radius)) continue;
+        const n = lib.assets[it.entry].lods.length;
+        const fr = n >= 3 ? PROP_LOD3 : n === 2 ? PROP_LOD2 : PROP_LOD1;
+        let lod = 0;
+        while (lod < n - 1 && d2 > (dd * fr[lod]) ** 2) lod++;
+        if (shadowsOnly) lod = Math.min(n - 1, lod + 1);
+        const key = it.entry * 4 + lod;
+        let b = batches.get(key);
+        if (!b) { b = { entry: it.entry, lod, list: [] }; batches.set(key, b); }
+        b.list.push(it);
+      }
+    }
+    return batches;
+  }
+
+  drawProps(batches, shadow) {
+    const gl = this.gl, lib = this.propLib;
+    if (!batches.size) return 0;
+    let total = 0;
+    for (const b of batches.values()) total += b.list.length;
+    if (this.propData.length < total * 12) this.propData = new Float32Array(total * 12 * 2);
+    const d = this.propData;
+    let o = 0;
+    for (const b of batches.values()) for (const it of b.list) {
+      d[o] = it.px; d[o + 1] = it.py; d[o + 2] = it.pz; d[o + 3] = it.s;
+      d[o + 4] = it.c; d[o + 5] = it.sn; d[o + 6] = it.sky; d[o + 7] = it.block;
+      d[o + 8] = it.temp ?? 0.5; d[o + 9] = it.humid ?? 0.5; d[o + 10] = 0; d[o + 11] = 0;
+      o += 12;
+    }
+    gl.bindVertexArray(this.propVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.propInst);
+    gl.bufferData(gl.ARRAY_BUFFER, d.subarray(0, total * 12), gl.STREAM_DRAW);
+    gl.disable(gl.CULL_FACE);
+    const prog = shadow ? this.progs.propShadow : this.progs.prop;
+    let first = 0, drawn = 0;
+    for (const b of batches.values()) {
+      const n = b.list.length, base = first * 48;
+      gl.vertexAttribPointer(6, 4, gl.FLOAT, false, 48, base);
+      gl.vertexAttribPointer(7, 4, gl.FLOAT, false, 48, base + 16);
+      gl.vertexAttribPointer(8, 4, gl.FLOAT, false, 48, base + 32);
+      const a = lib.assets[b.entry], lod = a.lods[b.lod];
+      for (const sub of lod.submeshes) {
+        const mat = a.mats[sub.slot] || a.mats[0];
+        if (shadow && mat.uFoliage) continue;
+        if (!shadow) setUniforms(gl, prog, mat);
+        gl.drawElementsInstanced(gl.TRIANGLES, sub.count, gl.UNSIGNED_INT, sub.first * 4, n);
+      }
+      first += n; drawn += n;
+    }
+    return drawn;
   }
 
   uploadAtlas(canvas) {
@@ -356,7 +478,7 @@ export class Renderer {
       uFog: [fogDensity, f.underwater ? 0 : 0.018, 64, 0], uFogEdge: f.underwater ? [1e5, 1e5 + 1] : [f.viewDistance * CS * 0.6, f.viewDistance * CS * 0.96],
       uBlockColor: [1.0 * 2.4, 0.62 * 2.4, 0.3 * 2.4], uCamSky: f.camSky,
       uShadowVP: this.shadowVPFlat, uShadowDist: [22, 88], uShadowOn: shadowsOn ? 1 : 0,
-      uShadow0: 4, uShadow1: 5, uCloudTex: 6, uSkyLut: 3, uAlbedo: 0, uNormal: 1, uMask: 2, uSceneColor: 7, uSceneDepth: 8, uAtlas: 9,
+      uShadow0: 4, uShadow1: 5, uCloudTex: 6, uSkyLut: 3, uAlbedo: 0, uNormal: 1, uMask: 2, uSceneColor: 7, uSceneDepth: 8, uAtlas: 9, uBakeN: 14, uBakeM: 15,
       uCloud: [wth.cloudCover, 1 / 5200, 420, 0.55 * wth.cloudCover + 0.1], uCloudOff: [this.cloudOff[0], this.cloudOff[1], 2.2, 1 - wth.storm * 0.55],
       uWet: wth.wetness, uSnow: wth.snowCover,
       uLP: this.uLP, uLT: this.uLT, uLP2: this.uLP2,
@@ -443,6 +565,13 @@ export class Renderer {
       gl.bindVertexArray(g.vao);
       gl.drawElements(gl.TRIANGLES, g.n1, g.type, g.n0 * g.isz);
       tris += g.n1 / 3;
+    }
+    // Blender props (rocks, dead wood, cave formations, plants)
+    if (f.props && this.propLib) {
+      this.use(this.progs.prop);
+      this.bindTex(14, gl.TEXTURE_2D_ARRAY, this.propBakeN);
+      this.bindTex(15, gl.TEXTURE_2D_ARRAY, this.propBakeM);
+      this.stats.props = this.drawProps(this.gatherProps(f.props, f.camPos, this.planes, false, far), false);
     }
     // entities (dropped blocks) with the foliage program (handles rotation + cutout)
     if (f.entities && f.entities.length) this.drawEntities(f.entities);
@@ -554,6 +683,10 @@ export class Renderer {
           gl.drawElements(gl.TRIANGLES, n, g.type, pass === 0 ? 0 : g.n0 * g.isz);
           drawnTotal++;
         }
+      }
+      if (f.props && this.propLib) {
+        this.use(this.progs.propShadow, { uViewProj: vp });
+        this.drawProps(this.gatherProps(f.props, center, planes, true, r * 1.5), true);
       }
     }
     this.shadowFresh = true;

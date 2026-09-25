@@ -83,6 +83,22 @@ export class Mesher {
     };
   }
 
+  /** cells: Int8Array of section-local x,y,z triples. Returns Uint8Array sky,block per cell (0..15). */
+  lightAtCells(cells) {
+    const n = cells.length / 3, out = new Uint8Array(n * 2);
+    const N6 = [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    for (let i = 0; i < n; i++) {
+      let sky = 0, bl = 0;
+      for (const d of N6) {
+        const ri = RI(cells[i * 3] + d[0], cells[i * 3 + 1] + d[1], cells[i * 3 + 2] + d[2]);
+        if (this.sky[ri] > sky) sky = this.sky[ri];
+        if (this.blk[ri] > bl) bl = this.blk[ri];
+      }
+      out[i * 2] = sky; out[i * 2 + 1] = bl;
+    }
+    return out;
+  }
+
   // ---------------------------------------------------------------- lighting
 
   computeLight() {

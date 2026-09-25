@@ -19,5 +19,5 @@ const esc = (s) => s.replace(/<\/script/gi, '<\/script');
 let html = readFileSync(join(root, 'src/index.html'), 'utf8');
 html = html.replace('/*__WORKER__*/', () => esc(worker)).replace('/*__MAIN__*/', () => esc(main));
 writeFileSync(join(dist, 'index.html'), html);
-for (const f of ['albedo.webp', 'normal.webp', 'mask.webp']) copyFileSync(join(root, 'assets', f), join(dist, 'assets', f));
+for (const f of ['albedo.webp', 'normal.webp', 'mask.webp', 'props.json', 'props.bin', 'prop_normal.webp', 'prop_mask.webp']) copyFileSync(join(root, 'assets', f), join(dist, 'assets', f));
 console.log(`dist/index.html ${(html.length / 1024).toFixed(0)} KB (worker ${(worker.length / 1024).toFixed(0)} KB, main ${(main.length / 1024).toFixed(0)} KB)`);

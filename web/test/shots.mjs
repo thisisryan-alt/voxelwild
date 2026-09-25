@@ -12,7 +12,7 @@ const server = http.createServer((req, res) => {
   if (!existsSync(p)) { res.writeHead(404); res.end(); return; }
   let body = readFileSync(p);
   if (p.endsWith('index.html')) body = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>[hidden]{display:none!important}body{margin:0}</style></head><body>' + body + '</body></html>';
-  res.writeHead(200, { 'content-type': { '.html': 'text/html', '.webp': 'image/webp' }[extname(p)] || 'application/octet-stream' }); res.end(body);
+  res.writeHead(200, { 'content-type': { '.html': 'text/html', '.webp': 'image/webp', '.bin': 'application/octet-stream' }[extname(p)] || 'application/octet-stream' }); res.end(body);
 });
 await new Promise((r) => server.listen(0, r));
 const browser = await puppeteer.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--ignore-gpu-blocklist', '--use-angle=d3d11'], defaultViewport: { width: 1280, height: 720 } });
@@ -22,7 +22,8 @@ page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warn' || m
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 await page.evaluateOnNewDocument(() => { window.__trace = '-8,2,6'; });
 await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
-await page.waitForFunction(() => window.voxelwild && window.voxelwild.game.icons, { timeout: 30000 });
+await page.waitForFunction(() => window.voxelwild && (window.voxelwild.game.icons || !document.getElementById('fatal').hidden), { timeout: 30000 });
+const fatal = await page.evaluate(() => document.getElementById('fatal').hidden ? '' : document.getElementById('fatalMsg').textContent); if (fatal) { console.log('FATAL', fatal); process.exit(1); }
 await page.waitForFunction(() => window.voxelwild.game.state === 'menu', { timeout: 60000 }); await new Promise((r) => setTimeout(r, 1200));
 await page.screenshot({ path: join(out, 'shot-title.png') });
 await page.evaluate((seed) => window.voxelwild.ui.play({ id: 'shots', name: 'Shots', seed: +seed, mode: 'creative', created: 0, lastPlayed: 0 }, true), seed);
@@ -50,6 +51,17 @@ for (let v of views) {
     });
     if (!at) { console.log('no cave found'); continue; }
     v = { ...v, abs: at };
+  }
+  if (v.prop != null) {
+    if (v.near) { const at = await page.evaluate((b) => window.voxelwild.game.findBiome(b), v.near); if (at) { await page.evaluate((at) => window.voxelwild.game.player.teleport([at[0], at[1] + 20, at[2]]), at); await new Promise((r) => setTimeout(r, 9000)); } }
+    const at = await page.evaluate((k) => {
+      const g = window.voxelwild.game, p = g.player.body.pos; let best = null, bd = 1e9;
+      for (const sp of g.world.props.sections.values()) for (const it of sp.items) { if (it.kind !== k) continue; const d = Math.hypot(it.x - p[0], it.z - p[2]); if (d < bd) { bd = d; best = it; } }
+      return best && [best.px, best.py, best.pz];
+    }, v.prop);
+    if (!at) { console.log('no prop', v.prop); continue; }
+    const dist = v.dist || 5;
+    v = { ...v, abs: [at[0] - Math.sin(-v.yaw) * dist * -1, at[1] + (v.dy || 1.5), at[2] + Math.cos(v.yaw) * dist] };
   }
   if (v.biome) {
     const at = await page.evaluate((v) => window.voxelwild.game.findBiome(v.biome), v);

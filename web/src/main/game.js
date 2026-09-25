@@ -54,6 +54,18 @@ export class Game {
       return createImageBitmap(await res.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
     };
     const [albedo, normal, mask] = await Promise.all([load('albedo.webp'), load('normal.webp'), load('mask.webp')]);
+    // Blender props: optional art (the world generates the same without it)
+    this.propsReady = (async () => {
+      try {
+        const [lib, bin, bn, bm] = await Promise.all([
+          fetch(this.assetBase + 'props.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+          fetch(this.assetBase + 'props.bin').then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }),
+          load('prop_normal.webp'), load('prop_mask.webp')]);
+        this.renderer.uploadProps(lib, bin, bn, bm);
+        this.propLib = lib;
+        if (this.world) this.world.props.setLibrary(lib);
+      } catch (e) { console.warn('props unavailable:', e && e.message); }
+    })();
     progress && progress('Preparing materials', 0.6);
     this.renderer.uploadLayers('albedo', albedo);
     this.renderer.uploadLayers('normal', normal);
@@ -83,6 +95,8 @@ export class Game {
       onMesh: (s, m) => this.renderer.uploadSection(s, m),
       onUnloadSection: (s) => this.renderer.freeSection(s),
     });
+    if (meta.removedProps) for (const a of meta.removedProps) this.world.props.removed.add(a);
+    if (this.propLib) this.world.props.setLibrary(this.propLib);
     this.player = new Player();
     this.inventory = new Inventory();
     this.stats = new SurvivalStats();
@@ -190,6 +204,7 @@ export class Game {
       player: { pos: [...p.body.pos], yaw: p.yaw, pitch: p.pitch, spawn: this.spawn, flying: p.flying },
       inventory: this.inventory.toJSON(), stats: this.stats.toJSON(),
       time: { hour: this.tod.hour, day: this.tod.day }, weather: this.weather.toJSON(),
+      removedProps: [...this.world.props.removed],
     };
   }
 
@@ -508,8 +523,10 @@ export class Game {
       // magnet + pickup
       const dx = eye[0] - b.pos[0], dy = eye[1] + 0.8 - b.pos[1], dz = eye[2] - b.pos[2];
       const d = Math.hypot(dx, dy, dz);
+      // picked up inside the player's box grown by 1 block sideways and half a block up and down
+      const touching = Math.abs(dx) < 1.3 && Math.abs(dz) < 1.3 && b.pos[1] > eye[1] - 0.75 && b.pos[1] < eye[1] + 2.3;
       if (e.pickup <= 0 && this.state !== 'dead') {
-        if (d < 1.4) {
+        if (touching || d < 1.4) {
           const left = this.inventory.add(e.item, e.count, { wear: e.wear });
           if (left < e.count) { this.audio.pop(); this.emit('pickup', e.item, e.count - left); }
           e.count = left;
@@ -705,7 +722,7 @@ export class Game {
       selection: this.target && this.state === 'playing' ? this.target.hit : null,
       crack: this.mining && this.mining.progress > 0 ? { pos: this.mining.pos, progress: Math.min(1, this.mining.progress) } : null,
       entities,
-      sprites, particles: this.packParticles(), hand, damage: this.damageFlash * 0.6, flash: this.flash,
+      sprites, particles: this.packParticles(), hand, damage: this.damageFlash * 0.6, flash: this.flash, props: this.world.props,
     };
     this.renderer.render(f);
   }
@@ -729,7 +746,7 @@ export class Game {
     return {
       pos: p.map((v) => v.toFixed(1)).join(' '), biome: clim ? BIOME_NAMES[clim.biome] : '-',
       fps: this.fps.toFixed(0), ms: this.frameMs.toFixed(1), sections: r.sections.size, drawn: r.stats.drawn, tris: Math.round(r.stats.tris / 1000) + 'k',
-      columns: w.columns.size, gpuMB: (r.gpuBytes / 1048576).toFixed(0), time: `day ${this.tod.day + 1} ${Math.floor(this.tod.hour).toString().padStart(2, '0')}:${Math.floor((this.tod.hour % 1) * 60).toString().padStart(2, '0')}`,
+      props: `${r.stats.props || 0}/${w.props.loaded}`, columns: w.columns.size, gpuMB: (r.gpuBytes / 1048576).toFixed(0), time: `day ${this.tod.day + 1} ${Math.floor(this.tod.hour).toString().padStart(2, '0')}:${Math.floor((this.tod.hour % 1) * 60).toString().padStart(2, '0')}`,
       weather: WEATHER_NAMES[this.weather.current], entities: this.entities.length, workers: w.workers.length, errors: w.errors.length,
     };
   }

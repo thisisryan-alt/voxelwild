@@ -18,9 +18,9 @@ self.onmessage = (e) => {
     } else if (m.type === 'decorate') {
       const t0 = performance.now();
       const vox = m.voxels;
-      const heightmap = decorateColumn(vox, m.cx, m.cz, m.seed, m.neighbours);
+      const { heightmap, props } = decorateColumn(vox, m.cx, m.cz, m.seed, m.neighbours);
       // split into sections; a section of one block id is sent as that id only
-      const sections = new Array(SECTIONS), transfer = [heightmap.buffer];
+      const sections = new Array(SECTIONS), transfer = [heightmap.buffer, props.buffer];
       for (let s = 0; s < SECTIONS; s++) {
         const view = vox.subarray(s * CS3, (s + 1) * CS3);
         const first = view[0];
@@ -29,13 +29,15 @@ self.onmessage = (e) => {
         if (uniform) sections[s] = first;
         else { const copy = view.slice(); sections[s] = copy; transfer.push(copy.buffer); }
       }
-      self.postMessage({ type: 'decorate', id: m.id, cx: m.cx, cz: m.cz, sections, heightmap, ms: performance.now() - t0 }, transfer);
+      self.postMessage({ type: 'decorate', id: m.id, cx: m.cx, cz: m.cz, sections, heightmap, props, ms: performance.now() - t0 }, transfer);
     } else if (m.type === 'mesh') {
       const t0 = performance.now();
       const r = mesher.mesh(m.region, m.heightPatch, m.climate, m.sx, m.sy, m.sz, m.fancy);
-      self.postMessage({ type: 'mesh', id: m.id, key: m.key, version: m.version, ...r, region: m.region, heightPatch: m.heightPatch, climate: m.climate,
+      // voxel light for the props standing in this section (brightest of the cell and its 6 neighbours)
+      const propLight = m.propCells ? mesher.lightAtCells(m.propCells) : null;
+      self.postMessage({ type: 'mesh', id: m.id, key: m.key, version: m.version, ...r, propLight, region: m.region, heightPatch: m.heightPatch, climate: m.climate,
         ms: performance.now() - t0 },
-        [r.vertices, r.opaque.buffer, r.cutout.buffer, r.water.buffer, m.region.buffer, m.heightPatch.buffer, m.climate.buffer]);
+        [r.vertices, r.opaque.buffer, r.cutout.buffer, r.water.buffer, m.region.buffer, m.heightPatch.buffer, m.climate.buffer, ...(propLight ? [propLight.buffer] : [])]);
     }
   } catch (err) {
     self.postMessage({ type: 'error', id: m.id, message: String(err && err.stack || err) });

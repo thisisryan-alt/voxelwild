@@ -13,12 +13,15 @@ const out = join(root, 'test', 'out');
 mkdirSync(out, { recursive: true });
 const headful = process.argv.includes('--headful');
 
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.webp': 'image/webp', '.json': 'application/json' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.webp': 'image/webp', '.bin': 'application/octet-stream', '.json': 'application/json' };
 const server = http.createServer((req, res) => {
   const p = join(dist, decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/+/, '') || 'index.html');
   if (req.url.startsWith('/favicon')) { res.writeHead(204); res.end(); return; }
   if (!p.startsWith(dist) || !existsSync(p)) { res.writeHead(404); res.end(); return; }
-  res.writeHead(200, { 'content-type': types[extname(p)] || 'application/octet-stream' });
+  const headers = { 'content-type': types[extname(p)] || 'application/octet-stream' };
+  // mirror the artifact frame's restrictions: no eval, workers only from blob:/self, same-origin fetch, Google Fonts
+  if (process.env.CSP) headers['content-security-policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; worker-src 'self' blob:; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com";
+  res.writeHead(200, headers);
   let body = readFileSync(p);
   // the artifact viewer wraps the page in this skeleton; mirror it locally
   if (p.endsWith('index.html')) body = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui;background:#fafaf7}img{max-width:100%}[hidden]{display:none!important}</style></head><body>' + body + '</body></html>';
@@ -85,8 +88,8 @@ await step('walk and jump', async () => {
 
 await step('mine by hand and collect drop', async () => {
   // look straight down at the ground and hold the mouse
-  const r = await G(() => {
-    const g = window.voxelwild.game; g.player.pitch = -1.55;
+  const r = await G(async () => {
+    const g = window.voxelwild.game; g.player.teleport(g.spawn, 0, -1.55); await new Promise((res) => setTimeout(res, 600)); g.player.pitch = -1.55;
     return new Promise((res) => setTimeout(() => res(g.target ? { block: g.target.block, at: g.target.hit } : null), 200));
   });
   if (!r) throw new Error('no block targeted below the player');
@@ -102,7 +105,10 @@ await step('mine by hand and collect drop', async () => {
 await step('place a block', async () => {
   const r = await G(async () => {
     const g = window.voxelwild.game;
-    g.player.teleport(g.spawn); await new Promise((res) => setTimeout(res, 400));
+    // stand beside the hole the mining step dug, on the highest solid block
+    const sx = Math.floor(g.spawn[0]) + 3, sz = Math.floor(g.spawn[2]);
+    let sy = 150; while (sy > 0 && !g.world.isSolidAt(sx, sy - 1, sz)) sy--;
+    g.player.teleport([sx + 0.5, sy + 0.01, sz + 0.5]); await new Promise((res) => setTimeout(res, 400));
     const slot = g.inventory.slots.findIndex((s) => s && s.item < 256);
     if (slot < 0) return { skipped: 'no block in inventory' };
     g.inventory.slots[0] = g.inventory.slots[slot]; if (slot) g.inventory.slots[slot] = null; g.select(0);
@@ -315,6 +321,24 @@ await step('drops and cracks render', async () => {
   });
   await shot('10-drops');
   return await G(() => ({ entities: window.voxelwild.game.entities.length }));
+});
+
+await step('props: placed, lit, removed with their support', async () => {
+  const r = await G(async () => {
+    const g = window.voxelwild.game, w = g.world, f = w.props;
+    let best = null;
+    for (const sp of f.sections.values()) for (const it of sp.items) if (it.kind === 2 || it.kind === 6 || it.kind === 7 || it.kind === 5) { best = it; break; }
+    if (!best) return { skipped: 'no boulder/stump/log loaded', loaded: f.loaded };
+    const lit = [...f.sections.values()].filter((s) => s.lit).length;
+    const cells = []; const core = w.getBlock(best.x, best.y, best.z);
+    w.setBlock(best.x, best.y - 1, best.z, 0);
+    const still = [...f.sections.values()].some((sp) => sp.items.includes(best));
+    const after = w.getBlock(best.x, best.y, best.z);
+    return { kind: best.kind, at: [best.x, best.y, best.z], coreBefore: core, coreAfter: after, still, removed: f.removed.size, loaded: f.loaded, litSections: lit };
+  });
+  if (r.skipped) throw new Error(JSON.stringify(r));
+  if (r.still || !(r.coreAfter === 0 || r.coreAfter === 1 && r.kind === 2)) throw new Error(JSON.stringify(r));
+  return r;
 });
 
 await step('save and reload', async () => {

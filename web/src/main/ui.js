@@ -66,7 +66,8 @@ export class UI {
     g.on('saved', () => {});
     await this.refreshWorlds();
     requestAnimationFrame((t) => this.loop(t));
-    g.startMenuWorld().catch((e) => console.warn('menu world', e));
+    // the title backdrop, unless a world was already started while the saved-world list loaded
+    if (!g.world) g.startMenuWorld().catch((e) => console.warn('menu world', e));
     window.addEventListener('pagehide', () => g.save());
     document.addEventListener('visibilitychange', () => { if (document.hidden) { g.save(); if (this.screen === 'playing') this.pause(); } });
   }

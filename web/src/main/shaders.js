@@ -680,3 +680,122 @@ void main() {
   outColor = vec4(applyFog(pow(t.rgb, vec3(2.2)) * uTint, vPos), 1.0);
 }
 `;
+
+// ------------------------------------------------------------------ props (Unity Voxelwild/Prop + VoxelPropSurface)
+export const PROP_VS = /* glsl */ `
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec4 aNormal;
+layout(location=2) in vec4 aTangent;
+layout(location=3) in vec2 aUV0;
+layout(location=4) in vec2 aUV1;
+layout(location=5) in vec4 aColor;
+layout(location=6) in vec4 iPosScale;     // pivot xyz, scale
+layout(location=7) in vec4 iRotLight;     // cos yaw, sin yaw, sky light, block light
+layout(location=8) in vec4 iClimate;      // temperature, humidity
+uniform mat4 uViewProj;
+uniform float uFoliage;
+out vec3 vPos; out vec3 vN; out vec4 vT; out vec4 vColor; out vec4 vUV; flat out vec4 vLight;
+vec3 rot(vec3 v) { return vec3(iRotLight.x * v.x + iRotLight.y * v.z, v.y, -iRotLight.y * v.x + iRotLight.x * v.z); }
+void main() {
+  vec3 p = rot(aPos * iPosScale.w) + iPosScale.xyz;
+  if (uFoliage > 0.5) p += windOffset(p, aColor.a);
+  vPos = p;
+  vN = rot(aNormal.xyz);
+  vT = vec4(rot(aTangent.xyz), aTangent.w);
+  vColor = aColor;
+  vUV = vec4(aUV0, aUV1);
+  vLight = vec4(iRotLight.zw, iClimate.xy);
+  gl_Position = uViewProj * vec4(p, 1.0);
+}
+`;
+export const PROP_FS = /* glsl */ `
+uniform sampler2DArray uAlbedo, uNormal, uMask;
+uniform sampler2DArray uBakeN, uBakeM;
+uniform vec4 uLP[35]; uniform vec4 uLT[35]; uniform vec4 uLP2[35];
+uniform float uMapping, uLayer, uTiling, uMoss, uFoliage, uBake, uRoughness, uEdgeWear;
+uniform vec3 uTint;
+in vec3 vPos; in vec3 vN; in vec4 vT; in vec4 vColor; in vec4 vUV; flat in vec4 vLight;
+out vec4 outColor;
+vec3 grassTint(float t, float h) {
+  vec3 c = mix(mix(vec3(0.86, 0.94, 0.86), vec3(1.2, 1.03, 0.62), t), mix(vec3(0.72, 0.9, 0.82), vec3(0.78, 1.08, 0.66), t), h);
+  return mix(vec3(1), c, clamp(length(vec2(t, h) - 0.5) * 2.2, 0.0, 1.0));
+}
+void main() {
+  vec3 vn = normalize(vN);
+  if (uFoliage > 0.5 && !gl_FrontFacing) vn = -vn;
+  vec3 N = vn;
+  vec4 baked = vec4(1.0, 0.5, 0.0, 1.0);
+  if (uBake >= 0.0) {
+    vec3 nts = texture(uBakeN, vec3(vUV.xy, uBake)).xyz * 2.0 - 1.0;
+    vec3 T = normalize(vT.xyz - vn * dot(vn, vT.xyz));
+    vec3 Bt = cross(vn, T) * vT.w;
+    N = normalize(nts.x * T + nts.y * Bt + nts.z * vn);   // MikkTSpace: B = cross(N, T) * w
+    baked = texture(uBakeM, vec3(vUV.xy, uBake));
+  }
+  int layer = int(uLayer + 0.5);
+  vec3 albedo; float rough = 0.8, metal = 0.0, spec = 1.0, trans = 0.0, layerAO = 1.0;
+  if (uMapping < 0.5) {
+    // world-space triplanar, continuous with the blocks around it
+    vec3 w = pow(abs(N), vec3(4.0)); w /= dot(w, vec3(1.0));
+    vec2 uvX = vPos.zy * uTiling, uvY = vPos.xz * uTiling, uvZ = vPos.xy * uTiling;
+    float L = float(layer);
+    albedo = pow(texture(uAlbedo, vec3(uvX, L)).rgb, vec3(2.2)) * w.x + pow(texture(uAlbedo, vec3(uvY, L)).rgb, vec3(2.2)) * w.y + pow(texture(uAlbedo, vec3(uvZ, L)).rgb, vec3(2.2)) * w.z;
+    vec4 m = texture(uMask, vec3(uvX, L)) * w.x + texture(uMask, vec3(uvY, L)) * w.y + texture(uMask, vec3(uvZ, L)) * w.z;
+    float st = uLP[layer].y;
+    vec3 nX = texture(uNormal, vec3(uvX, L)).xyz * 2.0 - 1.0, nY = texture(uNormal, vec3(uvY, L)).xyz * 2.0 - 1.0, nZ = texture(uNormal, vec3(uvZ, L)).xyz * 2.0 - 1.0;
+    nX.xy *= st; nY.xy *= st; nZ.xy *= st;
+    nX = vec3(nX.xy + N.zy, abs(nX.z) * N.x); nY = vec3(nY.xy + N.xz, abs(nY.z) * N.y); nZ = vec3(nZ.xy + N.xy, abs(nZ.z) * N.z);
+    N = normalize(nX.zyx * w.x + nY.xzy * w.y + nZ.xyz * w.z);
+    albedo *= uLT[layer].rgb; rough = clamp(m.g * uLP[layer].z, 0.0, 1.0); metal = m.b; spec = uLT[layer].w; layerAO = m.r;
+  } else if (uMapping < 1.5) {
+    vec2 uv = vUV.zw * uTiling;
+    uv.y = -uv.y;
+    float L = float(layer);
+    albedo = pow(texture(uAlbedo, vec3(uv, L)).rgb, vec3(2.2)) * uLT[layer].rgb;
+    vec4 m = texture(uMask, vec3(uv, L));
+    vec3 nts = texture(uNormal, vec3(uv, L)).xyz * 2.0 - 1.0; nts.xy *= uLP[layer].y;
+    vec3 T = normalize(vT.xyz - N * dot(N, vT.xyz)); vec3 Bt = cross(N, T) * vT.w;
+    N = normalize(nts.x * T + nts.y * Bt + max(nts.z, 1e-3) * N);
+    rough = clamp(m.g * uLP[layer].z, 0.0, 1.0); spec = uLT[layer].w; layerAO = m.r;
+  } else {
+    albedo = pow(vColor.rgb, vec3(2.2));
+    if (uFoliage > 0.5) {
+      albedo *= mix(vec3(1.0), grassTint(vLight.z, vLight.w), vUV.z);
+      N = normalize(N + vec3(0, 0.8, 0));
+      trans = 0.6; spec = 0.3;
+    }
+  }
+  albedo *= uTint;
+  rough = clamp(rough * uRoughness, 0.0, 1.0);
+  if (uMoss > 0.0) {
+    float up = clamp(N.y * 1.4 - 0.1, 0.0, 1.0);
+    float moss = clamp(baked.b * uMoss * 2.5, 0.0, 1.0) * up;
+    if (moss > 0.001) {
+      vec2 muv = vPos.xz * 0.5;
+      vec4 ma = texture(uAlbedo, vec3(muv, 20.0));
+      vec3 mc = pow(ma.rgb, vec3(2.2)) * uLT[20].rgb * grassTint(vLight.z, vLight.w);
+      moss = smoothstep(0.35, 0.65, moss + (ma.a - 0.5) * 0.5);
+      albedo = mix(albedo, mc, moss); rough = mix(rough, 0.95, moss); spec = mix(spec, 0.3, moss);
+    }
+  }
+  float convex = clamp((baked.g - 0.55) * 3.0, 0.0, 1.0), concave = clamp((0.45 - baked.g) * 3.0, 0.0, 1.0);
+  albedo *= 1.0 + convex * uEdgeWear - concave * 0.25;
+  rough = clamp(rough + convex * 0.1, 0.0, 1.0);
+  if (uFoliage < 0.5 && uWet > 0.0) { float wv = uWet * smoothstep(0.55, 0.95, vLight.x); albedo *= mix(1.0, 0.62, wv); rough = mix(rough, rough * 0.4, wv); }
+  if (uFoliage < 0.5 && uSnow > 0.0) { float sn = smoothstep(0.5, 0.9, clamp(N.y, 0.0, 1.0) * uSnow * smoothstep(0.55, 0.95, vLight.x)); albedo = mix(albedo, vec3(0.86, 0.9, 0.95), sn); rough = mix(rough, 0.75, sn); }
+  vec3 col = shade(albedo, N, rough, metal, baked.r * layerAO, spec, vec3(0), trans, vPos, vLight.x, vLight.y, 1.0, uSkyLut);
+  outColor = vec4(applyFog(col, vPos), 1.0);
+}
+`;
+export const PROP_SHADOW_VS = /* glsl */ `
+layout(location=0) in vec3 aPos;
+layout(location=6) in vec4 iPosScale;
+layout(location=7) in vec4 iRotLight;
+uniform mat4 uViewProj;
+void main() {
+  vec3 v = aPos * iPosScale.w;
+  vec3 p = vec3(iRotLight.x * v.x + iRotLight.y * v.z, v.y, -iRotLight.y * v.x + iRotLight.x * v.z) + iPosScale.xyz;
+  gl_Position = uViewProj * vec4(p, 1.0);
+}
+`;
+export const PROP_SHADOW_FS = /* glsl */ `out vec4 outColor; void main() { outColor = vec4(1); }`;

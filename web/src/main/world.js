@@ -2,6 +2,7 @@
 // relighting, persistence of edited sections, the cellular water simulation, and cave culling (section visibility).
 import { CS, CS2, CS3, MIN_SY, MAX_SY, SECTIONS, MIN_Y, MAX_Y, RS, RS2, RS3, RM, MAX_LIGHT } from '../shared/const.js';
 import { BLOCKS, B, F, isWater, waterLevel } from '../shared/blocks.js';
+import { PropField } from './props.js';
 
 const key2 = (cx, cz) => cx * 65536 + cz;              // cx, cz within +-32767 columns (~1000 km)
 const key3 = (cx, sy, cz) => `${cx},${sy},${cz}`;
@@ -39,6 +40,7 @@ export class World {
     this.visibilityDirty = true;
     this.lastCamSection = null;
     this.errors = [];
+    this.props = new PropField();
   }
 
   // ---------------------------------------------------------------- queries
@@ -214,6 +216,7 @@ export class World {
     const conn = data === B.Air ? 63 : 0;
     s.conn = [conn, conn, conn, conn, conn, conn];
     this.visibilityDirty = true;
+    this.props.onSectionTrivial(s.key, (x, z) => this.heightmapAt(x, z), s);
     this.onMesh(s, null);
     return true;
   }
@@ -225,8 +228,10 @@ export class World {
     s.needsMesh = false;
     const fancy = this.wantsFancy(s);
     s.fancy = fancy;
+    const props = this.props.cellsFor(s.key, s.cx * CS, s.sy * CS, s.cz * CS);
+    s.propsSent = props;
     this.post(w, { type: 'mesh', id: this.jobId++, key: s.key, version: s.version, region: buf.region, heightPatch: buf.heightPatch,
-      climate: buf.climate, sx: s.cx, sy: s.sy, sz: s.cz, fancy }, [buf.region.buffer, buf.heightPatch.buffer, buf.climate.buffer]);
+      climate: buf.climate, sx: s.cx, sy: s.sy, sz: s.cz, fancy, propCells: props ? props.cells : null }, [buf.region.buffer, buf.heightPatch.buffer, buf.climate.buffer]);
   }
 
   buildRegion(s, region, hp, clim) {
@@ -297,6 +302,7 @@ export class World {
           conn: [63, 63, 63, 63, 63, 63], gl: null, visible: true, visit: 0, fancy: true, hasLeaves: false, dead: false });
       }
       col.state = 'ready';
+      this.props.onColumnReady(col.cx, col.cz, m.props);
       this.seedWater(col);
       this.visibilityDirty = true;
     } else if (m.type === 'mesh') {
@@ -312,6 +318,8 @@ export class World {
       s.hasLeaves = m.leaves > 0;
       s.conn = m.connectivity;
       this.visibilityDirty = true;
+      if (m.propLight && s.propsSent) this.props.onSectionLit(s.key, s.propsSent, m.propLight, s);
+      else this.props.onSectionLit(s.key, { items: [] }, [], s);
       this.onMesh(s, m);
     }
   }
@@ -324,6 +332,7 @@ export class World {
       if (dx * dx + dz * dz <= limit) continue;
       if (col.state === 'gen' || col.state === 'decorating') continue;   // result will be discarded when it returns
       if (col.state === 'ready') {
+        this.props.onColumnUnloaded(col.cx, col.cz);
         for (const s of col.render) { s.dead = true; this.onUnloadSection(s); }
         for (let i = 0; i < SECTIONS; i++) {
           const k3 = key3(col.cx, MIN_SY + i, col.cz);
@@ -394,6 +403,10 @@ export class World {
       }
     }
     this.wakeWater(x, y, z);   // any edit can open a path for nearby water, or be water itself
+    // props resting on, hanging from or built into this cell go with it, and take their barrier/core cells along
+    for (const [cx2, cy2, cz2, b] of this.props.removeDependents(x, y, z)) {
+      if ((cx2 !== x || cy2 !== y || cz2 !== z) && this.getBlock(cx2, cy2, cz2) === b) this.setBlock(cx2, cy2, cz2, B.Air, urgent);
+    }
     return true;
   }
 

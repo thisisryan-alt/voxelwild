@@ -5,6 +5,7 @@ import { CS, CS2, MIN_Y, MAX_Y, SEA, colIdx } from './const.js';
 import { B, BLOCKS, F } from './blocks.js';
 import { Biome } from './terrain.js';
 import { hash4, mulberry32 } from './noise.js';
+import { placeProps } from './props.js';
 
 const K = { Oak: 0, BigOak: 1, Birch: 2, Spruce: 3, TallSpruce: 4, Jungle: 5, JungleGiant: 6, Bush: 7, SwampOak: 8 };
 const GRID = 5;
@@ -53,6 +54,8 @@ export function decorateColumn(vox, cx, cz, seed, neighbours) {
     root(x, y, z) { if (!inside(x, y, z)) return; const i = colIdx(x - ox, y, z - oz); if (vox[i] === B.Grass || vox[i] === B.SnowyGrass) vox[i] = B.Dirt; },
   };
   for (const t of trees) build(t, w);
+  // props after trees (they need open ground), before the heightmap (boulder cores block light)
+  const props = placeProps(vox, cx, cz, seed, neighbours[4].height, neighbours[4].biome);
 
   const heightmap = new Int32Array(CS2);
   for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
@@ -63,7 +66,7 @@ export function decorateColumn(vox, cx, cz, seed, neighbours) {
     }
     heightmap[x + z * CS] = top;
   }
-  return heightmap;
+  return { heightmap, props };
 }
 
 function build(t, w) {
