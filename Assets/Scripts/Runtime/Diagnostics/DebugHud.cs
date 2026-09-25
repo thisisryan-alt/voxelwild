@@ -101,7 +101,7 @@ namespace Voxelwild.Diagnostics
                 $"{(player.Flying ? "flying" : player.InWater ? "swimming" : player.Body.Grounded ? "grounded" : "airborne")}\n" +
                 $"columns {world.LoadedColumns} (generating {world.GeneratingColumns})  mesh jobs {world.MeshJobsInFlight}\n" +
                 $"sections drawn {world.RenderedSections} (occlusion-culled {world.OcclusionCulledSections})  tris {world.RenderedTriangles / 1000}k  edited {world.ModifiedSections}\n" +
-                $"props drawn {world.PropsDrawn} of {world.PropsLoaded}\n" +
+                $"props drawn {world.PropsDrawn} of {world.PropsLoaded}  water cells pending {world.WaterPending}\n" +
                 $"{Clock()}  quality {(quality != null ? quality.Current.Name : "-")}\n" +
                 $"target {target}\n" +
                 "<size=12>WASD move · Space jump (double-tap: fly) · Ctrl sprint · Shift descend · F fly\n" +

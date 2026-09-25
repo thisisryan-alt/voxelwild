@@ -4,7 +4,10 @@
     <EngineFree Include="$(Assets)/Scripts/Runtime/Environment/SkyModel.cs" />
     <EngineFree Include="$(Assets)/Scripts/Runtime/Environment/AtmosphereModel.cs" />
     <EngineFree Include="$(Assets)/Scripts/Runtime/Rendering/QualityPresets.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/World/BlockId.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/World/Water/WaterSimulation.cs" />
     <EngineFree Include="$(Assets)/Tests/EditMode/EnvironmentTests.cs" />
+    <EngineFree Include="$(Assets)/Tests/EditMode/WaterSimulationTests.cs" />
     <EngineFree Include="$(Assets)/Tests/EditMode/QualityPresetTests.cs" />
   </ItemGroup>
 </Project>

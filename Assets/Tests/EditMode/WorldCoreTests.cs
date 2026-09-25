@@ -117,6 +117,7 @@ namespace Voxelwild.Tests
             public int[] Heightmap;
             public ColumnSurface[] Surface;
             public PropInstance[] Props;
+            public int3[] Springs;
             public ushort At(int x, int y, int z) => Voxels[ColumnIndex(x, y, z)];
         }
 
@@ -130,6 +131,7 @@ namespace Voxelwild.Tests
             var heightmap = new NativeArray<int>(ChunkArea, Allocator.TempJob);
             var rules = PropRegistry.CreateNative(Allocator.TempJob);
             var props = new NativeList<PropInstance>(256, Allocator.TempJob);
+            var springs = new NativeList<int3>(4, Allocator.TempJob);
             try
             {
                 if (decorate)
@@ -146,18 +148,19 @@ namespace Voxelwild.Tests
                     new DecorationJob
                     {
                         Column = column, Seed = seed, Voxels = voxels, Neighborhood = neighborhood, Blocks = blocks, Heightmap = heightmap,
-                        PropRules = rules, Props = props,
+                        PropRules = rules, Props = props, Springs = springs,
                     }.Run();
                 return new Column
                 {
                     Voxels = voxels.ToArray(), Heightmap = heightmap.ToArray(), Surface = surface.ToArray(),
                     Props = props.AsArray().ToArray(),
+                    Springs = springs.AsArray().ToArray(),
                 };
             }
             finally
             {
                 blocks.Dispose(); neighborhood.Dispose(); voxels.Dispose(); surface.Dispose(); scratch.Dispose(); heightmap.Dispose();
-                rules.Dispose(); props.Dispose();
+                rules.Dispose(); props.Dispose(); springs.Dispose();
             }
         }
 
@@ -194,7 +197,7 @@ namespace Voxelwild.Tests
         }
 
         [Test]
-        public void Column_HasBedrockFloor_WaterOnlyAtOrBelowSeaLevel_AndValidHeightmap()
+        public void Column_HasBedrockFloor_WaterOnlyAtOrBelowSeaLevelOrSprings_AndValidHeightmap()
         {
             var col = TestGen.Generate(new int2(5, 5), 1234);
             var blocks = Enumerable.Range(0, BlockId.Count).Select(i => BlockRegistry.Get((ushort)i)).ToArray();
@@ -207,7 +210,9 @@ namespace Voxelwild.Tests
                     Assert.AreEqual(0, blocks[col.At(x, y, z)].LightOpacity, $"light-blocking block above heightmap at ({x},{y},{z})");
                 Assert.Greater(blocks[col.At(x, hm, z)].LightOpacity, 0);
                 for (int y = SeaLevel + 1; y < MaxWorldY; y++)
-                    Assert.AreNotEqual(BlockId.Water, col.At(x, y, z), $"water above sea level at ({x},{y},{z})");
+                    if (col.At(x, y, z) == BlockId.Water)
+                        Assert.IsTrue(col.Springs.Contains(new int3(5 * ChunkSize + x, y, 5 * ChunkSize + z)),
+                            $"water above sea level at ({x},{y},{z}) that isn't a spring");
             }
         }
 

@@ -42,7 +42,8 @@ Legend: ✅ done · 🟡 partial or stopgap · ⬜ not started
 
 **Stopgaps still in place** (each is replaced in the phase noted):
 
-- Water is static blocks. Rivers sit at sea level. Breaking a block next to water refills it. → Phase 5
+- ~~Water is static blocks; breaking a block next to water refills it.~~ Water flows (Phase 5). Rivers still sit
+  at sea level.
 - ~~Ambient is a fixed trilight and the sun angle is fixed.~~ Replaced by the day/night cycle (Phase 4).
 - The HUD is IMGUI. → Phase 7/8
 - ~~The sky is Unity's procedural skybox.~~ Replaced by `Voxelwild/Sky` (Phase 4).
@@ -97,12 +98,22 @@ Written and type-checked; the sky, time-of-day and quality maths are unit-tested
 
 Captures pin the clock (`-vwTime`, default 0.45: mid-morning, close to the old fixed sun).
 
-## Phase 5 — Water ⬜
+## Phase 5 — Water 🟡
 
-- Cellular water simulation (levels, down-then-sideways flow) in dirty regions only, on jobs.
-  Elevated rivers, waterfalls and springs follow from it.
-- Water shader: refraction, SSR, shoreline foam, caustics, flow-map normals, underwater fog and post.
-- Buoyancy and swimming polish, splashes and ripples from entities.
+The simulation is unit-tested outside Unity; meshing, world integration and the shader are written and
+type-checked but not yet run in Unity.
+
+| Item | Status | Notes |
+|---|---|---|
+| Cellular water | 🟡 | `WaterSimulation`: sources (level 8) and flowing levels 1–7 as block ids; falls before it spreads, spreads only over solid ground or sources, two sources make a third, flows retreat when fed no more; evaluated only where something changed, 4 ticks/s, capped per tick, waits at unloaded terrain |
+| World integration | 🟡 | `SetBlockDeferred` writes water without a same-frame remesh; player edits wake the water around them; the "refill broken blocks with water" stopgap is gone |
+| Springs and waterfalls | 🟡 | at most one spring per hilly column opens in a cliff face (or a cave wall); the simulation turns it into a waterfall on load |
+| Elevated rivers | ⬜ | rivers are still carved at sea level; springs give running water on slopes |
+| Meshing | 🟡 | per-corner surface heights averaged over neighbouring cells (continuous slopes), flow direction per vertex |
+| Water shader | 🟡 | refraction through the opaque texture, per-channel absorption, caustics on the bottom, flow-mapped ripples, waterfall streaks, shore/rapids/waterfall foam, surface visible from below |
+| Screen-space reflections | ⬜ | reflections still come from the sky probe |
+| Underwater | 🟡 | `UnderwaterEffects`: close fog in the water's colour, dimmed at night |
+| Splashes and ripples from entities | ⬜ | with the VFX work in Phase 8 |
 
 ## Phase 6 — Weather ⬜
 

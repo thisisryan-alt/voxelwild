@@ -45,8 +45,21 @@ namespace Voxelwild.World
         /// <summary>Invisible solid cell inside a prop (dead-tree trunks, fallen logs): cell-sized collision,
         /// no mesh, no light blocking. Breaking it removes the prop.</summary>
         public const ushort PropBarrier = 37;
+        // --- Phase 5: flowing water, one id per level (1 weakest .. 7 strongest). Water (8) is a source, level 8.
+        public const ushort FlowingWater1 = 38;
+        public const ushort FlowingWater7 = 44;
 
-        public const int Count = 38;
+        public const int Count = 45;
+
+        public static bool IsWater(ushort id) => id == Water || (id >= FlowingWater1 && id <= FlowingWater7);
+
+        /// <summary>8 for a source, 1..7 for flowing water, 0 for anything else.</summary>
+        public static int WaterLevel(ushort id) =>
+            id == Water ? 8 : id >= FlowingWater1 && id <= FlowingWater7 ? id - FlowingWater1 + 1 : 0;
+
+        /// <summary>The flowing-water block for a level 1..7 (8 gives a source).</summary>
+        public static ushort WaterOfLevel(int level) =>
+            level >= 8 ? Water : level <= 0 ? Air : (ushort)(FlowingWater1 + level - 1);
     }
 
     /// <summary>

@@ -20,6 +20,8 @@ namespace Voxelwild.World.Generation
         [ReadOnly] public NativeArray<PropRule> PropRules;
         /// <summary>Output: this column's props, cleared first.</summary>
         public NativeList<PropInstance> Props;
+        /// <summary>Output: spring sources opened in cliff faces (at most one per column), cleared first.</summary>
+        public NativeList<int3> Springs;
 
         const int CaveDepth = 6;        // cave props stay at least this far below the surface height
         const int MaxRoom = 16;
@@ -41,6 +43,41 @@ namespace Voxelwild.World.Generation
                         TryGround(k, rule, x, z, taken);
             }
             PlaceCave();
+            PlaceSpring();
+        }
+
+        /// <summary>
+        /// Now and then a spring opens in a cliff face in hilly country: a water source in a rock cell with open air
+        /// beside it, rock above and below. It is only placed here; the water simulation turns it into a waterfall
+        /// when the column loads (VoxelWorld marks the springs dirty).
+        /// </summary>
+        void PlaceSpring()
+        {
+            Springs.Clear();
+            uint h = math.hash(new int3(Column, (int)(Seed ^ 0x51A1u)));
+            if ((h & 0xFFFF) / 65536f >= 0.2f) return;
+            int2 origin = Column * ChunkSize;
+            for (int attempt = 0; attempt < 24; attempt++)
+            {
+                uint r = math.hash(new int3(Column, attempt * 7919 + (int)Seed));
+                int x = 1 + (int)(r % (ChunkSize - 2)), z = 1 + (int)((r >> 8) % (ChunkSize - 2));
+                var s = Neighborhood[4 * ChunkArea + x + z * ChunkSize];
+                if (s.Biome != Biome.Mountains && s.Biome != Biome.SnowyPeaks && s.Biome != Biome.Taiga
+                    && s.Biome != Biome.SnowyTaiga && s.Biome != Biome.Badlands && s.Biome != Biome.Forest) continue;
+                for (int y = math.min(s.Height - 2, MaxWorldY - 2); y > SeaLevel + 6; y--)
+                {
+                    ushort b = Voxels[ColumnIndex(x, y, z)];
+                    if (b != BlockId.Stone && b != BlockId.Sandstone && b != BlockId.RedSandstone && b != BlockId.Dirt) continue;
+                    if (!Blocks[Voxels[ColumnIndex(x, y + 1, z)]].Has(BlockFlags.Opaque)) continue;
+                    if (!Blocks[Voxels[ColumnIndex(x, y - 1, z)]].Has(BlockFlags.Opaque)) continue;
+                    bool open = Voxels[ColumnIndex(x + 1, y, z)] == BlockId.Air || Voxels[ColumnIndex(x - 1, y, z)] == BlockId.Air
+                             || Voxels[ColumnIndex(x, y, z + 1)] == BlockId.Air || Voxels[ColumnIndex(x, y, z - 1)] == BlockId.Air;
+                    if (!open) continue;
+                    Voxels[ColumnIndex(x, y, z)] = BlockId.Water;
+                    Springs.Add(new int3(origin.x + x, y, origin.y + z));
+                    return;
+                }
+            }
         }
 
         void PlaceGrid(int kind, in PropRule rule, NativeArray<byte> taken)

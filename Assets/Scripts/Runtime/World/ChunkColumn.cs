@@ -46,6 +46,8 @@ namespace Voxelwild.World
         public NativeArray<int> Heightmap;
         /// <summary>Props the decoration job placed in this column (see PropField for the live set).</summary>
         public NativeList<PropInstance> Props;
+        /// <summary>Spring sources the decoration job opened in cliff faces; the water simulation starts them on load.</summary>
+        public NativeList<int3> Springs;
         public readonly ChunkSection[] Sections = new ChunkSection[SectionsPerColumn];
 
         public ChunkColumn()
@@ -53,6 +55,7 @@ namespace Voxelwild.World
             Surface = new NativeArray<ColumnSurface>(ChunkArea, Allocator.Persistent);
             Heightmap = new NativeArray<int>(ChunkArea, Allocator.Persistent);
             Props = new NativeList<PropInstance>(256, Allocator.Persistent);
+            Springs = new NativeList<int3>(4, Allocator.Persistent);
         }
 
         public bool HasTerrain => State != ColumnState.Generating;
@@ -65,6 +68,7 @@ namespace Voxelwild.World
             if (Surface.IsCreated) Surface.Dispose();
             if (Heightmap.IsCreated) Heightmap.Dispose();
             if (Props.IsCreated) Props.Dispose();
+            if (Springs.IsCreated) Springs.Dispose();
         }
     }
 }

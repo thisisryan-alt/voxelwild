@@ -38,6 +38,8 @@ namespace Voxelwild.World
         [Tooltip("Rocks, cave formations, dead wood and plants (Assets/Art/Models, built by tools/blender).")]
         [SerializeField] PropLibrary propLibrary;
         [SerializeField] bool drawProps = true;
+        [Tooltip("Flowing water (Phase 5): springs, waterfalls, and water filling dug-out spaces.")]
+        [SerializeField] bool simulateWater = true;
 
         [Header("Budgets")]
         [SerializeField, Range(1, 64)] int maxColumnsStartedPerFrame = 6;
@@ -57,6 +59,10 @@ namespace Voxelwild.World
         NativeArray<BlockDefinition> _blocks;
         NativeArray<PropRule> _propRules;
         PropField _props;
+        readonly Water.WaterSimulation _water = new Water.WaterSimulation();
+        WaterGrid _waterGrid;
+        float _waterClock;
+        float _nextWaterRetry;
         readonly List<(int3 cell, ushort block)> _propLeftovers = new List<(int3, ushort)>();
         readonly Dictionary<int2, ChunkColumn> _columns = new Dictionary<int2, ChunkColumn>();
         readonly List<ChunkColumn> _columnJobs = new List<ChunkColumn>();
@@ -120,6 +126,7 @@ namespace Voxelwild.World
             _blocks = BlockRegistry.CreateNative(Allocator.Persistent);
             _propRules = PropRegistry.CreateNative(Allocator.Persistent);
             _props = new PropField(propLibrary);
+            _waterGrid = new WaterGrid(this);
             if (!_props.HasArt)
                 Debug.LogWarning("[VoxelWorld] no prop library: props are placed (cores, barriers) but not drawn. " +
                                  "Run Voxelwild/Art/Build Prop Library.", this);
@@ -164,6 +171,7 @@ namespace Voxelwild.World
             _blocks.Dispose();
             _propRules.Dispose();
             _props = null;
+            _water.Clear();
             _initialized = false;
         }
 
@@ -189,10 +197,44 @@ namespace Voxelwild.World
 
             CompleteColumnJobs();
             CompleteMeshes();
+            TickWater();
             StartGeneration();
             StartDecoration();
             StartMeshing();
             JobHandle.ScheduleBatchedJobs();
+        }
+
+        // ------------------------------------------------------------------ water
+
+        public int WaterPending => _water.Pending;
+        public bool SimulateWater { get => simulateWater; set => simulateWater = value; }
+
+        void TickWater()
+        {
+            if (!simulateWater) return;
+            _waterClock += Time.deltaTime;
+            if (_waterClock < Water.WaterSimulation.TickSeconds) return;
+            _waterClock = 0f;
+            if (Time.time >= _nextWaterRetry && _water.Waiting > 0)
+            {
+                _nextWaterRetry = Time.time + 2f;
+                _water.RetryWaiting();
+            }
+            if (_water.Pending > 0) _water.Tick(_waterGrid);
+        }
+
+        /// <summary>The loaded world as the water simulation sees it.</summary>
+        sealed class WaterGrid : Water.IWaterGrid
+        {
+            readonly VoxelWorld _w;
+            public WaterGrid(VoxelWorld w) => _w = w;
+            public bool TryGet(int3 cell, out ushort block) => _w.TryGetBlock(cell, out block);
+            public bool IsOpen(ushort block)
+            {
+                var d = _w._blocks[block];
+                return d.Has(BlockFlags.Replaceable) && !d.Has(BlockFlags.Liquid);
+            }
+            public void Set(int3 cell, ushort block) => _w.SetBlockDeferred(cell, block);
         }
 
         // ------------------------------------------------------------------ streaming
@@ -250,6 +292,7 @@ namespace Voxelwild.World
                 {
                     Column = col.Coord, Seed = seed, Voxels = col.Build.Voxels, Neighborhood = col.Build.Neighborhood,
                     Blocks = _blocks, Heightmap = col.Heightmap, PropRules = _propRules, Props = col.Props,
+                    Springs = col.Springs,
                 }.Schedule();
                 _columnJobs.Add(col);
                 started++;
@@ -313,6 +356,7 @@ namespace Voxelwild.World
                 for (int x = 0; x < ChunkSize; x++)
                     RecomputeHeight(col, x, z, MaxWorldY - 1);
             _props.OnColumnReady(col);
+            for (int i = 0; i < col.Springs.Length; i++) _water.MarkDirty(col.Springs[i]);
         }
 
         void UnloadFarColumns()
@@ -715,9 +759,48 @@ namespace Voxelwild.World
 
         /// <summary>
         /// Sets a block. Sections whose geometry depends on it are remeshed (in parallel) before returning;
-        /// sections whose lighting can change are queued for async remeshing.
+        /// sections whose lighting can change are queued for async remeshing. Water around it re-evaluates.
         /// </summary>
         public bool SetBlock(int3 world, ushort block)
+        {
+            if (!WriteBlock(world, block)) return false;
+
+            // geometry (faces, AO, bevels) depends only on the 3x3x3 voxel neighbourhood: remesh those now
+            _syncScratch.Clear();
+            for (int dy = -1; dy <= 1; dy++)
+            for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                var ns = GetSection(WorldToSection(world + new int3(dx, dy, dz)));
+                if (ns != null && ColumnAndNeighboursReady(ns.Coord.xz)) _syncScratch.Add(ns);
+            }
+            _syncJobs.Clear();
+            foreach (var ns in _syncScratch)
+                if (!TryResolveTrivially(ns)) _syncJobs.Add(ScheduleMesh(ns));
+            JobHandle.ScheduleBatchedJobs();
+            foreach (var job in _syncJobs)
+            {
+                job.Handle.Complete();
+                FinishMesh(job);
+            }
+
+            AfterWrite(world);
+            return true;
+        }
+
+        /// <summary>
+        /// Sets a block and lets the regular async meshing pick up the change (no same-frame remesh). For
+        /// simulations that change many cells at once (water).
+        /// </summary>
+        public bool SetBlockDeferred(int3 world, ushort block)
+        {
+            if (!WriteBlock(world, block)) return false;
+            AfterWrite(world);
+            return true;
+        }
+
+        /// <summary>Writes the voxel, keeps the light heightmap current and queues every section whose light can change.</summary>
+        bool WriteBlock(int3 world, ushort block)
         {
             var s = GetSection(WorldToSection(world));
             if (s == null) return false;
@@ -747,25 +830,13 @@ namespace Voxelwild.World
                 ns.Version++;
                 ns.NeedsMesh = true;
             }
+            return true;
+        }
 
-            // geometry (faces, AO, bevels) depends only on the 3x3x3 voxel neighbourhood: remesh those now
-            _syncScratch.Clear();
-            for (int dy = -1; dy <= 1; dy++)
-            for (int dz = -1; dz <= 1; dz++)
-            for (int dx = -1; dx <= 1; dx++)
-            {
-                var ns = GetSection(WorldToSection(world + new int3(dx, dy, dz)));
-                if (ns != null && ColumnAndNeighboursReady(ns.Coord.xz)) _syncScratch.Add(ns);
-            }
-            _syncJobs.Clear();
-            foreach (var ns in _syncScratch)
-                if (!TryResolveTrivially(ns)) _syncJobs.Add(ScheduleMesh(ns));
-            JobHandle.ScheduleBatchedJobs();
-            foreach (var job in _syncJobs)
-            {
-                job.Handle.Complete();
-                FinishMesh(job);
-            }
+        /// <summary>Consequences of a write: water re-evaluates, and props that depended on the cell go.</summary>
+        void AfterWrite(int3 world)
+        {
+            _water.MarkDirty(world);
 
             // props resting on, hanging from or built into this cell go, and take their core/barrier cells along
             _propLeftovers.Clear();
@@ -778,7 +849,6 @@ namespace Voxelwild.World
                     if (TryGetBlock(c, out var b) && b == owned)
                         SetBlock(c, BlockId.Air);
             }
-            return true;
         }
 
         int RecomputeHeight(ChunkColumn col, int lx, int lz, int fromY)

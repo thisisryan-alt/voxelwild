@@ -56,6 +56,10 @@ namespace Voxelwild.EditorTools
             water.SetFloat("_MinAlpha", 0.42f);
             water.SetFloat("_RippleStrength", 0.12f);
             water.SetFloat("_Smoothness", 0.9f);
+            water.SetFloat("_Refraction", 0.035f);
+            water.SetFloat("_FlowSpeed", 1.4f);
+            water.SetFloat("_Foam", 1f);
+            water.SetFloat("_Caustics", 1.2f);
             EditorUtility.SetDirty(water);
             var outline = MaterialAt(MaterialsFolder + "/SelectionOutline.mat", "Voxelwild/SelectionOutline");
             var sky = SkyMaterial();
@@ -140,6 +144,9 @@ namespace Voxelwild.EditorTools
             outlineGo.AddComponent<MeshFilter>();
             outlineGo.AddComponent<MeshRenderer>().sharedMaterial = outline;
             var selection = outlineGo.AddComponent<SelectionOutline>();
+
+            var underwater = playerGo.AddComponent<UnderwaterEffects>();
+            Assign(underwater, ("player", controller), ("waterMaterial", water));
 
             var interactor = playerGo.AddComponent<BlockInteractor>();
             Assign(interactor, ("world", world), ("player", controller), ("outline", selection));

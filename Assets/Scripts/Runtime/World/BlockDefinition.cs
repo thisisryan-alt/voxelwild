@@ -133,6 +133,19 @@ namespace Voxelwild.World
                 Flags = BlockFlags.Solid | BlockFlags.Breakable, Shape = RenderShape.None,
                 Top = None, Side = None, Bottom = None, SideOverlay = None,
             }),
+            ("Flowing Water 1", FlowingWater()),
+            ("Flowing Water 2", FlowingWater()),
+            ("Flowing Water 3", FlowingWater()),
+            ("Flowing Water 4", FlowingWater()),
+            ("Flowing Water 5", FlowingWater()),
+            ("Flowing Water 6", FlowingWater()),
+            ("Flowing Water 7", FlowingWater()),
+        };
+
+        static BlockDefinition FlowingWater() => new BlockDefinition
+        {
+            Flags = BlockFlags.Liquid | BlockFlags.Replaceable, Shape = RenderShape.Liquid,
+            Top = None, Side = None, Bottom = None, SideOverlay = None, LightOpacity = 2,
         };
 
         static BlockDefinition Cube(TextureLayer top, TextureLayer side = None, TextureLayer bottom = None,

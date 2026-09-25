@@ -258,3 +258,37 @@ namespace Voxelwild.Tests
         }
     }
 }
+
+namespace Voxelwild.Tests
+{
+    public class SpringGenerationTests
+    {
+        const uint Seed = 20260924;
+
+        [Test]
+        public void Springs_OpenInCliffFaces_InHillyColumns()
+        {
+            int found = 0;
+            var start = TestGen.FindColumn(Seed, s => s.Biome == Biome.Mountains);
+            for (int i = 0; i < 48 && found < 2; i++)
+            {
+                var c = start + new int2(i % 8, i / 8);
+                var col = TestGen.Generate(c, Seed);
+                Assert.LessOrEqual(col.Springs.Length, 1, "at most one spring per column");
+                foreach (var sp in col.Springs)
+                {
+                    found++;
+                    int x = sp.x - c.x * ChunkSize, z = sp.z - c.y * ChunkSize;
+                    Assert.AreEqual(BlockId.Water, col.At(x, sp.y, z));
+                    Assert.Greater(sp.y, SeaLevel + 6);
+                    Assert.IsTrue(BlockRegistry.Get(col.At(x, sp.y + 1, z)).Has(BlockFlags.Opaque), "rock above");
+                    Assert.IsTrue(BlockRegistry.Get(col.At(x, sp.y - 1, z)).Has(BlockFlags.Opaque), "rock below");
+                    bool open = col.At(x + 1, sp.y, z) == BlockId.Air || col.At(x - 1, sp.y, z) == BlockId.Air
+                             || col.At(x, sp.y, z + 1) == BlockId.Air || col.At(x, sp.y, z - 1) == BlockId.Air;
+                    Assert.IsTrue(open, "opens into air");
+                }
+            }
+            Assert.Greater(found, 0, "no springs in 48 mountain-area columns");
+        }
+    }
+}

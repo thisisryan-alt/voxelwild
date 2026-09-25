@@ -264,7 +264,7 @@ namespace Voxelwild.Diagnostics
                 for (int dz = -1; dz <= 1 && !blocked; dz++)
                 for (int dx = -1; dx <= 1 && !blocked; dx++)
                     blocked = world.GetBlockOrAir(e + new int3(dx, dy, dz)) != BlockId.Air
-                              && world.GetBlockOrAir(e + new int3(dx, dy, dz)) != BlockId.Water;
+                              && !BlockId.IsWater(world.GetBlockOrAir(e + new int3(dx, dy, dz)));
                 if (!blocked) break;
                 feet.y += 1f;
             }

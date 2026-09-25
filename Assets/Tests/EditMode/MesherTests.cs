@@ -136,6 +136,31 @@ namespace Voxelwild.Tests
         }
 
         [Test]
+        public void FlowingWater_SlopesDownhill_AndCarriesItsFlowDirection()
+        {
+            // a source feeding a level-4 flow along +x, in a stone channel
+            for (int x = 4; x <= 7; x++)
+            {
+                Set(x, 4, 5, BlockId.Stone);
+                Set(x, 5, 4, BlockId.Stone);
+                Set(x, 5, 6, BlockId.Stone);
+            }
+            Set(4, 5, 5, BlockId.Stone);
+            Set(5, 5, 5, BlockId.Water);
+            Set(6, 5, 5, BlockId.WaterOfLevel(4));
+            var v = Mesh();
+            var tops = _buffers.WaterIndices.AsArray().ToArray().Distinct().Select(i => v[i]).Where(x => x.Face == Faces.PosY).ToArray();
+            Assert.AreEqual(8, tops.Length, "two top quads");
+            const float source = 0.88f, flowing = 0.44f;
+            foreach (var x in tops)
+            {
+                float expected = x.Position.x < 5.5f ? source : x.Position.x > 6.5f ? flowing : (source + flowing) / 2f;
+                Assert.AreEqual(5f + expected, x.Position.y, 1e-4f, $"corner at x={x.Position.x}");
+            }
+            Assert.IsTrue(tops.Where(x => x.Position.x < 6.5f).All(x => x.FlowX > 20 && math.abs(x.FlowZ) < 3), "source flows toward +x");
+        }
+
+        [Test]
         public void Plants_AreTwoCrossedCutoutQuads_WithRootsAnchored()
         {
             Set(5, 4, 5, BlockId.Grass);

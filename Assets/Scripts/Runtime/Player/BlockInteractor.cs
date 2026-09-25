@@ -88,16 +88,8 @@ namespace Voxelwild.Player
         public bool TryBreak(int3 block)
         {
             if (!world.TryGetBlock(block, out var id) || !BlockRegistry.Get(id).Has(BlockFlags.Breakable)) return false;
-            // Water does not flow yet: blocks broken below sea level next to water are refilled with water
-            // so oceans stay sealed until the water simulation lands.
-            ushort replacement = BlockId.Air;
-            if (block.y <= VoxelConstants.SeaLevel)
-            {
-                for (int f = 0; f < 6 && replacement == BlockId.Air; f++)
-                    if (f != Faces.NegY && world.GetBlockOrAir(block + Faces.Normal(f)) == BlockId.Water)
-                        replacement = BlockId.Water;
-            }
-            if (!world.SetBlock(block, replacement)) return false;
+            // neighbouring water flows into the hole through the water simulation
+            if (!world.SetBlock(block, BlockId.Air)) return false;
             // plants and torches standing on the broken block drop with it
             var above = block + new int3(0, 1, 0);
             if (world.TryGetBlock(above, out var up) && BlockRegistry.Get(up).Has(BlockFlags.NeedsSupport))
@@ -113,7 +105,7 @@ namespace Voxelwild.Player
             if (def.Has(BlockFlags.NeedsSupport))
             {
                 if (!world.TryGetBlock(cell - new int3(0, 1, 0), out var below) || !BlockRegistry.Get(below).Has(BlockFlags.Opaque)) return false;
-                if (existing == BlockId.Water) return false;
+                if (BlockId.IsWater(existing)) return false;
             }
             return world.SetBlock(cell, block);
         }

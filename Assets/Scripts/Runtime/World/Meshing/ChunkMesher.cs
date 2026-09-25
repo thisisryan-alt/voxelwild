@@ -15,7 +15,7 @@ namespace Voxelwild.World.Meshing
     /// Data0 (TEXCOORD0): x = face (bits 0-2) | convex-edge mask or plant UV corner (bits 3-6),
     ///                    y = texture layer, z = voxel AO (0..3 * 85), w = side overlay layer (255 none)
     /// Data1 (TEXCOORD1): x = sky light * 17, y = block light * 17, z = temperature, w = humidity
-    /// Data2 (TEXCOORD2): x = tint mode, y = wind weight, zw = reserved
+    /// Data2 (TEXCOORD2): x = tint mode, y = wind weight, zw = water flow direction (x, z; 128 = still)
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct TerrainVertex
@@ -48,6 +48,14 @@ namespace Voxelwild.World.Meshing
         public int BlockLight => (int)((Data1 >> 8) & 255) / 17;
         public int Tint => (int)(Data2 & 255);
         public int Wind => (int)((Data2 >> 8) & 255);
+        public int FlowX => (int)((Data2 >> 16) & 255) - 128;
+        public int FlowZ => (int)(Data2 >> 24) - 128;
+
+        public static uint PackFlow(float2 flow)
+        {
+            int2 f = (int2)math.round(math.clamp(flow, -1f, 1f) * 127f) + 128;
+            return ((uint)f.x << 16) | ((uint)f.y << 24);
+        }
     }
 
     /// <summary>
@@ -496,14 +504,67 @@ namespace Voxelwild.World.Meshing
             }
         }
 
+        // ------------------------------------------------------------------ water
+
+        bool IsWaterAt(int3 p) => BlockId.IsWater(At(p));
+
+        /// <summary>Surface height of a water cell within its block: sources sit a little below the top, flowing
+        /// water drops with its level, and water with water above fills the block.</summary>
+        float WaterHeight(int3 p)
+        {
+            if (IsWaterAt(p + new int3(0, 1, 0))) return 1f;
+            int level = BlockId.WaterLevel(At(p));
+            return level >= 8 ? 1f - WaterSurfaceDrop : math.max(0.1f, level / 8f * (1f - WaterSurfaceDrop));
+        }
+
+        /// <summary>Height of the surface at a block corner (cx, cz in 0..1): the mean over the water cells sharing
+        /// the corner, so neighbouring levels meet in a continuous slope. Full if any has water above.</summary>
+        float CornerHeight(int3 p, int cx, int cz)
+        {
+            float sum = 0f;
+            int n = 0;
+            for (int dz = cz - 1; dz <= cz; dz++)
+            for (int dx = cx - 1; dx <= cx; dx++)
+            {
+                int3 q = p + new int3(dx, 0, dz);
+                if (!IsWaterAt(q)) continue;
+                float h = WaterHeight(q);
+                if (h >= 1f) return 1f;
+                sum += h;
+                n++;
+            }
+            return n > 0 ? sum / n : WaterHeight(p);
+        }
+
+        /// <summary>Downhill direction of the surface (xz), for flow-mapped ripples; zero on still water.</summary>
+        float2 WaterFlow(int3 p)
+        {
+            float h = WaterHeight(p);
+            float2 flow = 0f;
+            for (int f = 0; f < 6; f++)
+            {
+                if (f == Faces.PosY || f == Faces.NegY) continue;
+                int3 d = Faces.Normal(f);
+                int3 q = p + d;
+                float hq = IsWaterAt(q) ? WaterHeight(q) : IsOpaque(q) ? h : 0f;
+                flow += new float2(d.x, d.z) * (h - hq);
+            }
+            // falling water (water above, open below) streams downward: show strong flow
+            if (!IsWaterAt(p - new int3(0, 1, 0)) && !IsOpaque(p - new int3(0, 1, 0))) flow *= 2f;
+            float len = math.length(flow);
+            return len > 1f ? flow / len : flow;
+        }
+
         void EmitWater(int3 p, ushort id)
         {
-            bool surface = At(p + new int3(0, 1, 0)) != id;
+            bool surface = !IsWaterAt(p + new int3(0, 1, 0));
+            uint data2 = TerrainVertex.PackFlow(WaterFlow(p));
             for (int face = 0; face < 6; face++)
             {
                 int3 n = Faces.Normal(face);
                 ushort other = At(p + n);
-                if (other == id || Get(other).Has(BlockFlags.Opaque)) continue;
+                if (BlockId.IsWater(other) || Get(other).Has(BlockFlags.Opaque)) continue;
+                if (face == Faces.PosY && !surface) continue;
 
                 int3 t = Faces.Tangent(face);
                 int3 b = Faces.Bitangent(face);
@@ -511,22 +572,33 @@ namespace Voxelwild.World.Meshing
                 float3 ht = (float3)t * 0.5f, hb = (float3)b * 0.5f;
                 float3 v0 = center - ht - hb, v1 = center - ht + hb, v2 = center + ht + hb, v3 = center + ht - hb;
 
-                if (surface)
+                if (surface && face != Faces.NegY)
                 {
-                    float topY = p.y + 1f - WaterSurfaceDrop;
-                    if (face == Faces.PosY) { v0.y = v1.y = v2.y = v3.y = topY; }
-                    else if (face != Faces.NegY) { v1.y = math.min(v1.y, topY); v2.y = math.min(v2.y, topY); }
+                    // move every vertex at the top of the block down to its corner's surface height
+                    v0 = SurfaceVertex(p, v0);
+                    v1 = SurfaceVertex(p, v1);
+                    v2 = SurfaceVertex(p, v2);
+                    v3 = SurfaceVertex(p, v3);
                 }
 
                 uint data0 = TerrainVertex.Pack(face, 0, 255, 3, 255);
                 uint data1 = LightData(math.max(LightAt(p), LightAt(p + n)), p);
                 uint start = (uint)Vertices.Length;
-                Vertices.Add(new TerrainVertex { Position = v0, Data0 = data0, Data1 = data1 });
-                Vertices.Add(new TerrainVertex { Position = v1, Data0 = data0, Data1 = data1 });
-                Vertices.Add(new TerrainVertex { Position = v2, Data0 = data0, Data1 = data1 });
-                Vertices.Add(new TerrainVertex { Position = v3, Data0 = data0, Data1 = data1 });
+                Vertices.Add(new TerrainVertex { Position = v0, Data0 = data0, Data1 = data1, Data2 = data2 });
+                Vertices.Add(new TerrainVertex { Position = v1, Data0 = data0, Data1 = data1, Data2 = data2 });
+                Vertices.Add(new TerrainVertex { Position = v2, Data0 = data0, Data1 = data1, Data2 = data2 });
+                Vertices.Add(new TerrainVertex { Position = v3, Data0 = data0, Data1 = data1, Data2 = data2 });
                 AddQuad(ref WaterIndices, start, 0, 1, 2, 0, 2, 3);
             }
+        }
+
+        float3 SurfaceVertex(int3 p, float3 v)
+        {
+            if (v.y < p.y + 1f - 1e-4f) return v;
+            int cx = v.x > p.x + 0.5f ? 1 : 0;
+            int cz = v.z > p.z + 0.5f ? 1 : 0;
+            v.y = p.y + CornerHeight(p, cx, cz);
+            return v;
         }
 
         static int Ao(bool side1, bool side2, bool corner) =>
