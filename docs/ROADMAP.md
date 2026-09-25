@@ -38,7 +38,7 @@ Legend: ✅ done · 🟡 partial or stopgap · ⬜ not started
 | Voxel lighting | ✅ | sky light + block light, BFS over a 64³ region per mesh, smooth per-vertex light |
 | Foliage rendering | ✅ | alpha-tested double-sided shader, wind, sun transmission, alpha-clipped shadows |
 | Culling and performance | ✅ | section visibility graph (cave culling), leaf LOD, depth priming, in-job region copy |
-| Stalactites, stalagmites, detailed rocks | ⬜ | moved to Phase 3 (Blender meshes) |
+| Stalactites, stalagmites, detailed rocks | ✅ | moved to Phase 3 (Blender meshes) |
 
 **Stopgaps still in place** (each is replaced in the phase noted):
 
@@ -46,24 +46,36 @@ Legend: ✅ done · 🟡 partial or stopgap · ⬜ not started
 - Ambient is a fixed trilight and the sun angle is fixed. → Phase 4
 - The HUD is IMGUI. → Phase 7/8
 - The sky is Unity's procedural skybox. → Phase 4
-- Trees and plants are voxel/sprite generated. Hero trees, rocks and cave formations come from Blender.
-  → Phase 3
+- Trees and plants are voxel/sprite generated. Rocks, cave formations, dead wood and plant clumps now come
+  from Blender (Phase 3); hero trees with leaf cards are still to come.
 
-## Phase 3 — Art pipeline (Blender → Unity) ⬜
+## Phase 3 — Art pipeline (Blender → Unity) 🟡
 
-Blender 5.2.1 LTS is installed and runs headless (`blender --background --python`). Plan:
+Built and verified on the Blender side. The Unity side is written and type-checked but has not yet run
+in the editor: the gate is `./tools/unity.ps1 build`, `test -Platform EditMode`, `turntable` and a
+`capture` run reviewed by eye.
 
-- `SourceArt/Blender/` holds .blend sources. `tools/blender/*.py` generators and exporters run headless
-  from `tools/blender.ps1`.
-- Procedural generators:
-  - rocks and boulders (fractured, bevelled, moss and dirt masks)
-  - stalactites and stalagmites
-  - hero tree variants (trunk, branches, roots, leaf cards) to mix with voxel trees near the camera
-  - grass, flower and mushroom clumps
-- Bakes: normal, AO and curvature. LODs by decimation, exported per LOD.
-- Export FBX to `Assets/Art/Models/` with an `AssetPostprocessor` that assigns materials, LOD groups and
-  import settings. Props are placed by the decoration job as instanced detail meshes.
-- Quality gate: each asset gets a turntable capture in Unity before it's accepted.
+| Item | Status | Notes |
+|---|---|---|
+| Headless Blender pipeline | ✅ | `tools/blender/` (Blender 5.x or the `bpy` module), `tools/blender.ps1 build / check / preview` |
+| Rocks and boulders | ✅ | pebble clusters, stones and boulders: fractured by planes, bevelled, with cracks and strata; moss mask |
+| Stalactites, stalagmites | ✅ | lathe along a bent axis with a flared root, growth bands and drip bulges; clusters |
+| Dead wood | ✅ | dead trees (branch growth with roots), stumps, fallen logs; bark UVs in metres, end-grain caps |
+| Grass, flower and mushroom clumps | ✅ | modelled blades and petals (vertex colour, wind weight in alpha), mushroom clusters |
+| Hero trees with leaf cards | ⬜ | deferred: mixing card foliage with voxel canopies needs a style decision; the branch generator is ready for it |
+| Bakes | ✅ | normal (from high poly), AO, curvature and moss mask via Cycles; deterministic margin fill |
+| LODs | ✅ | decimated per LOD (hand-built subsets for blades and mushrooms), 2–3 LODs per prop |
+| FBX export + manifest | ✅ | byte-stable FBX (pinned header timestamp), `Assets/Art/Models/props_manifest.json` |
+| Validation | ✅ | `check_props.py`: re-import round trip, LOD budgets, closed meshes, boulder core containment, determinism |
+| Import settings | 🟡 | `PropModelPostprocessor` — not yet run in Unity |
+| Prop library + materials | 🟡 | `PropLibraryBuilder` → `PropLibrary.asset`, one `Voxelwild/Prop` material per slot — not yet run |
+| Prop shader | 🟡 | `Voxelwild/Prop`: block-array layers (triplanar or UV), baked maps, moss, curvature wear, voxel light, instancing — not yet compiled by Unity |
+| Placement | 🟡 | in `DecorationJob`, deterministic, column-local; boulder cores and `PropBarrier` collision cells — EditMode tests written, not yet run |
+| Rendering | 🟡 | `PropField`: per-section buckets, exact voxel light from the mesh job, LOD by distance, GPU instancing, cave culling |
+| Quality gate | 🟡 | turntables (`./tools/unity.ps1 turntable`) and the capture tour; Blender preview in `docs/images/props.png` |
+
+Prop kinds and where they grow are data in `PropRegistry` (biomes, support blocks, density, clumping,
+scale, clearance, footprint, draw distance). The art side is the library; generation never needs it.
 
 ## Phase 4 — Rendering ⬜
 
@@ -114,7 +126,10 @@ Blender 5.2.1 LTS is installed and runs headless (`blender --background --python
 |---|---|---|
 | Dense forest aerial views are GPU-heavy: 26–31 ms GPU on the Adreno X1-85 at 1600×900 | capture report | Quality presets (Phase 4) and draw-call work (Phase 8). SSAO and shadows are the largest costs, per the `-vwToggles` A/B runs |
 | Frame time sits 2–8 ms above GPU time in busy views, which points at render-thread overhead from roughly 14k draws (sections × 3 submeshes × several passes) | capture report | BatchRendererGroup or merged meshes (Phase 8) |
-| Steep slopes and cliffs read as vertical "combs" of alternating stone and grass columns | badlands capture | Slope-smoothed surface rules, plus Phase 3 cliff/rock meshes |
+| Steep slopes and cliffs read as vertical "combs" of alternating stone and grass columns | badlands capture | Slope-smoothed surface rules; Phase 3 rocks break up the ground but cliff meshes are not built yet |
+| Props are drawn with `Graphics.DrawMeshInstanced` from `LateUpdate` (one call per mesh LOD and submesh) | Phase 3 | Fold into the BatchRendererGroup work (Phase 8) |
+| Boulder LOD2 can let a corner of its stone core show (2 of 50 test points) | `check_props.py` | Same scan as the boulder, seen from 60 m+; tighten if it shows in captures |
+| Blender preview renders the violet flower clump nearly white | `docs/images/props.png` | Check in the turntable; raise petal saturation if it holds in-engine |
 | Undersides of leaf canopies can look like a flat grey sheet at grazing angles | forest captures | Revisit with Phase 4 lighting; consider per-face normal jitter for leaves |
 | Stone scan (Rock058) has rust-coloured veins that read orange under torch light | cave capture | Tint or swap the stone layer during Phase 4 art direction |
 | One frame spike (~150–250 ms) after large teleports | capture report | Suspected first-use pipeline (PSO) compilation plus streaming bursts. Profile, then add shader warm-up (Phase 8) |

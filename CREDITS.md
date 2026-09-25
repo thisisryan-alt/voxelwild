@@ -35,3 +35,9 @@ Needles, grass tufts, flowers, dead bush, glowcaps, cactus and torch are generat
 
 The source maps live in `SourceArt/Textures/ambientCG/` (Git LFS) and are packed into Texture2DArrays by
 `Voxelwild ▸ Art ▸ Build Block Texture Arrays`. See [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md).
+
+## Props
+
+The Phase 3 props (rocks, cave formations, dead wood, plant and mushroom clumps) are generated procedurally
+by `tools/blender/` (original to this project). In-game they are textured with the scans above: rock with
+Rock058, cave formations with Rock053, wood with the bark scans and the log-top set, moss with Moss002.

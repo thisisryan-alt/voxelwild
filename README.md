@@ -16,8 +16,10 @@ The world stays readable as blocks.
 
 ## Status
 
-**Phases 1 (Foundation) and 2 (World) are complete.** See [docs/ROADMAP.md](docs/ROADMAP.md) for all
-eight phases, what is still a stopgap, and known issues.
+**Phases 1 (Foundation) and 2 (World) are complete. Phase 3 (Art pipeline) is built and awaiting its
+in-engine gate:** the Blender pipeline runs and validates headless, and the Unity side (import, library,
+prop shader, placement, rendering, tests, turntables) is written but not yet run in the editor. See
+[docs/ROADMAP.md](docs/ROADMAP.md) for all eight phases, what is still a stopgap, and known issues.
 
 - **Streamed world:** 32³ sections in columns (y −64…191). A Burst-compiled pipeline builds each column:
   terrain → trees → lit meshes, all on worker threads.
@@ -29,6 +31,13 @@ eight phases, what is still a stopgap, and known issues.
 - **Trees and plants:** oak, big oak, birch, spruce, tall spruce, jungle and giant 2×2 jungle trees,
   bushes, swamp oaks, cacti, tall grass, flowers and dead bushes. Trees cross column borders seamlessly
   and deterministically.
+- **Props (Phase 3):** 34 Blender-generated props in 11 kinds: pebbles, stones and boulders; stalactites and
+  stalagmites; dead trees, stumps and fallen logs; grass, flower and mushroom clumps. Each has baked normal,
+  AO, curvature and moss maps and 2–3 LODs. They are placed by the generator per biome and cave, and lit by
+  the voxel grid. Boulders hide a stone core and wood has invisible barrier cells, so both collide like
+  terrain. Breaking what a prop rests on removes it.
+
+  ![Props](docs/images/props.png)
 - **Voxel lighting:** 15-level sky light (dimmed by leaves and water, leaking under overhangs, dark in
   caves) and block light (torches, glowcaps), smooth-lit per vertex. It drives ambient, reflections and
   how much sun a surface can receive.
@@ -45,8 +54,8 @@ eight phases, what is still a stopgap, and known issues.
   - Mesh jobs copy their own input, so the main thread stays at 2–5 ms.
 - **Player:** walk, sprint, jump, swim and fly on custom voxel physics. Break and place blocks,
   including torches. Plants and torches drop when their support is broken.
-- **Verification:** 44 EditMode and 4 PlayMode tests. The capture tool tours every biome and a cave,
-  and reports CPU/GPU time per view.
+- **Verification:** 52 EditMode and 4 PlayMode tests. The capture tool tours every biome and a cave,
+  and reports CPU/GPU time per view. `tools/blender/check_props.py` re-imports and validates every prop.
 
 ## Requirements
 
@@ -55,7 +64,7 @@ eight phases, what is still a stopgap, and known issues.
 | Unity | **6000.4.11f1** (the native Windows ARM64 editor is used on Arm machines) |
 | Git LFS | required: textures, scene data and screenshots are LFS objects |
 | Python 3.9+ | only to rebuild source textures: `pip install -r tools/requirements.txt` (numpy, Pillow) |
-| Blender 5.2 | asset pipeline from Phase 3 onwards |
+| Blender 5.x | prop pipeline (`tools/blender.ps1`); developed against 5.2, also runs on the `bpy` 5.0 module |
 
 ## Getting started
 
@@ -82,13 +91,17 @@ git clone https://github.com/thisisryan-alt/voxelwild.git
 ## Tooling
 
 ```powershell
-./tools/unity.ps1 build                    # texture arrays + World scene, generated from code
-./tools/unity.ps1 test -Platform EditMode  # 44 tests
+./tools/blender.ps1 build                  # generate, bake, LOD and export every prop (~2 min)
+./tools/blender.ps1 check -Determinism     # re-import and validate every prop; rebuild twice and compare
+./tools/blender.ps1 preview                # labelled contact sheet of every prop (needs Pillow)
+./tools/unity.ps1 build                    # texture arrays + prop library + World scene, generated from code
+./tools/unity.ps1 test -Platform EditMode  # 52 tests
+./tools/unity.ps1 turntable                # prop turntables into Screenshots/turntables/ (quality gate)
 ./tools/unity.ps1 test -Platform PlayMode  # 4 tests on the real scene
 ./tools/unity.ps1 capture                  # batch-mode screenshots into Screenshots/
 ./tools/unity.ps1 player                   # Windows player into Builds/Windows/
 Builds/Windows/Voxelwild.exe -vwCapture Screenshots/player            # real-GPU biome tour + CPU/GPU timings
-Builds/Windows/Voxelwild.exe -vwCapture out -vwShots 08,13 -vwToggles nossao,hardshadows   # A/B a render feature
+Builds/Windows/Voxelwild.exe -vwCapture out -vwShots 08,13 -vwToggles nossao,hardshadows   # A/B a render feature (also: noprops)
 python tools/fetch_ambientcg.py            # re-download scanned CC0 materials
 python tools/generate_textures.py          # regenerate procedural sets (foliage, plants, ores, torch...)
 ```
@@ -119,21 +132,24 @@ Full view distance streams in about 2.3 s from a cold start.
 ```
 Assets/
   Art/            Materials, Texture2DArray atlases (generated)
+    Models/         props: FBX + baked maps per category, props_manifest.json, PropLibrary (generated)
   Scenes/         World.unity (generated by WorldSceneBuilder)
   Scripts/
     Runtime/      Voxelwild.Runtime assembly
       World/        blocks, sections/columns, VoxelWorld streaming + culling, raycast
         Generation/   terrain/biome noise, column generation job, tree decoration job
         Meshing/      Burst lighting + mesher, vertex format, region builder
+        Props/        prop rules (PropRegistry), library, runtime field (light, edits, instanced drawing)
       Player/       controller, voxel physics body, block interaction
       Rendering/    layer profile (material framework), environment lighting
       Diagnostics/  debug HUD, capture/perf director
-    Editor/       scene builder, texture arrays, capture runner, player build
-  Shaders/        Terrain/, Foliage/, Water/, Utility/, Include/ (shared HLSL)
+    Editor/       scene builder, texture arrays, prop import + library + turntables, capture runner, player build
+  Shaders/        Terrain/, Foliage/, Props/, Water/, Utility/, Include/ (shared HLSL)
   Settings/       URP assets, post profile, TerrainLayerProfile
   Tests/          EditMode/, PlayMode/
 SourceArt/        scanned + generated source textures (later .blend files), outside Assets/
-tools/            unity.ps1, fetch_ambientcg.py, generate_textures.py
+tools/            unity.ps1, blender.ps1, fetch_ambientcg.py, generate_textures.py
+  blender/        prop generators (vw/), build_props.py, check_props.py, preview_props.py
 docs/             ROADMAP, ARCHITECTURE, ASSET_PIPELINE, perf data, images
 ```
 
@@ -141,5 +157,5 @@ docs/             ROADMAP, ARCHITECTURE, ASSET_PIPELINE, perf data, images
 
 - [docs/ROADMAP.md](docs/ROADMAP.md): phases, status, stopgaps, known issues
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): world data, generation, lighting, meshing, culling, rendering
-- [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md): scanned and generated textures, Blender → Unity (Phase 3)
+- [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md): scanned and generated textures, Blender props → Unity
 - [CREDITS.md](CREDITS.md): texture sources (CC0)

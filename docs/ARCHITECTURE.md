@@ -41,7 +41,7 @@ Generating ──terrain job──▶ Generated ──(all 8 neighbours have ter
      undercut water. Carved cells below a noisy aquifer level become underground lakes.
    - **Extras:** ore clusters (random walks in depth bands, replacing only stone), cave-floor moss and
      glowcaps, and surface plants by biome with clumping noise.
-2. **`DecorationJob` (Burst)** adds trees and computes the light heightmap. It gets a copy of the 3×3
+2. **`DecorationJob` (Burst)** adds trees, then props (see Props below), and computes the light heightmap. It gets a copy of the 3×3
    neighbouring surfaces. Tree positions come from a world-space jittered grid (at most one tree per
    5×5 cell), so spacing never depends on neighbouring voxel data. Every column applies all trees that
    can reach it, its own and its neighbours', in one global order, writing only its own blocks. A tree
@@ -102,6 +102,41 @@ blocks, plus the whole sky shaft if the heightmap moved; those sections are queu
 Sections whose geometry depends on the voxel (its 3×3×3 neighbourhood) are meshed as parallel jobs and
 completed within the same frame, so edits never show a hole.
 
+## Props
+
+Rocks, cave formations, dead wood and plant clumps are Blender meshes (docs/ASSET_PIPELINE.md) placed by the
+generator and drawn with GPU instancing.
+
+- **Rules:** `PropRegistry` holds one blittable `PropRule` per kind: placement (ground, cave floor, cave
+  ceiling), biomes, support blocks, density with a clumping noise, candidate grid, scale range, clearance,
+  footprint, and whether the prop writes a core block or barrier cells. It is data the job reads, so
+  generation never depends on the art.
+- **Placement** (`DecorationJob.Props.cs`, after trees): from this column's own voxels only, so it needs no
+  neighbours and regenerates identically. Ground candidates are every surface cell for small props, or one
+  hashed spot per `Grid`² cells for big ones; big props go first and claim a ring of cells. Cave candidates
+  are open cells at least 6 blocks under the surface next to cave rock. Each placed prop records its anchor
+  cell, variant, yaw, scale and the open room along its growth direction (formations shrink to the longest
+  variant that fits).
+- **Collision:** boulders write a stone core at their anchor, hidden inside the mesh; dead trees and fallen
+  logs write `PropBarrier` cells (solid, invisible, no light blocking). Both block the player like terrain,
+  and both come before the light heightmap, so cores shade the ground.
+- **Light:** props are bucketed by section. When a section's mesh job finishes, `PropField` reads the voxel
+  light (max over the anchor and its 6 neighbours) and climate from the job's 64³ region, which is exact and
+  free. A uniform-air section is never meshed, so its props estimate light from the sky heightmap. Props
+  appear only once lit.
+- **Edits:** `SetBlock` asks `PropField` for props that depend on the cell (anchor, core, barriers,
+  footprint, the block below or above). They are removed along with their core and barrier cells, and
+  remembered so they don't come back when their column reloads.
+- **Drawing:** every frame, sections hidden by cave culling are skipped, the rest are frustum-tested with a
+  16 m margin for shadows, and each prop picks a LOD by distance (22 / 50 / 100 % of its kind's draw
+  distance). Batches of up to 1023 go to `Graphics.DrawMeshInstanced` with a per-instance `_PropLight`
+  (sky, block, temperature, humidity).
+- **Shader** (`Voxelwild/Prop`): samples the terrain's block Texture2DArrays with the terrain's per-layer
+  tuning, either world-space triplanar (rock, continuous with blocks) or through UV1 (bark in metres, end
+  grain), or takes albedo from vertex colour (plants). The baked normal and mask add form, AO, curvature
+  wear on convex edges and moss that follows the local climate. Lighting is `VoxelFragmentPBR`: the same sky
+  and block light curves as the terrain. Foliage is double-sided with wind and a biome tint.
+
 ## Rendering
 
 - **Shared passes:** `VoxelPasses.hlsl` holds ForwardLit, ShadowCaster, DepthOnly and DepthNormals for
@@ -130,13 +165,15 @@ completed within the same frame, so edits never show a hole.
 
 ## Verification
 
-- **EditMode (44):**
+- **EditMode (52):**
   - coordinates and registry/manifest order
   - generation determinism, bedrock, heightmaps, caves and ores
   - forests and biome coverage over 12 km
   - mesher faces, winding, AO, edges, water, plants and leaf LOD
   - exact sky and block light values
   - region builder, raycast, physics and RLE store
+  - props: registry sanity, the Blender manifest against the registry, deterministic placement, placement
+    rules (support, biome, cores, barriers, footprints), edit dependencies and removal
 - **PlayMode (4):** spawn and ground contact, place/break with immediate remesh, no placement inside the
   player, and torch support.
 - **Capture (`-vwCapture`):**
