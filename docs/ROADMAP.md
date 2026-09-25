@@ -141,7 +141,7 @@ Unity. There is one new PlayMode test: dropped items are picked up.
 |---|---|---|
 | Items | 🟡 | `ItemRegistry`: every block is an item (same id), plus sticks, coal, iron and gold chunks, diamonds, apples, berries, and wooden/stone/iron/diamond pickaxes, axes and shovels (ids 256+) |
 | Mining | 🟡 | `Mining.BreakSeconds` from block hardness, the right tool type and its tier; ores need a high enough pickaxe tier to drop anything; tools wear out |
-| Drops | 🟡 | `Drops`: stone → cobblestone, ores → chunks/coal/diamond, leaves sometimes drop apples, bushes drop berries, props drop logs. Items fall, settle and are picked up within 1.6 m; they despawn after 5 minutes |
+| Drops | 🟡 | `Drops`: stone → cobblestone, grass → dirt, ores → chunks/coal/diamond, oak and jungle leaves sometimes drop apples, tall grass sometimes drops berries, dead bushes and some leaves drop sticks, fallen-log props drop logs, ice drops nothing. Items fall, settle and are picked up within 1.6 m; they despawn after 5 minutes |
 | Inventory | 🟡 | 36 slots with a 9-slot hotbar, stacks of 64 (tools don't stack). The E/Tab screen has click-to-move slots |
 | Crafting | 🟡 | shapeless recipes: planks from any log, sticks, torches, sandstone, bricks, and 12 tools. Recipes you can't make yet are greyed out |
 | Survival | 🟡 | Health 20, hunger 20 and breath 10. Walking, sprinting and jumping drain hunger. A full belly regenerates health and an empty one starves you. Falls further than 3 blocks hurt unless you land in water, and you drown once your breath runs out. On death you drop everything and respawn at your spawn point |
