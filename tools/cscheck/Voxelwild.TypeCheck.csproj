@@ -1,0 +1,34 @@
+<!--
+  Type-checks the Unity C# (runtime, the scene builder and prop editor tools, EditMode and PlayMode tests)
+  without Unity, against the UnityEngine 2021.3 reference assemblies from NuGet plus hand-written stubs
+  (Stubs/) for the packages that have no public assemblies: URP, Input System, Collections, Burst, and
+  the editor calls the builder makes. The URP stubs are checked member by member against URP 17.4's source.
+      tools/cscheck/run.sh [path to Unity.Mathematics/Unity.Mathematics]
+  A handful of Unity 6 APIs don't exist in the 2021 assemblies; run.sh ignores exactly those errors
+  (known-errors.txt) and fails on anything else. This finds typos, wrong signatures and missing members;
+  it cannot find behaviour that differs between Unity versions.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <LangVersion>9.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>CS0649;CS0169;CS0414;CS1701;CS1702;CS0436;CS8632;NU1701</NoWarn>
+    <Assets>$(MSBuildThisFileDirectory)../../Assets</Assets>
+    <MathematicsSrc Condition="'$(MathematicsSrc)' == ''">$(MSBuildThisFileDirectory)../../Library/PackageCache/com.unity.mathematics@*/Unity.Mathematics</MathematicsSrc>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Stubs/*.cs" />
+    <Compile Include="$(MathematicsSrc)/**/*.cs" />
+    <Compile Include="$(Assets)/Scripts/Runtime/**/*.cs" />
+    <Compile Include="$(Assets)/Scripts/Editor/Prop*.cs;$(Assets)/Scripts/Editor/WorldSceneBuilder.cs" />
+    <Compile Include="$(Assets)/Tests/EditMode/*.cs;$(Assets)/Tests/PlayMode/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+  </ItemGroup>
+</Project>

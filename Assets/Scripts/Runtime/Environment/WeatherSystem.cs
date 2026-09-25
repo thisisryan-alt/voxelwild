@@ -47,6 +47,8 @@ namespace Voxelwild.Rendering
 
         void Awake()
         {
+            // each world gets its own weather: GameSession has set the world seed by now (it runs first)
+            if (world != null) seed ^= (int)(world.Seed * 2654435761u);
             _model = new WeatherModel(seed, startWeather);
             var args = System.Environment.GetCommandLineArgs();
             if (Array.IndexOf(args, "-vwCapture") >= 0)

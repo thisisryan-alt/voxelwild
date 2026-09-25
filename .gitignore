@@ -21,6 +21,8 @@
 ExportedObj/
 .consulo/
 *.csproj
+# ...but not the standalone check projects under tools/ (engine-free tests, type check)
+!tools/**/*.csproj
 *.unityproj
 *.sln
 *.suo

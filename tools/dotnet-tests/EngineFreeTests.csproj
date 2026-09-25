@@ -1,0 +1,31 @@
+<!--
+  Runs the engine-free EditMode tests (game logic that only uses System and Unity.Mathematics) without Unity:
+      dotnet test tools/dotnet-tests
+  Unity.Mathematics comes from Unity's package cache (open the project in Unity once), or pass a checkout:
+      dotnet test tools/dotnet-tests -p:MathematicsSrc=/path/to/Unity.Mathematics/src/Unity.Mathematics
+  The same test files run inside Unity's Test Runner with the rest of the EditMode suite.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>CS8981;CS0436;CS1701;CS1702;CS0649</NoWarn>
+    <Assets>$(MSBuildThisFileDirectory)../../Assets</Assets>
+    <MathematicsSrc Condition="'$(MathematicsSrc)' == ''">$(MSBuildThisFileDirectory)../../Library/PackageCache/com.unity.mathematics@*/Unity.Mathematics</MathematicsSrc>
+  </PropertyGroup>
+  <Import Project="EngineFree.props" />
+  <ItemGroup>
+    <!-- the two files that convert to and from UnityEngine types are left out -->
+    <Compile Include="$(MathematicsSrc)/**/*.cs" Exclude="$(MathematicsSrc)/math_unity_conversion.cs;$(MathematicsSrc)/PropertyAttributes.cs" />
+    <Compile Include="@(EngineFree)" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+  </ItemGroup>
+</Project>

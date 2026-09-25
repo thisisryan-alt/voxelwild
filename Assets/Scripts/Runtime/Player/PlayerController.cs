@@ -219,12 +219,16 @@ namespace Voxelwild.Player
             else _fallStart = float.IsNaN(_fallStart) ? Body.Position.y : math.max(_fallStart, Body.Position.y);
         }
 
-        /// <summary>Back to a spawn point after death.</summary>
+        /// <summary>
+        /// Back to a spawn point after death. The spawn point can be far away and not loaded yet, so the player
+        /// waits there (loading screen) until the terrain around it is ready, as on first spawn.
+        /// </summary>
         public void Respawn(float3 feet)
         {
             Teleport(feet, Yaw, 0f);
             Flying = false;
             _fallStart = float.NaN;
+            Spawned = false;
         }
 
         void SyncTransform()

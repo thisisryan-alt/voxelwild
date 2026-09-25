@@ -60,7 +60,8 @@ namespace Voxelwild.Rendering
             var ps = go.AddComponent<ParticleSystem>();
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
-            main.loop = false;
+            // loops forever with emission off: a playing system simulates whatever Emit() adds
+            main.loop = true;
             main.playOnAwake = false;
             main.maxParticles = max;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
