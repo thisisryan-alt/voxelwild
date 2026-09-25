@@ -1,0 +1,256 @@
+<title>Voxelwild</title>
+<style>
+:root {
+  color-scheme: dark;
+  --ink: #0e1411; --panel: rgba(14, 20, 17, 0.86); --panel-solid: #141c18; --line: rgba(235, 229, 211, 0.14);
+  --text: #ebe5d3; --muted: #a8ad9f; --slate: #8fa3a6; --accent: #d9a441; --accent-ink: #1b1406; --heart: #d8574a; --food: #c98a4b; --air: #7fb6d6;
+  --slot: rgba(10, 14, 12, 0.62); --slot-line: rgba(235, 229, 211, 0.22);
+  --display: "Bitter", Georgia, "Times New Roman", serif; --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; background: var(--ink); color: var(--text); font-family: var(--body); overflow: hidden; }
+body { margin: 0; -webkit-user-select: none; user-select: none; }
+#app { position: fixed; inset: 0; background: var(--ink); }
+#view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #000; cursor: crosshair; touch-action: none; }
+.layer { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; box-sizing: border-box; overflow: auto; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 24px; width: min(440px, 100%); box-sizing: border-box;
+  backdrop-filter: blur(6px); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45); }
+.panel.wide { width: min(860px, 100%); }
+h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(40px, 9vw, 72px); letter-spacing: 0.01em; line-height: 1; }
+h2 { font-size: 24px; }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--slate); }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+button, .btn { font: 600 15px var(--body); color: var(--text); background: rgba(235, 229, 211, 0.07); border: 1px solid var(--line); border-radius: 4px;
+  padding: 11px 16px; cursor: pointer; text-align: center; transition: background 0.12s, border-color 0.12s; }
+button:hover { background: rgba(235, 229, 211, 0.14); border-color: rgba(235, 229, 211, 0.3); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.primary:hover { background: #e7b556; }
+button.danger { color: #f0a097; }
+button:disabled { opacity: 0.4; cursor: default; }
+label { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+input[type=text], select { font: 15px var(--body); color: var(--text); background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; }
+input[type=range] { accent-color: var(--accent); width: 100%; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.seg button[aria-pressed=true] { background: rgba(217, 164, 65, 0.18); border-color: var(--accent); color: #f3d79e; }
+.hint { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: rgba(0, 0, 0, 0.3); color: var(--text); }
+
+/* title */
+#title { background: radial-gradient(120% 90% at 50% 110%, rgba(217, 164, 65, 0.12), transparent 60%), linear-gradient(180deg, rgba(8, 12, 10, 0.2), rgba(8, 12, 10, 0.75)); }
+.title-card { width: min(520px, 100%); display: flex; flex-direction: column; gap: 22px; }
+.title-card .tag { font-size: 16px; color: var(--muted); max-width: 42ch; line-height: 1.5; }
+.survey { display: flex; gap: 18px; font: 12px var(--mono); color: var(--slate); flex-wrap: wrap; }
+.worlds { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow: auto; }
+.world { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px; background: rgba(0, 0, 0, 0.25); }
+.world b { font-weight: 600; }
+.world small { display: block; color: var(--muted); font: 12px var(--mono); margin-top: 2px; }
+.world button { padding: 7px 12px; font-size: 13px; }
+.controls { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; color: var(--muted); align-items: center; }
+
+/* loading */
+.bar { height: 6px; background: rgba(235, 229, 211, 0.1); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+
+/* HUD */
+#hud { position: absolute; inset: 0; pointer-events: none; }
+#crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%, -50%); }
+#crosshair::before, #crosshair::after { content: ""; position: absolute; background: rgba(255, 255, 255, 0.85); mix-blend-mode: difference; }
+#crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+#crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
+#bottom { position: absolute; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: calc(100% - 20px); }
+#stats { display: flex; justify-content: space-between; width: 100%; gap: 12px; }
+.meter { display: flex; gap: 1px; }
+.meter svg { width: 17px; height: 17px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); }
+#hotbar { display: flex; gap: 3px; padding: 3px; background: rgba(8, 11, 9, 0.55); border: 1px solid rgba(235, 229, 211, 0.18); border-radius: 5px; }
+.slot { position: relative; width: 48px; height: 48px; background: var(--slot); border: 1px solid var(--slot-line); border-radius: 3px; box-sizing: border-box; }
+.slot .ico { position: absolute; inset: 5px; background-repeat: no-repeat; image-rendering: auto; }
+.slot .n { position: absolute; right: 3px; bottom: 1px; font: 700 13px var(--mono); color: #fff; text-shadow: 0 1px 0 #000, 1px 0 0 #000, 0 0 3px #000; }
+.slot .wear { position: absolute; left: 5px; right: 5px; bottom: 4px; height: 3px; background: rgba(0, 0, 0, 0.7); }
+.slot .wear > i { display: block; height: 100%; }
+#hotbar .slot.sel { border: 2px solid var(--accent); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 12px rgba(217, 164, 65, 0.4); }
+#heldName { font: 600 14px var(--body); text-shadow: 0 1px 2px #000; opacity: 0; transition: opacity 0.3s; min-height: 18px; }
+#toast { position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); font-size: 14px; background: var(--panel); border: 1px solid var(--line); padding: 8px 14px; border-radius: 4px; opacity: 0; transition: opacity 0.3s; }
+#pickups { position: absolute; right: 14px; bottom: 90px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; font-size: 13px; }
+#pickups div { background: rgba(8, 11, 9, 0.6); padding: 4px 9px; border-radius: 3px; animation: fade 2.4s forwards; }
+@keyframes fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+#debug { position: absolute; left: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); font: 12px/1.55 var(--mono); background: rgba(0, 0, 0, 0.5); padding: 8px 10px; border-radius: 4px; white-space: pre; }
+#modeTag { position: absolute; right: 12px; top: calc(10px + env(safe-area-inset-top, 0px)); font: 11px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--slate); text-shadow: 0 1px 2px #000; }
+#clickHint { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); font-size: 14px; background: var(--panel); border: 1px solid var(--line); padding: 8px 14px; border-radius: 4px; pointer-events: none; }
+
+/* inventory */
+#inventory .panel { display: grid; grid-template-columns: auto 1fr; gap: 24px; }
+.grid9 { display: grid; grid-template-columns: repeat(9, 44px); gap: 3px; }
+.grid9 .slot { width: 44px; height: 44px; cursor: pointer; pointer-events: auto; }
+.grid9 .slot:hover { border-color: rgba(235, 229, 211, 0.6); }
+.gap { height: 10px; }
+.recipes { display: flex; flex-direction: column; gap: 4px; max-height: 360px; overflow: auto; padding-right: 4px; }
+.recipe { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: center; text-align: left; padding: 6px 8px; font-weight: 500; }
+.recipe .ico { width: 32px; height: 32px; background-repeat: no-repeat; }
+.recipe small { display: flex; gap: 8px; color: var(--muted); font: 12px var(--mono); margin-top: 2px; flex-wrap: wrap; }
+.recipe small .have { color: #b9d58a; } .recipe small .miss { color: #e39a8f; }
+.palette { display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 3px; max-height: 360px; overflow: auto; }
+#cursorStack { position: fixed; width: 40px; height: 40px; pointer-events: none; z-index: 10; }
+#cursorStack .ico { position: absolute; inset: 0; background-repeat: no-repeat; }
+#cursorStack .n { position: absolute; right: 0; bottom: -2px; font: 700 13px var(--mono); text-shadow: 0 1px 0 #000, 0 0 3px #000; }
+.tip { font-size: 12px; color: var(--muted); }
+
+#death { background: rgba(90, 10, 6, 0.42); }
+#death h1 { font-size: clamp(36px, 7vw, 56px); }
+
+/* settings */
+.settings { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; }
+.settings .full { grid-column: 1 / -1; }
+.check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 14px; }
+.check input { width: 16px; height: 16px; accent-color: var(--accent); }
+.val { font-family: var(--mono); color: var(--text); }
+
+/* touch */
+#touch { position: absolute; inset: 0; pointer-events: none; }
+#touch .pad { position: absolute; left: 18px; bottom: 90px; width: 120px; height: 120px; border-radius: 50%; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.2); pointer-events: auto; touch-action: none; }
+#touch .pad i { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; border-radius: 50%; background: rgba(235, 229, 211, 0.25); }
+#touch .tb { position: absolute; pointer-events: auto; width: 58px; height: 58px; border-radius: 50%; padding: 0; font-size: 12px; background: rgba(0, 0, 0, 0.35); touch-action: none; }
+
+@media (max-width: 720px) {
+  .slot { width: 38px; height: 38px; }
+  .grid9 { grid-template-columns: repeat(9, 34px); }
+  .grid9 .slot { width: 34px; height: 34px; }
+  #inventory .panel { grid-template-columns: 1fr; }
+  .settings { grid-template-columns: 1fr; }
+  .panel { padding: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700&family=IBM+Plex+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<div id="app">
+  <canvas id="view" tabindex="0" aria-label="Voxelwild game view"></canvas>
+
+  <div id="hud" hidden>
+    <div id="crosshair"></div>
+    <div id="modeTag"></div>
+    <div id="debug" hidden></div>
+    <div id="toast"></div>
+    <div id="pickups"></div>
+    <div id="clickHint" hidden>Click to look around</div>
+    <div id="bottom">
+      <div id="heldName"></div>
+      <div id="stats"><div class="meter" id="hearts"></div><div class="meter" id="air"></div><div class="meter" id="food"></div></div>
+      <div id="hotbar"></div>
+    </div>
+  </div>
+  <div id="touch" hidden></div>
+
+  <div id="title" class="layer">
+    <div class="title-card">
+      <div class="stack" style="gap:12px">
+        <span class="eyebrow">Survival sandbox &middot; browser edition</span>
+        <h1>Voxelwild</h1>
+        <p class="tag" style="margin:0">Walk out into a generated world of rivers, deserts, taiga and caves. Mine with the right tool, craft, keep fed, and watch the weather roll in.</p>
+      </div>
+      <div class="stack" id="titleButtons">
+        <button class="primary" id="btnContinue" hidden>Continue</button>
+        <button id="btnNew">New world</button>
+        <button id="btnSettingsT">Settings</button>
+      </div>
+      <div class="stack" id="worldListWrap" hidden>
+        <span class="eyebrow">Saved worlds</span>
+        <div class="worlds" id="worldList"></div>
+      </div>
+      <div class="survey"><span>32&sup3; sections</span><span>y &minus;64 to 191</span><span>sea level 64</span><span id="storageNote"></span></div>
+      <div id="bootMsg" class="hint"></div>
+    </div>
+  </div>
+
+  <div id="newWorld" class="layer" hidden>
+    <form class="panel stack" id="newForm" style="gap:16px">
+      <h2>New world</h2>
+      <label>Name<input type="text" id="nwName" maxlength="40" value="New World"></label>
+      <label>Seed <span class="tip">Leave empty for a random one. Words work too.</span><input type="text" id="nwSeed" maxlength="40" placeholder="random"></label>
+      <div class="stack" style="gap:6px"><span class="eyebrow">Game mode</span>
+        <div class="seg"><button type="button" id="nwSurvival" aria-pressed="true">Survival</button><button type="button" id="nwCreative" aria-pressed="false">Creative</button></div>
+        <span class="hint" id="nwModeHint">Health, hunger and breath. Blocks come from mining; tools come from crafting.</span>
+      </div>
+      <div class="row"><button type="submit" class="primary">Create world</button><button type="button" id="nwCancel">Back</button></div>
+    </form>
+  </div>
+
+  <div id="loading" class="layer" hidden>
+    <div class="panel stack" style="gap:14px">
+      <span class="eyebrow" id="loadEyebrow">Generating terrain</span>
+      <h2 id="loadTitle">Surveying the land</h2>
+      <div class="bar"><i id="loadBar"></i></div>
+      <span class="hint mono" id="loadDetail"></span>
+    </div>
+  </div>
+
+  <div id="pause" class="layer" hidden>
+    <div class="panel stack">
+      <h2>Paused</h2>
+      <span class="hint mono" id="pauseInfo"></span>
+      <button class="primary" id="btnResume">Back to game</button>
+      <button id="btnSettingsP">Settings</button>
+      <button id="btnMode">Switch to creative</button>
+      <button id="btnQuit">Save and quit to title</button>
+      <div class="controls" id="controlsList"></div>
+    </div>
+  </div>
+
+  <div id="settings" class="layer" hidden>
+    <div class="panel wide stack" style="gap:18px">
+      <h2>Settings</h2>
+      <div class="settings">
+        <label>View distance <span class="val" id="vViewDistance"></span><input type="range" id="sViewDistance" min="3" max="12" step="1"></label>
+        <label>Render scale <span class="val" id="vRenderScale"></span><input type="range" id="sRenderScale" min="0.4" max="1" step="0.05"></label>
+        <label>Field of view <span class="val" id="vFov"></span><input type="range" id="sFov" min="55" max="100" step="1"></label>
+        <label>Mouse sensitivity <span class="val" id="vSensitivity"></span><input type="range" id="sSensitivity" min="0.2" max="3" step="0.05"></label>
+        <label>Master volume <span class="val" id="vVolume"></span><input type="range" id="sVolume" min="0" max="1" step="0.05"></label>
+        <label>Effects <span class="val" id="vSfx"></span><input type="range" id="sSfx" min="0" max="1" step="0.05"></label>
+        <label>Ambience <span class="val" id="vAmbience"></span><input type="range" id="sAmbience" min="0" max="1" step="0.05"></label>
+        <label>Rain and snow density <span class="val" id="vParticles"></span><input type="range" id="sParticles" min="0" max="1" step="0.1"></label>
+        <label class="check"><input type="checkbox" id="sShadows"> Sun shadows</label>
+        <label class="check"><input type="checkbox" id="sBloom"> Bloom</label>
+        <label class="check"><input type="checkbox" id="sGodRays"> Light shafts</label>
+        <label class="check"><input type="checkbox" id="sInvertY"> Invert mouse Y</label>
+      </div>
+      <div class="row"><button class="primary" id="btnSettingsDone">Done</button><span class="hint">Lower the view distance or render scale if the game stutters.</span></div>
+    </div>
+  </div>
+
+  <div id="inventory" class="layer" hidden>
+    <div class="panel wide">
+      <div class="stack">
+        <span class="eyebrow">Inventory</span>
+        <div class="grid9" id="invMain"></div>
+        <div class="gap"></div>
+        <div class="grid9" id="invHot"></div>
+        <span class="tip">Click to pick up or put down. Right-click splits a stack or places one. Shift-click moves between bag and hotbar.</span>
+      </div>
+      <div class="stack">
+        <span class="eyebrow" id="sideTitle">Crafting</span>
+        <div class="recipes" id="recipes"></div>
+        <div class="palette" id="palette" hidden></div>
+        <span class="tip" id="sideTip">Shift-click a recipe to craft as many as you can.</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="death" class="layer" hidden>
+    <div class="panel stack" style="gap:16px; text-align:center">
+      <h1>You died</h1>
+      <p class="hint" id="deathCause" style="margin:0"></p>
+      <button class="primary" id="btnRespawn">Respawn</button>
+      <button id="btnDeathQuit">Quit to title</button>
+    </div>
+  </div>
+
+  <div id="cursorStack" hidden><div class="ico"></div><span class="n"></span></div>
+  <div id="fatal" class="layer" hidden><div class="panel stack"><h2>Voxelwild could not start</h2><p class="hint" id="fatalMsg" style="white-space:pre-wrap"></p></div></div>
+</div>
+<script id="worker-src" type="text/plain">/*__WORKER__*/</script>
+<script>/*__MAIN__*/</script>
