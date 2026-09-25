@@ -1,0 +1,5 @@
+# Unity 6 APIs missing from the 2021.3 reference assemblies (one regex per line, matched against compiler errors)
+'FrameTiming' does not contain a definition for 'cpuMainThreadFrameTime'
+The type name 'StandardRequest' does not exist in the type 'RenderPipeline'
+'RenderPipeline' does not contain a definition for 'SupportsRenderRequest'
+'RenderPipeline' does not contain a definition for 'SubmitRenderRequest'

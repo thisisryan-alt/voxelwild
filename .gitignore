@@ -65,3 +65,5 @@ tools/dotnet-tests/obj/
 
 # shader check downloads (Graphics checkout, DXC)
 tools/shadercheck/.cache/
+tools/cscheck/bin/
+tools/cscheck/obj/

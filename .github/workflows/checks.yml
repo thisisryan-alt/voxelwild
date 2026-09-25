@@ -1,0 +1,86 @@
+# Checks that run without a Unity licence on every push and pull request, plus the Unity test suites when
+# licence secrets are configured (Settings > Secrets and variables > Actions: UNITY_LICENSE, UNITY_EMAIL,
+# UNITY_PASSWORD; see https://game.ci/docs/github/activation).
+name: checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  engine-free-tests:
+    name: Engine-free tests (dotnet)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Fetch Unity.Mathematics (the version in packages-lock.json)
+        run: tools/ci/fetch_mathematics.sh "$RUNNER_TEMP/mathematics"
+      - name: Test
+        run: dotnet test tools/dotnet-tests -p:MathematicsSrc="$RUNNER_TEMP/mathematics/package/Unity.Mathematics"
+
+  type-check:
+    name: C# type check (runtime, editor tools, tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Fetch Unity.Mathematics
+        run: tools/ci/fetch_mathematics.sh "$RUNNER_TEMP/mathematics"
+      - name: Type check
+        run: tools/cscheck/run.sh "$RUNNER_TEMP/mathematics/package/Unity.Mathematics"
+
+  shaders:
+    name: Shader compile (URP 17.4, DXC, Vulkan + D3D)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch URP shader libraries and DXC
+        run: tools/shadercheck/setup.sh
+      - name: Compile every pass
+        run: >
+          python3 tools/shadercheck/check_shaders.py
+          --graphics tools/shadercheck/.cache/graphics
+          --dxc tools/shadercheck/.cache/dxc/bin/dxc
+
+  unity-tests:
+    name: Unity EditMode + PlayMode tests
+    runs-on: ubuntu-latest
+    env:
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+    steps:
+      - name: Skip without a Unity licence
+        if: env.UNITY_LICENSE == ''
+        run: echo "::notice::UNITY_LICENSE is not set; Unity tests skipped"
+      - uses: actions/checkout@v4
+        if: env.UNITY_LICENSE != ''
+        with:
+          lfs: true
+      - uses: actions/cache@v4
+        if: env.UNITY_LICENSE != ''
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Packages/packages-lock.json') }}
+      # the scenes, materials and texture arrays are generated from code: rebuild them before testing
+      - name: Build textures, props and scenes
+        if: env.UNITY_LICENSE != ''
+        uses: game-ci/unity-builder@v4
+        with:
+          unityVersion: 6000.4.11f1
+          targetPlatform: StandaloneLinux64
+          buildMethod: Voxelwild.EditorTools.WorldSceneBuilder.BuildAll
+          allowDirtyBuild: true
+      - name: Run tests
+        if: env.UNITY_LICENSE != ''
+        uses: game-ci/unity-test-runner@v4
+        with:
+          unityVersion: 6000.4.11f1
+          testMode: all
+          githubToken: ${{ secrets.GITHUB_TOKEN }}

@@ -140,7 +140,11 @@ Command line: `-vwWorld name [-vwNew] [-vwSeed n] [-vwMode Survival|Creative]` p
 ./tools/blender.ps1 preview                # labelled contact sheet of every prop (needs Pillow)
 ./tools/unity.ps1 build                    # texture arrays + prop library + World and MainMenu scenes, from code
 ./tools/unity.ps1 test -Platform EditMode  # 96 tests
-dotnet test tools/dotnet-tests -p:MathematicsSrc=<Unity.Mathematics/src/Unity.Mathematics>   # the 48 engine-free tests, no Unity
+tools/ci/fetch_mathematics.sh /tmp/um     # Unity.Mathematics for the checks below (no Unity needed for any of them)
+dotnet test tools/dotnet-tests -p:MathematicsSrc=/tmp/um/package/Unity.Mathematics   # the 48 engine-free tests
+tools/cscheck/run.sh /tmp/um/package/Unity.Mathematics                               # type-check runtime, editor tools, tests
+tools/shadercheck/setup.sh && python3 tools/shadercheck/check_shaders.py \
+    --graphics tools/shadercheck/.cache/graphics --dxc tools/shadercheck/.cache/dxc/bin/dxc   # compile every shader pass (DXC, URP 17.4)
 ./tools/unity.ps1 turntable                # prop turntables into Screenshots/turntables/ (quality gate)
 ./tools/unity.ps1 test -Platform PlayMode  # 5 tests on the real scene
 ./tools/unity.ps1 capture                  # batch-mode screenshots into Screenshots/
@@ -150,6 +154,10 @@ Builds/Windows/Voxelwild.exe -vwCapture out -vwShots 08,13 -vwToggles nossao,har
 python tools/fetch_ambientcg.py            # re-download scanned CC0 materials
 python tools/generate_textures.py          # regenerate procedural sets (foliage, plants, ores, torch...)
 ```
+
+GitHub Actions (`.github/workflows/checks.yml`) runs the engine-free tests, the type check and the shader
+compile on every push. The Unity test suites run too once `UNITY_LICENSE`, `UNITY_EMAIL` and
+`UNITY_PASSWORD` secrets are added; that job has not been run yet.
 
 `WorldSceneBuilder` generates both scenes, the materials, sky, post-processing, UI panel settings and URP
 settings. Change the builder rather than hand-editing a scene.
@@ -201,6 +209,9 @@ Assets/
 SourceArt/        scanned + generated source textures (later .blend files), outside Assets/
 tools/            unity.ps1, blender.ps1, fetch_ambientcg.py, generate_textures.py
   dotnet-tests/   runs the engine-free tests outside Unity
+  cscheck/        type-checks the Unity C# outside Unity (reference assemblies + stubs)
+  shadercheck/    compiles every shader pass with DXC against URP 17.4's shader libraries
+  ci/             helpers for the GitHub Actions checks
   blender/        prop generators (vw/), build_props.py, check_props.py, preview_props.py
 docs/             ROADMAP, ARCHITECTURE, ASSET_PIPELINE, perf data, images
 ```
