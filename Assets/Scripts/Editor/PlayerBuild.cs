@@ -21,7 +21,10 @@ namespace Voxelwild.EditorTools
 
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
-                scenes = new[] { WorldSceneBuilder.ScenePath },
+                // title screen first; it hands -vwCapture / -vwWorld runs straight to the World scene
+                scenes = System.IO.File.Exists(WorldSceneBuilder.MenuScenePath)
+                    ? new[] { WorldSceneBuilder.MenuScenePath, WorldSceneBuilder.ScenePath }
+                    : new[] { WorldSceneBuilder.ScenePath },
                 locationPathName = OutputPath,
                 target = BuildTarget.StandaloneWindows64,
                 options = BuildOptions.None,

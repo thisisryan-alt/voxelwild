@@ -113,7 +113,7 @@ type-checked but not yet run in Unity.
 | Water shader | 🟡 | refraction through the opaque texture, per-channel absorption, caustics on the bottom, flow-mapped ripples, waterfall streaks, shore/rapids/waterfall foam, surface visible from below |
 | Screen-space reflections | ⬜ | reflections still come from the sky probe |
 | Underwater | 🟡 | `UnderwaterEffects`: close fog in the water's colour, dimmed at night |
-| Splashes and ripples from entities | ⬜ | with the VFX work in Phase 8 |
+| Splashes and ripples from entities | 🟡 | the player falling into water throws spray and makes a splash (Phase 8); no surface ripples yet |
 
 ## Phase 6 — Weather 🟡
 
@@ -127,7 +127,7 @@ type-checked but not yet run in Unity.
 | Clouds, light, fog, wind | 🟡 | weather drives cloud cover and density, sun/moon strength, height fog and fog range, wind and gusts (foliage sway and cloud drift follow) |
 | Wetness, puddles, snow cover | 🟡 | lag the sky: wet after a minute of rain, puddles only on soaked ground, snow settles and melts with warmth and sun; terrain and props darken, gloss, pool and whiten (Phase 4 shader hooks) |
 | Rain and snow particles | 🟡 | around the camera, drifting with the wind, stopped under roofs and canopies (sky heightmap) |
-| Thunder and lightning | 🟡 | strikes every ~14 s in storms: ambient and light flash; the thunder sound comes with the Phase 8 audio |
+| Thunder and lightning | 🟡 | strikes every ~14 s in storms: ambient and light flash, then thunder (Phase 8 audio) after a delay set by the strike's distance |
 
 Y cycles the weather. Captures hold clear weather unless `-vwWeather Storm` (etc.) is given.
 
@@ -146,21 +146,31 @@ Unity. There is one new PlayMode test: dropped items are picked up.
 | Crafting | 🟡 | shapeless recipes: planks from any log, sticks, torches, sandstone, bricks, and 12 tools. Recipes you can't make yet are greyed out |
 | Survival | 🟡 | Health 20, hunger 20 and breath 10. Walking, sprinting and jumping drain hunger. A full belly regenerates health and an empty one starves you. Falls further than 3 blocks hurt unless you land in water, and you drown once your breath runs out. On death you drop everything and respawn at your spawn point |
 | Creative | 🟡 | no damage or hunger, flying allowed, instant breaking, infinite blocks. The inventory screen becomes a block palette |
-| Saves | 🟡 | `{persistentDataPath}/saves/{name}/`: `world.json` (seed, mode, time, weather, player, inventory, removed props) and `regions/r.X.Z.bin` (32×32-column regions of edited sections, `VWRG` v1). Writes are atomic (temp file then replace). F5 saves; it also autosaves every 5 minutes and on quit |
+| Saves | 🟡 | `{persistentDataPath}/saves/{name}/`: `world.json` (seed, mode, time, weather, player, inventory, removed props) and `regions/r.X.Z.bin` (16×16-column regions of edited sections, `VWRG` v1). Writes are atomic (temp file then replace). F5 saves; it also autosaves every 5 minutes and on quit |
 | HUD | 🟡 | UI Toolkit (`GameHud`): icon hotbar with counts and tool wear, health/hunger/breath bars, mining progress, toasts, death screen. Block icons are rendered from the real terrain materials |
 
 Editor Play, tests and captures run an unsaved creative sandbox, as before. `-vwWorld name [-vwNew] [-vwSeed n]
-[-vwMode Survival|Creative]` plays a saved world. The world select screen comes with the Phase 8 menus.
+[-vwMode Survival|Creative]` plays a saved world. Worlds are picked and created on the Phase 8 title screen.
 
-## Phase 8 — Polish ⬜
+## Phase 8 — Polish 🟡
 
-- UI Toolkit HUD, menus and settings. Audio with surface footsteps, ambience beds and 3D sources.
-- Optimisation:
-  - draw-call reduction (BatchRendererGroup or merged section meshes)
-  - greedy-meshed far LODs
-  - GPU occlusion
-  - shader/PSO warm-up
-- VFX: block break particles, dust, mist, falling leaves.
+Sound synthesis, settings and the save helpers are unit-tested outside Unity. The menus, audio playback,
+particles and warm-up are written and type-checked but not yet run in Unity.
+
+| Item | Status | Notes |
+|---|---|---|
+| Title screen | 🟡 | `MainMenu` scene (first in the build): continue the last world, world list (mode, seed, day, play time, last saved) with play and delete, new world (name, seed or seed words, survival/creative), an unsaved creative sandbox, settings. The live sky turns slowly behind it at dawn |
+| Pause menu | 🟡 | Esc: time and sound stop. Resume, settings, save, save and quit to title, quit |
+| Settings | 🟡 | graphics preset, field of view, mouse sensitivity, invert Y, master/effects/ambience volume, frame-rate counter. Applied at once and saved to `settings.json` (the preset to the existing preference) |
+| Loading screen | 🟡 | covers world generation, with the world name and a count of ready columns |
+| HUD | 🟡 | Phase 7 `GameHud` (UI Toolkit). The IMGUI overlay only shows the F3 statistics now |
+| Audio | 🟡 | every sound is synthesised at startup on a worker thread (`SoundSynth`), so no audio files are needed. Footsteps for 10 surfaces, mining strikes, breaking, placing, landing, splashes, pickups, damage, UI clicks, and thunder after each lightning flash (delayed by distance). Ambience beds: wind (altitude, weather), rain (muffled under cover), birds by day, crickets at night, a cave drone deep underground, underwater |
+| Block debris | 🟡 | coloured cubes burst from broken blocks and chip off while mining, in the block's own colour (from its icon), and settle on the ground |
+| Splashes | 🟡 | spray when the player falls into water, scaled by the fall height |
+| Falling leaves | 🟡 | drift down from canopies around the player, on the wind, and settle on the ground |
+| Dust, mist | ⬜ | not started |
+| Pipeline warm-up | 🟡 | `ShaderWarmup` draws every world material (terrain, foliage, water, items, particles, every prop LOD, instanced) through the real camera while the loading screen is up, to remove first-use hitches (the known ~200 ms spike). Needs measuring on the player build |
+| Draw-call reduction | ⬜ | BatchRendererGroup or merged section meshes; greedy-meshed far LODs; GPU occlusion. The largest remaining performance item (see known issues) |
 
 ---
 
@@ -176,8 +186,9 @@ Editor Play, tests and captures run an unsaved creative sandbox, as before. `-vw
 | Blender preview renders the violet flower clump nearly white | `docs/images/props.png` | Check in the turntable; raise petal saturation if it holds in-engine |
 | Undersides of leaf canopies can look like a flat grey sheet at grazing angles | forest captures | Revisit with Phase 4 lighting; consider per-face normal jitter for leaves |
 | Stone scan (Rock058) has rust-coloured veins that read orange under torch light | cave capture | Tint or swap the stone layer during Phase 4 art direction |
-| One frame spike (~150–250 ms) after large teleports | capture report | Suspected first-use pipeline (PSO) compilation plus streaming bursts. Profile, then add shader warm-up (Phase 8) |
+| One frame spike (~150–250 ms) after large teleports | capture report | Suspected first-use pipeline (PSO) compilation plus streaming bursts. `ShaderWarmup` (Phase 8) targets the PSO part; re-measure |
 | The capture tool's river viewpoint can land on a nearby hill | capture harness | Improve viewpoint selection; rivers are visible in the forest-aerial capture |
 | Faint dark line between two stacked coplanar blocks in some close-ups | Phase 1 | Not yet diagnosed |
 | Unity logs an `ArgumentOutOfRangeException` from `UnityEditor.Search` at batch-mode startup | batch logs | Engine-side; harmless |
 | Player build uses Mono | — | IL2CPP on ARM64 needs the VS C++ ARM64 toolchain |
+| Phases 3–8 have not been run in the Unity editor | — | Everything since Phase 2 was written without an editor: engine-free logic is unit-tested, the rest is type-checked against Unity reference assemblies. Next step: `./tools/unity.ps1 build`, both test suites, a capture run, and fixing what they find |

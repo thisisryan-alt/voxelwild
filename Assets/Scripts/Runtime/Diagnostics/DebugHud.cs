@@ -7,7 +7,7 @@ using Voxelwild.World;
 namespace Voxelwild.Diagnostics
 {
     /// <summary>
-    /// Developer overlay (IMGUI): F3 statistics and the "generating" notice. F1 hides every HUD, this one and the
+    /// Developer overlay (IMGUI): F3 statistics, or just the frame rate when the setting asks for it. F1 hides every HUD, this one and the
     /// game HUD (Voxelwild.UI.GameHud, which draws the crosshair, hotbar and inventory).
     /// </summary>
     public sealed class DebugHud : MonoBehaviour
@@ -18,7 +18,7 @@ namespace Voxelwild.Diagnostics
         [SerializeField] Voxelwild.Rendering.DayNightCycle dayNight;
         [SerializeField] Voxelwild.Rendering.QualityManager quality;
         [SerializeField] Voxelwild.Rendering.WeatherSystem weather;
-        [SerializeField] bool showStats = true;
+        [SerializeField] bool showStats;
 
         public bool Hidden { get; set; }
 
@@ -70,13 +70,14 @@ namespace Voxelwild.Diagnostics
             if (Hidden) return;
             EnsureStyles();
 
-            if (!player.Spawned)
+            if (!player.Spawned) return;   // the game HUD shows the loading screen
+
+            if (!showStats)
             {
-                GUI.Label(new Rect(Screen.width / 2f - 120, Screen.height / 2f - 12, 240, 24), "<b>Generating world…</b>", _label);
+                if (Voxelwild.Gameplay.SettingsStore.Current.showFps)
+                    GUI.Label(new Rect(12, 8, 200, 24), $"{1f / _smoothedDt:0} fps", _label);
                 return;
             }
-
-            if (!showStats) return;
             var p = player.Body.Position;
             string target = interactor.HasTarget
                 ? $"{BlockRegistry.Name(interactor.Target.Id)} @ {interactor.Target.Block}"

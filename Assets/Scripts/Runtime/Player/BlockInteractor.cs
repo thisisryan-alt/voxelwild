@@ -39,7 +39,14 @@ namespace Voxelwild.Player
         /// <summary>0..1 progress of the block being mined (survival).</summary>
         public float MiningProgress { get; private set; }
 
-        float _nextAction;
+        /// <summary>A block was removed (cell, block id). Sounds and debris listen to these.</summary>
+        public event System.Action<int3, ushort> Broken;
+        /// <summary>A block was placed (cell, block id).</summary>
+        public event System.Action<int3, ushort> Placed;
+        /// <summary>A strike while mining a block in survival, about four a second (cell, block id).</summary>
+        public event System.Action<int3, ushort> MiningHit;
+
+        float _nextAction, _nextHit;
         int _slot;
         int3 _miningBlock = new int3(int.MinValue);
 
@@ -119,6 +126,11 @@ namespace Voxelwild.Player
             }
             if (!repeat) return;
             float seconds = Gameplay.Mining.BreakSeconds(Target.Id, survival.Inventory.HeldItem);
+            if (Time.time >= _nextHit)
+            {
+                _nextHit = Time.time + 0.25f;
+                MiningHit?.Invoke(Target.Block, Target.Id);
+            }
             if (float.IsPositiveInfinity(seconds)) return;
             MiningProgress += seconds <= 0f ? 1f : Time.deltaTime / seconds;
             if (MiningProgress < 1f) return;
@@ -156,10 +168,11 @@ namespace Voxelwild.Player
             if (!world.TryGetBlock(block, out var id) || !BlockRegistry.Get(id).Has(BlockFlags.Breakable)) return false;
             // neighbouring water flows into the hole through the water simulation
             if (!world.SetBlock(block, BlockId.Air)) return false;
+            Broken?.Invoke(block, id);
             // plants and torches standing on the broken block drop with it
             var above = block + new int3(0, 1, 0);
-            if (world.TryGetBlock(above, out var up) && BlockRegistry.Get(up).Has(BlockFlags.NeedsSupport))
-                world.SetBlock(above, BlockId.Air);
+            if (world.TryGetBlock(above, out var up) && BlockRegistry.Get(up).Has(BlockFlags.NeedsSupport) && world.SetBlock(above, BlockId.Air))
+                Broken?.Invoke(above, up);
             return true;
         }
 
@@ -173,7 +186,9 @@ namespace Voxelwild.Player
                 if (!world.TryGetBlock(cell - new int3(0, 1, 0), out var below) || !BlockRegistry.Get(below).Has(BlockFlags.Opaque)) return false;
                 if (BlockId.IsWater(existing)) return false;
             }
-            return world.SetBlock(cell, block);
+            if (!world.SetBlock(cell, block)) return false;
+            Placed?.Invoke(cell, block);
+            return true;
         }
     }
 }

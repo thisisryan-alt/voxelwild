@@ -21,12 +21,39 @@ namespace Voxelwild.Gameplay
         [SerializeField] int size = 64;
 
         readonly Dictionary<ushort, Texture2D> _icons = new Dictionary<ushort, Texture2D>();
+        readonly Dictionary<ushort, Color> _average = new Dictionary<ushort, Color>();
         bool _built;
 
         public Texture2D Get(ushort item)
         {
             if (!_built) Build();
             return _icons.TryGetValue(item, out var t) ? t : null;
+        }
+
+        /// <summary>
+        /// The mean colour of an item's icon (opaque pixels only): debris and leaf particles take their colour from
+        /// the block they came from. Grey when there is no icon.
+        /// </summary>
+        public Color AverageColor(ushort item)
+        {
+            if (_average.TryGetValue(item, out var c)) return c;
+            var icon = Get(item);
+            c = new Color(0.5f, 0.5f, 0.5f);
+            if (icon != null)
+            {
+                var px = icon.GetPixels32();
+                float r = 0, g = 0, b = 0;
+                int n = 0;
+                foreach (var p in px)
+                {
+                    if (p.a < 128) continue;
+                    r += p.r; g += p.g; b += p.b;
+                    n++;
+                }
+                if (n > 0) c = new Color(r / (255f * n), g / (255f * n), b / (255f * n));
+            }
+            _average[item] = c;
+            return c;
         }
 
         void Build()
@@ -50,7 +77,8 @@ namespace Voxelwild.Gameplay
             Mesh mesh = null;
             try
             {
-                mesh = CubeMesh(def);
+                mesh = BlockCube(block, 15);
+                mesh.hideFlags = HideFlags.HideAndDontSave;
                 // high above the world: out of every view, and clear of the height fog that pools low down
                 go.transform.position = new Vector3(0f, 5000f, 0f);
                 go.AddComponent<MeshFilter>().sharedMesh = mesh;
@@ -95,11 +123,13 @@ namespace Voxelwild.Gameplay
             }
         }
 
-        static Mesh CubeMesh(BlockDefinition def)
+        /// <summary>A unit cube (0..1) in the terrain vertex format with the block's texture layers and tint.</summary>
+        public static Mesh BlockCube(ushort block, int skyLight)
         {
+            var def = BlockRegistry.Get(block);
             var verts = new List<TerrainVertex>(24);
             var idx = new List<int>(36);
-            uint light = TerrainVertex.PackLight(15, 0, 140, 110);
+            uint light = TerrainVertex.PackLight(skyLight, 0, 140, 110);
             for (int face = 0; face < 6; face++)
             {
                 int3 n = Faces.Normal(face), t = Faces.Tangent(face), b = Faces.Bitangent(face);
@@ -114,7 +144,7 @@ namespace Voxelwild.Gameplay
                     verts.Add(new TerrainVertex { Position = p, Data0 = d0, Data1 = light, Data2 = (uint)def.Tint });
                 idx.AddRange(new[] { s, s + 1, s + 2, s, s + 2, s + 3 });
             }
-            var mesh = new Mesh { name = "IconCube", hideFlags = HideFlags.HideAndDontSave };
+            var mesh = new Mesh { name = "BlockCube_" + BlockRegistry.Name(block) };
             mesh.SetVertexBufferParams(verts.Count, TerrainVertex.Layout);
             mesh.SetVertexBufferData(verts, 0, 0, verts.Count);
             mesh.SetIndices(idx, MeshTopology.Triangles, 0);

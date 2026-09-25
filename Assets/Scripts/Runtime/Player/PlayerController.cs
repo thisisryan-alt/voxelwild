@@ -34,6 +34,11 @@ namespace Voxelwild.Player
         public bool HeadInWater { get; private set; }
         /// <summary>External code (capture tool, cutscenes) can take over the camera.</summary>
         public bool InputEnabled { get; set; } = true;
+        /// <summary>Esc frees the mouse. The pause menu turns this off and handles Esc itself.</summary>
+        public bool EscapeReleasesCursor { get; set; } = true;
+        /// <summary>Settings: multiplier on the base mouse sensitivity, and inverted vertical look.</summary>
+        public float SensitivityScale { get; set; } = 1f;
+        public bool InvertY { get; set; }
 
         public float Yaw { get; private set; }
         public float Pitch { get; private set; }
@@ -111,7 +116,7 @@ namespace Voxelwild.Player
         {
             var mouse = Mouse.current;
             var kb = Keyboard.current;
-            if (kb != null && kb.escapeKey.wasPressedThisFrame) Cursor.lockState = CursorLockMode.None;
+            if (EscapeReleasesCursor && kb != null && kb.escapeKey.wasPressedThisFrame) Cursor.lockState = CursorLockMode.None;
             else if (mouse != null && mouse.leftButton.wasPressedThisFrame && Cursor.lockState != CursorLockMode.Locked)
                 Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = Cursor.lockState != CursorLockMode.Locked;
@@ -121,9 +126,9 @@ namespace Voxelwild.Player
         {
             var mouse = Mouse.current;
             if (mouse == null) return;
-            Vector2 d = mouse.delta.ReadValue() * mouseSensitivity;
+            Vector2 d = mouse.delta.ReadValue() * (mouseSensitivity * SensitivityScale);
             Yaw = (Yaw + d.x) % 360f;
-            Pitch = math.clamp(Pitch - d.y, -89.5f, 89.5f);
+            Pitch = math.clamp(Pitch - (InvertY ? -d.y : d.y), -89.5f, 89.5f);
         }
 
         void Move(float dt)

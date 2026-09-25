@@ -15,7 +15,7 @@ namespace Voxelwild.Rendering
     [DefaultExecutionOrder(-90)]
     public sealed class QualityManager : MonoBehaviour
     {
-        const string PrefKey = "voxelwild.quality";
+        public const string PrefKey = "voxelwild.quality";
 
         [SerializeField] VoxelWorld world;
         [SerializeField] Light sun;
@@ -50,9 +50,15 @@ namespace Voxelwild.Rendering
             var kb = Keyboard.current;
             if (kb != null && kb.f4Key.wasPressedThisFrame)
             {
-                Apply((_index + 1) % QualityPresets.All.Length);
-                PlayerPrefs.SetInt(PrefKey, _index);
+                Select((_index + 1) % QualityPresets.All.Length);
             }
+        }
+
+        /// <summary>Applies a preset and remembers it for the next session (settings screen, F4).</summary>
+        public void Select(int index)
+        {
+            Apply(index);
+            PlayerPrefs.SetInt(PrefKey, _index);
         }
 
         public void Apply(int index)

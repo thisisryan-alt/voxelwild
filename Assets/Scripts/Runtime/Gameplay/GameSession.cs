@@ -18,6 +18,8 @@ namespace Voxelwild.Gameplay
         public static bool CreateNew;
         public static uint NewSeed = 20260924;
         public static GameMode NewMode = GameMode.Survival;
+        /// <summary>The -vw command-line options apply to the first World load only.</summary>
+        public static bool CommandLineRead;
 
         public static void Load(string name) { WorldName = name; CreateNew = false; }
         public static void Create(string name, uint seed, GameMode mode) { WorldName = name; CreateNew = true; NewSeed = seed; NewMode = mode; }
@@ -61,7 +63,7 @@ namespace Voxelwild.Gameplay
     /// saves to disk (F5, every few minutes, and on quit), and handles death and respawning. Worlds live in
     /// <c>{persistentDataPath}/saves/{name}/</c>: world.json plus region files of the edited sections.
     /// Without a chosen world (editor Play, tests, capture runs) the session is an unsaved creative sandbox,
-    /// exactly as before Phase 7. Command line: -vwWorld name [-vwNew] [-vwSeed n] [-vwMode Survival|Creative].
+    /// exactly as before Phase 7. Command line: -vwWorld name [-vwNew] [-vwSeed n] [-vwMode Survival|Creative] (first load only).
     /// </summary>
     [DefaultExecutionOrder(-200)]
     public sealed class GameSession : MonoBehaviour
@@ -105,6 +107,8 @@ namespace Voxelwild.Gameplay
 
         static void ReadCommandLine()
         {
+            if (WorldLaunch.CommandLineRead) return;
+            WorldLaunch.CommandLineRead = true;
             var args = System.Environment.GetCommandLineArgs();
             if (Array.IndexOf(args, "-vwCapture") >= 0) { WorldLaunch.Sandbox(); return; }
             int w = Array.IndexOf(args, "-vwWorld");

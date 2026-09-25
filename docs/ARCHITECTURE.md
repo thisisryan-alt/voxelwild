@@ -163,9 +163,70 @@ generator and drawn with GPU instancing.
 - **Globals:** `EnvironmentLighting` publishes the block-light colour and wind, and refreshes the
   ambient probe.
 
+## Environment (Phases 4 and 6)
+
+- **Engine-free models:** `SkyModel` (sun and moon positions, moon phase, light colours and ambient for a
+  time of day), `AtmosphereModel` (the single-scattering Rayleigh + Mie table) and `WeatherModel` (a seeded
+  Markov chain over clear, cloudy, rain, heavy rain, storm and fog, blending the parameters over a minute, with
+  wetness, puddles and snow cover lagging behind the sky) use only `System` and `Unity.Mathematics`. They run
+  under `dotnet test` without Unity.
+- **`DayNightCycle`** turns the model into the scene: sun and moon light, trilight ambient, fog colours and the
+  `_VoxelSunDir` / `_VoxelClouds` / `_VoxelFog*` globals that the sky and every lit shader read
+  (`VoxelAtmosphere.hlsl`). One cloud density field is drawn by the sky and sampled toward the sun for cloud
+  shadows.
+- **`WeatherSystem`** pushes the weather's cloud cover, fog, light and wind into the cycle and
+  `EnvironmentLighting`, and publishes `_VoxelWeather` (wet, snow, puddles, snow layer) for the terrain and
+  prop surfaces. Rain and snow are particles around the camera, stopped under cover by the sky heightmap.
+  Lightning raises an event that audio listens to.
+- **`QualityManager`** applies a `QualityPresets` entry: render scale, shadows, SSAO, view distance, leaf and
+  prop distances, stochastic tiling, SMAA and cloud shadows.
+
+## Water (Phase 5)
+
+Water levels are block ids: `Water` is a source (level 8) and `FlowingWater1..7` are flows. `WaterSimulation`
+is a cellular automaton over an `IWaterGrid`. Water falls before it spreads, spreads only over solid ground or
+sources, two sources make a third, and flows retreat once nothing feeds them. `VoxelWorld` runs it at 4 ticks
+a second on a dirty set seeded by edits and springs. Writes go through `SetBlockDeferred`, so a tick remeshes
+each section once. The mesher gives every water corner the average height of the neighbouring cells, which
+makes slopes continuous, and packs a flow direction into the vertex for the shader's flow-mapped ripples.
+
+## Gameplay (Phase 7)
+
+- **Rules (engine-free):** `ItemRegistry` (blocks are items with the same id; materials, food and tools from
+  256), `Mining` (break time from hardness, tool type and tier), `Drops`, `Inventory` (36 slots, stacking,
+  hotbar), `Recipes` (shapeless crafting), `SurvivalStats` (health, hunger with saturation and exhaustion,
+  breath, fall damage) and `RegionFile` / `SaveFolders` (the save format).
+- **`GameSession`** (runs first) decides what is played: a world chosen on the title screen or the command
+  line, or an unsaved creative sandbox. It sets the seed and mode before any terrain generates, then imports
+  edited sections, removed props and the player's state. It saves on F5, every 5 minutes and on quit, and
+  handles death (drop everything, respawn at the spawn point).
+- **Saves:** `{persistentDataPath}/saves/{name}/world.json` plus `regions/r.X.Z.bin`. Each region file holds
+  the run-length-encoded edited sections of 16×16 columns. Files are written to a temporary file and swapped
+  in.
+- **`BlockInteractor`** raycasts, mines over time in survival (instantly in creative), drops items, wears tools
+  and places blocks. It raises `Broken`, `Placed` and `MiningHit`, which sound and particles listen to.
+  `ItemEntities` simulates dropped items with the player's voxel physics and picks them up.
+
+## Interface, sound and effects (Phase 8)
+
+- **UI Toolkit, built in code:** `GameHud` (hotbar, vitals, inventory and crafting, loading screen, death
+  screen), `PauseMenu` (its own document drawn above the HUD), `MainMenu` (title scene) and `SettingsView`,
+  all styled by `Ui` (square corners, dark panels, one gold accent). A runtime theme (`Assets/UI`) supplies
+  only the default font and controls. `SettingsStore` keeps the options in `settings.json`, and
+  `SettingsApplier` pushes them to the controller, the camera and the listener.
+- **Sound:** `SoundSynth` (engine-free) makes every sound from filtered noise, grains and sine partials.
+  One-shots are noise bursts shaped per surface; ambience beds are loops whose tail is cross-faded into the
+  head. `GameAudio` builds the bank on a worker thread and turns it into `AudioClip`s. It plays one-shots on a
+  pool of 3D voices and mixes six 2D beds from the weather, sun elevation, sky exposure, depth below the
+  surface and whether the head is under water.
+- **Particles:** `BlockEffects` emits debris, splashes and falling leaves from two particle systems. The world
+  has no colliders, so each frame it moves any particle found inside a solid block onto the block's top.
+- **Warm-up:** `ShaderWarmup` draws every world material and prop LOD in front of the camera while the loading
+  screen covers the view, so the pipeline states are compiled before play.
+
 ## Verification
 
-- **EditMode (52):**
+- **EditMode (96; 48 of them engine-free, also run by `dotnet test tools/dotnet-tests`):**
   - coordinates and registry/manifest order
   - generation determinism, bedrock, heightmaps, caves and ores
   - forests and biome coverage over 12 km
@@ -174,8 +235,12 @@ generator and drawn with GPU instancing.
   - region builder, raycast, physics and RLE store
   - props: registry sanity, the Blender manifest against the registry, deterministic placement, placement
     rules (support, biome, cores, barriers, footprints), edit dependencies and removal
-- **PlayMode (4):** spawn and ground contact, place/break with immediate remesh, no placement inside the
-  player, and torch support.
+  - sky, atmosphere and quality presets; weather chain, blending, wetness and snow
+  - water simulation (falling, spreading, sources, retreat, unloaded borders) and water meshing
+  - items, mining, drops, inventory, crafting, survival, region files and save folders
+  - sound synthesis (finite, audible, no clipping, deterministic, seamless loops), surfaces and settings
+- **PlayMode (5):** spawn and ground contact, place/break with immediate remesh, no placement inside the
+  player, torch support, and a dropped item falling and being picked up.
 - **Capture (`-vwCapture`):**
   - tours spawn, a showcase, the overview, mountains, coast, forest interior, jungle, taiga, badlands,
     desert, swamp, river and a real cave found by scanning voxels, with torches placed through the

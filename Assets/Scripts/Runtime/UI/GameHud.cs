@@ -23,6 +23,7 @@ namespace Voxelwild.UI
         [SerializeField] GameSession session;
         [SerializeField] ItemIcons icons;
         [SerializeField] Diagnostics.DebugHud debugHud;
+        [SerializeField] World.VoxelWorld world;
 
         static readonly Color Panel = new Color(0f, 0f, 0f, 0.45f);
         static readonly Color PanelStrong = new Color(0f, 0f, 0f, 0.7f);
@@ -42,7 +43,8 @@ namespace Voxelwild.UI
         }
 
         VisualElement _root, _hud, _vitals, _mining, _miningFill, _death, _inventory, _recipes;
-        VisualElement _health, _hunger, _air;
+        VisualElement _health, _hunger, _air, _loading, _loadingFill;
+        Label _loadingDetail;
         Label _toast, _mode, _saved, _deathText;
         readonly List<SlotView> _hotbar = new List<SlotView>();
         readonly List<SlotView> _grid = new List<SlotView>();
@@ -160,6 +162,52 @@ namespace Voxelwild.UI
             _root.Add(_death);
 
             BuildInventory();
+            BuildLoading();
+        }
+
+        void BuildLoading()
+        {
+            _loading = Fill(new VisualElement());
+            _loading.style.backgroundColor = new Color(0.063f, 0.071f, 0.078f);
+            _loading.style.justifyContent = Justify.Center;
+            _loading.style.alignItems = Align.Center;
+            var title = new Label("VOXELWILD");
+            title.style.fontSize = 44;
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            title.style.color = Color.white;
+            title.style.letterSpacing = 6;
+            _loading.Add(title);
+            var what = new Label(session != null && session.Persistent ? $"Loading {session.WorldName}" : "Generating world");
+            what.style.color = new Color(1, 1, 1, 0.8f);
+            what.style.fontSize = 16;
+            what.style.marginTop = 12;
+            _loading.Add(what);
+            var bar = new VisualElement();
+            bar.style.width = 320;
+            bar.style.height = 4;
+            bar.style.marginTop = 18;
+            bar.style.backgroundColor = new Color(1, 1, 1, 0.12f);
+            bar.style.overflow = Overflow.Hidden;
+            _loadingFill = Box(0, 0, 80, 4, Accent);
+            bar.Add(_loadingFill);
+            _loading.Add(bar);
+            _loadingDetail = new Label();
+            _loadingDetail.style.color = new Color(1, 1, 1, 0.5f);
+            _loadingDetail.style.fontSize = 12;
+            _loadingDetail.style.marginTop = 8;
+            _loading.Add(_loadingDetail);
+            _root.Add(_loading);
+        }
+
+        void UpdateLoading()
+        {
+            bool loading = !player.Spawned;
+            _loading.style.display = loading ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!loading) return;
+            // indeterminate: an accent block sweeping across the track
+            float t = Time.unscaledTime * 0.8f % 1f;
+            _loadingFill.style.left = -80 + t * 400f;
+            if (world != null) _loadingDetail.text = $"{world.LoadedColumns} columns ready";
         }
 
         void BuildInventory()
@@ -275,7 +323,7 @@ namespace Voxelwild.UI
         void Update()
         {
             var kb = Keyboard.current;
-            if (kb != null && player.Spawned && (session == null || !session.Dead))
+            if (kb != null && player.Spawned && (session == null || !session.Dead) && !PauseMenu.Paused)
             {
                 if (kb.eKey.wasPressedThisFrame || kb.tabKey.wasPressedThisFrame) SetOpen(!_open);
                 else if (_open && kb.escapeKey.wasPressedThisFrame) SetOpen(false);
@@ -303,6 +351,7 @@ namespace Voxelwild.UI
 
             bool hidden = debugHud != null && debugHud.Hidden;   // F1 and screenshot captures
             _root.style.display = hidden ? DisplayStyle.None : DisplayStyle.Flex;
+            UpdateLoading();
             bool alive = session == null || !session.Dead;
             _hud.style.display = player.Spawned && alive ? DisplayStyle.Flex : DisplayStyle.None;
             _death.style.display = alive ? DisplayStyle.None : DisplayStyle.Flex;

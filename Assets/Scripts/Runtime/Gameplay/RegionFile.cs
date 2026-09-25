@@ -95,6 +95,30 @@ namespace Voxelwild.Gameplay
 
         public static string WorldDirectory(string root, string name) => Path.Combine(root, SafeName(name));
 
+        /// <summary>The name itself if no world uses its folder yet, otherwise "name 2", "name 3", ... (always a SafeName).</summary>
+        public static string UniqueName(string root, string name)
+        {
+            string baseName = SafeName(name);
+            if (baseName.Length > 42) baseName = baseName.Substring(0, 42).TrimEnd();
+            string candidate = baseName;
+            for (int i = 2; Directory.Exists(Path.Combine(root, candidate)); i++) candidate = $"{baseName} {i}";
+            return candidate;
+        }
+
+        /// <summary>
+        /// The seed typed on the new-world screen: a number is used as is, any other text is hashed (FNV-1a) so
+        /// words make repeatable worlds too. Null when the field is blank (pick a random seed).
+        /// </summary>
+        public static uint? SeedFromText(string text)
+        {
+            text = (text ?? "").Trim();
+            if (text.Length == 0) return null;
+            if (uint.TryParse(text, out uint n)) return n;
+            uint h = 2166136261u;
+            foreach (char c in text) { h ^= c; h *= 16777619u; }
+            return h;
+        }
+
         /// <summary>Names of the saved worlds under root (folders that contain world.json), most recent first.</summary>
         public static List<string> List(string root)
         {
@@ -115,7 +139,12 @@ namespace Voxelwild.Gameplay
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string tmp = path + ".tmp";
             using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write)) write(fs);
-            if (File.Exists(path)) File.Delete(path);
+            // swap in one step where the file system allows it, so a crash leaves the old or the new file
+            if (File.Exists(path))
+            {
+                try { File.Replace(tmp, path, null); return; }
+                catch (PlatformNotSupportedException) { File.Delete(path); }
+            }
             File.Move(tmp, path);
         }
     }

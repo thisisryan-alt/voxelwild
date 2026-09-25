@@ -42,6 +42,8 @@ namespace Voxelwild.Gameplay
 
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         public int Count => _live.Count;
+        /// <summary>The player picked something up (item id).</summary>
+        public event System.Action<ushort> PickedUp;
 
         void Awake()
         {
@@ -114,6 +116,7 @@ namespace Voxelwild.Gameplay
                 if (pickup)
                 {
                     int left = survival.Inventory.Add(e.Stack);
+                    if (left < e.Stack.Count) PickedUp?.Invoke(e.Stack.Item);
                     if (left == 0) { Release(i); continue; }
                     e.Stack.Count = left;
                 }

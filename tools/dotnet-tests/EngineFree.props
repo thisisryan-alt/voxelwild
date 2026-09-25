@@ -13,6 +13,9 @@
     <EngineFree Include="$(Assets)/Scripts/Runtime/Gameplay/Inventory.cs" />
     <EngineFree Include="$(Assets)/Scripts/Runtime/Gameplay/Survival.cs" />
     <EngineFree Include="$(Assets)/Scripts/Runtime/Gameplay/RegionFile.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/Audio/SoundSynth.cs" />
+    <EngineFree Include="$(Assets)/Scripts/Runtime/Gameplay/GameSettings.cs" />
+    <EngineFree Include="$(Assets)/Tests/EditMode/AudioTests.cs" />
     <EngineFree Include="$(Assets)/Tests/EditMode/EnvironmentTests.cs" />
     <EngineFree Include="$(Assets)/Tests/EditMode/GameplayTests.cs" />
     <EngineFree Include="$(Assets)/Tests/EditMode/WeatherTests.cs" />

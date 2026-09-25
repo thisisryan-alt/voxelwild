@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UIElements;
+using Voxelwild.Audio;
 using Voxelwild.Diagnostics;
 using Voxelwild.Gameplay;
 using Voxelwild.Player;
@@ -22,6 +23,7 @@ namespace Voxelwild.EditorTools
     public static class WorldSceneBuilder
     {
         public const string ScenePath = "Assets/Scenes/World.unity";
+        public const string MenuScenePath = "Assets/Scenes/MainMenu.unity";
         const string MaterialsFolder = "Assets/Art/Materials";
         const string RenderingSettingsFolder = "Assets/Settings/Rendering";
         const string UIFolder = "Assets/UI";
@@ -74,7 +76,11 @@ namespace Voxelwild.EditorTools
             var volumeProfile = PostProfile();
             var token = MaterialAt(MaterialsFolder + "/ItemToken.mat", "Universal Render Pipeline/Lit");
             token.SetFloat("_Smoothness", 0.35f);
+            token.enableInstancing = true;
             EditorUtility.SetDirty(token);
+            var particles = MaterialAt(MaterialsFolder + "/Particles.mat", "Universal Render Pipeline/Particles/Simple Lit");
+            particles.SetFloat("_Smoothness", 0.2f);
+            EditorUtility.SetDirty(particles);
             var panel = HudPanelSettings();
             AssetDatabase.SaveAssets();
 
@@ -88,6 +94,7 @@ namespace Voxelwild.EditorTools
             sky = Reload(sky);
             volumeProfile = Reload(volumeProfile);
             token = Reload(token);
+            particles = Reload(particles);
             panel = Reload(panel);
 
             // --- sun & environment
@@ -210,15 +217,112 @@ namespace Voxelwild.EditorTools
             doc.panelSettings = panel;
             var gameHud = uiGo.AddComponent<GameHud>();
             Assign(gameHud, ("player", controller), ("survival", survival), ("interactor", interactor), ("session", session),
-                ("icons", icons), ("debugHud", hud));
+                ("icons", icons), ("debugHud", hud), ("world", world));
+            var settingsApplier = uiGo.AddComponent<SettingsApplier>();
+            Assign(settingsApplier, ("player", controller), ("playerCamera", cam));
+
+            // pause menu: its own document drawn over the HUD
+            var pauseGo = new GameObject("PauseMenu");
+            var pauseDoc = pauseGo.AddComponent<UIDocument>();
+            pauseDoc.panelSettings = panel;
+            pauseDoc.sortingOrder = 10;
+            var pause = pauseGo.AddComponent<PauseMenu>();
+            Assign(pause, ("player", controller), ("session", session), ("hud", gameHud), ("quality", quality));
+
+            // --- polish (Phase 8): sound, particles, pipeline warm-up
+            var audioGo = new GameObject("Audio");
+            var gameAudio = audioGo.AddComponent<GameAudio>();
+            Assign(gameAudio, ("player", controller), ("world", world), ("interactor", interactor), ("survival", survival),
+                ("items", items), ("weather", weather), ("dayNight", dayNight));
+
+            var effects = gameGo.AddComponent<BlockEffects>();
+            Assign(effects, ("world", world), ("player", controller), ("interactor", interactor), ("icons", icons),
+                ("environment", sunGo.GetComponent<EnvironmentLighting>()), ("particleMaterial", particles));
+
+            var warmup = gameGo.AddComponent<ShaderWarmup>();
+            Assign(warmup, ("player", controller), ("playerCamera", cam), ("terrainMaterial", terrain), ("foliageMaterial", foliage),
+                ("waterMaterial", water), ("tokenMaterial", token), ("particleMaterial", particles));
+            if (props != null) Assign(warmup, ("props", props));
 
             EditorSceneManager.SaveScene(scene, ScenePath);
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
 
             BakeEnvironment();
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
             Debug.Log("[WorldSceneBuilder] World scene rebuilt");
+
+            BuildMenuScene(sky, volumeProfile, panel);
+            // the title screen starts the game; World loads from it (or directly, for tests and captures)
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(MenuScenePath, true), new EditorBuildSettingsScene(ScenePath, true) };
+            AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>The title scene: the live sky at golden hour turning slowly behind the main menu.</summary>
+        static void BuildMenuScene(Material sky, VolumeProfile volumeProfile, PanelSettings panel)
+        {
+            string skyPath = AssetDatabase.GetAssetPath(sky), volumePath = AssetDatabase.GetAssetPath(volumeProfile), panelPath = AssetDatabase.GetAssetPath(panel);
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            sky = AssetDatabase.LoadAssetAtPath<Material>(skyPath);
+            volumeProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(volumePath);
+            panel = AssetDatabase.LoadAssetAtPath<PanelSettings>(panelPath);
+
+            var sunGo = new GameObject("Sun");
+            var sun = sunGo.AddComponent<Light>();
+            sun.type = LightType.Directional;
+            sun.color = new Color(1.0f, 0.955f, 0.88f);
+            sun.intensity = 2.1f;
+            sunGo.AddComponent<UniversalAdditionalLightData>();
+            sunGo.AddComponent<EnvironmentLighting>();
+            var dayNight = sunGo.AddComponent<DayNightCycle>();
+            SetFloat(dayNight, "timeOfDay", 0.29f);          // early morning, sun low in the east
+            SetFloat(dayNight, "dayLengthMinutes", 240f);    // barely moves while the menu is open
+
+            RenderSettings.sun = sun;
+            RenderSettings.skybox = sky;
+            RenderSettings.ambientMode = AmbientMode.Trilight;
+            RenderSettings.fog = false;
+
+            var volumeGo = new GameObject("PostProcessing");
+            var volume = volumeGo.AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.sharedProfile = volumeProfile;
+
+            var rig = new GameObject("CameraRig");
+            rig.transform.rotation = Quaternion.Euler(0f, 60f, 0f);
+            var camGo = new GameObject("Camera");
+            camGo.tag = "MainCamera";
+            camGo.transform.SetParent(rig.transform, false);
+            camGo.transform.localPosition = new Vector3(0f, 80f, 0f);
+            camGo.transform.localRotation = Quaternion.Euler(-9f, 0f, 0f);
+            var cam = camGo.AddComponent<Camera>();
+            cam.fieldOfView = 60f;
+            cam.farClipPlane = 5000f;
+            cam.allowHDR = true;
+            cam.clearFlags = CameraClearFlags.Skybox;
+            var camData = camGo.AddComponent<UniversalAdditionalCameraData>();
+            camData.renderPostProcessing = true;
+            camGo.AddComponent<AudioListener>();
+
+            var audioGo = new GameObject("Audio");
+            var gameAudio = audioGo.AddComponent<GameAudio>();
+            Assign(gameAudio, ("dayNight", dayNight));
+
+            var uiGo = new GameObject("UI");
+            var doc = uiGo.AddComponent<UIDocument>();
+            doc.panelSettings = panel;
+            var menu = uiGo.AddComponent<MainMenu>();
+            Assign(menu, ("cameraRig", rig.transform));
+
+            EditorSceneManager.SaveScene(scene, MenuScenePath);
+            Debug.Log("[WorldSceneBuilder] MainMenu scene rebuilt");
+        }
+
+        static void SetFloat(Object target, string field, float value)
+        {
+            var so = new SerializedObject(target);
+            var p = so.FindProperty(field) ?? throw new System.Exception($"{target.GetType().Name}.{field} not found");
+            p.floatValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         static void WriteTheme()

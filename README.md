@@ -16,10 +16,23 @@ The world stays readable as blocks.
 
 ## Status
 
-**Phases 1 (Foundation) and 2 (World) are complete. Phase 3 (Art pipeline) is built and awaiting its
-in-engine gate:** the Blender pipeline runs and validates headless, and the Unity side (import, library,
-prop shader, placement, rendering, tests, turntables) is written but not yet run in the editor. See
-[docs/ROADMAP.md](docs/ROADMAP.md) for all eight phases, what is still a stopgap, and known issues.
+**Phases 1 (Foundation) and 2 (World) are complete and verified in Unity. Phases 3–8 are all written but
+none has been run in the Unity editor yet:**
+
+- 3: art pipeline
+- 4: rendering
+- 5: water
+- 6: weather
+- 7: gameplay
+- 8: menus, audio, effects
+
+Their engine-free logic (sky, weather, water simulation, items, crafting, survival, save format, sound
+synthesis) is unit-tested with `dotnet test`. Everything else is type-checked against the Unity reference
+assemblies. The next step is an editor pass: build the scenes, run both test suites and a capture, and fix what
+they find. See [docs/ROADMAP.md](docs/ROADMAP.md) for all eight phases, what is still a stopgap, and the known
+issues.
+
+## Features
 
 - **Streamed world:** 32³ sections in columns (y −64…191). A Burst-compiled pipeline builds each column:
   terrain → trees → lit meshes, all on worker threads.
@@ -45,7 +58,23 @@ prop shader, placement, rendering, tests, turntables) is written but not yet run
   - Terrain: scanned PBR layers in Texture2DArrays, bevelled block edges, grass and snow creeping over
     block sides, voxel AO plus SSAO.
   - Foliage: alpha-tested and double-sided, with wind sway and sun transmission.
-  - Water: Phase 1 version.
+  - Water: refraction, absorption, caustics, flow-mapped ripples, foam and waterfalls (Phase 5).
+  - Sky: physically based scattering, sun, moon phases, stars and a cloud layer that casts shadows (Phase 4).
+- **Time and weather (Phases 4, 6):** 20-minute days; weather cycles through clear, cloudy, rain, storms with
+  lightning, and fog. Ground gets wet, puddles form, snow settles and melts; rain and snow stop under roofs.
+  Quality presets run from Low to Cinematic.
+- **Flowing water (Phase 5):** a cellular simulation: water falls, spreads over ground, refills from two
+  sources, and retreats. Springs in cliffs become waterfalls.
+- **Survival and creative (Phase 7):**
+  - Survival: timed mining with tools and tiers, item drops, a 36-slot inventory and crafting, health,
+    hunger, breath, fall damage and death.
+  - Creative: flying, instant breaking, every block.
+  - Worlds save to disk and autosave.
+- **Title screen, sound and effects (Phase 8):**
+  - Menus: a title screen with world create/load/delete, a pause menu and settings.
+  - Sound: synthesised in code (no audio files): footsteps per surface, mining and breaking, thunder, and
+    wind, rain, birds, crickets, caves and underwater.
+  - Effects: block debris, splashes and falling leaves.
 - **Performance:**
   - Cave culling: a section-connectivity visibility graph hides sealed caves from the surface, and the
     surface from deep caves.
@@ -54,8 +83,11 @@ prop shader, placement, rendering, tests, turntables) is written but not yet run
   - Mesh jobs copy their own input, so the main thread stays at 2–5 ms.
 - **Player:** walk, sprint, jump, swim and fly on custom voxel physics. Break and place blocks,
   including torches. Plants and torches drop when their support is broken.
-- **Verification:** 52 EditMode and 4 PlayMode tests. The capture tool tours every biome and a cave,
-  and reports CPU/GPU time per view. `tools/blender/check_props.py` re-imports and validates every prop.
+- **Verification:**
+  - Unity tests: 96 EditMode and 5 PlayMode. 48 of the EditMode tests are engine-free and also run with
+    `dotnet test tools/dotnet-tests`.
+  - Captures: the capture tool tours every biome and a cave, and reports CPU/GPU time per view.
+  - Props: `tools/blender/check_props.py` re-imports and validates every prop.
 
 ## Requirements
 
@@ -71,22 +103,34 @@ prop shader, placement, rendering, tests, turntables) is written but not yet run
 ```powershell
 git lfs install
 git clone https://github.com/thisisryan-alt/voxelwild.git
-# open the folder in Unity Hub with 6000.4.11f1, then open Assets/Scenes/World.unity and press Play
+# open the folder in Unity Hub with 6000.4.11f1, run Voxelwild > Build All once,
+# then open Assets/Scenes/MainMenu.unity and press Play
 ```
+
+Playing `Assets/Scenes/World.unity` directly starts an unsaved creative sandbox, as the tests and captures
+do.
 
 ### Controls
 
 | Input | Action |
 |---|---|
 | WASD | move |
-| Mouse | look (click the game view to capture the mouse, Esc releases it) |
-| Space | jump; double-tap to toggle flying |
+| Mouse | look (click the game view to capture the mouse) |
+| Space | jump; double-tap to toggle flying (creative) |
 | Left Ctrl | sprint |
 | Left Shift | descend while flying |
-| F | toggle flying |
-| LMB / RMB | break / place block (hold to repeat) |
-| 1–9, mouse wheel | hotbar: cobblestone, stone, dirt, planks, bricks, oak log, leaves, sandstone, torch |
-| F3 / F1 | stats overlay / hide HUD |
+| F | toggle flying (creative) |
+| LMB | break (creative) or hold to mine (survival) |
+| RMB | place the held block, or eat held food |
+| 1–9, mouse wheel | select a hotbar slot |
+| E / Tab | inventory and crafting (creative: block palette) |
+| Esc | pause menu (closes the inventory first) |
+| F5 | save |
+| F3 / F1 | statistics overlay / hide all HUD |
+| T, Shift+T / P | time +1 hour, −1 hour / pause time |
+| F4 / Y | next quality preset / next weather |
+
+Command line: `-vwWorld name [-vwNew] [-vwSeed n] [-vwMode Survival|Creative]` plays a saved world directly.
 
 ## Tooling
 
@@ -94,10 +138,11 @@ git clone https://github.com/thisisryan-alt/voxelwild.git
 ./tools/blender.ps1 build                  # generate, bake, LOD and export every prop (~2 min)
 ./tools/blender.ps1 check -Determinism     # re-import and validate every prop; rebuild twice and compare
 ./tools/blender.ps1 preview                # labelled contact sheet of every prop (needs Pillow)
-./tools/unity.ps1 build                    # texture arrays + prop library + World scene, generated from code
-./tools/unity.ps1 test -Platform EditMode  # 52 tests
+./tools/unity.ps1 build                    # texture arrays + prop library + World and MainMenu scenes, from code
+./tools/unity.ps1 test -Platform EditMode  # 96 tests
+dotnet test tools/dotnet-tests -p:MathematicsSrc=<Unity.Mathematics/src/Unity.Mathematics>   # the 48 engine-free tests, no Unity
 ./tools/unity.ps1 turntable                # prop turntables into Screenshots/turntables/ (quality gate)
-./tools/unity.ps1 test -Platform PlayMode  # 4 tests on the real scene
+./tools/unity.ps1 test -Platform PlayMode  # 5 tests on the real scene
 ./tools/unity.ps1 capture                  # batch-mode screenshots into Screenshots/
 ./tools/unity.ps1 player                   # Windows player into Builds/Windows/
 Builds/Windows/Voxelwild.exe -vwCapture Screenshots/player            # real-GPU biome tour + CPU/GPU timings
@@ -106,8 +151,8 @@ python tools/fetch_ambientcg.py            # re-download scanned CC0 materials
 python tools/generate_textures.py          # regenerate procedural sets (foliage, plants, ores, torch...)
 ```
 
-`WorldSceneBuilder` generates the scene, materials, sky, post-processing and URP settings. Change the
-builder rather than hand-editing the scene.
+`WorldSceneBuilder` generates both scenes, the materials, sky, post-processing, UI panel settings and URP
+settings. Change the builder rather than hand-editing a scene.
 
 ## Performance (Phase 2)
 
@@ -133,22 +178,29 @@ Full view distance streams in about 2.3 s from a cold start.
 Assets/
   Art/            Materials, Texture2DArray atlases (generated)
     Models/         props: FBX + baked maps per category, props_manifest.json, PropLibrary (generated)
-  Scenes/         World.unity (generated by WorldSceneBuilder)
+  Scenes/         MainMenu.unity, World.unity (generated by WorldSceneBuilder)
+  UI/             runtime theme + panel settings (generated)
   Scripts/
     Runtime/      Voxelwild.Runtime assembly
       World/        blocks, sections/columns, VoxelWorld streaming + culling, raycast
         Generation/   terrain/biome noise, column generation job, tree decoration job
         Meshing/      Burst lighting + mesher, vertex format, region builder
         Props/        prop rules (PropRegistry), library, runtime field (light, edits, instanced drawing)
-      Player/       controller, voxel physics body, block interaction
-      Rendering/    layer profile (material framework), environment lighting
-      Diagnostics/  debug HUD, capture/perf director
+        Water/        water simulation
+      Player/       controller, voxel physics body, block interaction, underwater effects
+      Environment/  sky and atmosphere models, day/night cycle, weather model and system
+      Rendering/    layer profile, environment lighting, quality presets, block particles, shader warm-up
+      Gameplay/     items, mining, inventory, crafting, survival, saves, session, dropped items, icons, settings
+      Audio/        sound synthesis, game audio
+      UI/           HUD, inventory, pause menu, title screen, settings (UI Toolkit)
+      Diagnostics/  debug overlay, capture/perf director
     Editor/       scene builder, texture arrays, prop import + library + turntables, capture runner, player build
-  Shaders/        Terrain/, Foliage/, Props/, Water/, Utility/, Include/ (shared HLSL)
+  Shaders/        Terrain/, Foliage/, Props/, Water/, Sky/, Weather/, Utility/, Include/ (shared HLSL)
   Settings/       URP assets, post profile, TerrainLayerProfile
   Tests/          EditMode/, PlayMode/
 SourceArt/        scanned + generated source textures (later .blend files), outside Assets/
 tools/            unity.ps1, blender.ps1, fetch_ambientcg.py, generate_textures.py
+  dotnet-tests/   runs the engine-free tests outside Unity
   blender/        prop generators (vw/), build_props.py, check_props.py, preview_props.py
 docs/             ROADMAP, ARCHITECTURE, ASSET_PIPELINE, perf data, images
 ```
@@ -156,6 +208,7 @@ docs/             ROADMAP, ARCHITECTURE, ASSET_PIPELINE, perf data, images
 ## Documentation
 
 - [docs/ROADMAP.md](docs/ROADMAP.md): phases, status, stopgaps, known issues
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): world data, generation, lighting, meshing, culling, rendering
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): world data, generation, lighting, meshing, culling, rendering,
+  environment, water, gameplay, interface, sound and effects
 - [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md): scanned and generated textures, Blender props → Unity
 - [CREDITS.md](CREDITS.md): texture sources (CC0)

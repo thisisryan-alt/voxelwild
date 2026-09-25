@@ -226,6 +226,47 @@ namespace Voxelwild.Tests
         }
 
         [Test]
+        public void NewWorldNames_AreUnique_AndSeedsComeFromText()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "vwsaves_" + System.Guid.NewGuid().ToString("N"));
+            try
+            {
+                Assert.AreEqual("Home", SaveFolders.UniqueName(root, "Home"));
+                Directory.CreateDirectory(Path.Combine(root, "Home"));
+                Directory.CreateDirectory(Path.Combine(root, "Home 2"));
+                string next = SaveFolders.UniqueName(root, "Home");
+                Assert.AreEqual("Home 3", next);
+                Assert.AreEqual(next, SaveFolders.SafeName(next), "unique names stay folder-safe");
+            }
+            finally
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            Assert.IsNull(SaveFolders.SeedFromText("   "));
+            Assert.AreEqual(12345u, SaveFolders.SeedFromText(" 12345 "));
+            Assert.AreEqual(SaveFolders.SeedFromText("glacier"), SaveFolders.SeedFromText("glacier"));
+            Assert.AreNotEqual(SaveFolders.SeedFromText("glacier"), SaveFolders.SeedFromText("Glacier"));
+        }
+
+        [Test]
+        public void AtomicWrite_ReplacesAnExistingFile()
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "vwatomic_" + System.Guid.NewGuid().ToString("N"));
+            string file = Path.Combine(dir, "world.json");
+            try
+            {
+                SaveFolders.WriteAtomic(file, s => s.WriteByte(1));
+                SaveFolders.WriteAtomic(file, s => { s.WriteByte(2); s.WriteByte(3); });
+                CollectionAssert.AreEqual(new byte[] { 2, 3 }, File.ReadAllBytes(file));
+                Assert.IsFalse(File.Exists(file + ".tmp"));
+            }
+            finally
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+        }
+
+        [Test]
         public void Worlds_AreListedMostRecentFirst()
         {
             string root = Path.Combine(Path.GetTempPath(), "vwsaves_" + System.Guid.NewGuid().ToString("N"));
