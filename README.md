@@ -110,6 +110,13 @@ git clone https://github.com/thisisryan-alt/voxelwild.git
 Playing `Assets/Scenes/World.unity` directly starts an unsaved creative sandbox, as the tests and captures
 do.
 
+### Finish setup in one step (Windows)
+
+With Unity 6000.4.11f1 installed through Unity Hub, close Unity and double-click **`Finish.bat`** in the
+project folder. It gets the latest code, rebuilds the generated textures, props and scenes, runs both test
+suites, takes the screenshot tour, builds the game into `Builds/Windows/Voxelwild.exe`, then starts it.
+It takes roughly 30–60 minutes. Everything it did and every error is in `Logs/finish-report.txt`.
+
 ### Controls
 
 | Input | Action |
