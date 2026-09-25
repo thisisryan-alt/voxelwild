@@ -57,10 +57,13 @@ export class Game {
     // Blender props: optional art (the world generates the same without it)
     this.propsReady = (async () => {
       try {
-        const [lib, bin, bn, bm] = await Promise.all([
+        const [lib, bn, bm] = await Promise.all([
           fetch(this.assetBase + 'props.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }),
-          fetch(this.assetBase + 'props.bin').then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }),
           load('prop_normal.webp'), load('prop_mask.webp')]);
+        // geometry: gzip + base64 inside the JSON (artifacts serve no raw binary files)
+        const gz = Uint8Array.from(atob(lib.data), (c) => c.charCodeAt(0));
+        const bin = await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+        delete lib.data;
         this.renderer.uploadProps(lib, bin, bn, bm);
         this.propLib = lib;
         if (this.world) this.world.props.setLibrary(lib);
