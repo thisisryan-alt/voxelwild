@@ -155,7 +155,8 @@ Editor Play, tests and captures run an unsaved creative sandbox, as before. `-vw
 ## Phase 8 — Polish 🟡
 
 Sound synthesis, settings and the save helpers are unit-tested outside Unity. The menus, audio playback,
-particles and warm-up are written and type-checked but not yet run in Unity.
+particles and warm-up are written and type-checked but not yet run in Unity. All shaders (Phases 1–6)
+compile against URP 17.4's shader libraries with DXC (`tools/shadercheck`), checked in CI.
 
 | Item | Status | Notes |
 |---|---|---|
@@ -191,4 +192,4 @@ particles and warm-up are written and type-checked but not yet run in Unity.
 | Faint dark line between two stacked coplanar blocks in some close-ups | Phase 1 | Not yet diagnosed |
 | Unity logs an `ArgumentOutOfRangeException` from `UnityEditor.Search` at batch-mode startup | batch logs | Engine-side; harmless |
 | Player build uses Mono | — | IL2CPP on ARM64 needs the VS C++ ARM64 toolchain |
-| Phases 3–8 have not been run in the Unity editor | — | Everything since Phase 2 was written without an editor: engine-free logic is unit-tested, the rest is type-checked against Unity reference assemblies. Next step: `./tools/unity.ps1 build`, both test suites, a capture run, and fixing what they find |
+| Phases 3–8 have not been run in the Unity editor | — | Everything since Phase 2 was written without an editor. What is checked on every push (`.github/workflows/checks.yml`): the engine-free unit tests; the C# type check against Unity reference assemblies; and every shader pass compiled with DXC against URP 17.4's own shader libraries, for Vulkan and Direct3D (364 compiles, no errors, no warnings in project code). Not checked: scene/asset building, runtime behaviour, and how things look. Next step: `./tools/unity.ps1 build`, both test suites, a capture run, and fixing what they find |

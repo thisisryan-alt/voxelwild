@@ -241,6 +241,13 @@ makes slopes continuous, and packs a flow direction into the vertex for the shad
   - sound synthesis (finite, audible, no clipping, deterministic, seamless loops), surfaces and settings
 - **PlayMode (5):** spawn and ground contact, place/break with immediate remesh, no placement inside the
   player, torch support, and a dropped item falling and being picked up.
+- **Without Unity (CI, every push):**
+  - `tools/dotnet-tests`: the engine-free tests under .NET 8
+  - `tools/cscheck`: a type check of the runtime, scene builder, prop tools and tests. It uses the UnityEngine
+    reference assemblies plus stubs, and the stubbed URP members are checked against URP 17.4's source.
+  - `tools/shadercheck`: every pass of every shader is compiled by DXC against URP 17.4's `ShaderLibrary`
+    (a sparse checkout of Unity-Technologies/Graphics `6000.4/staging`). Keyword variants come from the
+    `multi_compile` pragmas, and each pass is compiled as SPIR-V (Vulkan) and as validated DXIL (Direct3D).
 - **Capture (`-vwCapture`):**
   - tours spawn, a showcase, the overview, mountains, coast, forest interior, jungle, taiga, badlands,
     desert, swamp, river and a real cave found by scanning voxels, with torches placed through the
