@@ -8,6 +8,7 @@ using Voxelwild.Diagnostics;
 using Voxelwild.Player;
 using Voxelwild.Rendering;
 using Voxelwild.World;
+using Voxelwild.World.Props;
 
 namespace Voxelwild.EditorTools
 {
@@ -22,10 +23,11 @@ namespace Voxelwild.EditorTools
         const string RenderingSettingsFolder = "Assets/Settings/Rendering";
 
         /// <summary>Batch entry: texture arrays, then the scene that references them.</summary>
-        [MenuItem("Voxelwild/Build All (Textures + Scene)")]
+        [MenuItem("Voxelwild/Build All (Textures + Props + Scene)")]
         public static void BuildAll()
         {
             BlockTextureArrays.Build();
+            PropLibraryBuilder.Build();
             Build();
         }
 
@@ -109,6 +111,9 @@ namespace Voxelwild.EditorTools
             var worldGo = new GameObject("VoxelWorld");
             var world = worldGo.AddComponent<VoxelWorld>();
             Assign(world, ("terrainMaterial", terrain), ("foliageMaterial", foliage), ("waterMaterial", water), ("layerProfile", profile));
+            var props = AssetDatabase.LoadAssetAtPath<PropLibrary>(PropLibraryBuilder.LibraryPath);
+            if (props != null) Assign(world, ("propLibrary", props));
+            else Debug.LogWarning("[WorldSceneBuilder] no prop library: run Voxelwild/Art/Build Prop Library, then rebuild the scene");
 
             // --- player
             var playerGo = new GameObject("Player");

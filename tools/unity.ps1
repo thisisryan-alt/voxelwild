@@ -3,15 +3,16 @@
   Runs the Unity editor in batch mode against this project and reports errors from the log.
 
 .EXAMPLE
-  ./tools/unity.ps1 build                 # build texture arrays + World scene
+  ./tools/unity.ps1 build                 # build texture arrays + prop library + World scene
   ./tools/unity.ps1 test -Platform EditMode
   ./tools/unity.ps1 test -Platform PlayMode
   ./tools/unity.ps1 capture               # screenshots + perf report into Screenshots/
+  ./tools/unity.ps1 turntable             # prop turntables into Screenshots/turntables/
   ./tools/unity.ps1 player                # Windows standalone build into Builds/
 #>
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet("compile", "build", "test", "capture", "player")]
+    [ValidateSet("compile", "build", "test", "capture", "turntable", "player")]
     [string]$Task,
     [ValidateSet("EditMode", "PlayMode")]
     [string]$Platform = "EditMode",
@@ -49,6 +50,7 @@ switch ($Task) {
     "capture" {
         $unityArgs += @("-executeMethod", "Voxelwild.EditorTools.CaptureRunner.Run", "-vwCapture", "`"$project/Screenshots`"")
     }
+    "turntable" { $unityArgs += @("-quit", "-executeMethod", "Voxelwild.EditorTools.PropTurntable.CaptureAll") }
     "player"  { $unityArgs += @("-quit", "-executeMethod", "Voxelwild.EditorTools.PlayerBuild.BuildWindows") }
 }
 
