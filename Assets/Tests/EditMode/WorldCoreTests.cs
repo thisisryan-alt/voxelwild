@@ -8,6 +8,7 @@ using Unity.Mathematics;
 using Voxelwild.EditorTools;
 using Voxelwild.World;
 using Voxelwild.World.Generation;
+using Voxelwild.World.Props;
 using static Voxelwild.World.VoxelConstants;
 
 namespace Voxelwild.Tests
@@ -115,6 +116,7 @@ namespace Voxelwild.Tests
             public ushort[] Voxels;
             public int[] Heightmap;
             public ColumnSurface[] Surface;
+            public PropInstance[] Props;
             public ushort At(int x, int y, int z) => Voxels[ColumnIndex(x, y, z)];
         }
 
@@ -126,6 +128,8 @@ namespace Voxelwild.Tests
             var surface = new NativeArray<ColumnSurface>(ChunkArea, Allocator.TempJob);
             var scratch = new NativeArray<ushort>(ColumnVolume, Allocator.TempJob);
             var heightmap = new NativeArray<int>(ChunkArea, Allocator.TempJob);
+            var rules = PropRegistry.CreateNative(Allocator.TempJob);
+            var props = new NativeList<PropInstance>(256, Allocator.TempJob);
             try
             {
                 if (decorate)
@@ -139,12 +143,21 @@ namespace Voxelwild.Tests
                 }
                 new ColumnGenerationJob { Column = column, Seed = seed, Voxels = voxels, Surface = surface }.Run();
                 if (decorate)
-                    new DecorationJob { Column = column, Seed = seed, Voxels = voxels, Neighborhood = neighborhood, Blocks = blocks, Heightmap = heightmap }.Run();
-                return new Column { Voxels = voxels.ToArray(), Heightmap = heightmap.ToArray(), Surface = surface.ToArray() };
+                    new DecorationJob
+                    {
+                        Column = column, Seed = seed, Voxels = voxels, Neighborhood = neighborhood, Blocks = blocks, Heightmap = heightmap,
+                        PropRules = rules, Props = props,
+                    }.Run();
+                return new Column
+                {
+                    Voxels = voxels.ToArray(), Heightmap = heightmap.ToArray(), Surface = surface.ToArray(),
+                    Props = props.AsArray().ToArray(),
+                };
             }
             finally
             {
                 blocks.Dispose(); neighborhood.Dispose(); voxels.Dispose(); surface.Dispose(); scratch.Dispose(); heightmap.Dispose();
+                rules.Dispose(); props.Dispose();
             }
         }
 
