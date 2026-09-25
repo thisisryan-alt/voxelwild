@@ -113,6 +113,9 @@ namespace Voxelwild.Rendering
             SetRate(_snow, _cold ? fall : 0f, maxSnowParticles / 6f);
             DriftWithWind(_rain, p.WindStrength * 30f);
             DriftWithWind(_snow, p.WindStrength * 12f);
+            // the emitters ride on the camera; keep their spawn boxes level when the player looks up or down
+            if (_rain != null) _rain.transform.rotation = Quaternion.identity;
+            if (_snow != null) _snow.transform.rotation = Quaternion.identity;
         }
 
         void LateUpdate()
