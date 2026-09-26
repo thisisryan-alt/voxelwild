@@ -7,6 +7,7 @@ import { Player, raycast, targetable } from './player.js';
 import { Inventory, SurvivalStats, Weather, CREATIVE_HOTBAR, HOTBAR, WEATHER_NAMES } from './gameplay.js';
 import { GameAudio } from './audio.js';
 import { Icons } from './icons.js';
+import { FarTerrain } from './far.js';
 import { SaveStore, PackStore } from './save.js';
 import { readPackZip, convertPack, decodeLarge, fetchBuiltinPack, square } from './respack.js';
 import { LAYER_TUNING, LAYER_NAMES, I } from '../shared/blocks.js';
@@ -53,6 +54,8 @@ export class Game {
   /** textures: 'lbpr' (default: LB Photo Realism Reload! baked in by tools/build_lbpr.py) or 'original' (the game's own art). */
   async init(progress, textures = 'lbpr') {
     this.renderer = new Renderer(this.canvas);
+    this.far = new FarTerrain(this.renderer.gl, this.workerUrl);
+    this.renderer.far = this.far;
     await this.store.open();
     progress && progress('Loading textures', 0.1);
     const load = (name) => this.loadBitmap(name);
@@ -195,8 +198,17 @@ export class Game {
     r.setStarsTexture(set.stars || null);
     this.icons = new Icons(set.thumbs || set.albedo, { tuning: set.tuning, items: set.items });
     r.uploadAtlas(this.icons.canvas);
+    this.updateFarPalette();
     this.audio.setSamples(set.sounds);
     this.emit('inventory'); this.emit('textures', set);
+  }
+
+  /** Far terrain colours: the average colour of each surface texture (so it matches the textures in use). */
+  updateFarPalette() {
+    const avg = (name) => this.icons.layerAvg[LAYER_NAMES.indexOf(name)] || [0.3, 0.3, 0.3];
+    const names = ['GrassTop', 'Sand', 'Snow', 'Stone', 'Gravel', 'RedSandstone', 'Sandstone', 'Mud', 'Stone', 'Ice'];
+    this.renderer.farPalette = new Float32Array(names.flatMap((n) => avg(n)));
+    this.renderer.farLeaf = avg('Leaves');
   }
 
   /** Switches the built-in set from the settings; a loaded resource pack is converted again on top of it. */
@@ -251,6 +263,7 @@ export class Game {
     c.getContext('2d').putImageData(new ImageData(flat, conv.size, conv.size * n), 0, 0);
     this.icons = new Icons(await createImageBitmap(c), { tuning: conv.tuning, items: this.builtin.items });
     this.renderer.uploadAtlas(this.icons.canvas);
+    this.updateFarPalette();
     if (this.packIcon) URL.revokeObjectURL(this.packIcon);
     this.packIcon = pack.icon ? URL.createObjectURL(new Blob([pack.icon], { type: 'image/png' })) : null;
     this.pack = { name: pack.name, description: pack.description, credit: pack.credit || '', builtin: pack.builtin || null, found: conv.found, size: conv.size, source: conv.source, opts: pack.opts || {} };
@@ -554,6 +567,11 @@ export class Game {
     const w = this.world, pl = this.player;
     const eye = pl.eye();
     w.setViewer(eye[0], eye[1], eye[2]);
+    // far terrain in the overworld, out to the chosen distance
+    const farDist = this.settings ? this.settings.farDistance || 0 : 0;
+    const farOn = farDist > 0 && this.dim === Dim.Overworld && farDist > w.viewDistance * 32;
+    this.renderer.farOn = farOn;
+    if (farOn) this.far.update(eye, this.meta.seed >>> 0, farDist);
     w.update(this.state === 'playing' || this.state === 'loading' || this.state === 'inventory' ? dt : 0);
 
     if (this.meta.menu) {

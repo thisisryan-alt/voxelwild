@@ -4,13 +4,17 @@ import { generateColumn } from './shared/gen.js';
 import { decorateColumn } from './shared/decorate.js';
 import { Mesher } from './shared/mesh.js';
 import { CS3, SECTIONS } from './shared/const.js';
+import { farGrid } from './shared/far.js';
 
 const mesher = new Mesher();
 
 self.onmessage = (e) => {
   const m = e.data;
   try {
-    if (m.type === 'gen') {
+    if (m.type === 'far') {
+      const data = farGrid(m.seed, m.x0, m.z0, m.cell, m.n);
+      self.postMessage({ type: 'far', id: m.id, level: m.level, seed: m.seed, x0: m.x0, z0: m.z0, data }, [data.buffer]);
+    } else if (m.type === 'gen') {
       const t0 = performance.now();
       const { voxels, surface } = generateColumn(m.cx, m.cz, m.seed, m.dim | 0);
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, voxels, surface, ms: performance.now() - t0 },

@@ -43,6 +43,7 @@ export class Renderer {
       opaque: compile(gl, C + S.TERRAIN_VS, C + L + S.TERRAIN_FS, 'terrain'),
       cutout: compile(gl, C + S.TERRAIN_VS, C + L + S.TERRAIN_FS, 'foliage', '#define CUTOUT 1'),
       glow: compile(gl, C + S.TERRAIN_VS, C + L + S.TERRAIN_FS, 'portal', '#define TRANSLUCENT 1'),
+      far: compile(gl, C + S.FAR_VS, C + L + S.FAR_FS, 'far'),
       shadow: compile(gl, C + S.SHADOW_VS, C + S.SHADOW_FS, 'shadow'),
       shadowCut: compile(gl, C + S.SHADOW_VS, C + S.SHADOW_FS, 'shadow-cutout', '#define CUTOUT 1'),
       water: compile(gl, C + S.WATER_VS, C + L + S.WATER_FS, 'water'),
@@ -587,6 +588,28 @@ export class Renderer {
     if (extra) setUniforms(gl, prog, extra);
   }
 
+  /** The far terrain levels (main/far.js) with a projection reaching out to the far distance. */
+  drawFar(f) {
+    const gl = this.gl, far = this.far, dist = this.settings.farDistance;
+    const proj = mat4.perspective(mat4.create(), this.settings.fov * Math.PI / 180, this.width / this.height, 6, dist + 600);
+    const vp = mat4.mul(mat4.create(), proj, this.view);
+    gl.disable(gl.CULL_FACE);
+    const hole = Math.max(24, f.viewDistance * CS - 28);
+    this.use(this.progs.far, { uViewProj: vp, uFarPal: this.farPalette, uFarLeaf: this.farLeaf, uHole: hole, uFarEdge: [dist * 0.72, dist], uN: 128 });
+    const P = this.progs.far.u;
+    let prev = null;
+    for (const l of far.levels) {
+      if (!l.active || !l.ready) { continue; }
+      gl.uniform2f(P.uOrigin.loc, l.x0, l.z0);
+      gl.uniform1f(P.uCell.loc, l.cell);
+      if (prev) gl.uniform4f(P.uInner.loc, prev.cx, prev.cz, 64 * prev.cell - prev.cell * 2, 0); else gl.uniform4f(P.uInner.loc, 0, 0, 0, 0);
+      gl.bindVertexArray(l.vao);
+      gl.drawElements(gl.TRIANGLES, far.count, gl.UNSIGNED_SHORT, 0);
+      prev = l;
+    }
+    gl.bindVertexArray(null);
+  }
+
   fullscreen() { const gl = this.gl; gl.bindVertexArray(this.emptyVao); gl.drawArrays(gl.TRIANGLES, 0, 3); }
 
   // ---------------------------------------------------------------- frame
@@ -610,7 +633,7 @@ export class Renderer {
 
     // ---- frame uniforms
     const fogMul = this.settings.fogMul ?? 1;
-    const fogDensity = f.underwaterColor ? 0.9 : f.underwater ? 0.09 : (f.dimFog != null ? f.dimFog : (this.settings.farDistance > 0 ? 0.0007 : 0.0016) + wth.fog * 0.012) * fogMul;
+    const fogDensity = f.underwaterColor ? 0.9 : f.underwater ? 0.09 : (f.dimFog != null ? f.dimFog : (this.settings.farDistance > 0 ? 0.0011 : 0.0016) + wth.fog * 0.012) * fogMul;
     const fogColor = f.underwaterColor ? [1.6, 0.4, 0.05] : f.underwater ? sky.ambUp.map((c, i) => c * [0.05, 0.28, 0.35][i] * 1.2) : sky.fogColor;
     this.cloudOff = this.cloudOff || [0, 0];
     this.cloudOff[0] += wth.windX * f.dt * 6; this.cloudOff[1] += wth.windZ * f.dt * 6;
@@ -621,7 +644,7 @@ export class Renderer {
       uLightDir: sky.lightDir, uLightColor: sky.lightColor,
       uAmbUp: sky.ambUp, uAmbHorizon: sky.ambHorizon, uAmbDown: sky.ambDown,
       uFogColor: fogColor, uFogSun: f.underwater ? [0, 0, 0] : sky.fogSun,
-      uFog: [fogDensity, f.underwater || f.dim ? 0 : 0.018, 64, 0], uFogEdge: f.underwater ? [1e5, 1e5 + 1] : [f.viewDistance * CS * 0.6, f.viewDistance * CS * 0.96],
+      uFog: [fogDensity, f.underwater || f.dim ? 0 : 0.018, 64, 0], uFogEdge: this.farOn && f.dim === 0 ? [1e6, 1e6 + 1] : f.underwater ? [1e5, 1e5 + 1] : [f.viewDistance * CS * 0.6, f.viewDistance * CS * 0.96],
       uBlockColor: [1.0 * 2.4, 0.62 * 2.4, 0.3 * 2.4], uCamSky: f.camSky,
       uShadowVP: this.shadowVPFlat, uShadowDist: [Math.min(22, (this.settings.shadowDistance || 88) * 0.4), this.settings.shadowDistance || 88], uShadowSize: this.shadowSize, uShadowOn: shadowsOn ? 1 : 0,
       uShadow0: 4, uShadow1: 5, uCloudTex: 6, uSkyLut: 3, uAlbedo: 0, uNormal: 1, uMask: 2, uSceneColor: 7, uSceneDepth: 8, uAtlas: 9, uBakeN: 14, uBakeM: 15, uVar: 16, uCrack: 17, uMoonTex: 18,
@@ -696,6 +719,11 @@ export class Renderer {
     this.fullscreen();
 
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS);
+    // far terrain: its own depth range, then the chunks draw over it on a cleared depth buffer
+    if (this.farOn && f.dim === 0) {
+      this.drawFar(f);
+      gl.clear(gl.DEPTH_BUFFER_BIT);
+    }
     gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK); gl.frontFace(gl.CCW);   // mesher quads are counter-clockwise seen from outside
     let drawn = 0, tris = 0;
     this.use(this.progs.opaque);

@@ -210,6 +210,23 @@ int pickLayer(int row, int face, vec3 cell, vec2 uvB, inout vec2 uv, inout vec2 
 int sideRow(int layer) { return int(texelFetch(uVar, ivec2(33, layer), 0).r); }
 `;
 
+// grass and foliage colour by climate (terrain and far terrain)
+export const BIOME_TINT = /* glsl */ `
+vec3 biomeTint(int mode, float t, float h) {
+  if (mode == 0) return vec3(1);
+  if (mode == 3) return vec3(1.18, 1.16, 0.78);
+  if (mode == 4) return vec3(0.86, 0.96, 0.92);
+  vec3 cd, cw, hd, hw;
+  if (mode == 1) { cd = vec3(0.86, 0.94, 0.86); cw = vec3(0.72, 0.9, 0.82); hd = vec3(1.2, 1.03, 0.62); hw = vec3(0.78, 1.08, 0.66); }
+  else { cd = vec3(0.9, 0.95, 0.85); cw = vec3(0.74, 0.88, 0.8); hd = vec3(1.2, 1.05, 0.6); hw = vec3(0.72, 1.1, 0.6); }
+  vec3 c = mix(mix(cd, hd, t), mix(cw, hw, t), h);
+  vec3 tint = mix(vec3(1), c, clamp(length(vec2(t, h) - 0.5) * 2.2, 0.0, 1.0));
+  float swamp = smoothstep(0.66, 0.8, h) * smoothstep(0.35, 0.45, t) * (1.0 - smoothstep(0.62, 0.7, t));
+  return mix(tint, vec3(0.74, 0.8, 0.56), swamp * 0.8);
+}
+
+`;
+
 // ------------------------------------------------------------------ terrain / foliage / entities
 export const TERRAIN_VS = /* glsl */ `
 layout(location=0) in vec3 aPos;
@@ -245,7 +262,7 @@ void main() {
 }
 `;
 
-export const TERRAIN_FS = VARIANTS + /* glsl */ `
+export const TERRAIN_FS = VARIANTS + BIOME_TINT + /* glsl */ `
 uniform sampler2DArray uAlbedo, uNormal, uMask;
 uniform float uPom, uPomDist;   // relief multiplier (0 = off), fade-out distance
 uniform mat3 uModelRot;
@@ -261,19 +278,6 @@ flat in vec4 vClim;
 in vec2 vCorner;
 flat in vec3 vCell;
 out vec4 outColor;
-
-vec3 biomeTint(int mode, float t, float h) {
-  if (mode == 0) return vec3(1);
-  if (mode == 3) return vec3(1.18, 1.16, 0.78);
-  if (mode == 4) return vec3(0.86, 0.96, 0.92);
-  vec3 cd, cw, hd, hw;
-  if (mode == 1) { cd = vec3(0.86, 0.94, 0.86); cw = vec3(0.72, 0.9, 0.82); hd = vec3(1.2, 1.03, 0.62); hw = vec3(0.78, 1.08, 0.66); }
-  else { cd = vec3(0.9, 0.95, 0.85); cw = vec3(0.74, 0.88, 0.8); hd = vec3(1.2, 1.05, 0.6); hw = vec3(0.72, 1.1, 0.6); }
-  vec3 c = mix(mix(cd, hd, t), mix(cw, hw, t), h);
-  vec3 tint = mix(vec3(1), c, clamp(length(vec2(t, h) - 0.5) * 2.2, 0.0, 1.0));
-  float swamp = smoothstep(0.66, 0.8, h) * smoothstep(0.35, 0.45, t) * (1.0 - smoothstep(0.62, 0.7, t));
-  return mix(tint, vec3(0.74, 0.8, 0.56), swamp * 0.8);
-}
 
 struct Layer { vec3 albedo; float alpha; vec3 nts; float ao; float rough; float metal; float emis; };
 Layer sampleLayer(int layer, int tl, vec2 uv, vec2 gx, vec2 gy) {
@@ -1013,3 +1017,79 @@ void main() {
 }
 `;
 export const PROP_SHADOW_FS = /* glsl */ `out vec4 outColor; void main() { outColor = vec4(1); }`;
+
+// ------------------------------------------------------------------ far terrain (beyond the loaded chunks)
+export const FAR_VS = /* glsl */ `
+layout(location=0) in vec4 aA;        // surface y, material, tree cover, climate (temp*256+humid)
+layout(location=1) in vec2 aN;        // normal x, z
+uniform mat4 uViewProj;
+uniform vec2 uOrigin;
+uniform float uCell;
+uniform int uN;
+out vec3 vPos;
+out vec3 vNrm;
+flat out int vMat;
+out float vCover;
+out vec2 vClimate;
+void main() {
+  int i = gl_VertexID % (uN + 1), j = gl_VertexID / (uN + 1);
+  vec3 p = vec3(uOrigin.x + float(i) * uCell, aA.x, uOrigin.y + float(j) * uCell);
+  // tree canopies: a lumpy layer a few blocks above the ground
+  float lump = vnoise(p.xz * 0.21) * 0.6 + vnoise(p.xz * 0.07 + 3.7) * 0.4;
+  p.y += aA.z * (3.5 + 5.0 * lump);
+  vPos = p;
+  vNrm = normalize(vec3(aN.x, sqrt(max(0.05, 1.0 - aN.x * aN.x - aN.y * aN.y)), aN.y));
+  vMat = int(aA.y + 0.5);
+  vCover = aA.z;
+  vClimate = vec2(floor(aA.w / 256.0) / 255.0, mod(aA.w, 256.0) / 255.0);
+  gl_Position = uViewProj * vec4(p, 1.0);
+}
+`;
+export const FAR_FS = BIOME_TINT + /* glsl */ `
+uniform vec3 uFarPal[10];     // linear colours: grass sand snow stone gravel red-sand sandstone mud water ice
+uniform vec3 uFarLeaf;
+uniform float uHole;           // loaded chunks cover everything nearer than this
+uniform vec4 uInner;           // finer level: centre xz, half size (0 = none)
+uniform vec2 uFarEdge;         // fade into the sky between these distances
+in vec3 vPos;
+in vec3 vNrm;
+flat in int vMat;
+in float vCover;
+in vec2 vClimate;
+out vec4 outColor;
+void main() {
+  vec2 d = vPos.xz - uCamPos.xz;
+  float dist = length(d);
+  if (dist < uHole) discard;
+  if (uInner.z > 0.0 && abs(vPos.x - uInner.x) < uInner.z && abs(vPos.z - uInner.y) < uInner.z) discard;
+  vec3 V = normalize(uCamPos - vPos);
+  vec3 n = normalize(vNrm);
+  float grain = vnoise(vPos.xz * 0.5) * 0.5 + vnoise(vPos.xz * 0.13) * 0.5;
+  vec3 col;
+  float rough = 0.9, spec = 0.4;
+  if (vMat == 8) {
+    // water: deep colour under a sky reflection
+    vec3 R = reflect(-V, vec3(0, 1, 0));
+    vec3 sky = textureLod(uSkyLut, vec2(atan(R.z, R.x) / (2.0 * PI) + 0.5, asin(clamp(R.y, -1.0, 1.0)) / PI + 0.5), 0.0).rgb;
+    float fres = 0.04 + 0.96 * pow(1.0 - max(V.y, 0.0), 5.0);
+    vec3 deep = vec3(0.012, 0.045, 0.06) * (uAmbUp * 2.0 + uLightColor * 0.15);
+    col = mix(deep, sky, fres);
+    outColor = vec4(applyFog(col, vPos), 1.0);
+    vec3 skyc = textureLod(uSkyLut, vec2(atan(-V.z, -V.x) / (2.0 * PI) + 0.5, asin(clamp(-V.y, -1.0, 1.0)) / PI + 0.5), 0.0).rgb;
+    outColor.rgb = mix(outColor.rgb, skyc, smoothstep(uFarEdge.x, uFarEdge.y, dist));
+    return;
+  }
+  col = uFarPal[vMat] * (0.72 + 0.26 * grain);
+  if (vMat == 0) col *= biomeTint(1, vClimate.x, vClimate.y);
+  float trees = smoothstep(0.35, 0.65, vCover + (grain - 0.5) * 0.6);
+  if (trees > 0.0) {
+    vec3 leaf = uFarLeaf * biomeTint(2, vClimate.x, vClimate.y) * (0.5 + 0.35 * grain);
+    col = mix(col, leaf, trees);
+    n = normalize(mix(n, vec3(0, 1, 0), trees * 0.5));
+  }
+  vec3 lit = shade(col, n, rough, 0.0, mix(1.0, 0.75, trees), spec, vec3(0), trees * 0.5, vPos, 1.0, 0.0, 1.0, uSkyLut);
+  outColor = vec4(applyFog(lit, vPos), 1.0);
+  vec3 skyc = textureLod(uSkyLut, vec2(atan(-V.z, -V.x) / (2.0 * PI) + 0.5, asin(clamp(-V.y, -1.0, 1.0)) / PI + 0.5), 0.0).rgb;
+  outColor.rgb = mix(outColor.rgb, skyc, smoothstep(uFarEdge.x, uFarEdge.y, dist));
+}
+`;

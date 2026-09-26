@@ -8,7 +8,7 @@ import { PACK_NAMES, listBuiltinPacks } from './respack.js';
 const $ = (id) => document.getElementById(id);
 const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, volume: 0.8, sfx: 1, ambience: 0.7, particles: 1,
   shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr',
-  farDistance: 1500, dynamicRes: true, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
+  farDistance: 2000, dynamicRes: true, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
   rayStrength: 1, clouds: true, ao: 1, dayCycle: 'normal', fixedHour: 12, dayLength: 20, weatherMode: 'dynamic', brightness: 1,
   nightBrightness: 1, saturation: 1, fog: 1, viewBob: true };
 const pct = (x) => `${Math.round(x * 100)}%`;
