@@ -1,6 +1,6 @@
 // Bundles the browser build into dist/: index.html (page + inlined main script + inlined worker source) and assets/.
 import * as esbuild from 'esbuild';
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, existsSync, readdirSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,4 +32,8 @@ if (existsSync(join(root, 'assets', 'packs.json'))) {
   for (const p of JSON.parse(readFileSync(join(root, 'assets', 'packs.json'), 'utf8')))
     for (const f of Object.values(p.strips)) copyFileSync(join(root, 'assets', f), join(dist, 'assets', f));
 }
+// LB Photo Realism Reload! (default block textures, items, sounds), baked by tools/build_lbpr.py
+rmSync(join(dist, 'assets', 'lbpr'), { recursive: true, force: true });
+mkdirSync(join(dist, 'assets', 'lbpr'), { recursive: true });
+for (const f of readdirSync(join(root, 'assets', 'lbpr'))) copyFileSync(join(root, 'assets', 'lbpr', f), join(dist, 'assets', 'lbpr', f));
 console.log(`dist/index.html ${(html.length / 1024).toFixed(0)} KB (worker ${(worker.length / 1024).toFixed(0)} KB, main ${(main.length / 1024).toFixed(0)} KB)`);

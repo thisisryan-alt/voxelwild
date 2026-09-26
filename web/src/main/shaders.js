@@ -16,6 +16,12 @@ const vec3 FB[8] = vec3[8](vec3(0,1,0), vec3(0,1,0), vec3(0,0,1), vec3(0,0,1), v
 uniform float uTime;
 uniform vec4 uWind;          // x,z dir, y strength, w gust
 
+// block cell of a cross-plant vertex (mesh.js cross(): corner x 0/1 sit 0.84 blocks apart along the diagonal)
+vec3 plantCell(vec3 texPos, int face, vec2 corner) {
+  vec3 c = texPos + FT[face] * ((0.5 - corner.x) * 1.188);
+  c.y = texPos.y - corner.y * 0.5 + 0.01;
+  return floor(c);
+}
 float hash21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float vnoise(vec2 p) {
   vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -141,6 +147,39 @@ vec3 shade(vec3 albedo, vec3 n, float rough, float metal, float ao, float spec, 
 }
 `;
 
+// ------------------------------------------------------------------ texture variants
+// A row per layer (+ virtual rows) of 34 texels: 0..31 texture layers to pick from, 32 = (mode, w, h, flags),
+// 33 = (side-overlay row). Mode 0: the layer itself; 1: random per block (weighted slots) with optional quarter
+// turns on top/bottom faces and mirroring; 2: OptiFine-style repeat, a w x h grid of tiles spread over the blocks.
+export const VARIANTS = /* glsl */ `
+precision highp usampler2D;
+uniform usampler2D uVar;
+uint vhash(ivec3 c) {
+  uint h = (uint(c.x) * 73856093u) ^ (uint(c.y) * 19349663u) ^ (uint(c.z) * 83492791u);
+  h = (h ^ (h >> 13u)) * 0x5bd1e995u;
+  return h ^ (h >> 15u);
+}
+vec2 rot90(vec2 d, uint r) { return r == 1u ? vec2(d.y, -d.x) : r == 2u ? -d : r == 3u ? vec2(-d.y, d.x) : d; }
+int pickLayer(int row, int face, vec3 cell, vec2 uvB, inout vec2 uv, inout vec2 gx, inout vec2 gy) {
+  uvec4 inf = texelFetch(uVar, ivec2(32, row), 0);
+  if (inf.x == 0u) return int(texelFetch(uVar, ivec2(0, row), 0).r);
+  if (inf.x == 2u) {
+    ivec2 t = ivec2(floor(uvB + 1e-4)); int w = int(inf.y), h = int(inf.z);
+    return int(texelFetch(uVar, ivec2(((t.x % w) + w) % w + (((t.y % h) + h) % h) * w, row), 0).r);
+  }
+  uint hs = vhash(ivec3(cell) + ivec3(row * 7, 0, 0));
+  vec2 c = floor(uv) + 0.5, d = uv - c;
+  if ((inf.w & 1u) != 0u && (face == 2 || face == 3)) {
+    uint r = (hs >> 5u) & 3u;
+    d = rot90(d, r); gx = rot90(gx, r); gy = rot90(gy, r);
+  }
+  if ((inf.w & 2u) != 0u && ((hs >> 7u) & 1u) != 0u && face != 2 && face != 3) { d.x = -d.x; gx.x = -gx.x; gy.x = -gy.x; }
+  uv = c + d;
+  return int(texelFetch(uVar, ivec2(int(hs & 31u), row), 0).r);
+}
+int sideRow(int layer) { return int(texelFetch(uVar, ivec2(33, layer), 0).r); }
+`;
+
 // ------------------------------------------------------------------ terrain / foliage / entities
 export const TERRAIN_VS = /* glsl */ `
 layout(location=0) in vec3 aPos;
@@ -157,6 +196,7 @@ flat out ivec4 vFace;         // face, edges, layer, overlay
 out vec3 vLight;              // ao, sky, block
 flat out vec4 vClim;          // temperature, humidity, tint mode
 out vec2 vCorner;
+flat out vec3 vCell;          // block of a cross plant (variant pick)
 void main() {
   uvec4 a = uvec4(round(aD0 * 255.0));
   uvec4 c = uvec4(round(aD2 * 255.0));
@@ -170,11 +210,12 @@ void main() {
   vLight = uEntityLight.x < 0.0 ? vec3(aD0.z, aD1.x, aD1.y) : vec3(aD0.z, uEntityLight);
   vClim = vec4(aD1.z, aD1.w, float(c.x), 0.0);
   vCorner = vec2(float((a.x >> 3u) & 1u), float((a.x >> 4u) & 1u));
+  vCell = plantCell(vTexPos, vFace.x, vCorner);
   gl_Position = uViewProj * vec4(p, 1.0);
 }
 `;
 
-export const TERRAIN_FS = /* glsl */ `
+export const TERRAIN_FS = VARIANTS + /* glsl */ `
 uniform sampler2DArray uAlbedo, uNormal, uMask;
 uniform vec4 uLP[35];     // 1/tile, normal strength, roughness scale, macro variation
 uniform vec4 uLT[35];     // tint rgb, specular
@@ -191,6 +232,7 @@ flat in ivec4 vFace;
 in vec3 vLight;
 flat in vec4 vClim;
 in vec2 vCorner;
+flat in vec3 vCell;
 out vec4 outColor;
 
 vec3 biomeTint(int mode, float t, float h) {
@@ -207,10 +249,10 @@ vec3 biomeTint(int mode, float t, float h) {
 }
 
 struct Layer { vec3 albedo; float alpha; vec3 nts; float ao; float rough; float metal; float emis; };
-Layer sampleLayer(int layer, vec2 uv, vec2 gx, vec2 gy) {
-  vec4 a = textureGrad(uAlbedo, vec3(uv, float(layer)), gx, gy);
-  vec4 n = textureGrad(uNormal, vec3(uv, float(layer)), gx, gy);
-  vec4 m = textureGrad(uMask, vec3(uv, float(layer)), gx, gy);
+Layer sampleLayer(int layer, int tl, vec2 uv, vec2 gx, vec2 gy) {
+  vec4 a = textureGrad(uAlbedo, vec3(uv, float(tl)), gx, gy);
+  vec4 n = textureGrad(uNormal, vec3(uv, float(tl)), gx, gy);
+  vec4 m = textureGrad(uMask, vec3(uv, float(tl)), gx, gy);
   Layer s;
   s.albedo = pow(a.rgb, vec3(2.2)) * uLT[layer].rgb;
   if (uLP2[layer].z > 0.5) s.albedo *= biomeTint(int(vClim.z + 0.5), vClim.x, vClim.y);
@@ -233,6 +275,9 @@ void main() {
 
   vec2 gx = dFdx(uv), gy = dFdy(uv);
   vec2 ogx = dFdx(uvBlocks), ogy = dFdy(uvBlocks);
+  vec3 block = plant ? vCell : cell;
+  vec2 uvB0 = uvBlocks;
+  int tl = pickLayer(layer, face, block, uvBlocks, uv, gx, gy);
   float pomShadow = 1.0;
 #ifndef CUTOUT
   // parallax occlusion mapping: march the view ray through the height field (albedo alpha, 1 = surface)
@@ -247,7 +292,7 @@ void main() {
     vec2 dir = vec2(-dot(V, Tw), dot(V, Bw)) / max(ndv, 0.2) * k;
     int steps = int(mix(40.0, 10.0, ndv));
     float stepD = 1.0 / float(steps);
-    float L = float(layer);
+    float L = float(tl);
     vec2 cur = uv, prevUV = uv;
     float depth = 0.0, prevDepth = 0.0;
     float h = textureGrad(uAlbedo, vec3(cur, L), gx, gy).a, prevH = h;
@@ -278,15 +323,25 @@ void main() {
     uv = cur;
   }
 #endif
-  Layer s = sampleLayer(layer, uv, gx, gy);
+  Layer s = sampleLayer(layer, tl, uv, gx, gy);
   float alpha = uLP2[layer].w > 0.5 ? s.alpha : 1.0;
 #ifdef CUTOUT
   // keep foliage coverage in distant mips
   float lod = max(0.0, log2(max(length(dFdx(uv)), length(dFdy(uv))) * 256.0));
   if (alpha * (1.0 + lod * 0.18) < uCutoff) discard;
 #endif
-  if (overlay != 255) {
-    Layer o = sampleLayer(overlay, uvBlocks * uLP[overlay].x, ogx * uLP[overlay].x, ogy * uLP[overlay].x);
+  int side = overlay != 255 ? sideRow(overlay) : 255;
+  if (side != 255) {
+    // Minecraft-style side overlay (resource packs): a fringe texture with alpha over the side of the block
+    vec2 ouv = uvB0, ogx2 = ogx, ogy2 = ogy;
+    int otl = pickLayer(side, face, block, uvB0, ouv, ogx2, ogy2);
+    Layer o = sampleLayer(overlay, otl, ouv, ogx2, ogy2);
+    s.albedo = mix(s.albedo, o.albedo, o.alpha);
+    s.nts = normalize(mix(s.nts, o.nts, o.alpha));
+    s.ao = mix(s.ao, o.ao, o.alpha);
+    s.rough = mix(s.rough, o.rough, o.alpha);
+  } else if (overlay != 255) {
+    Layer o = sampleLayer(overlay, overlay, uvBlocks * uLP[overlay].x, ogx * uLP[overlay].x, ogy * uLP[overlay].x);
     float jitter = hash21(cell.xz + cell.y * 17.0) - 0.5;
     float edge = 1.0 - uOverhang + (o.alpha - 0.5) * 0.28 + jitter * 0.06;
     float m = smoothstep(edge - 0.035, edge + 0.035, w);
@@ -353,6 +408,7 @@ uniform vec3 uCamPos;
 out vec3 vTexPos;
 flat out ivec2 vFL;
 out vec2 vCorner;
+flat out vec3 vCell;
 void main() {
   uvec4 a = uvec4(round(aD0 * 255.0));
   vec3 p = (uModel * vec4(aPos, 1.0)).xyz;
@@ -363,6 +419,7 @@ void main() {
   vTexPos = aPos + uTexOrigin;
   vFL = ivec2(face, int(a.y));
   vCorner = vec2(float((a.x >> 3u) & 1u), float((a.x >> 4u) & 1u));
+  vCell = plantCell(vTexPos, face, vCorner);
   gl_Position = uViewProj * vec4(p, 1.0);
 #ifdef CUTOUT
   // small plants cast shadows only near the camera; leaves out to the mid distance
@@ -370,19 +427,23 @@ void main() {
 #endif
 }
 `;
-export const SHADOW_FS = /* glsl */ `
+export const SHADOW_FS = VARIANTS + /* glsl */ `
 uniform sampler2DArray uAlbedo;
 uniform vec4 uLP[35];
 uniform float uCutoff;
 in vec3 vTexPos;
 flat in ivec2 vFL;
 in vec2 vCorner;
+flat in vec3 vCell;
 out vec4 outColor;
 void main() {
 #ifdef CUTOUT
   int face = vFL.x, layer = vFL.y;
-  vec2 uv = face >= 6 ? vec2(vCorner.x, 1.0 - vCorner.y) : vec2(dot(vTexPos, FT[face]), -dot(vTexPos, FB[face])) * uLP[layer].x;
-  if (texture(uAlbedo, vec3(uv, float(layer))).a < uCutoff) discard;
+  vec2 uvB = vec2(dot(vTexPos, FT[face]), -dot(vTexPos, FB[face]));
+  vec2 uv = face >= 6 ? vec2(vCorner.x, 1.0 - vCorner.y) : uvB * uLP[layer].x;
+  vec2 gx = dFdx(uv), gy = dFdy(uv);
+  int tl = pickLayer(layer, face, face >= 6 ? vCell : floor(vTexPos - FN[face] * 0.5), uvB, uv, gx, gy);
+  if (textureGrad(uAlbedo, vec3(uv, float(tl)), gx, gy).a < uCutoff) discard;
 #endif
   outColor = vec4(1);
 }
@@ -455,6 +516,8 @@ uniform vec3 uSunColorC, uZenith;
 uniform sampler2D uCloudTex;
 uniform vec4 uCloud, uCloudOff;
 uniform float uFlash;
+uniform sampler2D uMoonTex;
+uniform float uMoonTexOn;
 in vec2 vUV;
 out vec4 outColor;
 float h31(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
@@ -496,6 +559,7 @@ void main() {
       vec3 nm = normalize(right * q.x + up * q.y - M * sqrt(1.0 - r2));
       float lit = clamp(dot(nm, uSunDir) * 1.5 + 0.05, 0.0, 1.0);
       float maria = 0.75 + 0.25 * sin(q.x * 5.1 + 1.3) * sin(q.y * 4.3 + 0.7);
+      if (uMoonTexOn > 0.5) { vec3 mt = texture(uMoonTex, q * vec2(0.5, -0.5) + 0.5).rgb; maria = dot(mt, vec3(0.333)) * 1.45; }
       sky = mix(sky, vec3(0.9, 0.92, 0.98) * lit * maria * 0.8 + 0.02, smoothstep(1.0, 0.94, r2) * clamp(1.0 - dayLum * 3.0, 0.0, 1.0));
     }
   }
@@ -680,7 +744,7 @@ layout(location=0) in vec3 aPos; uniform mat4 uViewProj; uniform vec3 uOffset; o
 void main() { vLocal = aPos; gl_Position = uViewProj * vec4((aPos - 0.5) * 1.004 + 0.5 + uOffset, 1.0); }
 `;
 export const CRACK_FS = /* glsl */ `
-uniform float uProgress; in vec3 vLocal; out vec4 outColor;
+uniform float uProgress; uniform sampler2DArray uCrack; uniform float uCrackTex; in vec3 vLocal; out vec4 outColor;
 float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 void main() {
   vec3 a = abs(vLocal - 0.5);
@@ -690,6 +754,12 @@ void main() {
   for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 o = vec2(x, y); vec2 c = o + vec2(h(i + o), h(i + o + 17.0)); d = min(d, length(f - c)); }
   float crack = smoothstep(0.08, 0.0, abs(d - 0.45)) * step(h(i) , uProgress * 1.2);
   outColor = vec4(0.0, 0.0, 0.0, crack * 0.75);
+  if (uCrackTex > 0.5) {
+    // resource-pack destroy stages (Minecraft multiplies them over the block: dark cracks, light = untouched)
+    vec4 c = texture(uCrack, vec3(p.x, 1.0 - p.y, min(9.0, floor(uProgress * 10.0))));
+    float dark = (1.0 - dot(c.rgb, vec3(0.333))) * c.a;
+    outColor = vec4(c.rgb * 0.25, clamp(dark * 1.3, 0.0, 0.9));
+  }
 }
 `;
 export const PARTICLE_VS = /* glsl */ `

@@ -56,3 +56,12 @@ Selectable in Settings ▸ Block textures. Built by `web/tools/build_packs.py`.
   names, upscaled 16× with nearest-neighbour; bedrock and mud are darkened copies of its stone and dirt; the
   ores are its mineral overlays composited on its stone. The adapted textures
   (`web/assets/pack_soothing32_color.webp`) are shared under the same licence.
+
+## LB Photo Realism Reload! (browser build default textures)
+
+[LB Photo Realism Reload!](https://www.curseforge.com/minecraft/texture-packs/lb-photo-realism-reload) v6.6 for
+Minecraft 1.21.8 by **1LotS**, based on LB Photo Realism and GKrond's version of LBPR. Licence (the pack's
+Licence.txt): the textures may be used any way with credit and a link to the CurseForge page, and no money may be
+made from them. Its sounds come from freesfx.co.uk and orangefreesounds.com, edited by 1LotS.
+Baked by `web/tools/build_lbpr.py` into `web/assets/lbpr/` (block textures with generated normal, height, AO and
+roughness maps, item icons, destroy stages, the full moon, rain, water, grass-step, stone-break and pop sounds).

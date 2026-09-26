@@ -9,7 +9,7 @@ import { GameAudio } from './audio.js';
 import { Icons } from './icons.js';
 import { SaveStore, PackStore } from './save.js';
 import { readPackZip, convertPack, decodeLarge, fetchBuiltinPack } from './respack.js';
-import { LAYER_TUNING, LAYER_NAMES } from '../shared/blocks.js';
+import { LAYER_TUNING, LAYER_NAMES, I } from '../shared/blocks.js';
 import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, breakSeconds, drops, canHarvest, itemName, layerFor } from '../shared/blocks.js';
 import { terrainFor } from '../shared/gen.js';
 import { Biome, BIOME_NAMES } from '../shared/terrain.js';
@@ -46,16 +46,13 @@ export class Game {
   on(ev, fn) { (this.listeners[ev] || (this.listeners[ev] = [])).push(fn); }
   emit(ev, ...a) { for (const fn of this.listeners[ev] || []) fn(...a); }
 
-  async init(progress) {
+  /** textures: 'lbpr' (default: LB Photo Realism Reload! baked in by tools/build_lbpr.py) or 'original' (the game's own art). */
+  async init(progress, textures = 'lbpr') {
     this.renderer = new Renderer(this.canvas);
     await this.store.open();
     progress && progress('Loading textures', 0.1);
-    const load = async (name) => {
-      const res = await fetch(this.assetBase + name);
-      if (!res.ok) throw new Error(`Could not load ${name} (${res.status})`);
-      return createImageBitmap(await res.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
-    };
-    const [albedo, normal, mask] = await Promise.all([load('albedo.webp'), load('normal.webp'), load('mask.webp')]);
+    const load = (name) => this.loadBitmap(name);
+    this.sets = {};
     // Blender props: optional art (the world generates the same without it)
     this.propsReady = (async () => {
       try {
@@ -71,13 +68,13 @@ export class Game {
         if (this.world) this.world.props.setLibrary(lib);
       } catch (e) { console.warn('props unavailable:', e && e.message); }
     })();
+    let set = null;
+    if (textures !== 'original') {
+      try { set = await this.loadSet('lbpr'); } catch (e) { console.warn('LBPR textures unavailable, using the originals:', e && e.message); }
+    }
+    if (!set) set = await this.loadSet('original');
     progress && progress('Preparing materials', 0.6);
-    this.builtin = { albedo, normal, mask };
-    this.renderer.uploadLayers('albedo', albedo);
-    this.renderer.uploadLayers('normal', normal);
-    this.renderer.uploadLayers('mask', mask);
-    this.icons = new Icons(albedo);
-    this.renderer.uploadAtlas(this.icons.canvas);
+    this.applySet(set);
     // a resource pack the player loaded earlier
     try {
       const saved = await PackStore.get();
@@ -88,6 +85,78 @@ export class Game {
       }
     } catch (e) { console.warn('saved resource pack could not be applied:', e); }
     progress && progress('Ready', 1);
+  }
+
+  // ---------------------------------------------------------------- texture sets
+
+  async loadBitmap(name) {
+    const res = await fetch(this.assetBase + name);
+    if (!res.ok) throw new Error(`Could not load ${name} (${res.status})`);
+    return createImageBitmap(await res.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+  }
+
+  /** The built-in texture sets: 'original' (the game's art) and 'lbpr' (the baked LB Photo Realism Reload! pack). */
+  async loadSet(name) {
+    if (this.sets[name]) return this.sets[name];
+    const load = (f) => this.loadBitmap(f);
+    let set;
+    if (name === 'lbpr') {
+      const res = await fetch(this.assetBase + 'lbpr/lbpr.json');
+      if (!res.ok) throw new Error(`lbpr.json (${res.status})`);
+      const meta = await res.json();
+      const [albedo, normal, mask, items, crack, moon] = await Promise.all(
+        ['albedo', 'normal', 'mask', 'items', 'crack', 'moon'].map((f) => load(`lbpr/${f}.webp`)));
+      const itemImages = new Map();
+      meta.items.forEach((key, k) => {
+        if (I[key] == null) return;
+        const c = document.createElement('canvas'); c.width = c.height = items.width;
+        c.getContext('2d').drawImage(items, 0, k * items.width, items.width, items.width, 0, 0, items.width, items.width);
+        itemImages.set(I[key], c);
+      });
+      const sounds = {};
+      await Promise.all(Object.entries(meta.sounds).map(async ([group, files]) => {
+        sounds[group] = await Promise.all(files.map(async (f) => {
+          try { const r = await fetch(this.assetBase + 'lbpr/' + f); return r.ok ? await r.arrayBuffer() : null; } catch { return null; }
+        }));
+        sounds[group] = sounds[group].filter(Boolean);
+      }));
+      set = { name, albedo, normal, mask, tuning: meta.tuning, variants: meta.variants, items: itemImages, crack, moon, sounds, credit: meta.credit };
+    } else {
+      const [albedo, normal, mask] = await Promise.all([load('albedo.webp'), load('normal.webp'), load('mask.webp')]);
+      set = { name: 'original', albedo, normal, mask, tuning: LAYER_TUNING, variants: null, items: null, crack: null, moon: null, sounds: null, credit: null };
+    }
+    this.sets[name] = set;
+    return set;
+  }
+
+  /** Makes a texture set the block materials (under any resource pack the player loaded). */
+  applySet(set) {
+    this.builtin = set;
+    this.builtinRaw = null;
+    const r = this.renderer;
+    r.uploadLayers('albedo', set.albedo);
+    r.uploadLayers('normal', set.normal);
+    r.uploadLayers('mask', set.mask);
+    r.setTuning(set.tuning);
+    r.setVariants(set.variants);
+    r.setCrackTexture(set.crack);
+    r.setMoonTexture(set.moon);
+    this.icons = new Icons(set.albedo, { tuning: set.tuning, items: set.items });
+    r.uploadAtlas(this.icons.canvas);
+    this.audio.setSamples(set.sounds);
+    this.emit('inventory'); this.emit('textures', set);
+  }
+
+  /** Switches the built-in set from the settings; a loaded resource pack is converted again on top of it. */
+  async setTextureSet(name) {
+    const set = await this.loadSet(name);
+    if (set === this.builtin) return set;
+    this.applySet(set);
+    if (this.pack) {
+      const saved = await PackStore.get();
+      if (saved) await this.applyPack(saved, false);
+    }
+    return set;
   }
 
   // ---------------------------------------------------------------- resource packs
@@ -118,6 +187,7 @@ export class Game {
     }
     const conv = await convertPack(pack, this.builtinRaw, pack.opts || {});
     const n = LAYER_NAMES.length;
+    this.renderer.setVariants(null);     // a pack has one texture per layer
     this.renderer.uploadLayersRaw('albedo', conv.albedo, conv.size, n);
     this.renderer.uploadLayersRaw('normal', conv.normal, conv.size, n);
     this.renderer.uploadLayersRaw('mask', conv.mask, conv.size, n);
@@ -127,7 +197,7 @@ export class Game {
     for (let i = 0; i < n; i++) if (!conv.tuning[i].cutout) for (let p = i * conv.size * conv.size * 4 + 3; p < (i + 1) * conv.size * conv.size * 4; p += 4) flat[p] = 255;
     const c = document.createElement('canvas'); c.width = conv.size; c.height = conv.size * n;
     c.getContext('2d').putImageData(new ImageData(flat, conv.size, conv.size * n), 0, 0);
-    this.icons = new Icons(await createImageBitmap(c));
+    this.icons = new Icons(await createImageBitmap(c), { tuning: conv.tuning, items: this.builtin.items });
     this.renderer.uploadAtlas(this.icons.canvas);
     if (this.packIcon) URL.revokeObjectURL(this.packIcon);
     this.packIcon = pack.icon ? URL.createObjectURL(new Blob([pack.icon], { type: 'image/png' })) : null;
@@ -137,13 +207,8 @@ export class Game {
   }
 
   async removePack() {
-    this.renderer.uploadLayers('albedo', this.builtin.albedo);
-    this.renderer.uploadLayers('normal', this.builtin.normal);
-    this.renderer.uploadLayers('mask', this.builtin.mask);
-    this.renderer.setTuning(LAYER_TUNING);
-    this.icons = new Icons(this.builtin.albedo);
-    this.renderer.uploadAtlas(this.icons.canvas);
     this.pack = null;
+    this.applySet(this.builtin);
     await PackStore.clear();
     this.emit('inventory'); this.emit('pack', null);
   }
@@ -805,7 +870,24 @@ export class Game {
     const open = this.camSky;
     const day = s.daylight;
     const rainy = this.cold ? 0 : wp.precip;
+    // water nearby (recorded stream / waterfall beds): open water surfaces and flowing water around the player
+    this.waterScanT = (this.waterScanT || 0) - dt;
+    if (this.waterScanT <= 0 && this.world) {
+      this.waterScanT = 0.5;
+      const [px, py, pz] = Array.from(pl.body.pos, Math.floor);
+      let still = 0, flow = 0;
+      for (let dz = -8; dz <= 8; dz += 2) for (let dx = -8; dx <= 8; dx += 2) for (let dy = -4; dy <= 3; dy++) {
+        const id = this.world.getBlock(px + dx, py + dy, pz + dz);
+        if (!isWater(id)) continue;
+        if (id !== B.Water) flow++;
+        else if (!isWater(this.world.getBlock(px + dx, py + dy + 1, pz + dz))) still++;
+      }
+      this.nearWater = { still: Math.min(1, still / 18), flow: Math.min(1, flow / 5) };
+    }
+    const nw = this.nearWater || { still: 0, flow: 0 };
     this.audio.setAmbience(under ? { underwater: 1 } : {
+      water: nw.still * 0.55,
+      waterfall: nw.flow * 0.7,
       wind: (0.18 + wp.wind * 3) * open * (1 - rainy * 0.3),
       rain: rainy * open * 0.9,
       birds: day * (1 - wp.precip) * open * (this.cold ? 0.2 : 0.55),

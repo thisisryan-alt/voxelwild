@@ -1,142 +1,210 @@
 <title>Voxelwild</title>
 <style>
+/* Classic Minecraft GUI: pixel font with a quarter-brightness drop shadow, stone buttons with a bevel that turn
+   blue with yellow text on hover, dirt option screens, the light-grey container GUI with inset slots.
+   Textures (--tex-*) are 16x16 pixel noise generated at boot in ui.js and scaled up without smoothing. */
 :root {
   color-scheme: dark;
-  --ink: #0e1411; --panel: rgba(14, 20, 17, 0.86); --panel-solid: #141c18; --line: rgba(235, 229, 211, 0.14);
-  --text: #ebe5d3; --muted: #a8ad9f; --slate: #8fa3a6; --accent: #d9a441; --accent-ink: #1b1406; --heart: #d8574a; --food: #c98a4b; --air: #7fb6d6;
-  --slot: rgba(10, 14, 12, 0.62); --slot-line: rgba(235, 229, 211, 0.22);
-  --display: "Bitter", Georgia, "Times New Roman", serif; --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --font: "Pixelify Sans", "Courier New", monospace;
+  --logo: "Press Start 2P", "Courier New", monospace;
+  --white: #ffffff; --text: #e0e0e0; --grey: #a0a0a0; --dark: #404040; --shadow: #3f3f3f;
+  --yellow: #ffff55; --hover-yellow: #ffffa0; --red: #ff5555; --green: #55ff55; --aqua: #55ffff;
+  --gui: #c6c6c6; --slot: #8b8b8b; --slot-dark: #373737;
+  --tex-dirt: none; --tex-stone: none;
+  --px: 2px;   /* one GUI pixel */
 }
 [hidden] { display: none !important; }
-html, body { height: 100%; background: var(--ink); color: var(--text); font-family: var(--body); overflow: hidden; }
-body { margin: 0; -webkit-user-select: none; user-select: none; }
-#app { position: fixed; inset: 0; background: var(--ink); }
+html, body { height: 100%; background: #1b1209; color: var(--white); font-family: var(--font); overflow: hidden; }
+body { margin: 0; -webkit-user-select: none; user-select: none; font-size: 16px; line-height: 1.25; }
+#app { position: fixed; inset: 0; background: #1b1209; }
 #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #000; cursor: crosshair; touch-action: none; }
-.layer { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; box-sizing: border-box; overflow: auto; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 24px; width: min(440px, 100%); box-sizing: border-box;
-  backdrop-filter: blur(6px); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45); }
-.panel.wide { width: min(860px, 100%); }
-h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; }
-h1 { font-size: clamp(40px, 9vw, 72px); letter-spacing: 0.01em; line-height: 1; }
-h2 { font-size: 24px; }
-.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--slate); }
-.stack { display: flex; flex-direction: column; gap: 10px; }
-.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-button, .btn { font: 600 15px var(--body); color: var(--text); background: rgba(235, 229, 211, 0.07); border: 1px solid var(--line); border-radius: 4px;
-  padding: 11px 16px; cursor: pointer; text-align: center; transition: background 0.12s, border-color 0.12s; }
-button:hover { background: rgba(235, 229, 211, 0.14); border-color: rgba(235, 229, 211, 0.3); }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-button.primary:hover { background: #e7b556; }
-button.danger { color: #f0a097; }
-button:disabled { opacity: 0.4; cursor: default; }
-label { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
-input[type=text], select { font: 15px var(--body); color: var(--text); background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; }
-input[type=range] { accent-color: var(--accent); width: 100%; }
-.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.seg button[aria-pressed=true] { background: rgba(217, 164, 65, 0.18); border-color: var(--accent); color: #f3d79e; }
-.hint { font-size: 13px; color: var(--muted); line-height: 1.5; }
-.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: rgba(0, 0, 0, 0.3); color: var(--text); }
+* { box-sizing: border-box; }
+.t { text-shadow: var(--px) var(--px) 0 var(--shadow); }
+h1, h2 { margin: 0; font-weight: 400; text-align: center; color: var(--white); text-shadow: var(--px) var(--px) 0 var(--shadow); }
+h2 { font-size: 20px; }
+p { margin: 0; }
+
+/* screens */
+.layer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px 16px; overflow: auto; }
+.dirt { background: linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)), var(--tex-dirt); background-size: auto, 64px 64px; image-rendering: pixelated; }
+.dim { background: linear-gradient(rgba(16, 16, 16, 0.75), rgba(16, 16, 16, 0.82)); }
+#app:not(.ingame) #settings { background: linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)), var(--tex-dirt); background-size: auto, 64px 64px; }
+#app.ingame #settings { background: linear-gradient(rgba(16, 16, 16, 0.75), rgba(16, 16, 16, 0.82)); }
+.screen { width: min(620px, 100%); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.col { width: min(400px, 100%); display: flex; flex-direction: column; gap: 8px; }
+.pair { width: min(400px, 100%); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hint { color: var(--grey); text-shadow: var(--px) var(--px) 0 #282828; text-align: center; line-height: 1.35; }
+.label { color: var(--grey); text-shadow: var(--px) var(--px) 0 #282828; align-self: flex-start; }
+
+/* buttons: stone with bevel, black frame */
+button { font: 400 16px var(--font); color: var(--text); text-shadow: var(--px) var(--px) 0 #383838; height: 40px; padding: 0 12px; cursor: pointer;
+  background: var(--tex-stone) 0 0 / 64px 64px, #6f6f6f; image-rendering: pixelated; border: var(--px) solid #000; border-radius: 0;
+  box-shadow: inset var(--px) var(--px) 0 rgba(255, 255, 255, 0.42), inset calc(var(--px) * -1) calc(var(--px) * -2) 0 rgba(0, 0, 0, 0.42);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+button:hover, button:focus-visible { color: var(--hover-yellow); outline: none;
+  background: linear-gradient(rgba(96, 110, 210, 0.55), rgba(96, 110, 210, 0.55)), var(--tex-stone) 0 0 / 64px 64px, #6f6f6f;
+  box-shadow: inset var(--px) var(--px) 0 rgba(200, 210, 255, 0.55), inset calc(var(--px) * -1) calc(var(--px) * -2) 0 rgba(0, 0, 0, 0.5); }
+button:active { box-shadow: inset calc(var(--px) * -1) calc(var(--px) * -1) 0 rgba(255, 255, 255, 0.3), inset var(--px) var(--px) 0 rgba(0, 0, 0, 0.5); }
+button:disabled { color: #a0a0a0; text-shadow: none; cursor: default; background: #2c2c2c; box-shadow: inset var(--px) var(--px) 0 rgba(255, 255, 255, 0.08); }
+button.danger { color: var(--red); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.seg button[aria-pressed=true] { color: var(--yellow); background: linear-gradient(rgba(96, 110, 210, 0.35), rgba(96, 110, 210, 0.35)), var(--tex-stone) 0 0 / 64px 64px, #6f6f6f; }
+
+/* text fields */
+label { display: flex; flex-direction: column; gap: 4px; color: var(--grey); text-shadow: var(--px) var(--px) 0 #282828; width: 100%; }
+input[type=text] { font: 16px var(--font); color: var(--text); background: #000; border: var(--px) solid #a0a0a0; border-radius: 0; height: 40px; padding: 0 8px; outline: none; text-shadow: var(--px) var(--px) 0 #383838; }
+input[type=text]:focus { border-color: #fff; }
+input[type=text]::placeholder { color: #707070; }
+
+/* sliders: a dark button track with the value written on it and a stone knob */
+.slider { position: relative; display: flex; flex-direction: row; justify-content: center; align-items: center; height: 40px; color: var(--text);
+  text-shadow: var(--px) var(--px) 0 #383838; pointer-events: none; isolation: isolate; white-space: nowrap; }
+.slider .val::before { content: ": "; }
+.slider input { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; margin: 0; pointer-events: auto; -webkit-appearance: none; appearance: none; cursor: pointer;
+  background: #2b2b2b; border: var(--px) solid #000; box-shadow: inset var(--px) var(--px) 0 rgba(255, 255, 255, 0.08); }
+.slider input::-webkit-slider-runnable-track { height: 100%; background: transparent; }
+.slider input::-moz-range-track { height: 100%; background: transparent; }
+.slider input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 36px; border: var(--px) solid #000; background: var(--tex-stone) 0 0 / 64px 64px, #8a8a8a;
+  box-shadow: inset var(--px) var(--px) 0 rgba(255, 255, 255, 0.5), inset calc(var(--px) * -1) calc(var(--px) * -2) 0 rgba(0, 0, 0, 0.45); }
+.slider input::-moz-range-thumb { width: 12px; height: 32px; border: var(--px) solid #000; border-radius: 0; background: #8a8a8a; }
+.slider:hover { color: var(--hover-yellow); }
+.slider input:focus-visible { outline: var(--px) solid #fff; }
+
+/* on/off options look like Minecraft's "Name: ON" buttons */
+.toggle { position: relative; height: 40px; flex-direction: row; justify-content: center; align-items: center; gap: 0; cursor: pointer; color: var(--text); text-shadow: var(--px) var(--px) 0 #383838;
+  background: var(--tex-stone) 0 0 / 64px 64px, #6f6f6f; image-rendering: pixelated; border: var(--px) solid #000;
+  box-shadow: inset var(--px) var(--px) 0 rgba(255, 255, 255, 0.42), inset calc(var(--px) * -1) calc(var(--px) * -2) 0 rgba(0, 0, 0, 0.42); white-space: nowrap; overflow: hidden; }
+.toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.toggle::after { content: ": OFF"; }
+.toggle:has(input:checked)::after { content: ": ON"; }
+.toggle:hover, .toggle:has(input:focus-visible) { color: var(--hover-yellow); background: linear-gradient(rgba(96, 110, 210, 0.55), rgba(96, 110, 210, 0.55)), var(--tex-stone) 0 0 / 64px 64px, #6f6f6f; }
 
 /* title */
-#title { background: linear-gradient(90deg, rgba(8, 12, 10, 0.78) 0%, rgba(8, 12, 10, 0.45) 55%, rgba(8, 12, 10, 0.1) 100%); place-items: center start; }
-#title .title-card { text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45); }
-@media (min-width: 721px) { #title .title-card { margin-left: clamp(0px, 6vw, 96px); } }
-@media (max-width: 720px) { #title { background: linear-gradient(180deg, rgba(8, 12, 10, 0.35), rgba(8, 12, 10, 0.8)); place-items: center; } }
-.title-card { width: min(520px, 100%); display: flex; flex-direction: column; gap: 22px; }
-.title-card .tag { font-size: 16px; color: var(--muted); max-width: 42ch; line-height: 1.5; }
-.survey { display: flex; gap: 18px; font: 12px var(--mono); color: var(--slate); flex-wrap: wrap; }
-.worlds { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow: auto; }
-.world { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px; background: rgba(0, 0, 0, 0.25); }
-.world b { font-weight: 600; }
-.world small { display: block; color: var(--muted); font: 12px var(--mono); margin-top: 2px; }
-.world button { padding: 7px 12px; font-size: 13px; }
-.controls { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; color: var(--muted); align-items: center; }
+#title { justify-content: flex-start; padding-top: clamp(24px, 9vh, 96px); background: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.35)); }
+.logo { position: relative; font: 400 clamp(30px, 7.4vw, 76px) var(--logo); letter-spacing: 0.02em; line-height: 1; margin-bottom: 8px; white-space: nowrap; }
+.logo span { position: relative; z-index: 1; color: #a8a8a8; background: var(--tex-stone) 0 0 / 48px 48px, #9a9a9a; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: contrast(1.35) brightness(1.2); }
+.logo::before { content: attr(data-text); position: absolute; left: 0; top: 0; color: #3a3a3a;
+  text-shadow: 1px 1px 0 #2e2e2e, 2px 2px 0 #2a2a2a, 3px 3px 0 #262626, 4px 4px 0 #222, 5px 5px 0 #1e1e1e, 6px 6px 0 #1a1a1a, 7px 7px 0 #111, 0 -2px 0 #111, -2px 0 0 #111; }
+.edition { font: 400 clamp(12px, 2vw, 18px) var(--logo); color: #e7e7e7; letter-spacing: 0.35em; text-shadow: 2px 2px 0 #3a3a3a; margin: -4px 0 18px; }
+#splash { position: absolute; right: -6%; bottom: -34%; color: var(--yellow); font: 400 clamp(13px, 1.9vw, 20px) var(--font); text-shadow: 2px 2px 0 #3f3f15; transform: rotate(-20deg);
+  animation: splash 0.5s ease-in-out infinite alternate; white-space: nowrap; letter-spacing: 0; }
+@keyframes splash { from { transform: rotate(-20deg) scale(1); } to { transform: rotate(-20deg) scale(1.08); } }
+.worlds { width: min(400px, 100%); display: flex; flex-direction: column; gap: 4px; max-height: 190px; overflow: auto; padding: 4px; background: rgba(0, 0, 0, 0.55); border: var(--px) solid #000; }
+.world { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; padding: 4px 6px; border: var(--px) solid transparent; }
+.world:hover { border-color: #808080; }
+.world b { font-weight: 400; color: var(--white); text-shadow: var(--px) var(--px) 0 var(--shadow); }
+.world small { display: block; color: #808080; font-size: 14px; text-shadow: none; }
+.world button { height: 32px; font-size: 14px; }
+.corner { position: absolute; bottom: 6px; color: var(--white); text-shadow: var(--px) var(--px) 0 var(--shadow); font-size: 14px; }
+.corner.l { left: 8px; } .corner.r { right: 8px; text-align: right; }
+.controls { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-size: 14px; color: var(--grey); align-items: center; width: min(400px, 100%); margin-top: 8px; text-shadow: var(--px) var(--px) 0 #282828; }
+kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5); border: var(--px) solid #555; padding: 0 5px; }
 
 /* loading */
-.bar { height: 6px; background: rgba(235, 229, 211, 0.1); border-radius: 3px; overflow: hidden; }
-.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+.bar { width: min(400px, 100%); height: 10px; border: var(--px) solid #000; background: #5a5a5a; box-shadow: inset 0 0 0 var(--px) #2b2b2b; }
+.bar > i { display: block; height: 100%; width: 0; background: #7fcc19; box-shadow: inset 0 calc(var(--px) * -2) 0 #58a012; transition: width 0.2s; }
 
 /* HUD */
 #hud { position: absolute; inset: 0; pointer-events: none; }
 #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%, -50%); }
-#crosshair::before, #crosshair::after { content: ""; position: absolute; background: rgba(255, 255, 255, 0.85); mix-blend-mode: difference; }
+#crosshair::before, #crosshair::after { content: ""; position: absolute; background: #fff; mix-blend-mode: difference; }
 #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
 #crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
-#mineBar { position: absolute; left: 50%; top: calc(50% + 16px); width: 44px; height: 4px; transform: translateX(-50%); background: rgba(0, 0, 0, 0.5); border-radius: 2px; overflow: hidden; }
-#mineBar i { display: block; height: 100%; width: 0; background: var(--accent); }
-#bottom { position: absolute; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: calc(100% - 20px); }
-#stats { display: flex; justify-content: space-between; width: 100%; gap: 12px; }
-.meter { display: flex; gap: 1px; }
-.meter svg { width: 17px; height: 17px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); }
-#hotbar { display: flex; gap: 3px; padding: 3px; background: rgba(8, 11, 9, 0.55); border: 1px solid rgba(235, 229, 211, 0.18); border-radius: 5px; }
-.slot { position: relative; width: 48px; height: 48px; background: var(--slot); border: 1px solid var(--slot-line); border-radius: 3px; box-sizing: border-box; }
-.slot .ico { position: absolute; inset: 5px; background-repeat: no-repeat; image-rendering: auto; }
-.slot .n { position: absolute; right: 3px; bottom: 1px; font: 700 13px var(--mono); color: #fff; text-shadow: 0 1px 0 #000, 1px 0 0 #000, 0 0 3px #000; }
-.slot .wear { position: absolute; left: 5px; right: 5px; bottom: 4px; height: 3px; background: rgba(0, 0, 0, 0.7); }
-.slot .wear > i { display: block; height: 100%; }
-#hotbar .slot.sel { border: 2px solid var(--accent); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 12px rgba(217, 164, 65, 0.4); }
-#heldName { font: 600 14px var(--body); text-shadow: 0 1px 2px #000; opacity: 0; transition: opacity 0.3s; min-height: 18px; }
-#toast { position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); font-size: 14px; background: var(--panel); border: 1px solid var(--line); padding: 8px 14px; border-radius: 4px; opacity: 0; transition: opacity 0.3s; }
-#pickups { position: absolute; right: 14px; bottom: 90px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; font-size: 13px; }
-#pickups div { background: rgba(8, 11, 9, 0.6); padding: 4px 9px; border-radius: 3px; animation: fade 2.4s forwards; }
+#mineBar { position: absolute; left: 50%; top: calc(50% + 16px); width: 40px; height: 6px; transform: translateX(-50%); background: #000; border: var(--px) solid #000; }
+#mineBar i { display: block; height: 100%; width: 0; background: #fff; }
+#bottom { position: absolute; left: 50%; bottom: calc(4px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; max-width: calc(100% - 8px); }
+#stats { display: flex; justify-content: space-between; align-items: flex-end; width: 100%; gap: 8px; padding: 0 2px; }
+.meter { display: flex; }
+.meter svg { width: 18px; height: 18px; margin-right: -2px; shape-rendering: crispEdges; }
+#air { margin-left: auto; margin-right: 8px; }
+#hotbar { display: flex; background: rgba(0, 0, 0, 0.35); border: var(--px) solid #000; box-shadow: inset 0 0 0 var(--px) #797979; padding: var(--px); }
+#hotbar .slot { width: 40px; height: 40px; background: rgba(8, 8, 8, 0.35); border: var(--px) solid #797979; border-width: 0 var(--px) 0 0; position: relative; }
+#hotbar .slot:last-child { border-right: 0; }
+#hotbar .slot.sel::after { content: ""; position: absolute; inset: -4px; border: 4px solid #fff; box-shadow: 0 0 0 var(--px) #000, inset 0 0 0 var(--px) #000; }
+.slot { position: relative; }
+.slot .ico { position: absolute; inset: 4px; background-repeat: no-repeat; image-rendering: pixelated; }
+.slot .n { position: absolute; right: 1px; bottom: -2px; font: 400 16px var(--font); color: #fff; text-shadow: var(--px) var(--px) 0 #3f3f3f; z-index: 1; }
+.slot .wear { position: absolute; left: 4px; right: 4px; bottom: 3px; height: 4px; background: #000; z-index: 1; }
+.slot .wear > i { display: block; height: 2px; }
+#heldName { color: #fff; text-shadow: var(--px) var(--px) 0 var(--shadow); opacity: 0; transition: opacity 0.3s; min-height: 20px; margin-bottom: 6px; }
+#toast, #pickups div { background: rgba(0, 0, 0, 0.5); color: #fff; text-shadow: var(--px) var(--px) 0 var(--shadow); padding: 2px 6px; }
+#toast { position: absolute; left: 4px; bottom: 120px; opacity: 0; transition: opacity 0.3s; max-width: min(640px, calc(100% - 8px)); }
+#pickups { position: absolute; left: 4px; bottom: 150px; display: flex; flex-direction: column; gap: 0; align-items: flex-start; }
+#pickups div { animation: fade 2.4s forwards; }
 @keyframes fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
-#debug { position: absolute; left: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); font: 12px/1.55 var(--mono); background: rgba(0, 0, 0, 0.5); padding: 8px 10px; border-radius: 4px; white-space: pre; }
-#modeTag { position: absolute; right: 12px; top: calc(10px + env(safe-area-inset-top, 0px)); font: 11px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--slate); text-shadow: 0 1px 2px #000; }
-#clickHint { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); font-size: 14px; background: var(--panel); border: 1px solid var(--line); padding: 8px 14px; border-radius: 4px; pointer-events: none; }
+#debug { position: absolute; left: 2px; top: calc(2px + env(safe-area-inset-top, 0px)); font: 16px/1.15 var(--font); white-space: pre; color: #e0e0e0; }
+#debug span { display: inline-block; background: rgba(80, 80, 80, 0.56); padding: 0 2px; margin-bottom: 1px; }
+#modeTag { position: absolute; right: 6px; top: calc(4px + env(safe-area-inset-top, 0px)); color: #fff; text-shadow: var(--px) var(--px) 0 var(--shadow); }
+#clickHint { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.5); color: #fff; padding: 2px 8px; text-shadow: var(--px) var(--px) 0 var(--shadow); }
 
-/* inventory */
-#inventory .panel { display: grid; grid-template-columns: auto 1fr; gap: 24px; }
-.grid9 { display: grid; grid-template-columns: repeat(9, 44px); gap: 3px; }
-.grid9 .slot { width: 44px; height: 44px; cursor: pointer; pointer-events: auto; }
-.grid9 .slot:hover { border-color: rgba(235, 229, 211, 0.6); }
-.gap { height: 10px; }
-.recipes { display: flex; flex-direction: column; gap: 4px; max-height: 360px; overflow: auto; padding-right: 4px; }
-.recipe { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: center; text-align: left; padding: 6px 8px; font-weight: 500; }
-.recipe .ico { width: 32px; height: 32px; background-repeat: no-repeat; }
-.recipe small { display: flex; gap: 8px; color: var(--muted); font: 12px var(--mono); margin-top: 2px; flex-wrap: wrap; }
-.recipe small .have { color: #b9d58a; } .recipe small .miss { color: #e39a8f; }
-.palette { display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 3px; max-height: 360px; overflow: auto; }
-#cursorStack { position: fixed; width: 40px; height: 40px; pointer-events: none; z-index: 10; }
-#cursorStack .ico { position: absolute; inset: 0; background-repeat: no-repeat; }
-#cursorStack .n { position: absolute; right: 0; bottom: -2px; font: 700 13px var(--mono); text-shadow: 0 1px 0 #000, 0 0 3px #000; }
-.tip { font-size: 12px; color: var(--muted); }
+/* container GUI (inventory): light grey panel, bevelled edges, inset slots, dark-grey title text */
+#inventory { background: rgba(16, 16, 16, 0.6); }
+.gui { background: var(--gui); color: var(--dark); padding: 14px; display: grid; grid-template-columns: auto 1fr; gap: 16px; width: min(760px, 100%); max-height: 100%;
+  border: var(--px) solid #000; box-shadow: inset var(--px) var(--px) 0 #fff, inset calc(var(--px) * 2) calc(var(--px) * 2) 0 #fff, inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #555, inset calc(var(--px) * -2) calc(var(--px) * -2) 0 #555; }
+.gui h3 { margin: 0 0 6px; font-weight: 400; font-size: 16px; color: var(--dark); }
+.gui .col { width: auto; gap: 0; }
+.grid9 { display: grid; grid-template-columns: repeat(9, 36px); }
+.grid9 .slot, .palette .slot, .recipe .ico-slot { width: 36px; height: 36px; background: var(--slot); cursor: pointer; pointer-events: auto;
+  box-shadow: inset var(--px) var(--px) 0 var(--slot-dark), inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #fff; }
+.grid9 .slot:hover::before, .palette .slot:hover::before { content: ""; position: absolute; inset: var(--px); background: rgba(255, 255, 255, 0.5); z-index: 2; }
+.gap { height: 8px; }
+.gui .tip { font-size: 14px; color: #555; margin-top: 8px; max-width: 324px; line-height: 1.2; }
+.recipes { display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow: auto; padding-right: 2px; }
+.recipe { display: grid; grid-template-columns: 36px 1fr; gap: 8px; align-items: center; text-align: left; height: auto; padding: 2px; color: var(--dark); text-shadow: none;
+  background: transparent; border: 0; box-shadow: none; white-space: normal; }
+.recipe:hover, .recipe:focus-visible { background: rgba(255, 255, 255, 0.45); color: #000; box-shadow: none; }
+.recipe:disabled { background: transparent; color: #555; box-shadow: none; }
+.recipe .ico-slot { position: relative; cursor: inherit; }
+.recipe:disabled .ico-slot { background: #a86a6a; }
+.recipe .ico { position: absolute; inset: 2px; background-repeat: no-repeat; image-rendering: pixelated; }
+.recipe small { display: flex; gap: 8px; font-size: 14px; flex-wrap: wrap; }
+.recipe small .have { color: #2a6a1a; } .recipe small .miss { color: #9a2a2a; }
+.palette { display: grid; grid-template-columns: repeat(auto-fill, 36px); max-height: 340px; overflow: auto; align-content: start; }
+#cursorStack { position: fixed; width: 32px; height: 32px; pointer-events: none; z-index: 10; }
+#cursorStack .ico { position: absolute; inset: 0; background-repeat: no-repeat; image-rendering: pixelated; }
+#cursorStack .n { position: absolute; right: -2px; bottom: -4px; font: 16px var(--font); color: #fff; text-shadow: var(--px) var(--px) 0 #3f3f3f; }
+#tooltip { position: fixed; z-index: 30; pointer-events: none; padding: 3px 6px 4px; color: #fff; text-shadow: var(--px) var(--px) 0 #3f3f3f; background: rgba(16, 0, 16, 0.94);
+  border: var(--px) solid rgba(16, 0, 16, 0.94); box-shadow: inset 0 0 0 var(--px) #2c0b5e, inset 0 var(--px) 0 calc(var(--px)) #5000ff55; white-space: nowrap; }
 
-#death { background: rgba(90, 10, 6, 0.42); }
-#death h1 { font-size: clamp(36px, 7vw, 56px); }
+#death { background: linear-gradient(rgba(96, 0, 0, 0.38), rgba(160, 48, 48, 0.63)); }
+#death h1 { font-size: clamp(34px, 6vw, 56px); }
+#deathCause { color: #fff; }
 
 /* settings */
-.settings { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; }
+.settings { width: min(620px, 100%); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .settings .full { grid-column: 1 / -1; }
-.pack { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; border-top: 1px solid var(--line); }
-.pack-row { display: flex; gap: 12px; align-items: center; }
-.pack button.on { border-color: var(--accent, #ffed99); color: var(--accent, #ffed99); }
-.pack-icon { width: 48px; height: 48px; flex: none; border-radius: 4px; background: rgba(0, 0, 0, 0.35) center / cover no-repeat; border: 1px solid var(--line); image-rendering: pixelated; }
-#dropHint { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(8, 12, 10, 0.72); font: 600 20px var(--body); z-index: 20; border: 3px dashed var(--accent); }
-.check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 14px; }
-.check input { width: 16px; height: 16px; accent-color: var(--accent); }
-.val { font-family: var(--mono); color: var(--text); }
+.pack { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding: 8px; background: rgba(0, 0, 0, 0.55); border: var(--px) solid #000; }
+.pack .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pack-row { display: flex; gap: 10px; align-items: center; }
+.pack-icon { width: 64px; height: 64px; flex: none; background: #000 center / cover no-repeat; border: var(--px) solid #555; image-rendering: pixelated; }
+.pack b { font-weight: 400; color: #fff; text-shadow: var(--px) var(--px) 0 var(--shadow); }
+.pack .hint { text-align: left; font-size: 14px; }
+.pack button.on { outline: var(--px) solid var(--yellow); }
+#texCredit a { color: var(--yellow); }
+#packStatus { color: var(--yellow); text-shadow: var(--px) var(--px) 0 #3f3f15; text-align: left; }
+#dropHint { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.75); color: #fff; font-size: 22px; z-index: 20; text-shadow: var(--px) var(--px) 0 var(--shadow); }
 
 /* touch */
 #touch { position: absolute; inset: 0; pointer-events: none; }
-#touch .pad { position: absolute; left: 18px; bottom: 90px; width: 120px; height: 120px; border-radius: 50%; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.2); pointer-events: auto; touch-action: none; }
-#touch .pad i { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; border-radius: 50%; background: rgba(235, 229, 211, 0.25); }
-#touch .tb { position: absolute; pointer-events: auto; width: 58px; height: 58px; border-radius: 50%; padding: 0; font-size: 12px; background: rgba(0, 0, 0, 0.35); touch-action: none; }
+#touch .pad { position: absolute; left: 18px; bottom: 90px; width: 120px; height: 120px; border: var(--px) solid rgba(255, 255, 255, 0.4); background: rgba(0, 0, 0, 0.25); pointer-events: auto; touch-action: none; }
+#touch .pad i { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; background: rgba(255, 255, 255, 0.35); border: var(--px) solid #000; }
+#touch .tb { position: absolute; pointer-events: auto; width: 60px; height: 60px; padding: 0; font-size: 14px; opacity: 0.85; touch-action: none; }
 
 @media (max-width: 720px) {
-  .slot { width: 38px; height: 38px; }
-  .grid9 { grid-template-columns: repeat(9, 34px); }
-  .grid9 .slot { width: 34px; height: 34px; }
-  #inventory .panel { grid-template-columns: 1fr; }
-  .settings { grid-template-columns: 1fr; }
-  .panel { padding: 18px; }
+  #hotbar .slot { width: 34px; height: 34px; }
+  .grid9 { grid-template-columns: repeat(9, 32px); }
+  .grid9 .slot { width: 32px; height: 32px; }
+  .gui { grid-template-columns: 1fr; }
+  .settings, .pack .row { grid-template-columns: 1fr; }
+  .corner { font-size: 12px; }
+  #splash { right: 0; bottom: -44%; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700&family=IBM+Plex+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400&family=Press+Start+2P&display=swap">
 
 <div id="app">
   <canvas id="view" tabindex="0" aria-label="Voxelwild game view"></canvas>
@@ -158,117 +226,118 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); b
   <div id="touch" hidden></div>
 
   <div id="title" class="layer">
-    <div class="title-card">
-      <div class="stack" style="gap:12px">
-        <span class="eyebrow">Survival sandbox &middot; browser edition</span>
-        <h1>Voxelwild</h1>
-        <p class="tag" style="margin:0">Walk out into a generated world of rivers, deserts, taiga and caves. Mine with the right tool, craft, keep fed, and watch the weather roll in.</p>
-      </div>
-      <div class="stack" id="titleButtons">
-        <button class="primary" id="btnContinue" hidden>Continue</button>
-        <button id="btnNew">New world</button>
-        <button id="btnSandbox">Creative sandbox <span class="tip">(not saved)</span></button>
-        <button id="btnSettingsT">Settings</button>
-      </div>
-      <div class="stack" id="worldListWrap" hidden>
-        <span class="eyebrow">Saved worlds</span>
-        <div class="worlds" id="worldList"></div>
-      </div>
-      <div class="survey"><span>32&sup3; sections</span><span>y &minus;64 to 191</span><span>sea level 64</span><span id="storageNote"></span></div>
-      <div id="bootMsg" class="hint"></div>
+    <div class="logo" data-text="VOXELWILD"><span>VOXELWILD</span><div id="splash"></div></div>
+    <div class="edition">BROWSER EDITION</div>
+    <div class="col" id="titleButtons">
+      <button id="btnContinue" hidden>Continue</button>
+      <button id="btnNew">Singleplayer</button>
+      <button id="btnSandbox">Creative Sandbox</button>
+      <button id="btnSettingsT">Options...</button>
     </div>
+    <div class="col" id="worldListWrap" hidden>
+      <span class="label">Select World</span>
+      <div class="worlds" id="worldList"></div>
+    </div>
+    <div id="bootMsg" class="hint"></div>
+    <div class="corner l">Voxelwild 1.0 (browser)</div>
+    <div class="corner r" id="storageNote"></div>
   </div>
 
-  <div id="newWorld" class="layer" hidden>
-    <form class="panel stack" id="newForm" style="gap:16px">
-      <h2>New world</h2>
-      <label>Name<input type="text" id="nwName" maxlength="40" value="New World"></label>
-      <label>Seed <span class="tip">Leave empty for a random one. Words work too.</span><input type="text" id="nwSeed" maxlength="40" placeholder="random"></label>
-      <div class="stack" style="gap:6px"><span class="eyebrow">Game mode</span>
+  <div id="newWorld" class="layer dirt" hidden>
+    <form class="screen" id="newForm">
+      <h2>Create New World</h2>
+      <div class="col" style="margin-top:16px">
+        <label>World Name<input type="text" id="nwName" maxlength="40" value="New World"></label>
+        <label>Seed for the World Generator<input type="text" id="nwSeed" maxlength="40" placeholder="Leave blank for a random seed"></label>
+        <span class="label">Game Mode</span>
         <div class="seg"><button type="button" id="nwSurvival" aria-pressed="true">Survival</button><button type="button" id="nwCreative" aria-pressed="false">Creative</button></div>
-        <span class="hint" id="nwModeHint">Health, hunger and breath. Blocks come from mining; tools come from crafting.</span>
+        <p class="hint" id="nwModeHint">Health, hunger and breath. Blocks come from mining; tools come from crafting.</p>
       </div>
-      <div class="row"><button type="submit" class="primary">Create world</button><button type="button" id="nwCancel">Back</button></div>
+      <div class="pair" style="margin-top:16px"><button type="submit">Create New World</button><button type="button" id="nwCancel">Cancel</button></div>
     </form>
   </div>
 
-  <div id="loading" class="layer" hidden>
-    <div class="panel stack" style="gap:14px">
-      <span class="eyebrow" id="loadEyebrow">Generating terrain</span>
-      <h2 id="loadTitle">Surveying the land</h2>
-      <div class="bar"><i id="loadBar"></i></div>
-      <span class="hint mono" id="loadDetail"></span>
-    </div>
+  <div id="loading" class="layer dirt" hidden>
+    <h2 id="loadTitle">Loading terrain</h2>
+    <p class="hint" id="loadEyebrow">Building terrain</p>
+    <div class="bar"><i id="loadBar"></i></div>
+    <p class="hint" id="loadDetail"></p>
   </div>
 
-  <div id="pause" class="layer" hidden>
-    <div class="panel stack">
-      <h2>Paused</h2>
-      <span class="hint mono" id="pauseInfo"></span>
-      <button class="primary" id="btnResume">Back to game</button>
-      <button id="btnSettingsP">Settings</button>
-      <button id="btnMode">Switch to creative</button>
-      <button id="btnQuit">Save and quit to title</button>
-      <div class="controls" id="controlsList"></div>
+  <div id="pause" class="layer dim" hidden>
+    <h2>Game Menu</h2>
+    <div class="col" style="margin-top:18px">
+      <button id="btnResume">Back to Game</button>
+      <div class="pair" style="width:100%"><button id="btnSettingsP">Options...</button><button id="btnMode">Switch to Creative</button></div>
+      <button id="btnQuit">Save and Quit to Title</button>
     </div>
+    <p class="hint" id="pauseInfo"></p>
+    <div class="controls" id="controlsList"></div>
   </div>
 
   <div id="settings" class="layer" hidden>
-    <div class="panel wide stack" style="gap:18px">
-      <h2>Settings</h2>
-      <div class="settings">
-        <label>View distance <span class="val" id="vViewDistance"></span><input type="range" id="sViewDistance" min="3" max="12" step="1"></label>
-        <label>Render scale <span class="val" id="vRenderScale"></span><input type="range" id="sRenderScale" min="0.4" max="1" step="0.05"></label>
-        <label>Field of view <span class="val" id="vFov"></span><input type="range" id="sFov" min="55" max="100" step="1"></label>
-        <label>Mouse sensitivity <span class="val" id="vSensitivity"></span><input type="range" id="sSensitivity" min="0.2" max="3" step="0.05"></label>
-        <label>Master volume <span class="val" id="vVolume"></span><input type="range" id="sVolume" min="0" max="1" step="0.05"></label>
-        <label>Effects <span class="val" id="vSfx"></span><input type="range" id="sSfx" min="0" max="1" step="0.05"></label>
-        <label>Ambience <span class="val" id="vAmbience"></span><input type="range" id="sAmbience" min="0" max="1" step="0.05"></label>
-        <label>Rain and snow density <span class="val" id="vParticles"></span><input type="range" id="sParticles" min="0" max="1" step="0.1"></label>
-        <label class="check"><input type="checkbox" id="sShadows"> Sun shadows</label>
-        <label class="check"><input type="checkbox" id="sBloom"> Bloom</label>
-        <label class="check"><input type="checkbox" id="sGodRays"> Light shafts</label>
-        <label class="check"><input type="checkbox" id="sInvertY"> Invert mouse Y</label>
-        <label>Surface relief (parallax) <span class="val" id="vPom"></span><input type="range" id="sPom" min="0" max="2" step="0.1"></label>
-        <div class="full pack">
-          <span class="eyebrow">Block textures</span>
-          <div class="pack-row">
-            <div class="pack-icon" id="packIcon"></div>
-            <div class="stack" style="gap:4px;min-width:0">
-              <b id="packName">Built-in textures</b>
-              <span class="hint" id="packInfo">Load a Minecraft Java resource pack (.zip), for example a 128x LabPBR pack with normal, height and specular maps. It stays in this browser and is not uploaded anywhere.</span>
-            </div>
-          </div>
-          <div class="row" id="builtinPacks">
-            <button data-pack="">Default</button>
-          </div>
-          <div class="row">
-            <button id="btnPackLoad">Load resource pack…</button>
-            <button id="btnPackRemove" hidden>Use built-in textures</button>
-            <input type="file" id="packFile" accept=".zip,application/zip" hidden>
-          </div>
-          <div class="row">
-            <label class="check"><input type="checkbox" id="sPackDX"> Normal maps are DirectX-style (LabPBR packs)</label>
-            <label class="check"><input type="checkbox" id="sPackOld"> Old PBR specular (SEUS-style packs)</label>
-          </div>
-          <span class="hint mono" id="packStatus"></span>
+    <h2>Options</h2>
+    <div class="settings" style="margin-top:10px">
+      <label class="slider">Render Distance<span class="val" id="vViewDistance"></span><input type="range" id="sViewDistance" min="3" max="12" step="1"></label>
+      <label class="slider">Render Scale<span class="val" id="vRenderScale"></span><input type="range" id="sRenderScale" min="0.4" max="1" step="0.05"></label>
+      <label class="slider">FOV<span class="val" id="vFov"></span><input type="range" id="sFov" min="55" max="100" step="1"></label>
+      <label class="slider">Sensitivity<span class="val" id="vSensitivity"></span><input type="range" id="sSensitivity" min="0.2" max="3" step="0.05"></label>
+      <label class="slider">Master Volume<span class="val" id="vVolume"></span><input type="range" id="sVolume" min="0" max="1" step="0.05"></label>
+      <label class="slider">Blocks and Items<span class="val" id="vSfx"></span><input type="range" id="sSfx" min="0" max="1" step="0.05"></label>
+      <label class="slider">Ambient<span class="val" id="vAmbience"></span><input type="range" id="sAmbience" min="0" max="1" step="0.05"></label>
+      <label class="slider">Rain and Snow<span class="val" id="vParticles"></span><input type="range" id="sParticles" min="0" max="1" step="0.1"></label>
+      <label class="toggle"><input type="checkbox" id="sShadows">Shadows</label>
+      <label class="toggle"><input type="checkbox" id="sBloom">Bloom</label>
+      <label class="toggle"><input type="checkbox" id="sGodRays">Light Shafts</label>
+      <label class="toggle"><input type="checkbox" id="sInvertY">Invert Mouse</label>
+      <label class="slider full">Surface Relief<span class="val" id="vPom"></span><input type="range" id="sPom" min="0" max="2" step="0.1"></label>
+      <div class="full pack">
+        <span class="label">Textures</span>
+        <div class="row">
+          <button id="btnTexLbpr">LB Photo Realism</button>
+          <button id="btnTexOriginal">Voxelwild Original</button>
         </div>
+        <span class="hint" id="texCredit"></span>
       </div>
-      <div class="row"><button class="primary" id="btnSettingsDone">Done</button><span class="hint">Lower the view distance or render scale if the game stutters.</span></div>
+      <div class="full pack">
+        <span class="label">Resource Packs</span>
+        <div class="pack-row">
+          <div class="pack-icon" id="packIcon"></div>
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+            <b id="packName">Built-in textures</b>
+            <span class="hint" id="packInfo">Load a Minecraft Java resource pack (.zip), for example a 128x LabPBR pack with normal, height and specular maps. It stays in this browser and is not uploaded anywhere.</span>
+          </div>
+        </div>
+        <div class="row" id="builtinPacks">
+          <button data-pack="">Default</button>
+        </div>
+        <div class="row">
+          <button id="btnPackLoad">Load Pack...</button>
+          <button id="btnPackRemove" hidden>Use Built-in Textures</button>
+          <input type="file" id="packFile" accept=".zip,application/zip" hidden>
+        </div>
+        <div class="row">
+          <label class="toggle"><input type="checkbox" id="sPackDX">DirectX Normals</label>
+          <label class="toggle"><input type="checkbox" id="sPackOld">Old PBR Specular</label>
+        </div>
+        <span class="hint" id="packStatus"></span>
+      </div>
     </div>
+    <div class="col" style="margin-top:10px"><button id="btnSettingsDone">Done</button></div>
+    <p class="hint">Lower the render distance or render scale if the game stutters.</p>
   </div>
 
   <div id="inventory" class="layer" hidden>
-    <div class="panel wide">
-      <div class="stack">
-        <span class="eyebrow">Inventory</span>
+    <div class="gui">
+      <div class="col">
+        <h3>Inventory</h3>
         <div class="grid9" id="invMain"></div>
         <div class="gap"></div>
         <div class="grid9" id="invHot"></div>
         <span class="tip">Click to pick up or put down. Right-click splits a stack or places one. Shift-click moves between bag and hotbar.</span>
       </div>
-      <div class="stack">
-        <span class="eyebrow" id="sideTitle">Crafting</span>
+      <div class="col" style="min-width:0">
+        <h3 id="sideTitle">Crafting</h3>
         <div class="recipes" id="recipes"></div>
         <div class="palette" id="palette" hidden></div>
         <span class="tip" id="sideTip">Shift-click a recipe to craft as many as you can.</span>
@@ -277,17 +346,18 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); b
   </div>
 
   <div id="death" class="layer" hidden>
-    <div class="panel stack" style="gap:16px; text-align:center">
-      <h1>You died</h1>
-      <p class="hint" id="deathCause" style="margin:0"></p>
-      <button class="primary" id="btnRespawn">Respawn</button>
-      <button id="btnDeathQuit">Quit to title</button>
+    <h1>You Died!</h1>
+    <p id="deathCause"></p>
+    <div class="col" style="margin-top:28px">
+      <button id="btnRespawn">Respawn</button>
+      <button id="btnDeathQuit">Title Screen</button>
     </div>
   </div>
 
   <div id="dropHint" hidden>Drop the resource pack .zip to use its textures</div>
   <div id="cursorStack" hidden><div class="ico"></div><span class="n"></span></div>
-  <div id="fatal" class="layer" hidden><div class="panel stack"><h2>Voxelwild could not start</h2><p class="hint" id="fatalMsg" style="white-space:pre-wrap"></p></div></div>
+  <div id="tooltip" hidden></div>
+  <div id="fatal" class="layer dirt" hidden><h2>Voxelwild could not start</h2><p class="hint" id="fatalMsg" style="white-space:pre-wrap;max-width:640px"></p></div>
 </div>
 <script id="worker-src" type="text/plain">/*__WORKER__*/</script>
 <script>/*__MAIN__*/</script>

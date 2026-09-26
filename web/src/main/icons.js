@@ -6,7 +6,10 @@ import { ITEMS, BLOCKS, Kind, Shape, LAYER_TUNING, NONE, I, ToolType } from '../
 const CELL = 64, COLS = 8;
 
 export class Icons {
-  constructor(albedoBitmap) {
+  /** opts: { tuning (per-layer, default the built-in), items: Map item id -> image (resource-pack item textures) } */
+  constructor(albedoBitmap, opts = {}) {
+    this.tuning = opts.tuning || LAYER_TUNING;
+    this.itemImages = opts.items || null;
     this.ids = Object.keys(ITEMS).map(Number).sort((a, b) => a - b);
     const rows = Math.ceil(this.ids.length / COLS);
     this.canvas = document.createElement('canvas');
@@ -27,7 +30,7 @@ export class Icons {
 
   /** 64px tinted thumbnails of every texture layer, plus the average colour (linear) for particles. */
   makeThumbs(bmp) {
-    const size = bmp.width, n = Math.round(bmp.height / size), T = 64;
+    const size = bmp.width, n = Math.min(Math.round(bmp.height / size), this.tuning.length), T = 64;   // the layers, not their variants
     const c = document.createElement('canvas'); c.width = T; c.height = T * n;
     const x = c.getContext('2d', { willReadFrequently: true });
     x.imageSmoothingQuality = 'high';
@@ -35,7 +38,7 @@ export class Icons {
     const img = x.getImageData(0, 0, T, T * n), d = img.data;
     const thumbs = [];
     for (let l = 0; l < n; l++) {
-      const t = LAYER_TUNING[l];
+      const t = this.tuning[l] || LAYER_TUNING[0];
       const k = t.tint.map((v) => Math.pow(v, 1 / 2.2));
       const cutout = t.cutout > 0;
       const sum = [0, 0, 0]; let cnt = 0;
@@ -66,6 +69,8 @@ export class Icons {
 
   draw(ctx, id) {
     const def = ITEMS[id];
+    const img = this.itemImages && this.itemImages.get(id);
+    if (img) { ctx.imageSmoothingEnabled = true; ctx.drawImage(img, 2, 2, CELL - 4, CELL - 4); return; }
     if (def.kind === Kind.Block) {
       const b = BLOCKS[def.block];
       if (this.thumbs && (b.shape === Shape.Cube || b.shape === Shape.Cutout)) return this.cube(ctx, b);

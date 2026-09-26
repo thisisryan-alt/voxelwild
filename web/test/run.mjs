@@ -348,6 +348,29 @@ await step('save and reload', async () => {
   return { worlds };
 });
 
+await step('LBPR textures by default, switch to the originals and back', async () => {
+  const before = await G(() => {
+    const g = window.voxelwild.game, b = g.builtin;
+    return { set: b.name, layers: Math.round(b.albedo.height / b.albedo.width), variants: b.variants && b.variants.length,
+      items: b.items && b.items.size, credit: b.credit && b.credit.author, sounds: Object.keys(b.sounds || {}).length,
+      decoded: g.audio.samples ? Object.values(g.audio.samples).reduce((a, l) => a + l.length, 0) : 0 };
+  });
+  if (before.set !== 'lbpr' || before.layers < 100 || !before.items || !before.credit) throw new Error(JSON.stringify(before));
+  await page.keyboard.press('Escape');
+  await page.click('#btnSettingsP');
+  const credit = await G(() => document.getElementById('texCredit').textContent);
+  if (!/1LotS/.test(credit) || !(await G(() => !!document.querySelector('#texCredit a[href*="curseforge"]')))) throw new Error('credit missing: ' + credit);
+  await page.click('#btnTexOriginal');
+  await waitFor(() => window.voxelwild.game.builtin.name === 'original' && document.getElementById('btnTexOriginal').classList.contains('on'), 30000, 'original textures');
+  await page.click('#btnTexLbpr');
+  await waitFor(() => window.voxelwild.game.builtin.name === 'lbpr', 30000, 'LBPR textures');
+  const stored = await G(() => JSON.parse(localStorage.getItem('voxelwild.settings') || '{}').textures);
+  await page.click('#btnSettingsDone');
+  await page.click('#btnResume');
+  if (stored !== 'lbpr') throw new Error('setting not stored: ' + stored);
+  return { ...before, stored };
+});
+
 await step('resource pack: load a LabPBR pack ZIP', async () => {
   await G(async () => {
     const g = window.voxelwild.game, w = g.world;

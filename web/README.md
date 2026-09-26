@@ -14,8 +14,9 @@ Unity project; the renderer and UI are rebuilt for the browser.
 | `src/main/renderer.js`, `shaders.js`, `sky.js` | HDR renderer: sky model, PBR terrain, shadows, water, props, particles, post |
 | `src/main/game.js`, `player.js`, `gameplay.js` | Session, player physics, interaction, items, survival, weather |
 | `src/main/ui.js`, `src/index.html` | Screens, HUD, inventory/crafting, input (pointer lock, touch) |
-| `src/main/audio.js` | Synthesised sound (port of `SoundSynth`) |
-| `tools/build_textures.py` | Packs `SourceArt` block textures into `assets/*.webp` strips |
+| `src/main/audio.js` | Synthesised sound (port of `SoundSynth`), plus recorded clips and loops from the texture set |
+| `tools/build_textures.py` | Packs `SourceArt` block textures into `assets/*.webp` strips (the "Voxelwild Original" texture set) |
+| `tools/build_lbpr.py` | Bakes the LB Photo Realism Reload! resource pack into `assets/lbpr/` (the default texture set) |
 | `tools/export_props.py` | Blender (headless) export of the prop FBX files to `assets/props.bin/json` + bake strips |
 | `tools/build.mjs` | Bundles everything into `dist/` (one HTML page + assets) |
 | `test/run.mjs` | End-to-end test in real Chrome with the GPU |
@@ -26,15 +27,17 @@ Unity project; the renderer and UI are rebuilt for the browser.
 ```sh
 npm install
 npm run build            # dist/index.html + dist/assets/
-npm test                 # 19-step gameplay test in Chrome (CSP=1 adds an artifact-like Content-Security-Policy)
+npm test                 # 22-step gameplay test in Chrome (CSP=1 adds an artifact-like Content-Security-Policy)
 node test/shots.mjs      # screenshots into test/out/
 blender -b -P web/tools/export_props.py   # re-export props after changing the Blender assets
+python tools/build_lbpr.py "<path>/LBPR Reload! v.6.6 for mc1.21.8.zip"   # re-bake the default textures
 ```
 
 ## Resource packs
 
-Settings ▸ Block textures switches between the game's own textures and two built-in packs, and can load any
-Minecraft Java resource pack ZIP (LabPBR normals, height and specular are used; it stays in the browser).
+Options ▸ Resource Packs lays two built-in packs, or any Minecraft Java resource pack ZIP (LabPBR normals, height
+and specular are used; it stays in the browser), over the texture set chosen under Options ▸ Textures; blocks a
+pack lacks keep that set's texture. "Default" removes the pack.
 
 | Pack | What it is | Licence |
 | --- | --- | --- |
@@ -45,6 +48,31 @@ Minecraft Java resource pack ZIP (LabPBR normals, height and specular are used; 
 `node test/packs.mjs` switches through every pack in Chrome, screenshots each and checks the choice survives a
 reload. Famous commercial packs (Faithful, Patrix, Stratum, ...) can't be shipped with the game, but players who
 own them can load them with *Load resource pack…*.
+
+## Textures: LB Photo Realism Reload!
+
+The default block textures, item icons, mining cracks, moon and several sounds come from
+[LB Photo Realism Reload!](https://www.curseforge.com/minecraft/texture-packs/lb-photo-realism-reload) v6.6
+by **1LotS** (based on LB Photo Realism and GKrond's version of LBPR; sounds from freesfx.co.uk and
+orangefreesounds.com). Its licence allows any use with credit and a link to the CurseForge page, and no money
+made from it; the game shows the credit under Options > Textures. "Voxelwild Original" switches back to the
+game's own photographic materials, and players can still load their own Java resource pack on top.
+
+LBPR is a 128px colour-only pack built around Minecraft's model system, so `build_lbpr.py` translates:
+
+| In the pack | In the game |
+| --- | --- |
+| Weighted random models per block (blockstates) | Variant table: 32 weighted slots per layer, picked per block by a hash in the shader, with random quarter turns on top faces and mirroring |
+| OptiFine CTM `method=repeat` (stone 4x4, gravel 4x4, sand 5x5) | Repeat mode: one tile per layer, chosen by block position, so a big seamless picture spans several blocks |
+| Grey textures Minecraft tints (grass, foliage, spruce) | Minecraft's default biome colour baked in; the game's biome tint varies it |
+| Grass/snow side overlay with alpha | Side-overlay rows: the fringe drawn over the dirt side like Minecraft |
+| Sprite leaves for extra model planes | Several wrapped copies layered into a denser, still tileable cube face |
+| Multi-part flower models (stems, leaves, blossoms) | Composed into one cross-plant sprite |
+| No normal/height/specular maps | Height from the colour (detail + broad high-pass), normals, cavity AO and roughness generated; gentle POM |
+
+Not carried over: OptiFine connected glass, random mob skins, custom entity models, animated water/lava
+(the game's water shader stays), the pack's sky/cloud pictures (the game's sky is physically based) and the
+swamp ambience (10 MB).
 
 ## Controls
 

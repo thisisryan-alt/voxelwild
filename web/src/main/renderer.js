@@ -59,6 +59,69 @@ export class Renderer {
       propShadow: compile(gl, C + S.PROP_SHADOW_VS, C + S.PROP_SHADOW_FS, 'prop-shadow'),
     };
     this.setTuning(LAYER_TUNING);
+    this.setVariants(null);
+  }
+
+  /**
+   * Texture variant table (VARIANTS in shaders.js): rows from lbpr.json, or null = every layer is its own texture.
+   * Row: { mode, w, h, flags, slots[32] texture layers, side (row of the side overlay, 255 = none) }.
+   */
+  setVariants(rows) {
+    const gl = this.gl, W = 34;
+    const n = Math.max(LAYER_NAMES.length, rows ? rows.length : 0);
+    const data = new Uint8Array(W * n * 4);
+    for (let r = 0; r < n; r++) {
+      const row = rows && rows[r];
+      const o = r * W * 4;
+      for (let k = 0; k < 32; k++) data[o + k * 4] = row ? row.slots[k] : Math.min(r, 255);
+      if (row) data.set([row.mode, row.w || 1, row.h || 1, row.flags || 0], o + 32 * 4);
+      data[o + 33 * 4] = row && row.side != null ? row.side : 255;
+    }
+    if (this.varTex) gl.deleteTexture(this.varTex);
+    this.varTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.varTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8UI, W, n, 0, gl.RGBA_INTEGER, gl.UNSIGNED_BYTE, data);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  }
+
+  /** Destroy stages (a strip of square frames) for the mining crack, or null for the procedural cracks. */
+  setCrackTexture(bitmap) {
+    const gl = this.gl;
+    if (this.crackTex) { gl.deleteTexture(this.crackTex); this.crackTex = null; }
+    if (!bitmap) return;
+    this.crackTex = this.arrayFromStrip(bitmap, gl.NEAREST);
+  }
+
+  /** Moon surface picture (square), or null for the procedural one. */
+  setMoonTexture(bitmap) {
+    const gl = this.gl;
+    if (this.moonTex) { gl.deleteTexture(this.moonTex); this.moonTex = null; }
+    if (!bitmap) return;
+    this.moonTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.moonTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+
+  arrayFromStrip(bitmap, magFilter) {
+    const gl = this.gl;
+    const size = bitmap.width, layers = Math.round(bitmap.height / size);
+    const tx = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, tx);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, Math.floor(Math.log2(size)) + 1, gl.RGBA8, size, size, layers);
+    gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, 0, size, size, layers, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
+    gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, magFilter);
+    return tx;
   }
 
   /** Per-layer material tables (the built-in tuning, or a resource pack's). */
@@ -502,7 +565,8 @@ export class Renderer {
       uFog: [fogDensity, f.underwater ? 0 : 0.018, 64, 0], uFogEdge: f.underwater ? [1e5, 1e5 + 1] : [f.viewDistance * CS * 0.6, f.viewDistance * CS * 0.96],
       uBlockColor: [1.0 * 2.4, 0.62 * 2.4, 0.3 * 2.4], uCamSky: f.camSky,
       uShadowVP: this.shadowVPFlat, uShadowDist: [22, 88], uShadowOn: shadowsOn ? 1 : 0,
-      uShadow0: 4, uShadow1: 5, uCloudTex: 6, uSkyLut: 3, uAlbedo: 0, uNormal: 1, uMask: 2, uSceneColor: 7, uSceneDepth: 8, uAtlas: 9, uBakeN: 14, uBakeM: 15,
+      uShadow0: 4, uShadow1: 5, uCloudTex: 6, uSkyLut: 3, uAlbedo: 0, uNormal: 1, uMask: 2, uSceneColor: 7, uSceneDepth: 8, uAtlas: 9, uBakeN: 14, uBakeM: 15, uVar: 16, uCrack: 17, uMoonTex: 18,
+      uCrackTex: this.crackTex ? 1 : 0, uMoonTexOn: this.moonTex ? 1 : 0,
       uCloud: [wth.cloudCover, 1 / 5200, 420, 0.55 * wth.cloudCover + 0.1], uCloudOff: [this.cloudOff[0], this.cloudOff[1], 2.2, 1 - wth.storm * 0.55],
       uWet: wth.wetness, uSnow: wth.snowCover,
       uLP: this.uLP, uLT: this.uLT, uLP2: this.uLP2, uLP3: this.uLP3, uPom: this.settings.pom ?? 1, uPomDist: 28,
@@ -519,6 +583,9 @@ export class Renderer {
     this.bindTex(5, gl.TEXTURE_2D, this.shadowTex[1]);
     this.bindTex(6, gl.TEXTURE_2D, this.cloudTex);
     this.bindTex(9, gl.TEXTURE_2D, this.atlas);
+    this.bindTex(16, gl.TEXTURE_2D, this.varTex);
+    this.bindTex(17, gl.TEXTURE_2D_ARRAY, this.crackTex || null);
+    this.bindTex(18, gl.TEXTURE_2D, this.moonTex || null);
 
     // ---- sky LUT
     this.bindTex(3, gl.TEXTURE_2D, null);

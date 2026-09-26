@@ -7,7 +7,7 @@ import { PACK_NAMES, listBuiltinPacks } from './respack.js';
 
 const $ = (id) => document.getElementById(id);
 const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, volume: 0.8, sfx: 1, ambience: 0.7, particles: 1,
-  shadows: true, bloom: true, godRays: true, invertY: false, pom: 1 };
+  shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr' };
 const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'KeyE', 'KeyQ', 'KeyF',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F3', 'Tab', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9']);
 const CAUSES = { fall: 'You hit the ground too hard.', drowning: 'You ran out of air.', starvation: 'You starved.', void: 'You fell out of the world.' };
@@ -52,7 +52,7 @@ export class UI {
     $('bootMsg').textContent = 'Loading textures…';
     this.bindStatic();
     try {
-      await g.init((msg) => { $('bootMsg').textContent = msg + '…'; });
+      await g.init((msg) => { $('bootMsg').textContent = msg + '…'; }, this.settings.textures);
     } catch (e) { this.fatal(e); return; }
     g.applySettings(this.settings);
     $('bootMsg').textContent = '';
@@ -246,6 +246,7 @@ export class UI {
     $('btnDeathQuit').onclick = async () => { g.stats.reset(); g.player.teleport(g.spawn); await g.save(); this.toTitle(); };
     this.renderControls();
     this.bindPack();
+    this.bindTextures();
 
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === c;
@@ -342,10 +343,46 @@ export class UI {
     for (const k of ['shadows', 'bloom', 'godRays', 'invertY']) bind(k);
     bind('pom', (x) => (x ? `${Math.round(x * 100)}%` : 'off'));
     this.renderPack();
+    this.renderTextures();
     this.show('settings');
   }
 
   // ---------------------------------------------------------------- resource pack
+
+  bindTextures() {
+    const g = this.game;
+    const pick = async (name) => {
+      if (this.texBusy) return;
+      this.texBusy = true;
+      $('texCredit').textContent = 'Loading textures…';
+      try {
+        await g.setTextureSet(name);
+        this.settings.textures = name; storeSettings(this.settings);
+        this.paletteBuilt = false; this.renderHotbar();
+      } catch (e) { $('texCredit').textContent = `Could not load those textures: ${e.message}`; this.texBusy = false; return; }
+      this.texBusy = false;
+      this.renderTextures();
+    };
+    $('btnTexLbpr').onclick = () => pick('lbpr');
+    $('btnTexOriginal').onclick = () => pick('original');
+    g.on('textures', () => this.renderTextures());
+  }
+
+  renderTextures() {
+    const set = this.game.builtin;
+    if (!set) return;
+    $('btnTexLbpr').classList.toggle('on', set.name === 'lbpr');
+    $('btnTexOriginal').classList.toggle('on', set.name === 'original');
+    const el = $('texCredit');
+    el.textContent = '';
+    if (set.credit) {
+      // the pack's licence asks for credit with a link to its CurseForge page
+      const c = set.credit;
+      el.append(`Blocks, items, cracks, moon and sounds: ${c.name} v${c.version} by ${c.author} (`);
+      const a = document.createElement('a'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'CurseForge';
+      el.append(a, `), based on ${c.based_on}. Normal, height and roughness maps are generated from its colours.`);
+    } else el.textContent = 'The game\'s own photographic materials.';
+  }
 
   bindPack() {
     const g = this.game;
@@ -547,7 +584,7 @@ export class UI {
         b.className = 'recipe';
         b.disabled = !ok;
         const ins = r.inputs.map(([item, n]) => `<span class="${inv.count(item) >= n ? 'have' : 'miss'}">${n}× ${itemName(item)}</span>`).join('');
-        b.innerHTML = `<div class="ico" style="${g.icons.css(r.out, 32)}"></div><div>${r.count > 1 ? r.count + '× ' : ''}${r.name}<small>${ins}</small></div>`;
+        b.innerHTML = `<div class="ico-slot"><div class="ico" style="${g.icons.css(r.out, 32)}"></div></div><div>${r.count > 1 ? r.count + '× ' : ''}${r.name}<small>${ins}</small></div>`;
         b.onclick = (e) => {
           let n = 0;
           do { if (!craft(inv, r)) break; n++; } while (e.shiftKey && n < 64 && canCraft(inv, r));

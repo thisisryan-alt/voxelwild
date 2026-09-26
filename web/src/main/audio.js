@@ -199,10 +199,69 @@ const BEDS = {
   }),
 };
 
+/** One seamless loop from recorded clips: laid end to end with crossfades, the tail folded over the head. */
+function loopFrom(ctx, clips, fadeSec = 0.4) {
+  const rate = ctx.sampleRate, F = Math.floor(fadeSec * rate);
+  const chans = Math.max(...clips.map((c) => c.numberOfChannels));
+  const total = clips.reduce((a, c) => a + c.length - F, 0);
+  const out = ctx.createBuffer(chans, total, rate);
+  for (let ch = 0; ch < chans; ch++) {
+    const o = out.getChannelData(ch);
+    let pos = 0;
+    for (const c of clips) {
+      const d = c.getChannelData(Math.min(ch, c.numberOfChannels - 1));
+      for (let i = 0; i < d.length; i++) {
+        const k = i < F ? i / F : i >= d.length - F ? (d.length - i) / F : 1;
+        o[(pos + i) % total] += d[i] * k;
+      }
+      pos += d.length - F;
+    }
+  }
+  return out;
+}
+
 export class GameAudio {
   constructor() {
     this.ctx = null; this.cache = new Map(); this.beds = {}; this.volumes = { master: 0.8, sfx: 1, ambience: 0.7 };
     this.variant = 0;
+    this.rawSamples = null; this.samples = null; this.sampleBeds = {};
+  }
+
+  /** Recorded sounds from the texture set (encoded ArrayBuffers per group), or null for the synthesised ones. */
+  setSamples(raw) {
+    this.rawSamples = raw;
+    if (this.ctx) this.decodeSamples();
+  }
+  async decodeSamples() {
+    const raw = this.rawSamples;
+    let out = null;
+    if (raw) {
+      out = {};
+      for (const [g, list] of Object.entries(raw)) {
+        out[g] = (await Promise.all(list.map((b) => this.ctx.decodeAudioData(b.slice(0)).catch(() => null)))).filter(Boolean);
+      }
+    }
+    if (this.rawSamples !== raw) return;
+    this.samples = out;
+    for (const b of Object.values(this.sampleBeds)) { try { b.src.stop(); } catch { /* not started */ } b.g.disconnect(); }
+    this.sampleBeds = {};
+    if (!out) return;
+    // recorded beds replace (rain) or add to (water, waterfall) the synthesised ambience
+    for (const name of ['rain', 'water', 'waterfall']) {
+      if (!out[name] || !out[name].length) continue;
+      const src = this.ctx.createBufferSource();
+      src.buffer = loopFrom(this.ctx, out[name]);
+      src.loop = true;
+      const g = this.ctx.createGain(); g.gain.value = 0;
+      src.connect(g); g.connect(this.amb);
+      src.start(this.ctx.currentTime + 0.05);
+      this.sampleBeds[name] = { src, g };
+    }
+  }
+  /** A random recorded clip of a group, or null. */
+  sample(group) {
+    const list = this.samples && this.samples[group];
+    return list && list.length ? list[Math.floor(Math.random() * list.length)] : null;
   }
   /** Must be called from a user gesture. */
   start() {
@@ -214,6 +273,7 @@ export class GameAudio {
     this.sfx = this.ctx.createGain(); this.sfx.connect(this.master);
     this.amb = this.ctx.createGain(); this.amb.connect(this.master);
     this.applyVolumes();
+    if (this.rawSamples) this.decodeSamples();
     // ambience beds are built a little later so the first frame is not delayed
     setTimeout(() => {
       for (const name of Object.keys(BEDS)) {
@@ -245,13 +305,23 @@ export class GameAudio {
     src.start();
   }
   nextVariant() { this.variant = (this.variant + 1) % 6; return this.variant; }
-  step(block, volume = 0.35) { const s = surfaceFor(block), k = this.nextVariant(); this.play(this.get(`step${s}_${k}`, () => SYNTH.step(s, k)), volume); }
+  step(block, volume = 0.35) {
+    const s = surfaceFor(block), k = this.nextVariant();
+    const rec = s === Surface.Grass && this.sample('grassStep');
+    if (rec) return this.play(rec, volume * 1.1, 0.85 + Math.random() * 0.3);
+    this.play(this.get(`step${s}_${k}`, () => SYNTH.step(s, k)), volume);
+  }
   hit(block) { const s = surfaceFor(block), k = this.nextVariant(); this.play(this.get(`hit${s}_${k}`, () => SYNTH.hit(s, k)), 0.4); }
-  break(block) { const s = surfaceFor(block), k = this.nextVariant() % 3; this.play(this.get(`brk${s}_${k}`, () => SYNTH.break(s, k)), 0.7); }
+  break(block) {
+    const s = surfaceFor(block), k = this.nextVariant() % 3;
+    const rec = s === Surface.Stone && this.sample('stoneBreak');
+    if (rec) return this.play(rec, 0.6, 0.9 + Math.random() * 0.2);
+    this.play(this.get(`brk${s}_${k}`, () => SYNTH.break(s, k)), 0.7);
+  }
   place(block) { const s = surfaceFor(block), k = this.nextVariant() % 3; this.play(this.get(`plc${s}_${k}`, () => SYNTH.place(s, k)), 0.6); }
   splash() { const k = this.nextVariant() % 3; this.play(this.get(`spl${k}`, () => SYNTH.splash(k)), 0.6); }
   hurt() { const k = this.nextVariant() % 3; this.play(this.get(`hurt${k}`, () => SYNTH.hurt(k)), 0.8); }
-  pop() { this.play(this.get('pop', SYNTH.pop), 0.35, 0.9 + Math.random() * 0.3); }
+  pop() { const rec = this.sample('pop'); this.play(rec || this.get('pop', SYNTH.pop), rec ? 0.3 : 0.35, 0.9 + Math.random() * 0.3); }
   click() { this.play(this.get('click', SYNTH.click), 0.4); }
   eat() { const k = this.nextVariant() % 2; this.play(this.get(`eat${k}`, () => SYNTH.eat(k)), 0.6); }
   thunder(near, delay = 0) {
@@ -265,8 +335,12 @@ export class GameAudio {
     if (!this.ctx) return;
     const k = 1 - Math.exp(-dt * 1.5);
     for (const [name, g] of Object.entries(this.beds)) {
-      const cur = g.gain.value, target = t[name] || 0;
+      const cur = g.gain.value, target = this.sampleBeds[name] ? 0 : t[name] || 0;
       g.gain.value = cur + (target - cur) * k;
+    }
+    for (const [name, b] of Object.entries(this.sampleBeds)) {
+      const cur = b.g.gain.value, target = t[name] || 0;
+      b.g.gain.value = cur + (target - cur) * k;
     }
   }
 }
