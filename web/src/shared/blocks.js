@@ -1,5 +1,5 @@
 import CATALOG from './catalog.json';
-import { K, KIND_NAMES, STATES, SOLID_KINDS } from './shapes.js';
+import { K, KIND_NAMES, STATES, SOLID_KINDS, FACE6, setRedstoneBlock } from './shapes.js';
 // Blocks, texture layers, items, mining and recipes - mirrors the Unity registry (BlockId, BlockRegistry,
 // ItemRegistry, Mining, Recipes) so both builds play by the same rules.
 
@@ -172,6 +172,7 @@ export const MODEL_START = CATALOG_START + CATALOG.blocks.length;
 export const FAMS = [];                    // family: { key, name, kind (K), first id, states, mat (full block id), list, cat }
 export const FAM = {};                     // family key -> family
 export const MODEL_LIST = { opaque: 0, cutout: 1, glow: 2 };
+const ROT = [1, 3, 0, 2];     // texture turn (0, 90, 180, 270 degrees) for facings east, west, south, north
 {
   let next = MODEL_START;
   const texLayer = (t) => (t.startsWith('B:') ? BLOCKS[B[t.slice(2)]].side : L['c:' + t]);
@@ -191,29 +192,53 @@ export const MODEL_LIST = { opaque: 0, cutout: 1, glow: 2 };
       else if (kind === K.Tall) top = side = bottom = texLayer(tex[st]);
       else if (kind === K.Rail) top = side = bottom = texLayer(tex[st]);
       else if (kind === K.Path) { top = texLayer(tex[0]); side = texLayer(tex[1]); bottom = texLayer(tex[2]); }
+      else if (kind === K.Wire) { const b = st === 0 ? 0 : st <= 5 ? 1 : st <= 10 ? 2 : 3; top = side = bottom = texLayer(tex[b * 3]); }
+      else if (kind === K.RTorch) top = side = bottom = texLayer(tex[st < 2 ? st : (st - 2) & 1]);
+      else if (kind === K.Lever) top = side = bottom = texLayer(tex[0]);
+      else if (kind === K.Repeater) { top = texLayer(tex[(st >= 16 ? 4 : 0) + ROT[st & 3]]); side = bottom = texLayer(tex[8]); }
+      else if (kind === K.Bed) { top = texLayer(tex[(st & 1 ? 0 : 4) + ROT[st >> 1]]); side = texLayer(tex[8]); bottom = texLayer(tex[9]); }
+      else if (kind === K.Crop) top = side = bottom = texLayer(tex[st]);
       else if (tex.length) top = side = bottom = texLayer(tex[0]);
       if (kind === K.Stairs || kind === K.Slab || kind === K.Wall || kind === K.Fence || kind === K.Gate) {
         // logs and pillars cut into shapes keep their side texture all round
         if (md && md.top !== md.side && md.bottom !== md.side && kind !== K.Slab && kind !== K.Stairs) top = bottom = side;
       }
-      let flags = F.Breakable | (SOLID_KINDS.has(kind) ? F.Solid : 0) | (needsFloor ? F.NeedsSupport : 0);
+      let flags = F.Breakable | (SOLID_KINDS.has(kind) ? F.Solid : 0) | (needsFloor || kind === K.Wire || kind === K.Crop || kind === K.Repeater ? F.NeedsSupport : 0);
       if (kind === K.Tall && tint) flags |= F.Replaceable;
       const d = { name: e.name, flags, shape: Shape.Model, top, side, bottom, overlay: NONE, emission: e.emission || (md ? md.emission : 0),
-        opacity: 0, tint, wind: kind === K.Tall ? 200 : 0, model: { kind, state: st, fam: fam.index } };
+        opacity: [K.Slab, K.Stairs, K.Path, K.Snow, K.Bed, K.Piston, K.Head].includes(kind) ? 1 : 0, tint, wind: kind === K.Tall ? 200 : 0, model: { kind, state: st, fam: fam.index } };
       if (kind === K.Slab && st === 2) Object.assign(d, { shape: md && md.shape !== Shape.Model ? md.shape : Shape.Cube, flags: md ? md.flags : T, opacity: md ? md.opacity : 15 });
       if (kind === K.Tall) d.shape = Shape.Cross;
+      if (kind === K.Crop) Object.assign(d, { shape: Shape.Cross, wind: 150 });
+      if (kind === K.Wire) d.alt = [0, 1, 2].map((k) => texLayer(tex[(st === 0 ? 0 : st <= 5 ? 1 : st <= 10 ? 2 : 3) * 3 + k]));
+      if (kind === K.Lever) d.alt = [texLayer(tex[0]), texLayer(tex[1])];
+      if (kind === K.Repeater) d.alt = [top, texLayer(tex[st >= 16 ? 9 : 10])];
+      if (kind === K.RTorch) {
+        d.emission = (st < 2 ? st === 0 : ((st - 2) & 1) === 0) ? 7 : 0;
+        if (st < 2) d.shape = Shape.Torch;
+      }
+      if (kind === K.Piston || kind === K.Head) {
+        const f = st % 6, front = FACE6[f], back = FACE6[f ^ 1], L6 = tex.map(texLayer);
+        if (kind === K.Piston) {
+          const ext = st >= 6;
+          d.faces = [0, 1, 2, 3, 4, 5].map((k) => (k === front ? L6[ext ? 3 : 0] : k === back ? L6[2] : L6[1]));
+          if (!ext) Object.assign(d, { shape: Shape.Cube, flags: T, opacity: 15 });
+        } else d.faces = [0, 1, 2, 3, 4, 5].map((k) => (k === front || k === back ? L6[st >= 6 ? 1 : 0] : L6[2]));
+        d.top = d.faces[2]; d.side = d.faces[0]; d.bottom = d.faces[3];
+      }
       BLOCKS[id] = d;
     }
     FAMS.push(fam); FAM[e.key] = fam;
   }
 }
+if (C.redstone_block) setRedstoneBlock(C.redstone_block);
 export const modelOf = (id) => (BLOCKS[id] ? BLOCKS[id].model : null);
 export const famOf = (id) => { const m = BLOCKS[id] && BLOCKS[id].model; return m ? FAMS[m.fam] : null; };
 
 export const has = (id, f) => (BLOCKS[id].flags & f) !== 0;
 export const isOpaque = (id) => (BLOCKS[id].flags & F.Opaque) !== 0;
 export const isSolid = (id) => (BLOCKS[id].flags & F.Solid) !== 0;
-export const layerFor = (d, face) => (face === 2 ? d.top : face === 3 ? d.bottom : d.side);
+export const layerFor = (d, face) => (d.faces ? d.faces[face] : face === 2 ? d.top : face === 3 ? d.bottom : d.side);
 
 // Per-layer material tuning (Unity WorldSceneBuilder.DefaultLayer): tiling (blocks per repeat), normal strength,
 // roughness scale, macro variation, tint rgb, specular, emission, translucency, biome tint, cutout.
@@ -293,9 +318,13 @@ export const I = {
   RawCopper: 287, Emerald: 288, LapisLazuli: 289, Redstone: 290,
   Beef: 291, Porkchop: 292, Mutton: 293, RawChicken: 294, Feather: 295, Leather: 296, RottenFlesh: 297, Bone: 298, Arrow: 299,
   Gunpowder: 300, String: 301, GoldNugget: 302, BlazeRod: 303, GhastTear: 304, WoodenSword: 305, StoneSword: 306, IronSword: 307, DiamondSword: 308,
+  IronIngot: 309, GoldIngot: 310, CopperIngot: 311, CookedBeef: 312, CookedPorkchop: 313, CookedMutton: 314, CookedChicken: 315, Charcoal: 316,
+  Bread: 317, Wheat: 318, WheatSeeds: 319, WoodenHoe: 320, StoneHoe: 321, IronHoe: 322, DiamondHoe: 323,
+  LeatherHelmet: 324,      // armour: 324 + material * 4 + piece (leather, golden, iron, diamond x helmet, chestplate, leggings, boots)
 };
-export const Kind = { Block: 0, Material: 1, Tool: 2, Food: 3, Use: 4 };   // Use: right-click items (flint and steel, eye of ender)
-export const ToolType = { None: 0, Pickaxe: 1, Axe: 2, Shovel: 3, Sword: 4 };
+export const ARMOR_MATS = ['Leather', 'Golden', 'Iron', 'Diamond'], ARMOR_PIECES = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
+export const Kind = { Block: 0, Material: 1, Tool: 2, Food: 3, Use: 4, Armor: 5 };   // Use: right-click items (flint and steel, eye of ender)
+export const ToolType = { None: 0, Pickaxe: 1, Axe: 2, Shovel: 3, Sword: 4, Hoe: 5 };
 export const Tier = { Hand: 0, Wood: 1, Stone: 2, Iron: 3, Diamond: 4 };
 
 export const ITEMS = {};
@@ -307,8 +336,12 @@ const placeable = [B.Stone, B.Dirt, B.Grass, B.Sand, B.Gravel, B.Snow, B.Cobbles
   B.CrimsonFungus, B.WarpedFungus, B.CrimsonRoots, B.WarpedRoots, B.WeepingVines, B.TwistingVines, B.EndStone, B.EndStoneBricks, B.Purpur,
   B.EndPortalFrame, B.ChorusPlant, B.ChorusFlower, B.StoneBricks, B.MossyStoneBricks, B.CrackedStoneBricks];
 for (const b of placeable) ITEMS[b] = { id: b, name: BLOCKS[b].name, kind: Kind.Block, stack: 64, block: b };
-for (const k in C) { const b = C[k]; if (CAT[b].hard !== 'unbreakable') ITEMS[b] = { id: b, name: BLOCKS[b].name, kind: Kind.Block, stack: 64, block: b }; }
-for (const f of FAMS) if (f.kind !== K.WallTorch) ITEMS[f.first] = { id: f.first, name: f.name, kind: Kind.Block, stack: 64, block: f.first };
+for (const k in C) { const b = C[k]; if (CAT[b].hard !== 'unbreakable' && !CAT[b].noitem) ITEMS[b] = { id: b, name: BLOCKS[b].name, kind: Kind.Block, stack: 64, block: b }; }
+for (const f of FAMS) {
+  if (f.kind === K.WallTorch || CATALOG.models[f.index].noitem) continue;
+  const first = f.kind === K.Piston ? f.first + 4 : f.kind === K.Bed ? f.first + 4 : f.first;   // the icon state
+  ITEMS[f.first] = { id: f.first, name: f.name, kind: Kind.Block, stack: f.kind === K.Bed ? 1 : 64, block: f.first, icon: first };
+}
 const mat = (id, name) => (ITEMS[id] = { id, name, kind: Kind.Material, stack: 64 });
 const food = (id, name, f, sat) => (ITEMS[id] = { id, name, kind: Kind.Food, stack: 64, food: f, sat });
 mat(I.Stick, 'Stick'); mat(I.Coal, 'Coal'); mat(I.IronChunk, 'Iron Chunk'); mat(I.GoldChunk, 'Gold Chunk'); mat(I.Diamond, 'Diamond');
@@ -320,6 +353,21 @@ food(I.RottenFlesh, 'Rotten Flesh', 4, 0.8);
 mat(I.RawCopper, 'Raw Copper'); mat(I.Emerald, 'Emerald'); mat(I.LapisLazuli, 'Lapis Lazuli'); mat(I.Redstone, 'Redstone Dust');
 mat(I.Flint, 'Flint'); mat(I.NetherQuartz, 'Nether Quartz'); mat(I.GlowstoneDust, 'Glowstone Dust');
 ITEMS[I.FlintAndSteel] = { id: I.FlintAndSteel, name: 'Flint and Steel', kind: Kind.Use, stack: 1, durability: 64 };
+mat(I.IronIngot, 'Iron Ingot'); mat(I.GoldIngot, 'Gold Ingot'); mat(I.CopperIngot, 'Copper Ingot'); mat(I.Charcoal, 'Charcoal'); mat(I.Wheat, 'Wheat');
+mat(I.WheatSeeds, 'Wheat Seeds');
+food(I.CookedBeef, 'Steak', 8, 12.8); food(I.CookedPorkchop, 'Cooked Porkchop', 8, 12.8); food(I.CookedMutton, 'Cooked Mutton', 6, 9.6);
+food(I.CookedChicken, 'Cooked Chicken', 6, 7.2); food(I.Bread, 'Bread', 5, 6);
+// armour (Minecraft's defence points and durability)
+ARMOR_MATS.forEach((m, mi) => ARMOR_PIECES.forEach((pc, pi) => {
+  const id = I.LeatherHelmet + mi * 4 + pi;
+  I[`${m}${pc}`] = id;
+  const points = [[1, 3, 2, 1], [2, 5, 3, 1], [2, 6, 5, 2], [3, 8, 6, 3]][mi][pi];
+  const dur = [55, 77, 165, 363][mi] * [11, 16, 15, 13][pi] / 11 | 0;
+  ITEMS[id] = { id, name: `${m === 'Golden' ? 'Golden' : m} ${pc}`, kind: Kind.Armor, stack: 1, slot: pi, points, durability: dur };
+}));
+// items that place a block: redstone dust lays a wire, seeds plant wheat
+if (FAM.redstone_wire) ITEMS[I.Redstone].places = FAM.redstone_wire.first;
+if (FAM.wheat) ITEMS[I.WheatSeeds].places = FAM.wheat.first;
 ITEMS[I.EyeOfEnder] = { id: I.EyeOfEnder, name: 'Eye of Ender', kind: Kind.Use, stack: 64 };
 const tiers = [['Wooden', Tier.Wood, 60], ['Stone', Tier.Stone, 132], ['Iron', Tier.Iron, 251], ['Diamond', Tier.Diamond, 1562]];
 tiers.forEach(([prefix, tier, dur], t) => {
@@ -327,8 +375,9 @@ tiers.forEach(([prefix, tier, dur], t) => {
   ITEMS[I.WoodenAxe + t] = { id: I.WoodenAxe + t, name: `${prefix} Axe`, kind: Kind.Tool, stack: 1, tool: ToolType.Axe, tier, durability: dur };
   ITEMS[I.WoodenShovel + t] = { id: I.WoodenShovel + t, name: `${prefix} Shovel`, kind: Kind.Tool, stack: 1, tool: ToolType.Shovel, tier, durability: dur };
   ITEMS[I.WoodenSword + t] = { id: I.WoodenSword + t, name: `${prefix} Sword`, kind: Kind.Tool, stack: 1, tool: ToolType.Sword, tier, durability: dur, damage: 4 + t };
+  ITEMS[I.WoodenHoe + t] = { id: I.WoodenHoe + t, name: `${prefix} Hoe`, kind: Kind.Tool, stack: 1, tool: ToolType.Hoe, tier, durability: dur };
 });
-export const itemName = (id) => (ITEMS[id] ? ITEMS[id].name : `Item ${id}`);
+export const itemName = (id) => (typeof id === 'string' ? GROUP_NAMES[id] || id : ITEMS[id] ? ITEMS[id].name : `Item ${id}`);
 
 // ---------------------------------------------------------------- mining (Unity Gameplay.Mining)
 
@@ -369,7 +418,9 @@ export function mining(block) {
     default: {
       const fam = famOf(block);
       if (fam) {
-        if (fam.kind === K.Tall || fam.kind === K.Lily || fam.kind === K.WallTorch) return { hardness: 0, tool: ToolType.None, required: Tier.Hand };
+        if ([K.Tall, K.Lily, K.WallTorch, K.Wire, K.RTorch, K.Lever, K.Repeater, K.Crop].includes(fam.kind)) return { hardness: 0, tool: ToolType.None, required: Tier.Hand };
+        if (fam.kind === K.Piston || fam.kind === K.Head) return { hardness: 1.5, tool: ToolType.Pickaxe, required: Tier.Hand };
+        if (fam.kind === K.Bed) return { hardness: 0.2, tool: ToolType.None, required: Tier.Hand };
         if (fam.kind === K.Ladder) return { hardness: 0.4, tool: ToolType.Axe, required: Tier.Hand };
         if (fam.kind === K.Snow) return { hardness: 0.1, tool: ToolType.Shovel, required: Tier.Hand };
         if (fam.kind === K.Carpet) return { hardness: 0.1, tool: ToolType.None, required: Tier.Hand };
@@ -440,13 +491,18 @@ export function drops(block, held, rnd) {
     case B.PropBarrier: return [[B.OakLog, 3]];   // dead wood yields logs
     case B.OakLeaves: case B.JungleLeaves: return rnd < 0.06 ? [[I.Apple, 1]] : rnd < 0.14 ? [[I.Stick, 1]] : [];
     case B.BirchLeaves: case B.SpruceLeaves: return rnd < 0.1 ? [[I.Stick, 1]] : [];
-    case B.TallGrass: return rnd < 0.12 ? [[I.Berries, 1]] : [];
+    case B.TallGrass: return rnd < 0.12 ? [[I.Berries, 1]] : rnd < 0.25 ? [[I.WheatSeeds, 1]] : [];
     case B.DeadBush: return rnd < 0.5 ? [[I.Stick, 1]] : [];
     default: {
       const fam = famOf(block);
       if (fam) {
         const st = BLOCKS[block].model.state;
         if (fam.kind === K.WallTorch) return [[B.Torch, 1]];
+        if (fam.kind === K.Wire) return [[I.Redstone, 1]];
+        if (fam.kind === K.Head) return [];
+        if (fam.kind === K.Piston) return [[fam.first, 1]];
+        if (fam.kind === K.Bed) return st & 1 ? [] : [[fam.first, 1]];
+        if (fam.kind === K.Crop) return st === 7 ? [[I.Wheat, 1], [I.WheatSeeds, 1 + Math.floor(rnd * 3)]] : [[I.WheatSeeds, 1]];
         if (fam.kind === K.Slab && st === 2) return [[fam.first, 2]];
         if ((fam.kind === K.Door || fam.kind === K.Tall) && (st & 1)) return [];
         if (fam.kind === K.Tall && BLOCKS[block].flags & F.Replaceable) return [];
@@ -464,6 +520,8 @@ export function drops(block, held, rnd) {
           return out ? [[out, n]] : [];
         }
         if (e.key === 'deepslate') return [[C.cobbled_deepslate, 1]];
+        if (e.key === 'lit_furnace') return [[C.furnace, 1]];
+        if (e.key === 'lit_redstone_lamp') return [[C.redstone_lamp, 1]];
       }
       return ITEMS[block] ? [[block, 1]] : [];
     }
@@ -473,10 +531,42 @@ export function drops(block, held, rnd) {
 // ---------------------------------------------------------------- recipes (Unity Recipes, shapeless)
 
 export const RECIPES = [];
-const recipe = (out, count, inputs) => RECIPES.push({ out, count, inputs, name: itemName(out) });
-for (const log of [B.OakLog, B.BirchLog, B.SpruceLog, B.JungleLog]) recipe(B.Planks, 4, [[log, 1]]);
-recipe(I.Stick, 4, [[B.Planks, 2]]);
-recipe(B.Torch, 4, [[I.Coal, 1], [I.Stick, 1]]);
+/** Ingredient groups: a recipe input may name one ('planks') and take any of its members. */
+export const GROUPS = {
+  planks: [B.Planks, ...['spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak', 'bamboo', 'crimson', 'warped'].map((w) => C[`${w}_planks`]).filter(Boolean)],
+  logs: [B.OakLog, B.BirchLog, B.SpruceLog, B.JungleLog, B.CrimsonStem, B.WarpedStem, ...['acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak'].map((w) => C[`${w}_log`]).filter(Boolean)],
+  wool: ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].map((c) => C[`${c}_wool`]).filter(Boolean),
+  stone: [B.Cobblestone, C.cobbled_deepslate, B.Blackstone].filter(Boolean),
+  coal: [I.Coal, I.Charcoal],
+};
+export const GROUP_NAMES = { planks: 'Any Planks', logs: 'Any Logs', wool: 'Any Wool', stone: 'Cobblestone', coal: 'Coal' };
+export const groupMembers = (item) => (typeof item === 'string' ? GROUPS[item] || [] : [item]);
+const recipe = (out, count, inputs) => {
+  const n = inputs.reduce((a, [, k]) => a + k, 0);
+  RECIPES.push({ out, count, inputs, name: itemName(out), table: n > 4 });    // up to four items fit the 2x2 grid of the inventory
+};
+recipe(B.Planks, 4, [[B.OakLog, 1]]);
+for (const [log, pl] of [[B.BirchLog, 'birch'], [B.SpruceLog, 'spruce'], [B.JungleLog, 'jungle'], [B.CrimsonStem, 'crimson'], [B.WarpedStem, 'warped']]) recipe(C[`${pl}_planks`] || B.Planks, 4, [[log, 1]]);
+recipe(I.Stick, 4, [['planks', 2]]);
+recipe(B.Torch, 4, [['coal', 1], [I.Stick, 1]]);
+if (C.crafting_table) recipe(C.crafting_table, 1, [['planks', 4]]);
+if (C.furnace) recipe(C.furnace, 1, [['stone', 8]]);
+if (C.chest) recipe(C.chest, 1, [['planks', 8]]);
+if (C.barrel) recipe(C.barrel, 1, [['planks', 6], [I.Stick, 2]]);
+if (FAM.red_bed) recipe(FAM.red_bed.first, 1, [['wool', 3], ['planks', 3]]);
+recipe(I.Bread, 1, [[I.Wheat, 3]]);
+if (C.hay_block) recipe(C.hay_block, 1, [[I.Wheat, 9]]);
+recipe(I.IronIngot, 9, [[C.iron_block, 1]]);
+recipe(I.GoldIngot, 1, [[I.GoldNugget, 9]]);
+// redstone
+if (FAM.redstone_torch) recipe(FAM.redstone_torch.first, 1, [[I.Redstone, 1], [I.Stick, 1]]);
+if (FAM.lever) recipe(FAM.lever.first, 1, [[I.Stick, 1], ['stone', 1]]);
+if (FAM.repeater) recipe(FAM.repeater.first, 1, [[FAM.redstone_torch.first, 2], [I.Redstone, 1], [B.Stone, 3]]);
+if (C.redstone_lamp) recipe(C.redstone_lamp, 1, [[I.Redstone, 4], [B.Glowstone, 1]]);
+if (FAM.piston) recipe(FAM.piston.first, 1, [['planks', 3], ['stone', 4], [I.IronIngot, 1], [I.Redstone, 1]]);
+if (FAM.sticky_piston && C.slime_block) recipe(FAM.sticky_piston.first, 1, [[FAM.piston.first, 1], [C.slime_block, 1]]);
+if (C.tnt) recipe(C.tnt, 1, [[I.Gunpowder, 5], [B.Sand, 4]]);
+if (C.note_block) recipe(C.note_block, 1, [['planks', 8], [I.Redstone, 1]]);
 recipe(B.Sandstone, 1, [[B.Sand, 4]]);
 recipe(B.Bricks, 1, [[B.Cobblestone, 2], [B.Sand, 2]]);
 recipe(I.FlintAndSteel, 1, [[I.IronChunk, 1], [I.Flint, 1]]);
@@ -487,14 +577,13 @@ recipe(B.NetherBricks, 1, [[B.Netherrack, 4]]);
 recipe(B.EndStoneBricks, 4, [[B.EndStone, 4]]);
 recipe(B.Planks, 4, [[B.CrimsonStem, 1]]);
 for (const w of ['acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak']) if (C[`${w}_log`] && C[`${w}_planks`]) recipe(C[`${w}_planks`], 4, [[C[`${w}_log`], 1]]);
-for (const [block, item] of [['iron_block', I.IronChunk], ['gold_block', I.GoldChunk], ['diamond_block', I.Diamond], ['emerald_block', I.Emerald],
+for (const [block, item] of [['iron_block', I.IronIngot], ['gold_block', I.GoldIngot], ['copper_block', I.CopperIngot], ['raw_iron_block', I.IronChunk], ['raw_gold_block', I.GoldChunk], ['diamond_block', I.Diamond], ['emerald_block', I.Emerald],
   ['lapis_block', I.LapisLazuli], ['redstone_block', I.Redstone], ['coal_block', I.Coal], ['raw_copper_block', I.RawCopper]]) if (C[block]) recipe(C[block], 1, [[item, 9]]);
-if (C.glass) recipe(C.glass, 1, [[B.Sand, 1], [I.Coal, 1]]);
+
 if (C.polished_granite) recipe(C.polished_granite, 4, [[C.granite, 4]]);
 if (C.polished_diorite) recipe(C.polished_diorite, 4, [[C.diorite, 4]]);
 if (C.polished_andesite) recipe(C.polished_andesite, 4, [[C.andesite, 4]]);
-if (C.torch) recipe(B.Torch, 4, [[I.Coal, 1], [I.Stick, 1]]);
-recipe(B.Planks, 4, [[B.WarpedStem, 1]]);
+
 for (const f of FAMS) {
   const m = f.mat;
   switch (f.kind) {
@@ -512,22 +601,50 @@ for (const f of FAMS) {
 const woodOf = (key) => { const w = key.replace(/_(door|trapdoor)$/, ''); return w === 'oak' ? B.Planks : C[`${w}_planks`]; };
 for (const f of FAMS) {
   if (f.kind === K.Door || f.kind === K.Trapdoor) {
-    const wood = woodOf(f.key), metal = f.key.startsWith('iron') ? I.IronChunk : f.key.includes('copper') ? I.RawCopper : 0;
+    const wood = woodOf(f.key), metal = f.key.startsWith('iron') ? I.IronIngot : f.key.includes('copper') ? I.CopperIngot : 0;
     const m = wood || metal;
     if (m) recipe(f.first, f.kind === K.Door ? 3 : 2, [[m, f.kind === K.Door ? 6 : metal ? 4 : 6]]);
   }
   if (f.key === 'glass_pane' && C.glass) recipe(f.first, 16, [[C.glass, 6]]);
   if (f.key.endsWith('stained_glass_pane') && C[f.key.replace('_pane', '')]) recipe(f.first, 16, [[C[f.key.replace('_pane', '')], 6]]);
-  if (f.key === 'iron_bars') recipe(f.first, 16, [[I.IronChunk, 6]]);
+  if (f.key === 'iron_bars') recipe(f.first, 16, [[I.IronIngot, 6]]);
   if (f.key === 'ladder') recipe(f.first, 3, [[I.Stick, 7]]);
-  if (f.kind === K.Rail) recipe(f.first, 16, [[I.IronChunk, 6], [I.Stick, 1]]);
+  if (f.kind === K.Rail) recipe(f.first, 16, [[I.IronIngot, 6], [I.Stick, 1]]);
   if (f.key === 'dirt_path') recipe(f.first, 1, [[B.Dirt, 1]]);
   if (f.key === 'farmland') recipe(f.first, 1, [[B.Dirt, 1]]);
 }
-const toolMats = [B.Planks, B.Cobblestone, I.IronChunk, I.Diamond];
+const toolMats = ['planks', 'stone', I.IronIngot, I.Diamond];
 toolMats.forEach((m, t) => {
   recipe(I.WoodenPickaxe + t, 1, [[m, 3], [I.Stick, 2]]);
   recipe(I.WoodenAxe + t, 1, [[m, 3], [I.Stick, 2]]);
   recipe(I.WoodenShovel + t, 1, [[m, 1], [I.Stick, 2]]);
   recipe(I.WoodenSword + t, 1, [[m, 2], [I.Stick, 1]]);
+  recipe(I.WoodenHoe + t, 1, [[m, 2], [I.Stick, 2]]);
+  if (t >= 2 || t === 0) {
+    const mi = t === 0 ? 0 : t === 2 ? 2 : 3, mm = t === 0 ? I.Leather : m;
+    [5, 8, 7, 4].forEach((n, pi) => recipe(I.LeatherHelmet + mi * 4 + pi, 1, [[mm, n]]));
+  }
 });
+
+/** Furnace recipes: input -> [output, count]. */
+export const SMELT = new Map([[I.IronChunk, [I.IronIngot, 1]], [I.GoldChunk, [I.GoldIngot, 1]], [I.RawCopper, [I.CopperIngot, 1]],
+  [I.Beef, [I.CookedBeef, 1]], [I.Porkchop, [I.CookedPorkchop, 1]], [I.Mutton, [I.CookedMutton, 1]], [I.RawChicken, [I.CookedChicken, 1]],
+  [B.Sand, [C.glass, 1]], [C.red_sand, [C.glass, 1]], [B.Cobblestone, [B.Stone, 1]], [B.Stone, [C.smooth_stone, 1]], [C.clay, [C.terracotta, 1]],
+  [C.cobbled_deepslate, [C.deepslate, 1]], [C.wet_sponge, [C.sponge, 1]], [B.Netherrack, [B.NetherBricks, 1]], [B.StoneBricks, [B.CrackedStoneBricks, 1]],
+  [B.IronOre, [I.IronIngot, 1]], [B.GoldOre, [I.GoldIngot, 1]], [B.Cactus, [C.green_concrete_powder, 1]],
+  ...GROUPS.logs.map((l) => [l, [I.Charcoal, 1]])].filter(([a, b]) => a && b[0]));
+/** Furnace fuel: burn time in seconds (one item takes 10 s). */
+export function fuelTime(item) {
+  if (item === I.Coal || item === I.Charcoal) return 80;
+  if (item === I.BlazeRod) return 120;
+  if (item === C.coal_block) return 800;
+  if (GROUPS.planks.includes(item) || GROUPS.logs.includes(item)) return 15;
+  if (item === I.Stick) return 5;
+  if (ITEMS[item] && ITEMS[item].kind === Kind.Tool && ITEMS[item].tier === Tier.Wood) return 10;
+  const f = famOf(item);
+  if (f && f.cat === 'wood') return 15;
+  if (CAT[item] && CAT[item].cat === 'wood') return 15;
+  return 0;
+}
+// golden armour
+[5, 8, 7, 4].forEach((n, pi) => recipe(I.LeatherHelmet + 4 + pi, 1, [[I.GoldIngot, n]]));

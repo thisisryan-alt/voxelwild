@@ -1177,18 +1177,23 @@ in vec2 vUV;
 out vec4 outColor;
 const float THICK = 260.0;
 float cphase(float mu, float g) { float g2 = g * g; return (1.0 - g2) / (4.0 * PI * pow(max(1.0 + g2 - 2.0 * g * mu, 1e-4), 1.5)); }
-float cloudDensity3(vec3 p) {
+float cloudDensity3(vec3 p, float lod) {
   float h = (p.y - uCloud.z) / THICK;
   if (h < 0.0 || h > 1.0) return 0.0;
   vec2 uv = (p.xz + uCloudOff.xy) * uCloud.y;
-  float base = texture(uCloudTex, uv).r * 0.72 + texture(uCloudTex, uv * 3.1 + 0.37).g * 0.28;
+  // pseudo-3D noise: two sheared layers blended over the height, so the volume is not a 2D pattern pulled upward
+  vec2 sh = vec2(0.043, 0.027) * h;
+  float n1 = textureLod(uCloudTex, uv + sh, lod).r, n2 = textureLod(uCloudTex, uv * 1.37 + vec2(0.41, 0.23) - sh, lod).r;
+  float base = mix(n1, n2, smoothstep(0.1, 0.9, h) * 0.45) * 0.72 + textureLod(uCloudTex, uv * 3.1 + 0.37 + sh * 2.0, lod).g * 0.28;
   // cumulus: flat bottoms, rounded, eroded tops
   float shape = smoothstep(0.0, 0.12, h) * (1.0 - smoothstep(0.35 + base * 0.55, 1.0, h));
   float cov = uCloud.x;
   float d = clamp((base - (1.0 - cov)) * 3.2, 0.0, 1.0) * shape;
   if (d <= 0.0) return 0.0;
-  float detail = texture(uCloudTex, uv * 11.0 + vec2(h * 0.7, 0.13)).b;
-  return clamp(d - detail * 0.35 * (1.0 - h * 0.5), 0.0, 1.0) * 0.035;
+  float h3 = h * 3.0, fh = fract(h3);
+  vec2 du = uv * 11.0 + vec2(0.13, 0.29) * floor(h3);
+  float detail = mix(textureLod(uCloudTex, du, lod + 1.0).b, textureLod(uCloudTex, du + vec2(0.13, 0.29), lod + 1.0).b, fh * fh * (3.0 - 2.0 * fh));
+  return clamp(d - detail * (0.3 + 0.25 * h), 0.0, 1.0) * 0.035;
 }
 void main() {
   vec4 wp = uInvViewProj * vec4(vUV * 2.0 - 1.0, 1.0, 1.0);
@@ -1207,11 +1212,12 @@ void main() {
   vec3 acc = vec3(0);
   for (int i = 0; i < N; i++) {
     vec3 p = uCamPos + V * t;
-    float d = cloudDensity3(p);
+    float lod = clamp(log2(t / 1200.0), 0.0, 5.0);
+    float d = cloudDensity3(p, lod);
     if (d > 0.0) {
       // light toward the sun or moon: three steps
       float od = 0.0;
-      for (int j = 1; j <= 3; j++) od += cloudDensity3(p + L * float(j * j) * 22.0) * float(j) * 22.0;
+      for (int j = 1; j <= 3; j++) od += cloudDensity3(p + L * float(j * j) * 22.0, lod + 1.0) * float(j) * 22.0;
       float lightT = exp(-od * 1.2) * (1.0 - exp(-od * 2.4) * 0.5);   // beer + powder
       float h = (p.y - uCloud.z) / THICK;
       vec3 lit = uSunColorC * lightT * phase * 0.55 + uZenith * (0.35 + 0.65 * h) + uFlash * 2.0;

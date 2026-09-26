@@ -8,6 +8,7 @@ pack; blocks whose textures are missing are left out), shape and material class.
 Texture names starting with '@dense:' are sparse leaf sprites layered into a full, tileable leaf face.
 """
 import json
+import re
 import pathlib
 import sys
 import zipfile
@@ -121,7 +122,7 @@ def main():
     for k in ["oak_sapling", "spruce_sapling", "birch_sapling", "jungle_sapling", "acacia_sapling", "dark_oak_sapling", "cherry_sapling",
               "pale_oak_sapling", "mangrove_propagule", "allium", "azure_bluet", "blue_orchid", "cornflower", "orange_tulip", "pink_tulip",
               "red_tulip", "white_tulip", "wither_rose", "torchflower", "fern", "short_dry_grass", "tall_dry_grass", "brown_mushroom",
-              "red_mushroom", "sweet_berry_bush_stage3", "sugar_cane", "cobweb", "wheat_stage7", "carrots_stage3", "potatoes_stage3",
+              "red_mushroom", "sweet_berry_bush_stage3", "sugar_cane", "cobweb", "carrots_stage3", "potatoes_stage3",
               "beetroots_stage3", "nether_sprouts", "hanging_roots", "firefly_bush", "lily_pad", "kelp_plant_static", "seagrass",
               "tumbleweed", "spore_blossom", "open_eyeblossom_flower"]:
         name = {"sweet_berry_bush_stage3": "Sweet Berry Bush", "wheat_stage7": "Wheat", "carrots_stage3": "Carrots", "potatoes_stage3": "Potatoes",
@@ -152,7 +153,10 @@ def main():
     add("tnt", "plant_block", top="tnt_top", side="tnt_side", bottom="tnt_bottom", name="TNT")
     add("note_block", "wood", all="note_block")
     add("jukebox", "wood", top="jukebox_top", side="jukebox_side")
-    add("redstone_lamp", "glass", all="redstone_lamp_on", emission=15)
+    add("redstone_lamp", "glass", all="redstone_lamp")
+    add("lit_redstone_lamp", "glass", all="redstone_lamp_on", emission=15, noitem=True, name="Redstone Lamp")
+    add("chest", "wood", top="chest_top", side="chest_side")
+    add("lit_furnace", "stone", top="furnace_top", side="furnace_front_on", bottom="furnace_top", emission=13, noitem=True, name="Furnace")
     add("barrel", "wood", top="barrel_top", side="barrel_side", bottom="barrel_bottom")
     add("bee_nest", "wood", top="bee_nest_top", side="bee_nest_front", bottom="bee_nest_bottom")
     add("beehive", "wood", top="beehive_end", side="beehive_front")
@@ -207,7 +211,8 @@ def model_families(have, keys):
         if mat and not mat.startswith("B:") and mat not in keys:
             return
         for t in tex or []:
-            if not t.startswith("B:") and t.split(":")[-1] not in have:
+            base = re.sub(r"^(@rot\d+:)+", "", t)
+            if not t.startswith("B:") and not base.startswith("@crop:") and base.split(":")[-1] not in have:
                 return
         out.append(dict(key=key, kind=kind, name=name or title(key), **({"mat": mat} if mat else {}), **({"tex": tex} if tex else {}), **extra))
         for t in tex or []:
@@ -284,6 +289,23 @@ def model_families(have, keys):
         top = "sunflower_front" if k == "sunflower" else f"{k}_top"
         fam(k, "tall", tex=[f"{k}_bottom", top], list="cutout", cat="plant", **({"tint": tint} if tint else {}))
     fam("wall_torch", "walltorch", mat="B:Torch", cat="plant")
+
+    # ---- redstone
+    dust = []
+    for c in ["3c0000", "8a0000", "c81008", "ff3a1a"]:           # power 0, 1-5, 6-10, 11-15
+        dust += [f"@tint:{c}:redstone_dust_dot", f"@tint:{c}:redstone_dust_line0", f"@rot90:@tint:{c}:redstone_dust_line0"]
+    fam("redstone_wire", "wire", tex=dust, list="cutout", cat="plant", noitem=True, name="Redstone Dust")
+    fam("redstone_torch", "rtorch", tex=["redstone_torch", "redstone_torch_off"], list="cutout", cat="plant", emission=7)
+    fam("lever", "lever", tex=["lever", "B:Cobblestone"], list="cutout", cat="plant")
+    rep = [f"@rot{r}:repeater" for r in (0, 90, 180, 270)] + [f"@rot{r}:repeater_on" for r in (0, 90, 180, 270)]
+    fam("repeater", "repeater", tex=rep + ["smooth_stone", "redstone_torch", "redstone_torch_off"], list="cutout", cat="stone", name="Redstone Repeater")
+    fam("piston", "piston", tex=["piston_top", "piston_side", "piston_bottom", "piston_inner"], cat="stone")
+    fam("sticky_piston", "piston", tex=["piston_top_sticky", "piston_side", "piston_bottom", "piston_inner"], cat="stone")
+    fam("piston_head", "head", tex=["piston_top", "piston_top_sticky", "piston_side"], cat="stone", noitem=True, name="Piston Head")
+    # ---- survival
+    beds = [f"@rot{r}:@crop:entity/bed/red:6,6,16,16" for r in (0, 90, 180, 270)] + [f"@rot{r}:@crop:entity/bed/red:6,28,16,16" for r in (0, 90, 180, 270)]
+    fam("red_bed", "bed", tex=beds + ["red_wool", "B:Planks"], cat="wool", name="Bed")
+    fam("wheat", "crop", tex=[f"wheat_stage{k}" for k in range(8)], list="cutout", cat="plant", noitem=True, name="Wheat Crops")
     return out, texinfo
 
 

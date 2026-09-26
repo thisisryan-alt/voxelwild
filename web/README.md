@@ -127,6 +127,22 @@ Rendering: volumetric clouds are ray-marched at quarter resolution (Options > Qu
 occlusion is screen-space at half resolution with a depth-aware blur, and the tone-mapped image goes through FXAA and
 contrast-adaptive sharpening. Shadows use 12 rotated Poisson taps; textures use 16x anisotropy and a slight mip bias.
 
+## Redstone and survival
+
+`src/main/redstone.js` runs circuits at 10 ticks a second over the components the player placed (`meta.redstone`, per
+dimension): dust with power 0..15 (one level lost per block, up and down block edges), redstone torches (inverters,
+one-tick delay), levers, buttons (1 s / 1.5 s pulses), pressure plates (player, mobs, items), repeaters (1..4 ticks,
+right-click to change), redstone blocks, lamps, pistons and sticky pistons (push 12 blocks, pull one), TNT (and chain
+reactions) and doors / trapdoors / gates that follow their power. Strong and weak power follow Minecraft's rules.
+
+Blocks with a screen: the crafting table unlocks every recipe (the inventory alone crafts recipes of up to four items),
+furnaces, smokers and blast furnaces smelt with fuel while their chunk is loaded, chests and barrels hold 27 stacks;
+contents live in `meta.blockData` and spill when the block is broken or blown up. Recipes accept ingredient groups
+(`planks`, `logs`, `wool`, `stone`, `coal`). Survival: raw ores smelt into ingots (iron tools, armour, rails need
+ingots), cooked food, charcoal, hoes and farmland, wheat that grows from seeds (grass drops them), bread, beds that set
+the respawn point and sleep through the night, and leather / gold / iron / diamond armour (Minecraft's defence points,
+worn out by hits). `node test/redstone.mjs` builds test circuits and checks furnaces, crops, beds and armour.
+
 ## Controls
 
 WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·

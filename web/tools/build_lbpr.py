@@ -680,14 +680,34 @@ def main():
     for t, info in catalog.get("texinfo", {}).items():
         if info.get("tint"):
             tints[t] = {"foliage": MC_FOLIAGE, "grass": MC_GRASS}[info["tint"]]
+    def texture_expr(p, t):
+        """'@rotN:x' turns x by N degrees, '@tint:rrggbb:x' multiplies a grey texture, '@crop:path:x,y,w,h' cuts a
+        rectangle (in 64-pixel units) out of any texture (entity textures), otherwise a block texture."""
+        if t.startswith("@rot"):
+            n, rest = t[4:].split(":", 1)
+            return np.ascontiguousarray(np.rot90(texture_expr(p, rest), -int(n) // 90))
+        if t.startswith("@tint:"):
+            c, rest = t[6:].split(":", 1)
+            a = texture_expr(p, rest).copy()
+            g = a[..., :3].mean(axis=2, keepdims=True)
+            rgb = np.array([int(c[i:i + 2], 16) for i in (0, 2, 4)], dtype=np.float32) / 255
+            a[..., :3] = np.clip(g / max(g.max(), 1e-3) * rgb, 0, 1)
+            return a
+        if t.startswith("@crop:"):
+            path, rect = t[6:].rsplit(":", 1)
+            x, y, w, h = [int(v) for v in rect.split(",")]
+            im = Image.open(io.BytesIO(p.raw(T + path + ".png"))).convert("RGBA")
+            k = im.width / 64
+            im = im.crop((round(x * k), round(y * k), round((x + w) * k), round((y + h) * k)))
+            return arr(fit(im))
+        return arr(fit(p.img("block/" + t)))
+
     cat = []
     for t in catalog["textures"]:
         if t.startswith("@dense:"):
             a = dense_leaves(p, "block/" + t[7:], None)
-        elif t.startswith("@rot90:"):
-            a = np.ascontiguousarray(np.rot90(arr(fit(p.img("block/" + t[7:])))))
         else:
-            a = arr(fit(p.img("block/" + t)))
+            a = texture_expr(p, t)
         if t in tints:
             a = tint(a, tints[t])
         if a[..., 3].min() < 0.99:
@@ -707,12 +727,36 @@ def main():
              "Gunpowder": "gunpowder", "String": "string", "GoldNugget": "gold_nugget", "BlazeRod": "blaze_rod", "GhastTear": "ghast_tear",
              "WoodenSword": "wooden_sword", "StoneSword": "stone_sword", "IronSword": "iron_sword", "DiamondSword": "diamond_sword"}
     for tier in ("wooden", "stone", "iron", "diamond"):
-        for tool in ("pickaxe", "axe", "shovel"):
+        for tool in ("pickaxe", "axe", "shovel", "hoe"):
             items[f"{tier.capitalize()}{tool.capitalize()}"] = f"{tier}_{tool}"
-    keys = list(items)
+    items.update({"IronIngot": "iron_ingot", "GoldIngot": "gold_ingot", "CopperIngot": "copper_ingot", "CookedBeef": "cooked_beef",
+                  "CookedPorkchop": "cooked_porkchop", "CookedMutton": "cooked_mutton", "CookedChicken": "cooked_chicken", "Charcoal": "charcoal",
+                  "Bread": "bread", "Wheat": "wheat", "WheatSeeds": "wheat_seeds"})
+    for mi, m in enumerate(["leather", "golden", "iron", "diamond"]):
+        for pi, pc in enumerate(["helmet", "chestplate", "leggings", "boots"]):
+            items[f"{m.capitalize()}{pc.capitalize()}"] = f"{m}_{pc}"
+    # shaped blocks that show as flat items in Minecraft (key 'fam:<family>')
+    for w in ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak", "bamboo", "crimson", "warped",
+              "iron", "copper", "exposed_copper", "weathered_copper", "oxidized_copper"]:
+        items[f"fam:{w}_door"] = f"{w}_door"
+    items.update({"fam:repeater": "repeater", "fam:redstone_torch": "block/redstone_torch", "fam:lever": "block/lever",
+                  "fam:ladder": "block/ladder", "fam:rail": "block/rail", "fam:powered_rail": "block/powered_rail",
+                  "fam:detector_rail": "block/detector_rail", "fam:activator_rail": "block/activator_rail", "fam:red_bed": "red_bed"})
+    good = {}
+    for key, name in items.items():
+        try:
+            good[key] = p.img(name if name.startswith("block/") else "item/" + name)
+        except Exception:
+            print("no item texture", name)
+    for key in list(good):
+        if key.startswith("Leather") and key != "Leather":        # undyed leather armour is brown
+            a = np.asarray(good[key].convert("RGBA"), dtype=np.float32)
+            a[..., :3] *= np.array([0xa0, 0x65, 0x40], dtype=np.float32) / 255 * 1.6
+            good[key] = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGBA")
+    keys = list(good)
     strip = Image.new("RGBA", (64, 64 * len(keys)))
     for k, key in enumerate(keys):
-        im = p.img("item/" + items[key]).resize((64, 64), Image.LANCZOS)
+        im = good[key].resize((64, 64), Image.LANCZOS)
         strip.paste(im, (0, k * 64))
     strip.save(OUT / "items.webp", quality=92, alpha_quality=100, method=6)
 

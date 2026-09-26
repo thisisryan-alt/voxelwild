@@ -348,8 +348,10 @@ export class Mobs {
       if (d > r * (0.7 + this.rng() * 0.3)) continue;
       const bx = Math.floor(x + dx), by = Math.floor(y + dy), bz = Math.floor(z + dz), b = w.getBlock(bx, by, bz);
       if (b <= 0 || isLiquid(b)) continue;
+      if (b === g.redstone.tntId) { g.redstone.prime(bx, by, bz, 0.5 + this.rng()); continue; }     // chain reactions
       const m = mining(b);
       if (m.hardness < 0 || m.hardness >= 50) continue;
+      g.spill(bx, by, bz);
       w.setBlock(bx, by, bz, B.Air);
       if (this.rng() < 0.3) g.spawnBreakParticles([bx, by, bz], b, 4);
     }

@@ -16,7 +16,9 @@ import { readPackZip, convertPack } from './packconv.js';
 import { LAYER_TUNING, LAYER_NAMES, I, BASE_LAYERS, CAT } from '../shared/blocks.js';
 import CATALOG from '../shared/catalog.json';
 import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, isLava, isPortal, Dim, breakSeconds, drops, canHarvest, itemName, layerFor, FAMS, FAM, famOf, isLiquid } from '../shared/blocks.js';
-import { K, facingFromYaw, facingFromFace, opposite } from '../shared/shapes.js';
+import { K, facingFromYaw, facingFromFace, opposite, DIR6 } from '../shared/shapes.js';
+import { Redstone } from './redstone.js';
+import { C as CK, SMELT, fuelTime, ToolType } from '../shared/blocks.js';
 import { strongholds, frameRing } from '../shared/stronghold.js';
 import { END_ARRIVAL, END_GATEWAY, outerGateway } from '../shared/end.js';
 import { netherClimate, nearestFortress } from '../shared/nether.js';
@@ -40,6 +42,8 @@ export class Game {
     this.store = new SaveStore();
     this.settings = null;
     this.keys = new Set();
+    this.redstone = new Redstone(this);
+    this.station = null;        // the block whose screen is open: { kind: 'table' | 'furnace' | 'chest', key, pos }
     this.pressed = new Set();
     this.mouse = { left: false, right: false, leftClicked: false, rightClicked: false };
     this.time = 0;
@@ -133,10 +137,10 @@ export class Game {
       const [albedo, normal, mask] = [albedoP[0], normalP[0], maskP[0]];
       const itemImages = new Map();
       meta.items.forEach((key, k) => {
-        if (I[key] == null) return;
+        if (I[key] == null && !(key.startsWith('fam:') && FAM[key.slice(4)])) return;
         const c = document.createElement('canvas'); c.width = c.height = items.width;
         c.getContext('2d').drawImage(items, 0, k * items.width, items.width, items.width, 0, 0, items.width, items.width);
-        itemImages.set(I[key], c);
+        itemImages.set(key.startsWith('fam:') ? (FAM[key.slice(4)] || {}).first : I[key], c);
       });
       const sounds = {};
       await Promise.all(Object.entries(meta.sounds).map(async ([group, files]) => {
@@ -481,6 +485,16 @@ export class Game {
     this.player.onStep = () => this.audio.step(this.blockUnderFeet());
     this.stats.onDamage = (a) => { this.damageFlash = Math.min(1, this.damageFlash + 0.5 + a * 0.05); this.audio.hurt(); this.emit('hud'); };
     this.stats.onDeath = (cause) => this.die(cause);
+    this.stats.armor = () => this.inventory.defense;
+    this.stats.onArmorHit = () => {
+      const a = this.inventory.armor;
+      for (let i = 0; i < 4; i++) {
+        const s = a[i]; if (!s) continue;
+        s.wear = (s.wear || 0) + 1;
+        if (s.wear >= ITEMS[s.item].durability) { a[i] = null; this.emit('toast', `${ITEMS[s.item].name} broke`); this.audio.break(B.Planks); }
+      }
+      this.inventory.changed();
+    };
     this.inventory.onChange = () => this.emit('inventory');
     if (isNew) {
       if (this.creative) CREATIVE_HOTBAR.forEach((b, i) => { this.inventory.slots[i] = { item: b, count: 64 }; });
@@ -608,6 +622,10 @@ export class Game {
       this.spawnItem(s.item, s.count, [p[0], Math.max(p[1], MIN_Y + 2) + 0.8, p[2]], [(Math.random() - 0.5) * 5, 3 + Math.random() * 2, (Math.random() - 0.5) * 5], s.wear);
       this.inventory.slots[i] = null;
     }
+    this.inventory.armor.forEach((s, i) => {
+      if (s) this.spawnItem(s.item, 1, [p[0], Math.max(p[1], MIN_Y + 2) + 0.8, p[2]], [(Math.random() - 0.5) * 5, 3, (Math.random() - 0.5) * 5], s.wear);
+      this.inventory.armor[i] = null;
+    });
     this.inventory.changed();
     this.deathCause = cause;
     this.state = 'dead';
@@ -765,6 +783,7 @@ export class Game {
       this.interact(dt);
     }
     this.updateEntities(dt);
+    if (!this.meta.menu) { this.redstone.update(dt); this.updateBlocks(dt); }
     this.updateEyes(dt);
     if (!this.meta.menu) this.mobs.update(dt);
 
@@ -850,7 +869,10 @@ export class Game {
       else if (def && def.kind === Kind.Use) this.useItem(def, hit);
       else if (def && def.kind === Kind.Food) {
         if (!this.creative && this.stats.hunger < 20) { this.stats.eat(def.food, def.sat); inv.consumeHeld(); this.audio.eat(); this.swing = 1; this.emit('hud'); }
-      } else if (hit && def && def.kind === Kind.Block) this.place(hit, def.block);
+      } else if (hit && def && def.kind === Kind.Tool && def.tool === ToolType.Hoe) this.till(hit);
+      else if (def && def.kind === Kind.Armor) this.wear();
+      else if (hit && def && def.places) this.place(hit, def.places);
+      else if (hit && def && def.kind === Kind.Block) this.place(hit, def.block);
     }
   }
 
@@ -871,8 +893,25 @@ export class Game {
       }
       this.stats.addExhaustion(0.005);
     }
+    this.spill(x, y, z);
     // the other half of a door or a tall plant goes with it
     const fam = famOf(block);
+    if (fam && fam.kind === K.Bed) {
+      const s = BLOCKS[block].model.state, n = [[1, 0], [-1, 0], [0, 1], [0, -1]][s >> 1], k = s & 1 ? -1 : 1;
+      const ox = x + n[0] * k, oz = z + n[1] * k, o = w.getBlock(ox, y, oz);
+      if (famOf(o) === fam) w.setBlock(ox, y, oz, B.Air);
+      if (survival && s & 1) this.spawnItem(fam.first, 1, [x + 0.5, y + 0.3, z + 0.5], [0, 2, 0]);
+    }
+    if (fam && (fam.kind === K.Piston || fam.kind === K.Head)) {
+      const s = BLOCKS[block].model.state, d = DIR6[s % 6], k = fam.kind === K.Piston ? 1 : -1;
+      const ox = x + d[0] * k, oy = y + d[1] * k, oz = z + d[2] * k, o = w.getBlock(ox, oy, oz), of = famOf(o);
+      if (fam.kind === K.Piston && s >= 6 && of && of.kind === K.Head) w.setBlock(ox, oy, oz, B.Air);
+      if (fam.kind === K.Head && of && of.kind === K.Piston && BLOCKS[o].model.state >= 6) {
+        w.setBlock(ox, oy, oz, B.Air);
+        if (survival) this.spawnItem(of.first, 1, [ox + 0.5, oy + 0.3, oz + 0.5], [0, 2, 0]);
+      }
+    }
+    if (fam && fam.kind === K.Crop && this.meta.crops) delete this.meta.crops[this.bkey(x, y, z)];
     if (fam && (fam.kind === K.Door || fam.kind === K.Tall)) {
       const oy = BLOCKS[block].model.state & 1 ? y - 1 : y + 1, other = w.getBlock(x, oy, z);
       if (other > 0 && famOf(other) === fam) { w.setBlock(x, oy, z, B.Air); this.spawnBreakParticles([x, oy, z], other, 10); }
@@ -889,6 +928,120 @@ export class Game {
     }
   }
 
+  // ---------------------------------------------------------------- blocks with a screen, crops, beds
+
+  /** A chest or furnace that is broken or blown up spills its contents. */
+  spill(x, y, z) {
+    const bd = this.meta.blockData && this.meta.blockData[this.bkey(x, y, z)];
+    if (!bd) return;
+    for (const s of bd.slots) if (s) this.spawnItem(s.item, s.count, [x + 0.5, y + 0.5, z + 0.5], [(Math.random() - 0.5) * 3, 3, (Math.random() - 0.5) * 3], s.wear);
+    delete this.meta.blockData[this.bkey(x, y, z)];
+    if (this.station && this.station.key === this.bkey(x, y, z)) this.emit('closeStation');
+  }
+
+  bkey(x, y, z) { return `${this.dim || 0}:${x},${y},${z}`; }
+  /** Stored contents of a chest or furnace at pos (created empty). */
+  blockData(pos, kind) {
+    const m = this.meta, k = this.bkey(...pos);
+    m.blockData = m.blockData || {};
+    if (!m.blockData[k]) m.blockData[k] = kind === 'furnace' ? { kind, slots: [null, null, null], burn: 0, burnMax: 0, cook: 0 } : { kind, slots: new Array(27).fill(null) };
+    return m.blockData[k];
+  }
+  openStation(st) {
+    if (st.pos) { st.key = this.bkey(...st.pos); st.data = this.blockData(st.pos, st.kind); }
+    this.station = st;
+    this.emit('openStation', st);
+  }
+
+  /** Furnaces smelt (while their chunk is loaded), crops grow. */
+  updateBlocks(dt) {
+    const m = this.meta, w = this.world;
+    m.clock = (m.clock || 0) + dt;
+    this.blockTimer = (this.blockTimer || 0) + dt;
+    if (this.blockTimer < 0.25) return;
+    const step = this.blockTimer; this.blockTimer = 0;
+    const prefix = `${this.dim || 0}:`;
+    for (const [k, d] of Object.entries(m.blockData || {})) {
+      if (d.kind !== 'furnace' || !k.startsWith(prefix)) continue;
+      const [x, y, z] = k.slice(prefix.length).split(',').map(Number), id = w.getBlock(x, y, z);
+      const smoker = id === CK.smoker, blast = id === CK.blast_furnace;
+      if (id !== CK.furnace && id !== CK.lit_furnace && !smoker && !blast) continue;
+      const [inp, fuel, out] = d.slots;
+      let r = inp && SMELT.get(inp.item);
+      if (r && (smoker || blast)) { const food = ITEMS[r[0]] && ITEMS[r[0]].kind === Kind.Food; if (smoker !== food) r = null; }
+      const fits = r && (!out || (out.item === r[0] && out.count + r[1] <= ITEMS[r[0]].stack));
+      if (d.burn <= 0 && fits && fuel && fuelTime(fuel.item) > 0) {
+        d.burn = d.burnMax = fuelTime(fuel.item);
+        fuel.count--; if (fuel.count <= 0) d.slots[1] = null;
+      }
+      if (d.burn > 0) {
+        d.burn -= step;
+        if (fits) {
+          d.cook += step * (smoker || blast ? 2 : 1);
+          if (d.cook >= 10) {
+            d.cook = 0;
+            inp.count--; if (inp.count <= 0) d.slots[0] = null;
+            if (out) out.count += r[1]; else d.slots[2] = { item: r[0], count: r[1] };
+          }
+        } else d.cook = 0;
+      } else d.cook = Math.max(0, d.cook - step * 2);
+      const lit = d.burn > 0;
+      if (!smoker && !blast && lit !== (id === CK.lit_furnace)) w.setBlock(x, y, z, lit ? CK.lit_furnace : CK.furnace);
+      if (this.station && this.station.key === k) this.emit('station');
+    }
+    for (const [k, t] of Object.entries(m.crops || {})) {
+      if (!k.startsWith(prefix)) continue;
+      const [x, y, z] = k.slice(prefix.length).split(',').map(Number), id = w.getBlock(x, y, z), f = famOf(id);
+      if (id < 0) continue;
+      if (!f || f.kind !== K.Crop) { delete m.crops[k]; continue; }
+      const stage = Math.min(7, Math.floor((m.clock - t) / 30));     // about four minutes from seed to wheat
+      if (stage > BLOCKS[id].model.state) w.setBlock(x, y, z, f.first + stage);
+    }
+  }
+
+  /** Right-click with armour: put it on (swapping what was worn into the hand). */
+  wear() {
+    const inv = this.inventory, s = inv.held, def = ITEMS[s.item];
+    const old = inv.armor[def.slot];
+    inv.armor[def.slot] = { ...s, count: 1 };
+    inv.slots[inv.selected] = old;
+    this.audio.place(B.Planks); this.swing = 1;
+    inv.changed(); this.emit('hud');
+  }
+
+  /** A hoe turns grass and dirt into farmland. */
+  till(hit) {
+    const [x, y, z] = hit.hit, b = hit.block, w = this.world;
+    if (![B.Grass, B.Dirt, B.SnowyGrass, B.Moss].includes(b) && b !== FAM.dirt_path.first) return;
+    const above = w.getBlock(x, y + 1, z);
+    if (above !== B.Air && !(BLOCKS[above].flags & F.Replaceable)) return;
+    if (above !== B.Air) w.setBlock(x, y + 1, z, B.Air);
+    w.setBlock(x, y, z, FAM.farmland.first);
+    this.audio.place(B.Dirt); this.swing = 1;
+    if (!this.creative && this.inventory.wearHeld()) this.emit('toast', 'Hoe broke');
+    // tilling tall grass sometimes turns up seeds
+    if (above === B.TallGrass && Math.random() < 0.5) this.spawnItem(I.WheatSeeds, 1, [x + 0.5, y + 1.2, z + 0.5], [0, 2, 0]);
+  }
+
+  /** Beds: set the respawn point; at night (or in a storm) sleep through to the morning. */
+  sleep(pos) {
+    const [x, y, z] = pos;
+    if (this.dim !== Dim.Overworld) { this.emit('toast', 'Beds explode here'); this.mobs.explode(x + 0.5, y + 0.5, z + 0.5, 3, null); return; }
+    this.spawn = [x + 0.5, y + 0.6, z + 0.5];
+    const h = this.tod ? this.tod.hour : 12, night = h < 6 || h > 18.5;
+    if (!night) { this.emit('toast', 'Respawn point set. You can only sleep at night'); return; }
+    const near = this.mobs.list.some((m) => !m.dead && m.def.kind === 'hostile' && Math.hypot(m.body.pos[0] - x, m.body.pos[1] - y, m.body.pos[2] - z) < 8);
+    if (near) { this.emit('toast', 'You may not rest now; there are monsters nearby'); return; }
+    this.sleeping = 1.6;
+    this.emit('toast', 'Sleeping…');
+    setTimeout(() => {
+      if (this.tod) { if (this.tod.hour > 12) this.tod.day++; this.tod.hour = 6.2; }
+      if (this.weather && !this.weather.frozen) this.weather.force(0);
+      this.emit('toast', 'Good morning. Respawn point set');
+      this.save();
+    }, 1500);
+  }
+
   /** Outline boxes of the targeted block (shaped blocks show their real shape). */
   selectionBoxes(t) {
     const d = BLOCKS[t.block];
@@ -902,8 +1055,21 @@ export class Game {
 
   /** Right-click on doors, trapdoors and gates: open or close. Returns true when something toggled. */
   toggle(hit) {
-    const w = this.world, fam = famOf(hit.block);
-    if (!fam || (fam.kind !== K.Door && fam.kind !== K.Trapdoor && fam.kind !== K.Gate)) return false;
+    const w = this.world, fam = famOf(hit.block), [hx, hy, hz] = hit.hit;
+    // blocks with a screen
+    if (hit.block === CK.crafting_table) { this.openStation({ kind: 'table' }); return true; }
+    if (hit.block === CK.furnace || hit.block === CK.lit_furnace) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Furnace' }); return true; }
+    if (hit.block === CK.smoker) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Smoker' }); return true; }
+    if (hit.block === CK.blast_furnace) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Blast Furnace' }); return true; }
+    if (hit.block === CK.chest || hit.block === CK.barrel) { this.openStation({ kind: 'chest', pos: hit.hit, name: hit.block === CK.chest ? 'Chest' : 'Barrel' }); this.audio.place(hit.block); return true; }
+    if (hit.block === CK.note_block) { this.audio.click(); this.spawnEmbers([hx + 0.5, hy + 1.2, hz + 0.5], 3, [0.3, 1, 0.4]); return true; }
+    if (!fam) return false;
+    const st0 = BLOCKS[hit.block].model.state;
+    if (fam.kind === K.Bed) { this.sleep(hit.hit); return true; }
+    if (fam.kind === K.Lever) { w.setBlock(hx, hy, hz, fam.first + (st0 >= 6 ? st0 - 6 : st0 + 6)); this.redstone.track(hx, hy, hz); this.audio.click(); return true; }
+    if (fam.kind === K.Button) { this.redstone.press(hx, hy, hz, hit.block); this.audio.click(); return true; }
+    if (fam.kind === K.Repeater) { w.setBlock(hx, hy, hz, fam.first + ((st0 & ~12) | ((((st0 >> 2) & 3) + 1) & 3) << 2)); this.audio.click(); return true; }
+    if (fam.kind !== K.Door && fam.kind !== K.Trapdoor && fam.kind !== K.Gate) return false;
     const [x, y, z] = hit.hit, st = BLOCKS[hit.block].model.state;
     const flip = fam.kind === K.Gate ? 1 : 2;
     w.setBlock(x, y, z, fam.first + (st ^ flip));
@@ -932,6 +1098,23 @@ export class Game {
         return wall(side) || fam.key === 'vine' && hit.face !== 2 && hit.face !== 3 ? side : -1;
       }
       case K.Rail: return f >= 2 ? 0 : 1;
+      case K.Repeater: return f;
+      case K.Lever: return hit.face === 2 ? 4 : hit.face === 3 ? 5 : opposite(facingFromFace(hit.face));
+      case K.RTorch: {
+        if (hit.face === 2) { const b = w.getBlock(pos[0], pos[1] - 1, pos[2]); return b > 0 && (BLOCKS[b].flags & F.Solid) ? 0 : -1; }
+        if (hit.face === 3) return -1;
+        const side = opposite(facingFromFace(hit.face));
+        return wall(side) ? 2 + side * 2 : -1;
+      }
+      case K.Piston: {
+        const p = this.player.pitch;
+        return p < -0.85 ? 4 : p > 0.85 ? 5 : opposite(f);      // the face points back at the player
+      }
+      case K.Bed: {
+        const n = [[1, 0], [-1, 0], [0, 1], [0, -1]][f], b = w.getBlock(pos[0] + n[0], pos[1], pos[2] + n[1]), fl = w.getBlock(pos[0] + n[0], pos[1] - 1, pos[2] + n[1]);
+        return b >= 0 && (BLOCKS[b].flags & F.Replaceable) && !isLiquid(b) && fl > 0 && (BLOCKS[fl].flags & F.Solid) ? f * 2 : -1;
+      }
+      case K.Crop: return w.getBlock(pos[0], pos[1] - 1, pos[2]) === FAM.farmland.first ? 0 : -1;
       default: return 0;
     }
   }
@@ -969,7 +1152,9 @@ export class Game {
     if (cur < 0 || !(BLOCKS[cur].flags & F.Replaceable)) return;
     if (d.flags & F.NeedsSupport) {
       const below = w.getBlock(x, y - 1, z);
-      if (below < 0 || !(BLOCKS[below].flags & F.Solid) || !(BLOCKS[below].flags & F.Opaque)) return;
+      const farm = FAM.farmland && below === FAM.farmland.first;
+      if (below < 0 || ((!(BLOCKS[below].flags & F.Solid) || !(BLOCKS[below].flags & F.Opaque)) && !farm)) return;
+      if (fam && fam.kind === K.Crop && !farm) return;
       if (isWater(cur)) return;
     }
     let id = block;
@@ -988,6 +1173,9 @@ export class Game {
     }
     if (!w.setBlock(x, y, z, id)) return;
     if (fam && (fam.kind === K.Door || fam.kind === K.Tall)) w.setBlock(x, y + 1, z, id + 1);
+    if (fam && fam.kind === K.Bed) { const n = [[1, 0], [-1, 0], [0, 1], [0, -1]][(id - fam.first) >> 1]; w.setBlock(x + n[0], y, z + n[1], id + 1); }
+    if (fam && fam.kind === K.Crop) this.meta.crops = { ...(this.meta.crops || {}), [this.bkey(x, y, z)]: this.meta.clock || 0 };
+    this.redstone.track(x, y, z);
     this.audio.place(block);
     this.swing = 1;
     if (!this.creative) this.inventory.consumeHeld();
@@ -1143,6 +1331,7 @@ export class Game {
     const inv = this.inventory, w = this.world;
     if (def.id === I.FlintAndSteel) {
       if (!hit) return;
+      if (hit.block === CK.tnt) { this.redstone.prime(...hit.hit); this.swing = 1; if (!this.creative) inv.wearHeld(); return; }
       const [x, y, z] = hit.prev;
       this.swing = 1;
       if (this.dim !== Dim.End && this.lightPortal(x, y, z)) {

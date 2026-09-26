@@ -80,7 +80,7 @@ export class Icons {
     const img = this.itemImages && this.itemImages.get(id);
     if (img) { ctx.imageSmoothingEnabled = true; ctx.drawImage(img, 2, 2, CELL - 4, CELL - 4); return; }
     if (def.kind === Kind.Block) {
-      const b = BLOCKS[def.block];
+      const b = BLOCKS[def.icon ?? def.block];
       if (this.thumbs && (b.shape === Shape.Cube || b.shape === Shape.Cutout)) return this.cube(ctx, b);
       if (this.thumbs && b.shape === Shape.Model) return this.model(ctx, b);
       if (this.thumbs) {
@@ -123,7 +123,7 @@ export class Icons {
   /** Shaped blocks: their boxes drawn in the same isometric view as cubes (flat things as their picture). */
   model(ctx, b) {
     const m = b.model;
-    if ([K.Door, K.Ladder, K.Rail, K.Lily].includes(m.kind)) {
+    if ([K.Door, K.Ladder, K.Rail, K.Lily, K.Lever, K.RTorch].includes(m.kind)) {
       ctx.imageSmoothingEnabled = true;
       if (m.kind === K.Door) { ctx.drawImage(this.thumbs[b.side], 16, 32, 32, 30); ctx.drawImage(this.thumbs[BLOCKS[ITEMS_UPPER(b)].side], 16, 2, 32, 30); }
       else ctx.drawImage(this.thumbs[b.side], 4, 4, 56, 56);

@@ -1,13 +1,13 @@
 // Game rules shared with the Unity build: inventory + crafting (Gameplay.Inventory/Recipes), survival stats
 // (Gameplay.SurvivalStats) and the weather Markov chain with surface wetness / snow (Rendering.WeatherModel).
-import { ITEMS, Kind, RECIPES, B } from '../shared/blocks.js';
+import { ITEMS, Kind, RECIPES, B, groupMembers } from '../shared/blocks.js';
 import { mulberry32 } from '../shared/noise.js';
 
 export const HOTBAR = 9, INV_SIZE = 36;
 export const CREATIVE_HOTBAR = [B.Cobblestone, B.Stone, B.Dirt, B.Planks, B.Bricks, B.OakLog, B.OakLeaves, B.Sandstone, B.Torch];
 
 export class Inventory {
-  constructor() { this.slots = new Array(INV_SIZE).fill(null); this.selected = 0; this.onChange = null; }
+  constructor() { this.slots = new Array(INV_SIZE).fill(null); this.armor = [null, null, null, null]; this.selected = 0; this.onChange = null; }
   changed() { if (this.onChange) this.onChange(); }
   get held() { return this.slots[this.selected]; }
   get heldItem() { const s = this.held; return s ? ITEMS[s.item] : null; }
@@ -30,12 +30,14 @@ export class Inventory {
     this.changed();
     return count;
   }
-  count(item) { let n = 0; for (const s of this.slots) if (s && s.item === item) n += s.count; return n; }
+  /** item: an item id or an ingredient group name ('planks'). */
+  count(item) { const g = groupMembers(item); let n = 0; for (const s of this.slots) if (s && g.includes(s.item)) n += s.count; return n; }
   remove(item, count) {
     let removed = 0;
+    const g = groupMembers(item);
     for (let i = INV_SIZE - 1; i >= 0 && removed < count; i--) {
       const s = this.slots[i];
-      if (!s || s.item !== item) continue;
+      if (!s || !g.includes(s.item)) continue;
       const n = Math.min(count - removed, s.count);
       s.count -= n; removed += n;
       if (s.count <= 0) this.slots[i] = null;
@@ -71,8 +73,14 @@ export class Inventory {
     this.changed();
   }
   clear() { this.slots.fill(null); this.changed(); }
-  toJSON() { return { slots: this.slots, selected: this.selected }; }
-  load(o) { this.slots = (o.slots || []).concat(new Array(INV_SIZE).fill(null)).slice(0, INV_SIZE); this.selected = o.selected || 0; this.changed(); }
+  toJSON() { return { slots: this.slots, selected: this.selected, armor: this.armor }; }
+  load(o) {
+    this.slots = (o.slots || []).concat(new Array(INV_SIZE).fill(null)).slice(0, INV_SIZE); this.selected = o.selected || 0;
+    this.armor = (o.armor || [null, null, null, null]).slice(0, 4);
+    this.changed();
+  }
+  /** Worn armour's defence points (0..20). */
+  get defense() { return (this.armor || []).reduce((a, s) => a + (s && ITEMS[s.item] ? ITEMS[s.item].points : 0), 0); }
 }
 
 export const canCraft = (inv, r) => r.inputs.every(([item, n]) => inv.count(item) >= n);
@@ -102,6 +110,11 @@ export class SurvivalStats {
   eat(food, sat) { this.hunger = Math.min(MAX_HUNGER, this.hunger + food); this.saturation = Math.min(this.hunger, this.saturation + sat); }
   damage(amount, cause) {
     if (this.dead || amount <= 0) return;
+    // armour takes up to 80% of hits from mobs, explosions and fire (not falls, drowning, hunger or the void)
+    if (this.armor && !['fall', 'void', 'starve', 'drown'].includes(cause)) {
+      const def = this.armor();
+      if (def > 0) { amount = amount * (1 - Math.min(20, def) / 25); if (this.onArmorHit) this.onArmorHit(); }
+    }
     this.health = Math.max(0, this.health - amount);
     this.addExhaustion(0.1);
     if (this.onDamage) this.onDamage(amount, cause);

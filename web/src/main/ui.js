@@ -1,6 +1,6 @@
 // Screens and HUD (Unity UI.*): title, new world, loading, HUD, inventory + crafting, creative palette, pause,
 // settings, death. Also owns input: keyboard, mouse with pointer lock (free-look fallback), wheel, touch.
-import { ITEMS, Kind, itemName, RECIPES } from '../shared/blocks.js';
+import { ITEMS, Kind, itemName, RECIPES, SMELT, fuelTime } from '../shared/blocks.js';
 import { canCraft, craft, HOTBAR, INV_SIZE, MAX_AIR } from './gameplay.js';
 import { loadSettings, storeSettings } from './save.js';
 import { PACK_NAMES, listBuiltinPacks } from './respack.js';
@@ -69,6 +69,10 @@ function svgFood(fill) {
   const f = fill === 2 ? 'var(--food)' : fill === 1 ? 'rgba(201,138,75,0.55)' : 'rgba(0,0,0,0.45)';
   return `<svg viewBox="0 0 16 16"><path d="M9.6 2.2c2.6 0 4.2 1.7 4.2 4 0 2.6-2.4 4.4-4.9 4.4-.8 0-1.4-.2-1.9-.5L4.9 12.2a1.4 1.4 0 1 1-1.9-.1 1.4 1.4 0 1 1-.1-1.9L5 8.1c-.3-.5-.5-1.1-.5-1.8 0-2.3 2.2-4.1 5.1-4.1Z" fill="${f}" stroke="#1a0f06" stroke-width="1"/></svg>`;
 }
+function svgArmor(fill) {
+  const f = fill === 2 ? '#dcdcdc' : fill === 1 ? 'url(#halfA)' : 'rgba(0,0,0,0.45)';
+  return `<svg viewBox="0 0 16 16"><defs><linearGradient id="halfA"><stop offset="50%" stop-color="#dcdcdc"/><stop offset="50%" stop-color="rgba(0,0,0,0.45)"/></linearGradient></defs><path d="M3 2.5h3.2L8 4l1.8-1.5H13l.6 3.6-1.4.8V13.5H3.8V6.9L2.4 6.1Z" fill="${f}" stroke="#1a1a1a" stroke-width="1"/></svg>`;
+}
 function svgBubble(on) {
   return `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" fill="${on ? 'rgba(127,182,214,0.55)' : 'rgba(0,0,0,0.25)'}" stroke="${on ? '#cfe8f5' : 'rgba(0,0,0,0.4)'}" stroke-width="1.2"/><circle cx="6" cy="6" r="1.4" fill="${on ? '#eaf6fc' : 'transparent'}"/></svg>`;
 }
@@ -108,6 +112,9 @@ export class UI {
     $('storageNote').textContent = g.store.persistent ? 'saves stay in this browser' : 'saves last until you close the page';
     g.on('state', (s, cause) => this.onState(s, cause));
     g.on('inventory', () => { this.renderHotbar(); if (this.screen === 'inventory') this.renderInventory(); });
+    g.on('openStation', () => { if (this.screen === 'playing') this.openInventory(); });
+    g.on('station', () => { if (this.screen === 'inventory') this.renderStation(); });
+    g.on('closeStation', () => { if (this.screen === 'inventory' && g.station) this.closeInventory(); });
     g.on('hud', () => this.renderStats());
     g.on('heldName', () => this.flashHeldName());
     g.on('toast', (t) => this.toast(t));
@@ -230,6 +237,7 @@ export class UI {
       if (left > 0) { const e = g.player.eye(), f = g.player.forward(); g.spawnItem(this.cursor.item, left, [e[0] + f[0], e[1] - 0.4, e[2] + f[2]], [f[0] * 3, 2, f[2] * 3], this.cursor.wear); }
       this.cursor = null;
     }
+    g.station = null;
     g.state = 'playing';
     this.show('playing');
     this.lock();
@@ -367,7 +375,7 @@ export class UI {
 
   renderControls() {
     const rows = [['W A S D', 'Move'], ['Space', 'Jump · swim up · double-tap to fly (creative)'], ['Ctrl / double-tap W', 'Sprint'], ['Shift', 'Fly down · swim down'],
-      ['Left mouse', 'Mine (hold)'], ['Right mouse', 'Place block · eat'], ['Middle mouse', 'Pick block'], ['1–9 / wheel', 'Choose hotbar slot'], ['E', 'Inventory and crafting'],
+      ['Left mouse', 'Mine (hold)'], ['Right mouse', 'Place block · eat · put on armour'], ['Right mouse on a block', 'Use it: crafting table, furnace, chest, bed, door, lever, button, repeater'], ['Shift + right mouse', 'Place against a usable block'], ['Middle mouse', 'Pick block'], ['1–9 / wheel', 'Choose hotbar slot'], ['E', 'Inventory and crafting'],
       ['Q', 'Drop item (Ctrl+Q: stack)'], ['F', 'Toggle flight (creative)'], ['F3', 'Debug info'], ['Esc', 'Pause']];
     $('controlsList').innerHTML = rows.map(([k, v]) => `<span>${k.split(' / ').map((x) => `<kbd>${x}</kbd>`).join(' ')}</span><span>${v}</span>`).join('');
   }
@@ -603,6 +611,8 @@ export class UI {
       const hk = Math.ceil(st.health), fk = Math.ceil(st.hunger);
       if (hk !== this.lastH) { $('hearts').innerHTML = icons(hk, svgHeart); this.lastH = hk; }
       if (fk !== this.lastF) { $('food').innerHTML = icons(fk, svgFood).split('</svg>').reverse().join('</svg>'); this.lastF = fk; }
+      const ak2 = g.inventory.defense;
+      if (ak2 !== this.lastArmor) { $('armorBar').innerHTML = ak2 > 0 ? icons(ak2, svgArmor) : ''; this.lastArmor = ak2; }
       const showAir = st.air < MAX_AIR - 0.01 || g.player.headInWater;
       const ak = showAir ? Math.ceil(st.air) : -1;
       if (ak !== this.lastA) { let h = ''; if (showAir) for (let i = 0; i < 10; i++) h += svgBubble(i < ak); $('air').innerHTML = h; this.lastA = ak; }
@@ -637,6 +647,18 @@ export class UI {
     for (let i = HOTBAR; i < INV_SIZE; i++) main += slot(i);
     for (let i = 0; i < HOTBAR; i++) hot += slot(i);
     $('invMain').innerHTML = main; $('invHot').innerHTML = hot;
+    const names = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
+    $('invArmor').innerHTML = inv.armor.map((s, i) => `<div class="slot" data-armor="${i}" title="${s ? itemName(s.item) : names[i]}">${this.slotHTML(s, px)}</div>`).join('');
+    for (const el of document.querySelectorAll('#invArmor .slot')) {
+      el.oncontextmenu = (e) => e.preventDefault();
+      el.onmousedown = (e) => {
+        e.preventDefault();
+        const i = +el.dataset.armor;
+        if (e.shiftKey && inv.armor[i] && !this.cursor) { if (!inv.add(inv.armor[i].item, 1, inv.armor[i])) inv.armor[i] = null; inv.changed(); return; }
+        this.arrClick(inv.armor, i, 0, (item) => ITEMS[item] && ITEMS[item].kind === Kind.Armor && ITEMS[item].slot === i);
+        inv.changed(); g.emit('hud');
+      };
+    }
     for (const el of document.querySelectorAll('#inventory .slot[data-slot]')) {
       el.onmousedown = (e) => { e.preventDefault(); this.slotClick(+el.dataset.slot, e.button, e.shiftKey); };
       el.oncontextmenu = (e) => e.preventDefault();
@@ -644,11 +666,17 @@ export class UI {
       el.onmouseleave = () => { this.hoverSlot = null; };
       el.title = inv.slots[+el.dataset.slot] ? itemName(inv.slots[+el.dataset.slot].item) : '';
     }
-    // crafting (survival) or palette (creative)
-    $('sideTitle').textContent = g.creative ? 'All blocks and items' : 'Crafting';
-    $('recipes').hidden = g.creative; $('palette').hidden = !g.creative; $('paletteSearch').hidden = !g.creative;
-    $('sideTip').textContent = g.creative ? 'Click to take a full stack. Drop items back here to delete them.' : 'Shift-click a recipe to craft as many as you can.';
-    if (g.creative) {
+    // a chest or furnace, crafting (survival, or at a table), or the palette (creative)
+    const st = g.station, box = st && (st.kind === 'chest' || st.kind === 'furnace'), crafting = !box && (!g.creative || (st && st.kind === 'table'));
+    $('sideTitle').textContent = box ? st.name : crafting ? (st && st.kind === 'table' ? 'Crafting Table' : 'Crafting') : 'All blocks and items';
+    $('station').hidden = !box;
+    $('recipes').hidden = !crafting; $('recipeSearch').hidden = !crafting;
+    $('palette').hidden = !(g.creative && !st); $('paletteSearch').hidden = !(g.creative && !st);
+    $('sideTip').textContent = box ? 'Shift-click moves stacks between your inventory and the ' + (st.kind === 'furnace' ? 'furnace (ores and food go in, fuel below).' : st.name.toLowerCase() + '.')
+      : crafting ? (st ? 'Shift-click a recipe to craft as many as you can.' : 'Small recipes only. Use a crafting table for the rest. Shift-click crafts as many as you can.')
+        : 'Click to take a full stack. Drop items back here to delete them.';
+    if (box) this.renderStation();
+    else if (!crafting) {
       if (!this.paletteBuilt) {
         this.paletteBuilt = true;
         const ids = Object.keys(ITEMS).map(Number);
@@ -667,16 +695,23 @@ export class UI {
         };
       }
     } else {
-      const rec = $('recipes');
+      const rec = $('recipes'), table = !!(st && st.kind === 'table');
       rec.innerHTML = '';
-      const sorted = RECIPES.map((r, i) => ({ r, i, ok: canCraft(inv, r) })).sort((a, b) => (b.ok - a.ok) || a.i - b.i);
+      const search = $('recipeSearch');
+      if (!search.bound) { search.bound = true; search.onkeydown = (e) => e.stopPropagation(); search.oninput = () => this.renderInventory(); }
+      const q = search.value.trim().toLowerCase();
+      const sorted = RECIPES.map((r, i) => ({ r, i, ok: canCraft(inv, r) && (table || !r.table) }))
+        .filter(({ r }) => (!q || r.name.toLowerCase().includes(q)) && (table || !r.table || q))
+        .sort((a, b) => (b.ok - a.ok) || a.i - b.i).slice(0, q ? 400 : 160);
       for (const { r, ok } of sorted) {
         const b = document.createElement('button');
         b.className = 'recipe';
         b.disabled = !ok;
         const ins = r.inputs.map(([item, n]) => `<span class="${inv.count(item) >= n ? 'have' : 'miss'}">${n}× ${itemName(item)}</span>`).join('');
-        b.innerHTML = `<div class="ico-slot"><div class="ico" style="${g.icons.css(r.out, 32)}"></div></div><div>${r.count > 1 ? r.count + '× ' : ''}${r.name}<small>${ins}</small></div>`;
+        const needs = r.table && !table ? '<span class="miss">needs a crafting table</span>' : '';
+        b.innerHTML = `<div class="ico-slot"><div class="ico" style="${g.icons.css(r.out, 32)}"></div></div><div>${r.count > 1 ? r.count + '× ' : ''}${r.name}<small>${ins}${needs}</small></div>`;
         b.onclick = (e) => {
+          if (r.table && !table) return;
           let n = 0;
           do { if (!craft(inv, r)) break; n++; } while (e.shiftKey && n < 64 && canCraft(inv, r));
           if (n) { g.audio.click(); this.game.emit('toast', `Crafted ${n * r.count}× ${r.name}`); }
@@ -690,6 +725,24 @@ export class UI {
   slotClick(i, button, shift) {
     const g = this.game, inv = g.inventory, s = inv.slots[i];
     g.audio.click();
+    if (shift && !this.cursor && s && g.station && g.station.data) {
+      const d = g.station.data;
+      if (g.station.kind === 'furnace') {
+        const k = SMELT.has(s.item) ? 0 : fuelTime(s.item) > 0 ? 1 : -1;
+        if (k >= 0) { const t = d.slots[k]; if (!t) { d.slots[k] = { ...s }; inv.slots[i] = null; } else if (t.item === s.item) { const n = Math.min(s.count, ITEMS[s.item].stack - t.count); t.count += n; s.count -= n; if (!s.count) inv.slots[i] = null; } }
+      } else {
+        const def = ITEMS[s.item];
+        for (const t of d.slots) if (t && t.item === s.item && def.stack > 1 && t.count < def.stack && s.count > 0) { const n = Math.min(s.count, def.stack - t.count); t.count += n; s.count -= n; }
+        for (let j = 0; j < d.slots.length && s.count > 0; j++) if (!d.slots[j]) { d.slots[j] = { ...s }; s.count = 0; }
+        if (s.count <= 0) inv.slots[i] = null;
+      }
+      inv.changed(); this.renderStation();
+      return;
+    }
+    if (shift && !this.cursor && s && ITEMS[s.item] && ITEMS[s.item].kind === Kind.Armor && !inv.armor[ITEMS[s.item].slot]) {
+      inv.armor[ITEMS[s.item].slot] = s; inv.slots[i] = null; inv.changed(); g.emit('hud');
+      return;
+    }
     if (shift && !this.cursor && s) {
       // move between hotbar and bag
       const range = i < HOTBAR ? [HOTBAR, INV_SIZE] : [0, HOTBAR];
@@ -716,6 +769,61 @@ export class UI {
       const n = Math.min(cur.count, ITEMS[s.item].stack - s.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null;
     } else { inv.slots[i] = cur; this.cursor = s; }
     inv.changed();
+    this.updateCursor();
+  }
+
+  /** The open chest's slots or the furnace (input, fuel, output with progress). */
+  renderStation() {
+    const g = this.game, st = g.station;
+    if (!st || !st.data) return;
+    const d = st.data, px = window.innerWidth <= 720 ? 26 : 34, el = $('station');
+    const slot = (i) => `<div class="slot" data-st="${i}">${this.slotHTML(d.slots[i], px)}</div>`;
+    if (st.kind === 'furnace') {
+      const burn = d.burnMax ? Math.max(0, d.burn / d.burnMax) : 0, cook = Math.min(1, d.cook / 10);
+      el.innerHTML = `<div class="furnace">${slot(0)}<div></div><div></div>
+        <div class="flame"><i style="width:${Math.round(burn * 100)}%"></i></div><div class="arrow"><i style="width:${Math.round(cook * 100)}%"></i></div>${slot(2)}
+        ${slot(1)}<div></div><div></div></div>`;
+    } else el.innerHTML = `<div class="grid9">${d.slots.map((_, i) => slot(i)).join('')}</div>`;
+    for (const s of el.querySelectorAll('.slot[data-st]')) {
+      const i = +s.dataset.st;
+      s.title = d.slots[i] ? itemName(d.slots[i].item) : '';
+      s.oncontextmenu = (e) => e.preventDefault();
+      s.onmousedown = (e) => {
+        e.preventDefault();
+        const inv = g.inventory, it = d.slots[i];
+        if (e.shiftKey && it && !this.cursor) {            // back into the inventory
+          const left = inv.add(it.item, it.count, it);
+          if (left) it.count = left; else d.slots[i] = null;
+          g.audio.click(); this.renderStation(); return;
+        }
+        const accept = st.kind !== 'furnace' ? null : i === 2 ? () => false : i === 1 ? (item) => fuelTime(item) > 0 : null;
+        this.arrClick(d.slots, i, e.button, accept);
+        inv.changed(); this.renderStation();
+      };
+    }
+  }
+
+  /** Click on a slot of any slot array (accept: which items may be put down there). */
+  arrClick(arr, i, button, accept) {
+    const g = this.game, s = arr[i], cur = this.cursor;
+    g.audio.click();
+    if (cur && accept && !accept(cur.item)) {
+      // cannot put down here: pick up / merge into the cursor instead
+      if (s && s.item === cur.item && cur.count + s.count <= ITEMS[s.item].stack) { cur.count += s.count; arr[i] = null; }
+      this.updateCursor();
+      return;
+    }
+    if (button === 2) {
+      if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = { ...s, count: half }; s.count -= half; if (!s.count) arr[i] = null; }
+      else if (cur && (!s || (s.item === cur.item && s.count < ITEMS[s.item].stack))) {
+        if (!s) arr[i] = { ...cur, count: 1 }; else s.count++;
+        cur.count--; if (!cur.count) this.cursor = null;
+      }
+    } else if (!cur) { if (s) { this.cursor = s; arr[i] = null; } }
+    else if (!s) { arr[i] = cur; this.cursor = null; }
+    else if (s.item === cur.item && ITEMS[s.item].stack > 1) {
+      const n = Math.min(cur.count, ITEMS[s.item].stack - s.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null;
+    } else { arr[i] = cur; this.cursor = s; }
     this.updateCursor();
   }
 

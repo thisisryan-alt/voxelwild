@@ -118,6 +118,10 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
 .meter { display: flex; }
 .meter svg { width: 18px; height: 18px; margin-right: -2px; shape-rendering: crispEdges; }
 #air { margin-left: auto; margin-right: 8px; }
+#armorBar { align-self: flex-start; padding-left: 2px; min-height: 0; }
+.armorRow { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+#invArmor { display: flex; gap: 2px; }
+#invArmor .slot { width: 36px; height: 36px; background: var(--slot); cursor: pointer; }
 #hotbar { display: flex; background: rgba(0, 0, 0, 0.35); border: var(--px) solid #000; box-shadow: inset 0 0 0 var(--px) #797979; padding: var(--px); }
 #hotbar .slot { width: 40px; height: 40px; background: rgba(8, 8, 8, 0.35); border: var(--px) solid #797979; border-width: 0 var(--px) 0 0; position: relative; }
 #hotbar .slot:last-child { border-right: 0; }
@@ -150,8 +154,16 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
 .grid9 .slot:hover::before, .palette .slot:hover::before { content: ""; position: absolute; inset: var(--px); background: rgba(255, 255, 255, 0.5); z-index: 2; }
 .gap { height: 8px; }
 .gui .tip { font-size: 14px; color: #555; margin-top: 8px; max-width: 324px; line-height: 1.2; }
-.recipes { display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow: auto; padding-right: 2px; }
-.recipe { display: grid; grid-template-columns: 36px 1fr; gap: 8px; align-items: center; text-align: left; height: auto; padding: 2px; color: var(--dark); text-shadow: none;
+#station { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+#station .grid9 { max-width: 342px; }
+.furnace { display: grid; grid-template-columns: 36px 60px 36px; grid-template-rows: 36px 22px 36px; gap: 4px 10px; align-items: center; padding: 6px 0; }
+.furnace .slot { width: 36px; height: 36px; background: var(--slot); position: relative; cursor: pointer; }
+.furnace .flame, .furnace .arrow { height: 14px; background: #6b6b6b; position: relative; overflow: hidden; }
+.furnace .flame i { position: absolute; left: 0; bottom: 0; top: 0; background: linear-gradient(90deg, #ff9d1a, #ffd23a); }
+.furnace .arrow i { position: absolute; left: 0; top: 0; bottom: 0; background: #fff; }
+#recipeSearch { width: 100%; box-sizing: border-box; }
+.recipes { width: 100%; display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow: auto; padding-right: 2px; }
+.recipe { flex: 0 0 auto; width: 100%; display: grid; grid-template-columns: 36px 1fr; gap: 8px; align-items: center; text-align: left; height: auto; padding: 2px; color: var(--dark); text-shadow: none;
   background: transparent; border: 0; box-shadow: none; white-space: normal; }
 .recipe:hover, .recipe:focus-visible { background: rgba(255, 255, 255, 0.45); color: #000; box-shadow: none; }
 .recipe:disabled { background: transparent; color: #555; box-shadow: none; }
@@ -226,6 +238,7 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
     <div id="clickHint" hidden>Click to look around</div>
     <div id="bottom">
       <div id="heldName"></div>
+      <div id="armorBar" class="meter"></div>
       <div id="stats"><div class="meter" id="hearts"></div><div class="meter" id="air"></div><div class="meter" id="food"></div></div>
       <div id="hotbar"></div>
     </div>
@@ -327,6 +340,7 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
     <div class="gui">
       <div class="col">
         <h3>Inventory</h3>
+        <div class="armorRow"><span>Armour</span><div id="invArmor"></div></div>
         <div class="grid9" id="invMain"></div>
         <div class="gap"></div>
         <div class="grid9" id="invHot"></div>
@@ -334,6 +348,8 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
       </div>
       <div class="col" style="min-width:0">
         <h3 id="sideTitle">Crafting</h3>
+        <div id="station" hidden></div>
+        <input type="text" id="recipeSearch" placeholder="Search recipes..." autocomplete="off" hidden>
         <div class="recipes" id="recipes"></div>
         <input type="text" id="paletteSearch" placeholder="Search blocks and items..." autocomplete="off" hidden>
         <div class="palette" id="palette" hidden></div>

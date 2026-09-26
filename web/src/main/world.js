@@ -68,9 +68,9 @@ export class World {
     const m = BLOCKS[id].model;
     let conn = 0, up = false;
     if (CONNECTING.has(m.kind)) {
-      conn = connections(m.kind, (dx, dz) => {
-        const n = this.getBlock(x + dx, y, z + dz);
-        return n < 0 ? null : { opaque: (BLOCKS[n].flags & F.Opaque) !== 0, model: BLOCKS[n].model };
+      conn = connections(m.kind, (dx, dz, dy = 0) => {
+        const n = this.getBlock(x + dx, y + dy, z + dz);
+        return n < 0 ? null : { id: n, opaque: (BLOCKS[n].flags & F.Opaque) !== 0, model: BLOCKS[n].model };
       });
       up = this.getBlock(x, y + 1, z) > 0;
     }

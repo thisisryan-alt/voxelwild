@@ -344,7 +344,7 @@ export class Mesher {
     const d = BLOCKS[id], m = d.model, region = this.region;
     let conn = 0, up = false;
     if (CONNECTING.has(m.kind)) {
-      conn = connections(m.kind, (dx, dz) => { const n = region[RI(x + dx, y, z + dz)]; return { opaque: OPAQUE[n], model: BLOCKS[n] && BLOCKS[n].model }; });
+      conn = connections(m.kind, (dx, dz, dy = 0) => { const n = region[RI(x + dx, y + dy, z + dz)]; return { id: n, opaque: OPAQUE[n], model: BLOCKS[n] && BLOCKS[n].model }; });
       up = region[RI(x, y + 1, z)] !== 0;
     }
     const own = this.light(x, y, z), clim = this.clim(x, z);
@@ -360,7 +360,7 @@ export class Mesher {
         const sl = Math.max(own[0], nl[0]), bl = Math.max(own[1], nl[1]);
         const cx = c[0] + n[0] * hf[0], cy = c[1] + n[1] * hf[1], cz = c[2] + n[2] * hf[2];
         const tx = t[0] * hf[0], ty = t[1] * hf[1], tz = t[2] * hf[2], ux = b[0] * hf[0], uy = b[1] * hf[1], uz = b[2] * hf[2];
-        const layer = layerFor(d, f);
+        const layer = bx.length > 6 && d.alt ? d.alt[bx[6]] : layerFor(d, f);
         const P = [[cx - tx - ux, cy - ty - uy, cz - tz - uz], [cx - tx + ux, cy - ty + uy, cz - tz + uz], [cx + tx + ux, cy + ty + uy, cz + tz + uz], [cx + tx - ux, cy + ty - uy, cz + tz - uz]];
         let s0 = -1;
         for (const p of P) {
