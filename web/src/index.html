@@ -172,6 +172,7 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
 #deathCause { color: #fff; }
 
 /* settings */
+#paletteSearch { width: 100%; box-sizing: border-box; height: 30px; font: inherit; font-size: 14px; padding: 0 8px; background: #000; color: #fff; border: var(--px) solid #a0a0a0; margin-bottom: 4px; pointer-events: auto; }
 .tabs { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; width: min(760px, 100%); margin-top: 8px; }
 .tabs button { width: auto; min-width: 96px; padding: 0 12px; height: 32px; }
 .tabs button.on { color: var(--yellow); outline: var(--px) solid var(--yellow); }
@@ -334,6 +335,7 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
       <div class="col" style="min-width:0">
         <h3 id="sideTitle">Crafting</h3>
         <div class="recipes" id="recipes"></div>
+        <input type="text" id="paletteSearch" placeholder="Search blocks and items..." autocomplete="off" hidden>
         <div class="palette" id="palette" hidden></div>
         <span class="tip" id="sideTip">Shift-click a recipe to craft as many as you can.</span>
       </div>

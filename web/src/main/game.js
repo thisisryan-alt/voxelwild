@@ -9,7 +9,8 @@ import { GameAudio } from './audio.js';
 import { Icons } from './icons.js';
 import { FarTerrain } from './far.js';
 import { SaveStore, PackStore } from './save.js';
-import { readPackZip, convertPack, decodeLarge, fetchBuiltinPack, square } from './respack.js';
+import { decodeLarge, fetchBuiltinPack, square } from './respack.js';
+import { readPackZip, convertPack } from './packconv.js';
 import { LAYER_TUNING, LAYER_NAMES, I, BASE_LAYERS, CAT } from '../shared/blocks.js';
 import CATALOG from '../shared/catalog.json';
 import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, isLava, isPortal, Dim, breakSeconds, drops, canHarvest, itemName, layerFor } from '../shared/blocks.js';
@@ -185,7 +186,7 @@ export class Game {
     // icons: base layers from the first strip, catalog layers from a sheet of the colour textures
     const cols = 16, sheet = document.createElement('canvas');
     sheet.width = cols * size; sheet.height = Math.ceil(cat.count / cols) * size;
-    const sx = sheet.getContext('2d');
+    const sx = sheet.getContext('2d', { willReadFrequently: true });   // CPU-side: icons read it back layer by layer
     for (let k = 0; k < cat.count; k++) {
       const px = new Uint8ClampedArray(maps.A.buffer, k * L, L).slice();
       for (let p = 3; p < L; p += 4) if (!opts[k].cutout) px[p] = 255;
@@ -207,6 +208,16 @@ export class Game {
       const part = set.decoded[which][Math.floor(t / perPart)];
       return part.subarray((t % perPart) * L, (t % perPart + 1) * L);
     };
+  }
+
+  /** Generated normal / height / material maps in a worker (for textures without PBR maps). */
+  runSurface(data, size, count, opts) {
+    return new Promise((resolve, reject) => {
+      const w = new Worker(this.workerUrl);
+      w.onmessage = (e) => { w.terminate(); resolve(e.data); };
+      w.onerror = (e) => { w.terminate(); reject(new Error(e.message)); };
+      w.postMessage({ type: 'surface', id: 1, size, count, data, opts }, [data.buffer]);
+    });
   }
 
   /** Completes a set with fewer layers than the game has from another set: its layers from there on, plus the variant
@@ -250,7 +261,7 @@ export class Game {
     // thumbnails for the item icons: an opaque copy of the base layers on a sheet (a strip would be too tall for a canvas)
     const cols = 16, sheet = document.createElement('canvas');
     sheet.width = cols * S; sheet.height = Math.ceil(n / cols) * S;
-    const sx = sheet.getContext('2d');
+    const sx = sheet.getContext('2d', { willReadFrequently: true });   // CPU-side: icons read it back layer by layer
     for (let i = 0; i < n; i++) {
       const px = new Uint8ClampedArray(set.raw.albedo.subarray(i * L, (i + 1) * L));
       if (!set.tuning[i].cutout) for (let p = 3; p < L; p += 4) px[p] = 255;
@@ -327,24 +338,33 @@ export class Game {
       for (const w of ['albedo', 'normal', 'mask']) for (let i = 0; i < n; i++) raw[w].set(await set.rawLayer(w, i), i * L);
       this.builtinRaw = raw;
     }
-    const conv = await convertPack(pack, this.builtinRaw, pack.opts || {});
-    const n = LAYER_NAMES.length;
-    this.renderer.setVariants(null);     // a pack has one texture per layer
-    this.renderer.uploadLayersRaw('albedo', conv.albedo, conv.size, n);
-    this.renderer.uploadLayersRaw('normal', conv.normal, conv.size, n);
-    this.renderer.uploadLayersRaw('mask', conv.mask, conv.size, n);
-    this.renderer.setTuning(conv.tuning);
-    // item icons from the pack's colours (opaque copy: heights live in the alpha channel)
-    const flat = new Uint8ClampedArray(conv.albedo);
-    for (let i = 0; i < n; i++) if (!conv.tuning[i].cutout) for (let p = i * conv.size * conv.size * 4 + 3; p < (i + 1) * conv.size * conv.size * 4; p += 4) flat[p] = 255;
-    const c = document.createElement('canvas'); c.width = conv.size; c.height = conv.size * n;
-    c.getContext('2d').putImageData(new ImageData(flat, conv.size, conv.size * n), 0, 0);
-    this.icons = new Icons(await createImageBitmap(c), { tuning: conv.tuning, items: this.builtin.items });
-    this.renderer.uploadAtlas(this.icons.canvas);
+    const conv = await convertPack(pack, this.builtinRaw, pack.opts || {}, { surface: (data, size, count, opts) => this.runSurface(data, size, count, opts) });
+    const n = LAYER_NAMES.length, r = this.renderer;
+    r.uploadLayersRaw('albedo', conv.albedo, conv.size, conv.layers);
+    r.uploadLayersRaw('normal', conv.normal, conv.size, conv.layers);
+    r.uploadLayersRaw('mask', conv.mask, conv.size, conv.layers);
+    r.setTuning(conv.tuning);
+    r.setVariants(conv.variants);
+    r.setCrackTexture(conv.crack || this.builtin.crack);
+    r.setMoonTexture(conv.moon || this.builtin.moon);
+    // item icons: block faces from the converted layers (a sheet: a strip would be too tall), items from the pack
+    const S = conv.size, LB = S * S * 4, cols = 16, sheet = document.createElement('canvas');
+    sheet.width = cols * S; sheet.height = Math.ceil(n / cols) * S;
+    const sx = sheet.getContext('2d', { willReadFrequently: true });   // CPU-side: icons read it back layer by layer
+    for (let i = 0; i < n; i++) {
+      const px = new Uint8ClampedArray(conv.albedo.subarray(i * LB, (i + 1) * LB));
+      if (!conv.tuning[i].cutout) for (let q = 3; q < LB; q += 4) px[q] = 255;
+      sx.putImageData(new ImageData(px, S, S), (i % cols) * S, Math.floor(i / cols) * S);
+    }
+    const items = new Map([...(this.builtin.items || []), ...conv.items]);
+    this.icons = new Icons(sheet, { tuning: conv.tuning, items, thumb: (l) => [sheet, (l % cols) * S, Math.floor(l / cols) * S, S, S] });
+    r.uploadAtlas(this.icons.canvas);
     this.updateFarPalette();
+    this.audio.setSamples({ ...(this.builtin.sounds || {}), ...conv.sounds });
     if (this.packIcon) URL.revokeObjectURL(this.packIcon);
     this.packIcon = pack.icon ? URL.createObjectURL(new Blob([pack.icon], { type: 'image/png' })) : null;
-    this.pack = { name: pack.name, description: pack.description, credit: pack.credit || '', builtin: pack.builtin || null, found: conv.found, size: conv.size, source: conv.source, opts: pack.opts || {} };
+    this.pack = { name: pack.name, description: pack.description, credit: pack.credit || '', builtin: pack.builtin || null, found: conv.found, size: conv.size, source: conv.source,
+      stats: conv.stats, items: conv.items.size, sounds: Object.keys(conv.sounds).length, opts: pack.opts || {} };
     this.emit('inventory'); this.emit('pack', this.pack);
     return this.pack;
   }

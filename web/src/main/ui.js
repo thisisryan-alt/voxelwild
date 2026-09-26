@@ -506,7 +506,11 @@ export class UI {
       const info = await g.loadPackFile(file, this.packOpts());
       this.paletteBuilt = false;
       this.renderHotbar();
-      $('packStatus').textContent = `Using ${info.found.length} of ${Object.keys(PACK_NAMES).length} block textures at ${info.source}×${info.source}` +
+      const st = info.stats || {};
+      $('packStatus').textContent = `Using ${info.found.length} block textures at ${info.source}×${info.source}` +
+        `${st.variantSets ? `, ${st.variantSets} random/connected sets` : ''}${st.animations ? `, ${st.animations} animations` : ''}` +
+        `${info.items ? `, ${info.items} items` : ''}${info.sounds ? `, ${info.sounds} sounds` : ''}` +
+        `${st.generated ? `; ${st.generated} textures got generated relief` : ''}` +
         (info.source > info.size ? ` (shown at ${info.size}×${info.size} to fit GPU memory)` : '') + (info.stored ? '. Kept in this browser.' : '. Storage is blocked here, so load it again next time.');
     } catch (e) {
       console.warn(e);
@@ -634,13 +638,20 @@ export class UI {
     }
     // crafting (survival) or palette (creative)
     $('sideTitle').textContent = g.creative ? 'All blocks and items' : 'Crafting';
-    $('recipes').hidden = g.creative; $('palette').hidden = !g.creative;
+    $('recipes').hidden = g.creative; $('palette').hidden = !g.creative; $('paletteSearch').hidden = !g.creative;
     $('sideTip').textContent = g.creative ? 'Click to take a full stack. Drop items back here to delete them.' : 'Shift-click a recipe to craft as many as you can.';
     if (g.creative) {
       if (!this.paletteBuilt) {
         this.paletteBuilt = true;
         const ids = Object.keys(ITEMS).map(Number);
         $('palette').innerHTML = ids.map((id) => `<div class="slot" data-item="${id}" title="${itemName(id)}"><div class="ico" style="${g.icons.css(id, px)}"></div></div>`).join('');
+        const search = $('paletteSearch');
+        search.oninput = () => {
+          const q = search.value.trim().toLowerCase();
+          for (const el of $('palette').children) el.hidden = !!q && !el.title.toLowerCase().includes(q);
+        };
+        search.onkeydown = (e) => e.stopPropagation();
+        search.oninput();
         for (const el of $('palette').children) el.onmousedown = (e) => {
           e.preventDefault();
           if (this.cursor) { this.cursor = null; this.updateCursor(); return; }
