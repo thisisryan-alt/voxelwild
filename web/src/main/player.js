@@ -1,6 +1,7 @@
 // Port of Player.VoxelBody (swept axis-separated AABB collision) and PlayerController movement: walking, sprinting,
 // jumping, swimming, creative flight (double-tap space or F), fall tracking.
 import { BLOCKS, B, F, isWater, isLava } from '../shared/blocks.js';
+import { K } from '../shared/shapes.js';
 
 const SKIN = 0.001;
 
@@ -14,7 +15,33 @@ export class VoxelBody {
   min() { return [this.pos[0] - this.half, this.pos[1], this.pos[2] - this.half]; }
   max() { return [this.pos[0] + this.half, this.pos[1] + this.height, this.pos[2] + this.half]; }
 
-  move(world, d) {
+  /** step: how high the body may step up onto slabs, stairs and paths when walking into them. Returns the step taken. */
+  move(world, d, step = 0) {
+    const start = [...this.pos], vel = [...this.vel];
+    this.moveOnce(world, d);
+    this.stepped = 0;
+    if (step > 0 && this.hitWall && d[1] <= 0) {
+      const after = [...this.pos], flags = [this.grounded, this.hitCeiling, this.hitWall], vAfter = [...this.vel];
+      this.pos = [...start];
+      const up = this.sweep(world, 1, step);
+      this.pos[1] += up;
+      const ax = this.sweep(world, 0, d[0]); this.pos[0] += ax;
+      const az = this.sweep(world, 2, d[2]); this.pos[2] += az;
+      const down = this.sweep(world, 1, -up + Math.min(d[1], 0));
+      this.pos[1] += down;
+      const gainOld = Math.hypot(after[0] - start[0], after[2] - start[2]), gainNew = Math.hypot(this.pos[0] - start[0], this.pos[2] - start[2]);
+      if (gainNew > gainOld + 1e-3 && down > -up + 1e-4) {
+        this.grounded = true; this.hitCeiling = false; this.hitWall = ax !== d[0] || az !== d[2];
+        this.vel = [ax !== d[0] ? 0 : vel[0], 0, az !== d[2] ? 0 : vel[2]];
+        this.stepped = this.pos[1] - after[1];
+      } else {
+        this.pos = after; [this.grounded, this.hitCeiling, this.hitWall] = flags; this.vel = vAfter;
+      }
+    }
+    return this.stepped;
+  }
+
+  moveOnce(world, d) {
     this.grounded = this.hitCeiling = this.hitWall = false;
     const ay = this.sweep(world, 1, d[1]);
     if (ay !== d[1]) { if (d[1] < 0) this.grounded = true; else this.hitCeiling = true; this.vel[1] = 0; }
@@ -35,26 +62,21 @@ export class VoxelBody {
     return mx[0] > bx + SKIN && mn[0] < bx + 1 - SKIN && mx[1] > by + SKIN && mn[1] < by + 1 - SKIN && mx[2] > bz + SKIN && mn[2] < bz + 1 - SKIN;
   }
 
+  /** How far the box can move along axis (clipped against full blocks and the boxes of shaped blocks). */
   sweep(world, axis, amount) {
     if (amount === 0) return 0;
     const mn = this.min(), mx = this.max();
     const a1 = (axis + 1) % 3, a2 = (axis + 2) % 3;
-    const lo1 = Math.floor(mn[a1] + SKIN), hi1 = Math.floor(mx[a1] - SKIN);
-    const lo2 = Math.floor(mn[a2] + SKIN), hi2 = Math.floor(mx[a2] - SKIN);
-    const p = [0, 0, 0];
-    const anySolid = (c) => {
-      for (let i = lo1; i <= hi1; i++) for (let j = lo2; j <= hi2; j++) {
-        p[axis] = c; p[a1] = i; p[a2] = j;
-        if (world.isSolidAt(p[0], p[1], p[2])) return true;
-      }
-      return false;
-    };
-    if (amount > 0) {
-      const start = Math.ceil(mx[axis] - SKIN), end = Math.floor(mx[axis] + amount);
-      for (let c = start; c <= end; c++) if (anySolid(c)) return Math.max(0, c - mx[axis] - SKIN);
-    } else {
-      const start = Math.floor(mn[axis] + SKIN) - 1, end = Math.floor(mn[axis] + amount);
-      for (let c = start; c >= end; c--) if (anySolid(c)) return Math.min(0, c + 1 - mn[axis] + SKIN);
+    const lo = [mn[0], mn[1], mn[2]], hi = [mx[0], mx[1], mx[2]];
+    if (amount > 0) hi[axis] += amount; else lo[axis] += amount;
+    const boxes = [];
+    for (let y = Math.floor(lo[1] + SKIN); y <= Math.floor(hi[1] - SKIN); y++)
+      for (let z = Math.floor(lo[2] + SKIN); z <= Math.floor(hi[2] - SKIN); z++)
+        for (let x = Math.floor(lo[0] + SKIN); x <= Math.floor(hi[0] - SKIN); x++) world.collisionBoxes(x, y, z, boxes);
+    for (const b of boxes) {
+      if (!(b[3 + a1] > mn[a1] + SKIN && b[a1] < mx[a1] - SKIN && b[3 + a2] > mn[a2] + SKIN && b[a2] < mx[a2] - SKIN)) continue;
+      if (amount > 0) { if (b[axis] >= mx[axis] - SKIN * 0.5) amount = Math.min(amount, Math.max(0, b[axis] - mx[axis] - SKIN)); }
+      else if (b[3 + axis] <= mn[axis] + SKIN * 0.5) amount = Math.max(amount, Math.min(0, b[3 + axis] - mn[axis] + SKIN));
     }
     return amount;
   }
@@ -78,7 +100,7 @@ export class Player {
     this.crouchEye = 0;
   }
 
-  eye() { return [this.body.pos[0], this.body.pos[1] + this.eyeHeight - this.crouchEye, this.body.pos[2]]; }
+  eye() { return [this.body.pos[0], this.body.pos[1] + this.eyeHeight - this.crouchEye - (this.stepLag || 0), this.body.pos[2]]; }
   forward() { const cp = Math.cos(this.pitch); return [-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp]; }
 
   look(dx, dy, sens) {
@@ -112,6 +134,9 @@ export class Player {
     this.headInWater = eyeB >= 0 && isWater(eyeB);
     this.inLava = feet >= 0 && isLava(feet);
     const swimming = this.inWater || this.inLava;
+    // ladders and vines: climb by walking or jumping into them, hold still by sneaking
+    const climbAt = (y) => { const c = world.getBlock(Math.floor(b.pos[0]), Math.floor(y), Math.floor(b.pos[2])); return c > 0 && BLOCKS[c].model && BLOCKS[c].model.kind === K.Ladder; };
+    this.climbing = !this.flying && !swimming && (climbAt(b.pos[1] + 0.1) || climbAt(b.pos[1] + 1.2));
 
     if (this.flying) {
       const sp = this.flySpeed * (input.sprint ? 2 : 1);
@@ -137,12 +162,21 @@ export class Player {
       v[0] += (wx * sp - v[0]) * k; v[2] += (wz * sp - v[2]) * k;
       if (grounded && input.jump && v[1] <= 0.01) { v[1] = Math.sqrt(2 * this.gravity * this.jumpHeight); this.jumps++; }
       v[1] = Math.max(v[1] - this.gravity * dt, -60);
+      if (this.climbing) {
+        if (input.jump || (iz > 0.1 && b.hitWall)) v[1] = 2.4;
+        else if (input.descend) v[1] = Math.max(v[1], 0);
+        else v[1] = Math.max(v[1], -2.2);
+        this.fallStart = NaN;
+      }
     }
     if (!this.canFly) this.flying = false;
     this.sprinting = input.sprint && (ix || iz) && !this.flying;
 
     const before = [b.pos[0], b.pos[2]];
-    b.move(world, [v[0] * dt, v[1] * dt, v[2] * dt]);
+    const canStep = !this.flying && !swimming && b.probeGround(world);
+    const stepped = b.move(world, [v[0] * dt, v[1] * dt, v[2] * dt], canStep ? 0.6 : 0);
+    // the camera eases up a step instead of jumping
+    this.stepLag = Math.max(0, (this.stepLag || 0) + stepped) * Math.exp(-14 * dt);
     const moved = Math.hypot(b.pos[0] - before[0], b.pos[2] - before[1]);
     this.distance += moved;
     if (b.grounded && !this.flying && !swimming) {
@@ -186,13 +220,40 @@ export function raycast(world, origin, dir, maxDist, pick) {
   for (let i = 0; i < 256 && t <= maxDist; i++) {
     const b = world.getBlock(x, y, z);
     if (b < 0) return null;
-    if (pick(b)) return { hit: [x, y, z], prev: [px, py, pz], face, block: b, dist: t };
+    if (pick(b)) {
+      const d = BLOCKS[b];
+      if (!d.model || !world.modelBoxesAt || d.shape !== 9) return { hit: [x, y, z], prev: [px, py, pz], face, block: b, dist: t, point: origin.map((o, k) => o + dir[k] * t) };
+      // shaped blocks: the ray has to meet one of their boxes
+      let best = null;
+      for (const k of world.modelBoxesAt(x, y, z, b, false)) {
+        const r = rayBox(origin, dir, [x + k[0], y + k[1], z + k[2]], [x + k[3], y + k[4], z + k[5]]);
+        if (r && (!best || r.t < best.t)) best = r;
+      }
+      if (best && best.t <= maxDist) {
+        const n = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]][best.face];
+        return { hit: [x, y, z], prev: [x + n[0], y + n[1], z + n[2]], face: best.face, block: b, dist: best.t, point: origin.map((o, k) => o + dir[k] * best.t) };
+      }
+    }
     px = x; py = y; pz = z;
     if (tmx < tmy && tmx < tmz) { x += sx; t = tmx; tmx += tdx; face = sx > 0 ? 1 : 0; }
     else if (tmy < tmz) { y += sy; t = tmy; tmy += tdy; face = sy > 0 ? 3 : 2; }
     else { z += sz; t = tmz; tmz += tdz; face = sz > 0 ? 5 : 4; }
   }
   return null;
+}
+
+/** Ray against an axis-aligned box: { t, face } of the entry face (0 +X 1 -X 2 +Y 3 -Y 4 +Z 5 -Z), or null. */
+function rayBox(o, d, mn, mx) {
+  let t0 = -Infinity, t1 = Infinity, face = -1;
+  for (let a = 0; a < 3; a++) {
+    if (Math.abs(d[a]) < 1e-9) { if (o[a] < mn[a] || o[a] > mx[a]) return null; continue; }
+    let ta = (mn[a] - o[a]) / d[a], tb = (mx[a] - o[a]) / d[a], fa = a * 2 + 1, fb = a * 2;
+    if (ta > tb) { [ta, tb] = [tb, ta]; [fa, fb] = [fb, fa]; }
+    if (ta > t0) { t0 = ta; face = fa; }
+    t1 = Math.min(t1, tb);
+  }
+  if (t0 > t1 || t1 < 0) return null;
+  return { t: Math.max(0, t0), face };
 }
 
 export const targetable = (b) => b !== 0 && !isWater(b) && (BLOCKS[b].flags & F.Breakable || BLOCKS[b].flags & F.Solid);

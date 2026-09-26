@@ -1,4 +1,5 @@
 import CATALOG from './catalog.json';
+import { K, KIND_NAMES, STATES, SOLID_KINDS } from './shapes.js';
 // Blocks, texture layers, items, mining and recipes - mirrors the Unity registry (BlockId, BlockRegistry,
 // ItemRegistry, Mining, Recipes) so both builds play by the same rules.
 
@@ -46,7 +47,7 @@ export const L = Object.fromEntries(LAYER_NAMES.map((n, i) => [n, i]));
 export const NONE = 255;
 
 export const F = { Solid: 1, Opaque: 2, Liquid: 4, Replaceable: 8, Breakable: 16, NeedsSupport: 32 };
-export const Shape = { None: 0, Cube: 1, Cutout: 2, Cross: 3, Torch: 4, Liquid: 5, Portal: 6, EndPortal: 7, Glass: 8 };
+export const Shape = { None: 0, Cube: 1, Cutout: 2, Cross: 3, Torch: 4, Liquid: 5, Portal: 6, EndPortal: 7, Glass: 8, Model: 9 };
 export const Tint = { None: 0, Grass: 1, Foliage: 2, Birch: 3, Spruce: 4 };
 
 const T = F.Solid | F.Opaque | F.Breakable;
@@ -166,6 +167,49 @@ CATALOG.blocks.forEach((e, k) => {
   BLOCKS[id] = d; C[e.key] = id; CAT[id] = e;
 });
 
+// ---------------------------------------------------------------- shaped blocks (catalog.json models, shapes.js): ids after the catalog
+export const MODEL_START = CATALOG_START + CATALOG.blocks.length;
+export const FAMS = [];                    // family: { key, name, kind (K), first id, states, mat (full block id), list, cat }
+export const FAM = {};                     // family key -> family
+export const MODEL_LIST = { opaque: 0, cutout: 1, glow: 2 };
+{
+  let next = MODEL_START;
+  const texLayer = (t) => (t.startsWith('B:') ? BLOCKS[B[t.slice(2)]].side : L['c:' + t]);
+  for (const e of CATALOG.models) {
+    const kind = KIND_NAMES[e.kind];
+    const mat = e.mat ? (e.mat.startsWith('B:') ? B[e.mat.slice(2)] : C[e.mat]) : 0;
+    const md = mat ? BLOCKS[mat] : null;
+    const fam = { key: e.key, name: e.name, kind, first: next, states: STATES[kind], mat, cat: e.cat, index: FAMS.length };
+    fam.list = MODEL_LIST[e.list || (md && md.shape === Shape.Glass ? 'glow' : md && md.shape === Shape.Cutout ? 'cutout' : 'opaque')];
+    const tint = TINTS[e.tint] || (md ? md.tint : 0);
+    const needsFloor = kind === K.Plate || kind === K.Rail || kind === K.Carpet || kind === K.Tall || kind === K.Snow;
+    for (let st = 0; st < fam.states; st++) {
+      const id = next++;
+      let top = md ? md.top : NONE, side = md ? md.side : NONE, bottom = md ? md.bottom : NONE;
+      const tex = e.tex || [];
+      if (kind === K.Door) top = side = bottom = texLayer(tex[st & 1]);
+      else if (kind === K.Tall) top = side = bottom = texLayer(tex[st]);
+      else if (kind === K.Rail) top = side = bottom = texLayer(tex[st]);
+      else if (kind === K.Path) { top = texLayer(tex[0]); side = texLayer(tex[1]); bottom = texLayer(tex[2]); }
+      else if (tex.length) top = side = bottom = texLayer(tex[0]);
+      if (kind === K.Stairs || kind === K.Slab || kind === K.Wall || kind === K.Fence || kind === K.Gate) {
+        // logs and pillars cut into shapes keep their side texture all round
+        if (md && md.top !== md.side && md.bottom !== md.side && kind !== K.Slab && kind !== K.Stairs) top = bottom = side;
+      }
+      let flags = F.Breakable | (SOLID_KINDS.has(kind) ? F.Solid : 0) | (needsFloor ? F.NeedsSupport : 0);
+      if (kind === K.Tall && tint) flags |= F.Replaceable;
+      const d = { name: e.name, flags, shape: Shape.Model, top, side, bottom, overlay: NONE, emission: e.emission || (md ? md.emission : 0),
+        opacity: 0, tint, wind: kind === K.Tall ? 200 : 0, model: { kind, state: st, fam: fam.index } };
+      if (kind === K.Slab && st === 2) Object.assign(d, { shape: md && md.shape !== Shape.Model ? md.shape : Shape.Cube, flags: md ? md.flags : T, opacity: md ? md.opacity : 15 });
+      if (kind === K.Tall) d.shape = Shape.Cross;
+      BLOCKS[id] = d;
+    }
+    FAMS.push(fam); FAM[e.key] = fam;
+  }
+}
+export const modelOf = (id) => (BLOCKS[id] ? BLOCKS[id].model : null);
+export const famOf = (id) => { const m = BLOCKS[id] && BLOCKS[id].model; return m ? FAMS[m.fam] : null; };
+
 export const has = (id, f) => (BLOCKS[id].flags & f) !== 0;
 export const isOpaque = (id) => (BLOCKS[id].flags & F.Opaque) !== 0;
 export const isSolid = (id) => (BLOCKS[id].flags & F.Solid) !== 0;
@@ -223,6 +267,13 @@ export const LAYER_TUNING = LAYER_NAMES.map((n) => {
       if (e.cat === 'ice') { t.rough = 0.15; t.spec = 1.5; }
       if (e.cat === 'wool') { t.rough = 1.3; t.spec = 0.4; t.pom = 0.008; }
     }
+    const ti = CATALOG.texinfo && CATALOG.texinfo[n.slice(2)];
+    if (ti) {
+      if (ti.cutout) { t.cutout = 1; t.pom = 0; }
+      if (ti.tint) t.biome = 1;
+      if (ti.cat === 'plant' || ti.cat === 'leaves') { t.trans = 0.6; t.macro = 0.1; }
+      if (ti.cat === 'metal' || ti.cat === 'glass') { t.rough = 0.4; t.spec = 1.4; }
+    }
   }
   if (n === 'LeavesExt' || n === 'NeedlesExt') {
     const base = n === 'LeavesExt' ? 'Leaves' : 'Needles';
@@ -257,6 +308,7 @@ const placeable = [B.Stone, B.Dirt, B.Grass, B.Sand, B.Gravel, B.Snow, B.Cobbles
   B.EndPortalFrame, B.ChorusPlant, B.ChorusFlower, B.StoneBricks, B.MossyStoneBricks, B.CrackedStoneBricks];
 for (const b of placeable) ITEMS[b] = { id: b, name: BLOCKS[b].name, kind: Kind.Block, stack: 64, block: b };
 for (const k in C) { const b = C[k]; if (CAT[b].hard !== 'unbreakable') ITEMS[b] = { id: b, name: BLOCKS[b].name, kind: Kind.Block, stack: 64, block: b }; }
+for (const f of FAMS) if (f.kind !== K.WallTorch) ITEMS[f.first] = { id: f.first, name: f.name, kind: Kind.Block, stack: 64, block: f.first };
 const mat = (id, name) => (ITEMS[id] = { id, name, kind: Kind.Material, stack: 64 });
 const food = (id, name, f, sat) => (ITEMS[id] = { id, name, kind: Kind.Food, stack: 64, food: f, sat });
 mat(I.Stick, 'Stick'); mat(I.Coal, 'Coal'); mat(I.IronChunk, 'Iron Chunk'); mat(I.GoldChunk, 'Gold Chunk'); mat(I.Diamond, 'Diamond');
@@ -315,11 +367,25 @@ export function mining(block) {
     case B.ChorusPlant: case B.ChorusFlower: return { hardness: 0.4, tool: ToolType.Axe, required: Tier.Hand };
     case B.NetherWartBlock: case B.WarpedWartBlock: case B.Shroomlight: return { hardness: 1, tool: ToolType.None, required: Tier.Hand };
     default: {
+      const fam = famOf(block);
+      if (fam) {
+        if (fam.kind === K.Tall || fam.kind === K.Lily || fam.kind === K.WallTorch) return { hardness: 0, tool: ToolType.None, required: Tier.Hand };
+        if (fam.kind === K.Ladder) return { hardness: 0.4, tool: ToolType.Axe, required: Tier.Hand };
+        if (fam.kind === K.Snow) return { hardness: 0.1, tool: ToolType.Shovel, required: Tier.Hand };
+        if (fam.kind === K.Carpet) return { hardness: 0.1, tool: ToolType.None, required: Tier.Hand };
+        if (fam.mat) { const m = mining(fam.mat); return m.hardness < 0 ? { ...m, hardness: 2 } : m; }
+        return catMining(fam.cat);
+      }
       const e = CAT[block];
       if (!e) return { hardness: 0, tool: ToolType.None, required: Tier.Hand };
       if (e.hard === 'unbreakable') return { hardness: -1, tool: ToolType.None, required: Tier.Hand };
       if (e.hard === 'obsidian') return { hardness: 50, tool: ToolType.Pickaxe, required: Tier.Diamond };
-      switch (e.cat) {
+      return catMining(e.cat, e);
+    }
+  }
+}
+function catMining(cat, e = {}) {
+      switch (cat) {
         case 'stone': return { hardness: 1.5, tool: ToolType.Pickaxe, required: Tier.Wood };
         case 'metal': return { hardness: 5, tool: ToolType.Pickaxe, required: Tier.Stone };
         case 'ore': return { hardness: 3, tool: ToolType.Pickaxe, required: [Tier.Hand, Tier.Wood, Tier.Stone, Tier.Iron][e.tier || 1] };
@@ -332,11 +398,9 @@ export function mining(block) {
         case 'plant_block': return { hardness: 0.5, tool: ToolType.None, required: Tier.Hand };
         default: return { hardness: 0, tool: ToolType.None, required: Tier.Hand };
       }
-    }
-  }
 }
 // footstep / breaking sound family for the catalog
-export const catSurface = (block) => (CAT[block] ? CAT[block].cat : null);
+export const catSurface = (block) => (CAT[block] ? CAT[block].cat : famOf(block) ? famOf(block).cat : null);
 const toolSpeed = (tier) => [1, 2, 4, 6, 8][tier];
 export function canHarvest(block, held) {
   const m = mining(block);
@@ -379,6 +443,16 @@ export function drops(block, held, rnd) {
     case B.TallGrass: return rnd < 0.12 ? [[I.Berries, 1]] : [];
     case B.DeadBush: return rnd < 0.5 ? [[I.Stick, 1]] : [];
     default: {
+      const fam = famOf(block);
+      if (fam) {
+        const st = BLOCKS[block].model.state;
+        if (fam.kind === K.WallTorch) return [[B.Torch, 1]];
+        if (fam.kind === K.Slab && st === 2) return [[fam.first, 2]];
+        if ((fam.kind === K.Door || fam.kind === K.Tall) && (st & 1)) return [];
+        if (fam.kind === K.Tall && BLOCKS[block].flags & F.Replaceable) return [];
+        if (fam.kind === K.Snow) return [[fam.first, st + 1]];
+        return [[fam.first, 1]];
+      }
       const e = CAT[block];
       if (e) {
         if (e.cat === 'glass' && e.key !== 'sea_lantern' && !e.key.endsWith('froglight') && e.key !== 'redstone_lamp') return [];
@@ -421,6 +495,35 @@ if (C.polished_diorite) recipe(C.polished_diorite, 4, [[C.diorite, 4]]);
 if (C.polished_andesite) recipe(C.polished_andesite, 4, [[C.andesite, 4]]);
 if (C.torch) recipe(B.Torch, 4, [[I.Coal, 1], [I.Stick, 1]]);
 recipe(B.Planks, 4, [[B.WarpedStem, 1]]);
+for (const f of FAMS) {
+  const m = f.mat;
+  switch (f.kind) {
+    case K.Stairs: recipe(f.first, 4, [[m, 6]]); break;
+    case K.Slab: recipe(f.first, 6, [[m, 3]]); break;
+    case K.Wall: recipe(f.first, 6, [[m, 6]]); break;
+    case K.Fence: recipe(f.first, 3, [[m, 4], [I.Stick, 2]]); break;
+    case K.Gate: recipe(f.first, 1, [[m, 2], [I.Stick, 4]]); break;
+    case K.Carpet: recipe(f.first, 3, [[m, 2]]); break;
+    case K.Plate: recipe(f.first, 1, [[m, 2]]); break;
+    case K.Button: recipe(f.first, 1, [[m, 1]]); break;
+    case K.Snow: recipe(f.first, 6, [[m, 3]]); break;
+  }
+}
+const woodOf = (key) => { const w = key.replace(/_(door|trapdoor)$/, ''); return w === 'oak' ? B.Planks : C[`${w}_planks`]; };
+for (const f of FAMS) {
+  if (f.kind === K.Door || f.kind === K.Trapdoor) {
+    const wood = woodOf(f.key), metal = f.key.startsWith('iron') ? I.IronChunk : f.key.includes('copper') ? I.RawCopper : 0;
+    const m = wood || metal;
+    if (m) recipe(f.first, f.kind === K.Door ? 3 : 2, [[m, f.kind === K.Door ? 6 : metal ? 4 : 6]]);
+  }
+  if (f.key === 'glass_pane' && C.glass) recipe(f.first, 16, [[C.glass, 6]]);
+  if (f.key.endsWith('stained_glass_pane') && C[f.key.replace('_pane', '')]) recipe(f.first, 16, [[C[f.key.replace('_pane', '')], 6]]);
+  if (f.key === 'iron_bars') recipe(f.first, 16, [[I.IronChunk, 6]]);
+  if (f.key === 'ladder') recipe(f.first, 3, [[I.Stick, 7]]);
+  if (f.kind === K.Rail) recipe(f.first, 16, [[I.IronChunk, 6], [I.Stick, 1]]);
+  if (f.key === 'dirt_path') recipe(f.first, 1, [[B.Dirt, 1]]);
+  if (f.key === 'farmland') recipe(f.first, 1, [[B.Dirt, 1]]);
+}
 const toolMats = [B.Planks, B.Cobblestone, I.IronChunk, I.Diamond];
 toolMats.forEach((m, t) => {
   recipe(I.WoodenPickaxe + t, 1, [[m, 3], [I.Stick, 2]]);

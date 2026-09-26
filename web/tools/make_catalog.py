@@ -171,10 +171,13 @@ def main():
         add(f"{k}_coral_block", "stone", all=f"{k}_coral_block")
         add(f"dead_{k}_coral_block", "stone", all=f"dead_{k}_coral_block")
         add(f"{k}_coral", "plant", all=f"{k}_coral", shape="cross")
+    blocks[:] = [b for b in blocks if b["key"] != "lily_pad"]   # a flat pad on the water (a model below)
     for k in ["ochre", "verdant", "pearlescent"]:
         add(f"{k}_froglight", "glass", top=f"{k}_froglight_top", side=f"{k}_froglight_side", emission=15)
     add("resin_block", "stone", all="resin_block")
     add("spawner", "metal", all="spawner", shape="clear", hard="unbreakable")
+
+    models, texinfo = model_families(have, {b["key"] for b in blocks})
 
     # textures in first-use order
     textures = []
@@ -182,8 +185,106 @@ def main():
         for t in (b["top"], b["side"], b["bottom"]):
             if t not in textures:
                 textures.append(t)
-    OUT.write_text(json.dumps({"textures": textures, "blocks": blocks}, separators=(",", ":")))
-    print(f"{len(blocks)} blocks, {len(textures)} textures -> {OUT}")
+    for m in models:
+        for t in m.get("tex", []):
+            if not t.startswith("B:") and t not in textures:
+                textures.append(t)
+    OUT.write_text(json.dumps({"textures": textures, "blocks": blocks, "models": models, "texinfo": texinfo}, separators=(",", ":")))
+    print(f"{len(blocks)} blocks, {len(models)} shaped families, {len(textures)} textures -> {OUT}")
+
+
+WOODS = ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak", "bamboo", "crimson", "warped"]
+
+
+def model_families(have, keys):
+    """Shaped blocks (stairs, slabs, walls, fences, gates, doors, trapdoors, panes, carpets, plates, buttons, ladders, vines,
+    rails, snow layers, paths, tall plants, lily pads, wall torches). mat: the full block they are cut from ('B:Name' for
+    the game's own blocks, else a catalog key), whose textures they share; tex: their own Minecraft textures ('B:Name' =
+    that game block's side texture, '@rot90:name' = the texture turned a quarter)."""
+    out, texinfo = [], {}
+
+    def fam(key, kind, name=None, mat=None, tex=None, **extra):
+        if mat and not mat.startswith("B:") and mat not in keys:
+            return
+        for t in tex or []:
+            if not t.startswith("B:") and t.split(":")[-1] not in have:
+                return
+        out.append(dict(key=key, kind=kind, name=name or title(key), **({"mat": mat} if mat else {}), **({"tex": tex} if tex else {}), **extra))
+        for t in tex or []:
+            if not t.startswith("B:"):
+                texinfo.setdefault(t, dict(cat=extra.get("cat", "wood"), cutout=1 if extra.get("list") in ("cutout", "glow") else 0,
+                                           **({"tint": extra["tint"]} if extra.get("tint") else {})))
+
+    plank = lambda w: "B:Planks" if w == "oak" else f"{w}_planks"
+    stone_like = [("stone", "B:Stone"), ("cobblestone", "B:Cobblestone"), ("mossy_cobblestone", "mossy_cobblestone"),
+                  ("stone_brick", "B:StoneBricks"), ("mossy_stone_brick", "B:MossyStoneBricks"), ("smooth_stone", "smooth_stone"),
+                  ("granite", "granite"), ("polished_granite", "polished_granite"), ("diorite", "diorite"), ("polished_diorite", "polished_diorite"),
+                  ("andesite", "andesite"), ("polished_andesite", "polished_andesite"), ("cobbled_deepslate", "cobbled_deepslate"),
+                  ("polished_deepslate", "polished_deepslate"), ("deepslate_brick", "deepslate_bricks"), ("deepslate_tile", "deepslate_tiles"),
+                  ("tuff", "tuff"), ("polished_tuff", "polished_tuff"), ("tuff_brick", "tuff_bricks"), ("brick", "B:Bricks"), ("mud_brick", "mud_bricks"),
+                  ("sandstone", "B:Sandstone"), ("smooth_sandstone", "smooth_sandstone"), ("cut_sandstone", "cut_sandstone"),
+                  ("red_sandstone", "B:RedSandstone"), ("smooth_red_sandstone", "smooth_red_sandstone"), ("cut_red_sandstone", "cut_red_sandstone"),
+                  ("prismarine", "prismarine"), ("prismarine_brick", "prismarine_bricks"), ("dark_prismarine", "dark_prismarine"),
+                  ("nether_brick", "B:NetherBricks"), ("red_nether_brick", "red_nether_bricks"), ("blackstone", "B:Blackstone"),
+                  ("polished_blackstone", "polished_blackstone"), ("polished_blackstone_brick", "polished_blackstone_bricks"),
+                  ("end_stone_brick", "B:EndStoneBricks"), ("purpur", "B:Purpur"), ("quartz", "quartz_block"), ("smooth_quartz", "smooth_quartz"),
+                  ("cut_copper", "cut_copper"), ("exposed_cut_copper", "exposed_cut_copper"), ("weathered_cut_copper", "weathered_cut_copper"),
+                  ("oxidized_cut_copper", "oxidized_cut_copper"), ("resin_brick", "resin_bricks"), ("bamboo_mosaic", "bamboo_mosaic")]
+    for w in WOODS:
+        stone_like.append((w, plank(w)))
+    for k, mat in stone_like:
+        cat = "wood" if k in WOODS or k == "bamboo_mosaic" else "metal" if "copper" in k else "stone"
+        if k not in ("smooth_stone", "cut_sandstone", "cut_red_sandstone"):
+            fam(f"{k}_stairs", "stairs", mat=mat, cat=cat)
+        fam(f"{k}_slab", "slab", mat=mat, cat=cat)
+    for k, mat in [("cobblestone", "B:Cobblestone"), ("mossy_cobblestone", "mossy_cobblestone"), ("stone_brick", "B:StoneBricks"),
+                   ("mossy_stone_brick", "B:MossyStoneBricks"), ("granite", "granite"), ("diorite", "diorite"), ("andesite", "andesite"),
+                   ("cobbled_deepslate", "cobbled_deepslate"), ("polished_deepslate", "polished_deepslate"), ("deepslate_brick", "deepslate_bricks"),
+                   ("deepslate_tile", "deepslate_tiles"), ("tuff", "tuff"), ("polished_tuff", "polished_tuff"), ("tuff_brick", "tuff_bricks"),
+                   ("brick", "B:Bricks"), ("mud_brick", "mud_bricks"), ("sandstone", "B:Sandstone"), ("red_sandstone", "B:RedSandstone"),
+                   ("prismarine", "prismarine"), ("nether_brick", "B:NetherBricks"), ("red_nether_brick", "red_nether_bricks"),
+                   ("blackstone", "B:Blackstone"), ("polished_blackstone", "polished_blackstone"), ("polished_blackstone_brick", "polished_blackstone_bricks"),
+                   ("end_stone_brick", "B:EndStoneBricks"), ("resin_brick", "resin_bricks")]:
+        fam(f"{k}_wall", "wall", mat=mat, cat="stone")
+    for w in WOODS:
+        fam(f"{w}_fence", "fence", mat=plank(w), cat="wood")
+        fam(f"{w}_fence_gate", "gate", mat=plank(w), cat="wood")
+        fam(f"{w}_door", "door", tex=[f"{w}_door_lower", f"{w}_door_upper"], list="cutout", cat="wood")
+        fam(f"{w}_trapdoor", "trapdoor", tex=[f"{w}_trapdoor"], list="cutout", cat="wood")
+        fam(f"{w}_pressure_plate", "plate", mat=plank(w), cat="wood")
+        fam(f"{w}_button", "button", mat=plank(w), cat="wood")
+    fam("nether_brick_fence", "fence", mat="B:NetherBricks", cat="stone")
+    for k in ["iron", "copper", "exposed_copper", "weathered_copper", "oxidized_copper"]:
+        fam(f"{k}_door", "door", tex=[f"{k}_door_lower", f"{k}_door_upper"], list="cutout", cat="metal")
+        fam(f"{k}_trapdoor", "trapdoor", tex=[f"{k}_trapdoor"], list="cutout", cat="metal")
+    fam("stone_pressure_plate", "plate", mat="B:Stone", cat="stone")
+    fam("polished_blackstone_pressure_plate", "plate", mat="polished_blackstone", cat="stone")
+    fam("light_weighted_pressure_plate", "plate", mat="gold_block", cat="metal")
+    fam("heavy_weighted_pressure_plate", "plate", mat="iron_block", cat="metal")
+    fam("stone_button", "button", mat="B:Stone", cat="stone")
+    fam("polished_blackstone_button", "button", mat="polished_blackstone", cat="stone")
+    fam("glass_pane", "pane", tex=["glass"], list="cutout", cat="glass")
+    for c in COLORS:
+        fam(f"{c}_stained_glass_pane", "pane", tex=[f"{c}_stained_glass"], list="glow", cat="glass")
+    fam("iron_bars", "pane", tex=["iron_bars"], list="cutout", cat="metal")
+    for c in COLORS:
+        fam(f"{c}_carpet", "carpet", mat=f"{c}_wool", cat="wool")
+    fam("moss_carpet", "carpet", mat="B:Moss", cat="dirt")
+    fam("pale_moss_carpet", "carpet", mat="pale_moss_block", cat="dirt")
+    fam("ladder", "ladder", tex=["ladder"], list="cutout", cat="wood")
+    fam("vine", "ladder", tex=["vine"], list="cutout", cat="leaves", tint="foliage")
+    fam("glow_lichen", "ladder", tex=["glow_lichen"], list="cutout", cat="leaves", emission=7)
+    for k in ["rail", "powered_rail", "detector_rail", "activator_rail"]:
+        fam(k, "rail", tex=[k, f"@rot90:{k}"], list="cutout", cat="metal")
+    fam("lily_pad", "lily", tex=["lily_pad"], list="cutout", cat="plant", tint="foliage")
+    fam("snow", "snow", mat="B:Snow", cat="sand", name="Snow Layer")
+    fam("dirt_path", "path", tex=["dirt_path_top", "dirt_path_side", "B:Dirt"], cat="dirt")
+    fam("farmland", "path", tex=["farmland_moist", "farmland_side", "B:Dirt"], cat="dirt")
+    for k, tint in [("sunflower", None), ("lilac", None), ("rose_bush", None), ("peony", None), ("tall_grass", "grass"), ("large_fern", "grass")]:
+        top = "sunflower_front" if k == "sunflower" else f"{k}_top"
+        fam(k, "tall", tex=[f"{k}_bottom", top], list="cutout", cat="plant", **({"tint": tint} if tint else {}))
+    fam("wall_torch", "walltorch", mat="B:Torch", cat="plant")
+    return out, texinfo
 
 
 if __name__ == "__main__":

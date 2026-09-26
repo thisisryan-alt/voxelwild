@@ -4,7 +4,8 @@
 // Vertex = 24 bytes: float32 x,y,z | u8x4 d0 (face | edges<<3, layer, ao*85, overlay) | u8x4 d1 (sky*17, block*17, temp, humid)
 //                                   | u8x4 d2 (tint, wind, flowX, flowZ)
 import { CS, CS2, CS3, RS, RS2, RS3, RM, MAX_LIGHT, MIN_SY, MAX_SY } from './const.js';
-import { BLOCKS, B, F, Shape, NONE, layerFor, waterLevel, isWater, lavaLevel, isLava } from './blocks.js';
+import { BLOCKS, B, F, Shape, NONE, layerFor, waterLevel, isWater, lavaLevel, isLava, FAMS } from './blocks.js';
+import { modelBoxes, connections, CONNECTING } from './shapes.js';
 
 const N = BLOCKS.length;
 const EXT = new Uint16Array(BLOCKS.length).fill(NONE);
@@ -84,6 +85,7 @@ export class Mesher {
         for (let f = 0; f < 6; f++) { const n = FN[f], nb = region[RI(x + n[0], y + n[1], z + n[2])]; if (nb !== id && !OPAQUE[nb]) this.cubeFace(x, y, z, f, id, glow, true); }
       }
       else if (shape === Shape.EndPortal) this.endPortal(x, y, z, id, opaque);
+      else if (shape === Shape.Model) this.model(x, y, z, id, [opaque, cutout, glow][FAMS[BLOCKS[id].model.fam].list]);
     }
     const vertices = vb.buf.slice(0, vb.len);
     return {
@@ -334,6 +336,40 @@ export class Mesher {
       this.vert(cx + tx + bx, cy + ty + by, cz + tz + bz, f, 0, layer, 3, NONE, sl, bl, clim, 0, 0);
       this.vert(cx + tx - bx, cy + ty - by, cz + tz - bz, f, 0, layer, 3, NONE, sl, bl, clim, 0, 0);
       list.push6(s, 0, 1, 2, 0, 2, 3);
+    }
+  }
+
+  /** A shaped block (shapes.js): its boxes, faces against opaque neighbours dropped, world-aligned textures. */
+  model(x, y, z, id, list) {
+    const d = BLOCKS[id], m = d.model, region = this.region;
+    let conn = 0, up = false;
+    if (CONNECTING.has(m.kind)) {
+      conn = connections(m.kind, (dx, dz) => { const n = region[RI(x + dx, y, z + dz)]; return { opaque: OPAQUE[n], model: BLOCKS[n] && BLOCKS[n].model }; });
+      up = region[RI(x, y + 1, z)] !== 0;
+    }
+    const own = this.light(x, y, z), clim = this.clim(x, z);
+    for (const bx of modelBoxes(m, conn, up, false)) {
+      const min = [x + bx[0], y + bx[1], z + bx[2]], max = [x + bx[3], y + bx[4], z + bx[5]];
+      const c = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
+      const hf = [(max[0] - min[0]) / 2, (max[1] - min[1]) / 2, (max[2] - min[2]) / 2];
+      for (let f = 0; f < 6; f++) {
+        const n = FN[f], t = FT[f], b = FB[f];
+        const edge = [bx[3] >= 1, bx[0] <= 0, bx[4] >= 1, bx[1] <= 0, bx[5] >= 1, bx[2] <= 0][f];
+        const nl = this.light(x + n[0], y + n[1], z + n[2]);
+        if (edge && OPAQUE[region[RI(x + n[0], y + n[1], z + n[2])]]) continue;
+        const sl = Math.max(own[0], nl[0]), bl = Math.max(own[1], nl[1]);
+        const cx = c[0] + n[0] * hf[0], cy = c[1] + n[1] * hf[1], cz = c[2] + n[2] * hf[2];
+        const tx = t[0] * hf[0], ty = t[1] * hf[1], tz = t[2] * hf[2], ux = b[0] * hf[0], uy = b[1] * hf[1], uz = b[2] * hf[2];
+        const layer = layerFor(d, f);
+        const P = [[cx - tx - ux, cy - ty - uy, cz - tz - uz], [cx - tx + ux, cy - ty + uy, cz - tz + uz], [cx + tx + ux, cy + ty + uy, cz + tz + uz], [cx + tx - ux, cy + ty - uy, cz + tz - uz]];
+        let s0 = -1;
+        for (const p of P) {
+          const ao = f === 3 ? 2 : f === 2 ? 3 : p[1] <= min[1] + 1e-4 && bx[1] <= 0 ? 2 : 3;
+          const v = this.vert(p[0], p[1], p[2], f, 0, layer, ao, NONE, sl, bl, clim, d.tint, 0);
+          if (s0 < 0) s0 = v;
+        }
+        list.push6(s0, 0, 1, 2, 0, 2, 3);
+      }
     }
   }
 

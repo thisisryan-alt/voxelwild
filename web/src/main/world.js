@@ -2,6 +2,7 @@
 // relighting, persistence of edited sections, the cellular water simulation, and cave culling (section visibility).
 import { CS, CS2, CS3, MIN_SY, MAX_SY, SECTIONS, MIN_Y, MAX_Y, RS, RS2, RS3, RM, MAX_LIGHT } from '../shared/const.js';
 import { BLOCKS, B, F, isWater, waterLevel, isLava, lavaLevel, isLiquid } from '../shared/blocks.js';
+import { modelBoxes, connections, CONNECTING } from '../shared/shapes.js';
 import { PropField } from './props.js';
 
 const key2 = (cx, cz) => cx * 65536 + cz;              // cx, cz within +-32767 columns (~1000 km)
@@ -60,6 +61,35 @@ export class World {
     const s = c.sections[(y - MIN_Y) >> 5];
     if (typeof s === 'number') return s;
     return s[(x & 31) + ((z & 31) << 5) + (((y - MIN_Y) & 31) << 10)];
+  }
+
+  /** Boxes (block units, relative to the cell) of the shaped block id at x, y, z. */
+  modelBoxesAt(x, y, z, id, collision) {
+    const m = BLOCKS[id].model;
+    let conn = 0, up = false;
+    if (CONNECTING.has(m.kind)) {
+      conn = connections(m.kind, (dx, dz) => {
+        const n = this.getBlock(x + dx, y, z + dz);
+        return n < 0 ? null : { opaque: (BLOCKS[n].flags & F.Opaque) !== 0, model: BLOCKS[n].model };
+      });
+      up = this.getBlock(x, y + 1, z) > 0;
+    }
+    return modelBoxes(m, conn, up, collision);
+  }
+
+  /** Absolute collision boxes touching cell x, y, z (fence and wall posts from the cell below reach up into it). */
+  collisionBoxes(x, y, z, out) {
+    const b = this.getBlock(x, y, z);
+    if (b < 0) out.push([x, y, z, x + 1, y + 1, z + 1]);
+    else if (BLOCKS[b].flags & F.Solid) {
+      if (BLOCKS[b].model) { for (const k of this.modelBoxesAt(x, y, z, b, true)) out.push([x + k[0], y + k[1], z + k[2], x + k[3], y + k[4], z + k[5]]); }
+      else out.push([x, y, z, x + 1, y + 1, z + 1]);
+    }
+    const u = this.getBlock(x, y - 1, z);
+    if (u > 0 && BLOCKS[u].model && (BLOCKS[u].flags & F.Solid)) {
+      for (const k of this.modelBoxesAt(x, y - 1, z, u, true)) if (k[4] > 1) out.push([x + k[0], y - 1 + k[1], z + k[2], x + k[3], y - 1 + k[4], z + k[5]]);
+    }
+    return out;
   }
 
   isSolidAt(x, y, z) {

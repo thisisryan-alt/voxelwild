@@ -2,8 +2,10 @@
 // and torches are their sprite, materials/tools are drawn as small pixel-art shapes. Packed into one atlas used by the
 // HUD (CSS background) and by the renderer (dropped items and the held item).
 import { ITEMS, BLOCKS, Kind, Shape, LAYER_TUNING, NONE, I, ToolType } from '../shared/blocks.js';
+import { K, modelBoxes } from '../shared/shapes.js';
 
 const CELL = 64, COLS = 8;
+const ITEMS_UPPER = (b) => { for (let i = 0; i < BLOCKS.length; i++) if (BLOCKS[i] === b) return i + 1; return 0; };
 
 export class Icons {
   /** opts: { tuning (per-layer, default the built-in), items: Map item id -> image (resource-pack item textures) } */
@@ -80,6 +82,7 @@ export class Icons {
     if (def.kind === Kind.Block) {
       const b = BLOCKS[def.block];
       if (this.thumbs && (b.shape === Shape.Cube || b.shape === Shape.Cutout)) return this.cube(ctx, b);
+      if (this.thumbs && b.shape === Shape.Model) return this.model(ctx, b);
       if (this.thumbs) {
         const layer = b.shape === Shape.Torch ? b.side : b.side;
         ctx.imageSmoothingEnabled = false;
@@ -115,6 +118,38 @@ export class Icons {
     const ov = b.overlay !== NONE ? b.overlay : null;
     face(side, [k, k * 0.5, 0, k * 1.1, cx - s, cy - s * 0.5 + 0.5], 0.28, ov);
     face(side, [k, -k * 0.5, 0, k * 1.1, cx, cy + 0.5], 0.46, ov);
+  }
+
+  /** Shaped blocks: their boxes drawn in the same isometric view as cubes (flat things as their picture). */
+  model(ctx, b) {
+    const m = b.model;
+    if ([K.Door, K.Ladder, K.Rail, K.Lily].includes(m.kind)) {
+      ctx.imageSmoothingEnabled = true;
+      if (m.kind === K.Door) { ctx.drawImage(this.thumbs[b.side], 16, 32, 32, 30); ctx.drawImage(this.thumbs[BLOCKS[ITEMS_UPPER(b)].side], 16, 2, 32, 30); }
+      else ctx.drawImage(this.thumbs[b.side], 4, 4, 56, 56);
+      return;
+    }
+    const state = { [K.Stairs]: 6, [K.Trapdoor]: 12, [K.Gate]: 6, [K.Button]: 3 }[m.kind] ?? m.state;
+    let boxes = modelBoxes({ kind: m.kind, state }, m.kind === K.Pane || m.kind === K.Fence || m.kind === K.Wall ? 3 : 0, true, false);
+    if (m.kind === K.Button || m.kind === K.Plate || m.kind === K.Carpet || m.kind === K.Snow) boxes = boxes.map((q) => [q[0], q[1], q[2], q[3], Math.max(q[4], 0.25), q[5]]);
+    const s = 22, cx = 32, cy = 31;
+    const P = (x, y, z) => [cx + s * (x - z), cy - s + s * 0.5 * (x + z) + (1 - y) * 1.1 * s];
+    ctx.imageSmoothingEnabled = true;
+    const face = (img, o, u, v, sx, sy, sw, sh, shade) => {
+      ctx.save();
+      ctx.transform(u[0] - o[0], u[1] - o[1], v[0] - o[0], v[1] - o[1], o[0], o[1]);
+      ctx.beginPath(); ctx.rect(0, 0, 1, 1); ctx.clip();
+      ctx.drawImage(img, sx * 64, sy * 64, Math.max(1, sw * 64), Math.max(1, sh * 64), 0, 0, 1, 1);
+      ctx.fillStyle = `rgba(0,0,0,${shade})`; ctx.fillRect(0, 0, 1, 1);
+      ctx.restore();
+    };
+    boxes.sort((a, c) => (a[3] + a[5]) - (c[3] + c[5]) || a[1] - c[1]);
+    const top = this.thumbs[b.top], side = this.thumbs[b.side];
+    for (const [x0, y0, z0, x1, y1, z1] of boxes) {
+      face(side, P(x0, y1, z1), P(x1, y1, z1), P(x0, y0, z1), x0, 1 - y1, x1 - x0, y1 - y0, 0.28);
+      face(side, P(x1, y1, z1), P(x1, y1, z0), P(x1, y0, z1), 1 - z1, 1 - y1, z1 - z0, y1 - y0, 0.46);
+      face(top, P(x0, y1, z0), P(x1, y1, z0), P(x0, y1, z1), x0, z0, x1 - x0, z1 - z0, 0);
+    }
   }
 
   material(ctx, id, def) {

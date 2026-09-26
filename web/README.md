@@ -111,6 +111,22 @@ materials and the exit portal is open from the start), no fire blocks, no bucket
 - **Far terrain** out to 2 km, **fluffy leaves**, a moonlit **night** with god rays and the Milky Way, and options for
   always-day / always-night / a fixed hour, weather lock, and a tabbed options screen.
 
+## Shaped blocks and graphics
+
+`tools/make_catalog.py` also writes 280 shaped block families into `catalog.json` (`models`): stairs, slabs (double slabs
+when stacked), walls, fences, fence gates, doors, trapdoors, glass panes and iron bars, carpets, pressure plates,
+buttons, ladders, vines, glow lichen, rails, snow layers, dirt paths, farmland, tall flowers, lily pads and wall
+torches. `src/shared/shapes.js` gives each state (facing, half, open) its boxes; `blocks.js` registers one block id per
+state after the catalog (`FAMS`, `FAM`), with mining, drops and recipes from the block each one is cut from. The mesher
+draws the boxes with world-aligned textures; the player collides with them (with a 0.6 block step-up and climbable
+ladders and vines), rays pick them precisely, and right-click opens doors, trapdoors and gates. Texture names
+`@rot90:x` are baked turned a quarter (east-west rails). `node test/shapes.mjs` builds a showcase of every family in
+the sky, screenshots it and checks stairs, slabs, doors and picking.
+
+Rendering: volumetric clouds are ray-marched at quarter resolution (Options > Quality > Cloud Style), ambient
+occlusion is screen-space at half resolution with a depth-aware blur, and the tone-mapped image goes through FXAA and
+contrast-adaptive sharpening. Shadows use 12 rotated Poisson taps; textures use 16x anisotropy and a slight mip bias.
+
 ## Controls
 
 WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·

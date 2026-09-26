@@ -15,7 +15,8 @@ import { decodeLarge, fetchBuiltinPack, square } from './respack.js';
 import { readPackZip, convertPack } from './packconv.js';
 import { LAYER_TUNING, LAYER_NAMES, I, BASE_LAYERS, CAT } from '../shared/blocks.js';
 import CATALOG from '../shared/catalog.json';
-import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, isLava, isPortal, Dim, breakSeconds, drops, canHarvest, itemName, layerFor } from '../shared/blocks.js';
+import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, isLava, isPortal, Dim, breakSeconds, drops, canHarvest, itemName, layerFor, FAMS, FAM, famOf, isLiquid } from '../shared/blocks.js';
+import { K, facingFromYaw, facingFromFace, opposite } from '../shared/shapes.js';
 import { strongholds, frameRing } from '../shared/stronghold.js';
 import { END_ARRIVAL, END_GATEWAY, outerGateway } from '../shared/end.js';
 import { netherClimate, nearestFortress } from '../shared/nether.js';
@@ -403,7 +404,8 @@ export class Game {
     r.renderScale = s.renderScale; r.shadows = s.shadows; r.bloom = s.bloom; r.godRays = s.godRays; r.fov = s.fov; r.pom = s.pom;
     Object.assign(r, { bloomStrength: s.bloomStrength ?? 1, rayStrength: s.rayStrength ?? 1, clouds: s.clouds !== false, ao: s.ao ?? 1,
       brightness: s.brightness ?? 1, nightBrightness: s.nightBrightness ?? 1, saturation: s.saturation ?? 1, fogMul: s.fog ?? 1,
-      shadowDistance: s.shadowDistance ?? 88, farDistance: s.farDistance ?? 0 });
+      shadowDistance: s.shadowDistance ?? 88, farDistance: s.farDistance ?? 0, cloudQuality: s.cloudQuality ?? 1, ssao: s.ssao !== false,
+      aa: s.aa !== false, sharpen: s.sharpen ?? 0.6 });
     this.renderer.setShadowSize(s.shadowQuality || 2048);
     if (this.world) { this.world.viewDistance = s.viewDistance; this.world.setLeaves(s.leaves || 'fluffy'); }
     this.applyClock();
@@ -843,7 +845,9 @@ export class Game {
     if ((this.mouse.rightClicked || (this.mouse.right && this.useCooldown <= 0))) {
       this.useCooldown = 0.25;
       const def = inv.heldItem;
-      if (def && def.kind === Kind.Use) this.useItem(def, hit);
+      const sneaking = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+      if (hit && !sneaking && this.toggle(hit)) { this.useCooldown = 0.3; this.swing = 1; }
+      else if (def && def.kind === Kind.Use) this.useItem(def, hit);
       else if (def && def.kind === Kind.Food) {
         if (!this.creative && this.stats.hunger < 20) { this.stats.eat(def.food, def.sat); inv.consumeHeld(); this.audio.eat(); this.swing = 1; this.emit('hud'); }
       } else if (hit && def && def.kind === Kind.Block) this.place(hit, def.block);
@@ -867,6 +871,12 @@ export class Game {
       }
       this.stats.addExhaustion(0.005);
     }
+    // the other half of a door or a tall plant goes with it
+    const fam = famOf(block);
+    if (fam && (fam.kind === K.Door || fam.kind === K.Tall)) {
+      const oy = BLOCKS[block].model.state & 1 ? y - 1 : y + 1, other = w.getBlock(x, oy, z);
+      if (other > 0 && famOf(other) === fam) { w.setBlock(x, oy, z, B.Air); this.spawnBreakParticles([x, oy, z], other, 10); }
+    }
     // blocks that need support fall with it (plants, torches on top)
     let yy = y + 1;
     for (;;) {
@@ -879,8 +889,78 @@ export class Game {
     }
   }
 
+  /** Outline boxes of the targeted block (shaped blocks show their real shape). */
+  selectionBoxes(t) {
+    const d = BLOCKS[t.block];
+    if (!d || !d.model || d.shape !== Shape.Model) return null;
+    const bs = this.world.modelBoxesAt(t.hit[0], t.hit[1], t.hit[2], t.block, false);
+    if (!bs.length) return null;
+    const u = [1, 1, 1, 0, 0, 0];
+    for (const b of bs) for (let k = 0; k < 3; k++) { u[k] = Math.min(u[k], b[k]); u[k + 3] = Math.max(u[k + 3], b[k + 3]); }
+    return bs.length > 3 ? [u] : bs;
+  }
+
+  /** Right-click on doors, trapdoors and gates: open or close. Returns true when something toggled. */
+  toggle(hit) {
+    const w = this.world, fam = famOf(hit.block);
+    if (!fam || (fam.kind !== K.Door && fam.kind !== K.Trapdoor && fam.kind !== K.Gate)) return false;
+    const [x, y, z] = hit.hit, st = BLOCKS[hit.block].model.state;
+    const flip = fam.kind === K.Gate ? 1 : 2;
+    w.setBlock(x, y, z, fam.first + (st ^ flip));
+    if (fam.kind === K.Door) {
+      const oy = st & 1 ? y - 1 : y + 1, other = w.getBlock(x, oy, z);
+      if (other > 0 && famOf(other) === fam) w.setBlock(x, oy, z, fam.first + (BLOCKS[other].model.state ^ 2));
+    }
+    this.audio.place(hit.block);
+    return true;
+  }
+
+  /** The state a shaped block takes from where it is placed and which way the player looks; -1 if it cannot go there. */
+  modelState(fam, hit, pos) {
+    const w = this.world, f = facingFromYaw(this.player.yaw), fy = hit.point ? hit.point[1] - Math.floor(hit.point[1] - (hit.face === 2 ? 1e-4 : 0)) : 0.25;
+    const upper = hit.face === 3 || (hit.face !== 2 && fy > 0.5) ? 1 : 0;
+    const wall = (side) => { const n = [[1, 0], [-1, 0], [0, 1], [0, -1]][side], b = w.getBlock(pos[0] + n[0], pos[1], pos[2] + n[1]); return b > 0 && (BLOCKS[b].flags & F.Opaque); };
+    switch (fam.kind) {
+      case K.Slab: return upper;
+      case K.Stairs: return f * 2 + upper;
+      case K.Gate: return f * 2;
+      case K.Door: return f * 4;
+      case K.Trapdoor: return f * 4 + upper;
+      case K.Button: return hit.face === 2 ? 4 : hit.face === 3 ? 5 : opposite(facingFromFace(hit.face));
+      case K.Ladder: case K.WallTorch: {
+        const side = hit.face === 2 || hit.face === 3 ? f : opposite(facingFromFace(hit.face));
+        return wall(side) || fam.key === 'vine' && hit.face !== 2 && hit.face !== 3 ? side : -1;
+      }
+      case K.Rail: return f >= 2 ? 0 : 1;
+      default: return 0;
+    }
+  }
+
   place(hit, block) {
-    const w = this.world, d = BLOCKS[block];
+    const w = this.world;
+    let fam = famOf(block);
+    // torches on walls
+    if (block === B.Torch && FAM.wall_torch && hit.face !== 2 && hit.face !== 3 && hit.face >= 0) { fam = FAM.wall_torch; block = fam.first; }
+    const hm = BLOCKS[hit.block].model;
+    if (fam && hm && hm.fam === fam.index) {
+      // a slab onto its matching slab: a double slab; snow onto snow: a deeper layer
+      if (fam.kind === K.Slab && hm.state !== 2 && ((hm.state === 0 && hit.face === 2) || (hm.state === 1 && hit.face === 3))) {
+        if (w.setBlock(hit.hit[0], hit.hit[1], hit.hit[2], fam.first + 2)) { this.audio.place(block); this.swing = 1; if (!this.creative) this.inventory.consumeHeld(); }
+        return;
+      }
+      if (fam.kind === K.Snow && hm.state < 7 && hit.face === 2) {
+        if (w.setBlock(hit.hit[0], hit.hit[1], hit.hit[2], fam.first + hm.state + 1)) { this.audio.place(block); this.swing = 1; if (!this.creative) this.inventory.consumeHeld(); }
+        return;
+      }
+    }
+    if (fam && fam.kind === K.Lily) {
+      // lily pads float: aim through to the water surface
+      const eye = this.player.eye(), wh = raycast(w, eye, this.player.forward(), REACH, (b) => b !== 0);
+      if (!wh || !isWater(wh.block) || w.getBlock(wh.hit[0], wh.hit[1] + 1, wh.hit[2]) !== B.Air) return;
+      if (w.setBlock(wh.hit[0], wh.hit[1] + 1, wh.hit[2], fam.first)) { this.audio.place(block); this.swing = 1; if (!this.creative) this.inventory.consumeHeld(); }
+      return;
+    }
+    const d = BLOCKS[block];
     // plants and other replaceables are built into, not onto
     const tgt = BLOCKS[hit.block].flags & F.Replaceable && !isWater(hit.block) ? hit.hit : hit.prev;
     const [x, y, z] = tgt;
@@ -892,8 +972,22 @@ export class Game {
       if (below < 0 || !(BLOCKS[below].flags & F.Solid) || !(BLOCKS[below].flags & F.Opaque)) return;
       if (isWater(cur)) return;
     }
-    if ((d.flags & F.Solid) && this.player.body.overlaps(x, y, z)) return;
-    if (!w.setBlock(x, y, z, block)) return;
+    let id = block;
+    if (fam) {
+      const st = this.modelState(fam, hit, [x, y, z]);
+      if (st < 0) return;
+      id = fam.first + st;
+      if (fam.kind === K.Door || fam.kind === K.Tall) {
+        const up = w.getBlock(x, y + 1, z);
+        if (up < 0 || !(BLOCKS[up].flags & F.Replaceable) || isLiquid(up)) return;
+      }
+    }
+    if (d.flags & F.Solid) {
+      const bs = fam ? w.modelBoxesAt(x, y, z, id, true) : [[0, 0, 0, 1, 1, 1]], mn = this.player.body.min(), mx = this.player.body.max();
+      if (bs.some((b) => mx[0] > x + b[0] + 1e-3 && mn[0] < x + b[3] - 1e-3 && mx[1] > y + b[1] + 1e-3 && mn[1] < y + b[4] - 1e-3 && mx[2] > z + b[2] + 1e-3 && mn[2] < z + b[5] - 1e-3)) return;
+    }
+    if (!w.setBlock(x, y, z, id)) return;
+    if (fam && (fam.kind === K.Door || fam.kind === K.Tall)) w.setBlock(x, y + 1, z, id + 1);
     this.audio.place(block);
     this.swing = 1;
     if (!this.creative) this.inventory.consumeHeld();
@@ -1530,6 +1624,7 @@ export class Game {
         snowCover: this.weather.snowCover * (clim && clim.temp < 0.25 ? 1 : 0) },
       viewDistance: this.world.viewDistance, camSky: this.camSky, underwater: pl.headInWater || inLava, underwaterColor: inLava ? [0.9, 0.25, 0.02] : null,
       selection: this.target && this.state === 'playing' ? this.target.hit : null,
+      selectionBoxes: this.target && this.state === 'playing' ? this.selectionBoxes(this.target) : null,
       crack: this.mining && this.mining.progress > 0 ? { pos: this.mining.pos, progress: Math.min(1, this.mining.progress) } : null,
       entities, mobs: this.mobs.list,
       sprites, particles: this.packParticles(), hand, damage: this.damageFlash * 0.6, flash: this.flash, props: this.world.props,

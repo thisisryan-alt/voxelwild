@@ -88,12 +88,18 @@ float shadowAt(vec3 p, vec3 n) {
   vec4 s = uShadowVP[c] * vec4(pb, 1.0);
   vec3 q = s.xyz / s.w * 0.5 + 0.5;
   if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0 || q.z > 1.0) return 1.0;
-  float o = 1.0 / uShadowSize;
-  float sum;
-  if (c == 0) sum = texture(uShadow0, q + vec3(-o, -o, 0)) + texture(uShadow0, q + vec3(o, -o, 0)) + texture(uShadow0, q + vec3(-o, o, 0)) + texture(uShadow0, q + vec3(o, o, 0));
-  else sum = texture(uShadow1, q + vec3(-o, -o, 0)) + texture(uShadow1, q + vec3(o, -o, 0)) + texture(uShadow1, q + vec3(-o, o, 0)) + texture(uShadow1, q + vec3(o, o, 0));
+  float o = (c == 0 ? 1.6 : 1.1) / uShadowSize;
+  const vec2 PD[12] = vec2[12](vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696, 0.457), vec2(-0.203, 0.621), vec2(0.962, -0.195), vec2(0.473, -0.480),
+                               vec2(0.519, 0.767), vec2(0.185, -0.893), vec2(0.507, 0.064), vec2(0.896, 0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598));
+  float ang = hash21(gl_FragCoord.xy) * 6.2832;
+  mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
+  float sum = 0.0;
+  for (int i = 0; i < 12; i++) {
+    vec3 qq = q + vec3(rot * PD[i] * o * 1.8, 0.0);
+    sum += c == 0 ? texture(uShadow0, qq) : texture(uShadow1, qq);
+  }
   float fade = smoothstep(uShadowDist.y * 0.85, uShadowDist.y, d);
-  return mix(sum * 0.25, 1.0, fade);
+  return mix(sum / 12.0, 1.0, fade);
 }
 vec3 hemi(vec3 n) { return n.y >= 0.0 ? mix(uAmbHorizon, uAmbUp, n.y) : mix(uAmbHorizon, uAmbDown, -n.y); }
 float phaseHG(float mu, float g) { float g2 = g * g; return (1.0 - g2) / (4.0 * PI * pow(max(1.0 + g2 - 2.0 * g * mu, 1e-4), 1.5)); }
@@ -281,6 +287,7 @@ out vec4 outColor;
 
 struct Layer { vec3 albedo; float alpha; vec3 nts; float ao; float rough; float metal; float emis; };
 Layer sampleLayer(int layer, int tl, vec2 uv, vec2 gx, vec2 gy) {
+  gx *= 0.72; gy *= 0.72;
   vec4 a = textureGrad(uAlbedo, vec3(uv, float(tl)), gx, gy);
   vec4 n = textureGrad(uNormal, vec3(uv, float(tl)), gx, gy);
   vec4 m = textureGrad(uMask, vec3(uv, float(tl)), gx, gy);
@@ -592,6 +599,8 @@ uniform float uFlash;
 uniform sampler2D uMoonTex;
 uniform float uMoonTexOn;
 uniform float uDim;
+uniform sampler2D uCloudRT;
+uniform float uCloudVol;
 in vec2 vUV;
 out vec4 outColor;
 float h31(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
@@ -663,7 +672,10 @@ void main() {
   float outside = smoothstep(cos(0.0262), cos(0.0285), mm);
   sky += (pow(mm, 2200.0) * 0.12 * outside + pow(mm, 260.0) * 0.05 + pow(mm, 18.0) * 0.01) * (0.25 + uSunParams.y) * step(-0.02, M.y) * dark * vec3(0.62, 0.72, 1.0);
   // clouds
-  if (V.y > 0.01 && uCloud.x > 0.0) {
+  if (uCloudVol > 0.5) {
+    vec4 cl = texture(uCloudRT, vUV);
+    sky = sky * cl.a + cl.rgb;
+  } else if (V.y > 0.01 && uCloud.x > 0.0) {
     float t = (uCloud.z - uCamPos.y) / V.y;
     vec2 xz = uCamPos.xz + V.xz * t;
     float d = cloudD(xz);
@@ -813,6 +825,8 @@ uniform vec3 uUnderwaterColor;
 uniform float uDamage;
 uniform float uPortal;
 uniform float uNight;
+uniform sampler2D uAO;
+uniform float uAOAmt;
 in vec2 vUV; out vec4 outColor;
 vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 void main() {
@@ -820,6 +834,7 @@ void main() {
   if (uUnderwater > 0.5) uv += vec2(sin(uv.y * 30.0 + uTime * 2.0), cos(uv.x * 25.0 + uTime * 1.7)) * 0.0025;
   if (uPortal > 0.0) { vec2 d = uv - 0.5; float a = uPortal * 1.2 * (1.0 - length(d)); uv = 0.5 + mat2(cos(a), -sin(a), sin(a), cos(a)) * d * (1.0 - uPortal * 0.15); }
   vec3 c = texture(uColor, uv).rgb;
+  if (uAOAmt > 0.0) c *= mix(1.0, texture(uAO, uv).r, uAOAmt);
   c += (texture(uBloom, uv).rgb * 0.45 + texture(uBloom2, uv).rgb * 0.55) * uBloomAmt;
   c += texture(uRays, uv).rgb;
   if (uUnderwater > 0.5) c = mix(c, uUnderwaterColor, 0.35);
@@ -842,7 +857,7 @@ void main() {
 
 // ------------------------------------------------------------------ helpers: outline, particles, crack overlay
 export const LINE_VS = /* glsl */ `
-layout(location=0) in vec3 aPos; uniform mat4 uViewProj; uniform vec3 uOffset; uniform float uScale;
+layout(location=0) in vec3 aPos; uniform mat4 uViewProj; uniform vec3 uOffset; uniform vec3 uScale;
 void main() { gl_Position = uViewProj * vec4(aPos * uScale + uOffset, 1.0); }
 `;
 export const LINE_FS = /* glsl */ `uniform vec4 uColor; out vec4 outColor; void main() { outColor = uColor; }`;
@@ -1147,4 +1162,161 @@ uniform sampler2D uSkin;
 in vec2 vUV;
 out vec4 outColor;
 void main() { if (texture(uSkin, vUV).a < 0.5) discard; outColor = vec4(1); }
+`;
+
+// ------------------------------------------------------------------ volumetric clouds (quarter resolution)
+export const CLOUDS_FS = /* glsl */ `
+uniform sampler2D uCloudTex;
+uniform mat4 uInvViewProj;
+uniform vec3 uCamPos;
+uniform vec3 uSunDir, uMoonDir;
+uniform vec3 uSunColorC, uZenith;
+uniform vec4 uCloud, uCloudOff;   // coverage, 1/size, base height, shadow; offset xy, sharpness, brightness
+uniform float uFlash;
+in vec2 vUV;
+out vec4 outColor;
+const float THICK = 260.0;
+float cphase(float mu, float g) { float g2 = g * g; return (1.0 - g2) / (4.0 * PI * pow(max(1.0 + g2 - 2.0 * g * mu, 1e-4), 1.5)); }
+float cloudDensity3(vec3 p) {
+  float h = (p.y - uCloud.z) / THICK;
+  if (h < 0.0 || h > 1.0) return 0.0;
+  vec2 uv = (p.xz + uCloudOff.xy) * uCloud.y;
+  float base = texture(uCloudTex, uv).r * 0.72 + texture(uCloudTex, uv * 3.1 + 0.37).g * 0.28;
+  // cumulus: flat bottoms, rounded, eroded tops
+  float shape = smoothstep(0.0, 0.12, h) * (1.0 - smoothstep(0.35 + base * 0.55, 1.0, h));
+  float cov = uCloud.x;
+  float d = clamp((base - (1.0 - cov)) * 3.2, 0.0, 1.0) * shape;
+  if (d <= 0.0) return 0.0;
+  float detail = texture(uCloudTex, uv * 11.0 + vec2(h * 0.7, 0.13)).b;
+  return clamp(d - detail * 0.35 * (1.0 - h * 0.5), 0.0, 1.0) * 0.035;
+}
+void main() {
+  vec4 wp = uInvViewProj * vec4(vUV * 2.0 - 1.0, 1.0, 1.0);
+  vec3 V = normalize(wp.xyz / wp.w - uCamPos);
+  if (uCloud.x <= 0.0 || V.y < 0.005) { outColor = vec4(0, 0, 0, 1); return; }
+  float t0 = max(0.0, (uCloud.z - uCamPos.y) / V.y), t1 = (uCloud.z + THICK - uCamPos.y) / V.y;
+  if (t1 <= 0.0) { outColor = vec4(0, 0, 0, 1); return; }
+  t1 = min(t1, t0 + 2500.0);
+  vec3 L = uSunDir.y > -0.05 ? uSunDir : uMoonDir;
+  float mu = dot(V, L);
+  float phase = mix(cphase(mu, -0.25), cphase(mu, 0.75), 0.65) * 4.0 * PI;
+  const int N = 20;
+  float dt = (t1 - t0) / float(N);
+  float t = t0 + dt * hash21(gl_FragCoord.xy + fract(uCloudOff.xy * 0.01));
+  float T = 1.0;
+  vec3 acc = vec3(0);
+  for (int i = 0; i < N; i++) {
+    vec3 p = uCamPos + V * t;
+    float d = cloudDensity3(p);
+    if (d > 0.0) {
+      // light toward the sun or moon: three steps
+      float od = 0.0;
+      for (int j = 1; j <= 3; j++) od += cloudDensity3(p + L * float(j * j) * 22.0) * float(j) * 22.0;
+      float lightT = exp(-od * 1.2) * (1.0 - exp(-od * 2.4) * 0.5);   // beer + powder
+      float h = (p.y - uCloud.z) / THICK;
+      vec3 lit = uSunColorC * lightT * phase * 0.55 + uZenith * (0.35 + 0.65 * h) + uFlash * 2.0;
+      float a = 1.0 - exp(-d * dt);
+      acc += T * a * lit * uCloudOff.w;
+      T *= 1.0 - a;
+      if (T < 0.02) break;
+    }
+    t += dt;
+  }
+  // far clouds melt into the sky
+  float fade = clamp(1.0 - t0 / 18000.0, 0.0, 1.0) * smoothstep(0.005, 0.06, V.y);
+  outColor = vec4(acc * fade, mix(1.0, T, fade));
+}
+`;
+
+// ------------------------------------------------------------------ screen-space ambient occlusion (half resolution)
+export const SSAO_FS = /* glsl */ `
+uniform sampler2D uDepth;
+uniform mat4 uInvProj, uProj;
+uniform vec2 uTexel;
+uniform float uRadius;
+in vec2 vUV;
+out vec4 outColor;
+vec3 viewPos(vec2 uv) { float d = texture(uDepth, uv).r; vec4 p = uInvProj * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0); return p.xyz / p.w; }
+void main() {
+  float d0 = texture(uDepth, vUV).r;
+  if (d0 >= 0.99999) { outColor = vec4(1); return; }
+  vec3 P = viewPos(vUV);
+  vec3 N = normalize(cross(viewPos(vUV + vec2(uTexel.x, 0)) - P, viewPos(vUV + vec2(0, uTexel.y)) - P));
+  if (dot(N, P) > 0.0) N = -N;
+  float ang = hash21(gl_FragCoord.xy) * 6.2832;
+  vec3 rnd = vec3(cos(ang), sin(ang), 0.0);
+  vec3 T = normalize(rnd - N * dot(rnd, N)), B = cross(N, T);
+  float occ = 0.0;
+  float radius = uRadius * clamp(-P.z / 6.0, 0.4, 2.5);
+  for (int i = 0; i < 12; i++) {
+    float fi = float(i);
+    float r = (fi + 0.5) / 12.0;
+    float a = fi * 2.39996;
+    vec3 k = vec3(cos(a) * sqrt(1.0 - r), sin(a) * sqrt(1.0 - r), sqrt(r));   // cosine-weighted hemisphere
+    k *= mix(0.15, 1.0, r * r);
+    vec3 s = P + (T * k.x + B * k.y + N * k.z) * radius;
+    vec4 c = uProj * vec4(s, 1.0);
+    vec2 uv = c.xy / c.w * 0.5 + 0.5;
+    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) continue;
+    float sz = viewPos(uv).z;
+    float range = smoothstep(0.0, 1.0, radius / abs(P.z - sz));
+    occ += (sz >= s.z + 0.03 ? 1.0 : 0.0) * range;
+  }
+  outColor = vec4(vec3(clamp(1.0 - occ / 12.0, 0.0, 1.0)), 1.0);
+}
+`;
+// depth-aware blur of the occlusion (two passes)
+export const AO_BLUR_FS = /* glsl */ `
+uniform sampler2D uAOIn, uDepth;
+uniform vec2 uDir;
+uniform mat4 uInvProj;
+in vec2 vUV;
+out vec4 outColor;
+float lin(vec2 uv) { float d = texture(uDepth, uv).r; vec4 p = uInvProj * vec4(0.0, 0.0, d * 2.0 - 1.0, 1.0); return p.z / p.w; }
+void main() {
+  float z0 = lin(vUV), sum = 0.0, wsum = 0.0;
+  for (int i = -4; i <= 4; i++) {
+    vec2 uv = vUV + uDir * float(i);
+    float w = exp(-float(i * i) / 8.0) * exp(-abs(lin(uv) - z0) * 2.0);
+    sum += texture(uAOIn, uv).r * w; wsum += w;
+  }
+  outColor = vec4(vec3(sum / max(wsum, 1e-4)), 1.0);
+}
+`;
+// ------------------------------------------------------------------ anti-aliasing (FXAA) and contrast-adaptive sharpening
+export const FXAA_FS = /* glsl */ `
+uniform sampler2D uLdr;
+uniform vec2 uTexel;
+uniform float uAA, uSharpen;
+in vec2 vUV;
+out vec4 outColor;
+float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+void main() {
+  vec3 c = texture(uLdr, vUV).rgb;
+  if (uAA > 0.5) {
+    vec3 nw = texture(uLdr, vUV + vec2(-1, -1) * uTexel).rgb, ne = texture(uLdr, vUV + vec2(1, -1) * uTexel).rgb;
+    vec3 sw = texture(uLdr, vUV + vec2(-1, 1) * uTexel).rgb, se = texture(uLdr, vUV + vec2(1, 1) * uTexel).rgb;
+    float lNW = luma(nw), lNE = luma(ne), lSW = luma(sw), lSE = luma(se), lM = luma(c);
+    float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE))), lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
+    if (lMax - lMin > max(0.0312, lMax * 0.125)) {
+      vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), (lNW + lSW) - (lNE + lSE));
+      float red = max((lNW + lNE + lSW + lSE) * 0.03125, 1.0 / 128.0);
+      dir = clamp(dir / (min(abs(dir.x), abs(dir.y)) + red), vec2(-8.0), vec2(8.0)) * uTexel;
+      vec3 a = 0.5 * (texture(uLdr, vUV + dir * (1.0 / 3.0 - 0.5)).rgb + texture(uLdr, vUV + dir * (2.0 / 3.0 - 0.5)).rgb);
+      vec3 b = a * 0.5 + 0.25 * (texture(uLdr, vUV - dir * 0.5).rgb + texture(uLdr, vUV + dir * 0.5).rgb);
+      float lB = luma(b);
+      c = (lB < lMin || lB > lMax) ? a : b;
+    }
+  }
+  if (uSharpen > 0.0) {
+    // contrast-adaptive sharpening: stronger where the image is flat, gentle on edges
+    vec3 n = texture(uLdr, vUV + vec2(0, -1) * uTexel).rgb, s2 = texture(uLdr, vUV + vec2(0, 1) * uTexel).rgb;
+    vec3 e = texture(uLdr, vUV + vec2(1, 0) * uTexel).rgb, w = texture(uLdr, vUV + vec2(-1, 0) * uTexel).rgb;
+    vec3 mn = min(c, min(min(n, s2), min(e, w))), mx = max(c, max(max(n, s2), max(e, w)));
+    vec3 amp = sqrt(clamp(min(mn, 1.0 - mx) / max(mx, 1e-4), 0.0, 1.0));
+    vec3 wgt = -amp * uSharpen * 0.2;
+    c = clamp((c + (n + s2 + e + w) * wgt) / (1.0 + 4.0 * wgt), 0.0, 1.0);
+  }
+  outColor = vec4(c, 1.0);
+}
 `;

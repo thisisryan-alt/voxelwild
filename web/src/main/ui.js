@@ -10,7 +10,7 @@ const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, vol
   shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr',
   farDistance: 2000, dynamicRes: true, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
   rayStrength: 1, clouds: true, ao: 1, dayCycle: 'normal', fixedHour: 12, dayLength: 20, weatherMode: 'dynamic', brightness: 1,
-  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true };
+  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true, cloudQuality: 1, ssao: true, aa: true, sharpen: 0.6 };
 const pct = (x) => `${Math.round(x * 100)}%`;
 // every option: tab, key, label and either a range (min/max/step/fmt) or a choice list (values + labels) or a toggle
 const OPTIONS = [
@@ -33,6 +33,10 @@ const OPTIONS = [
   { tab: 'Quality', key: 'godRays', label: 'Light Shafts' },
   { tab: 'Quality', key: 'rayStrength', label: 'Light Shaft Strength', min: 0, max: 2.5, step: 0.1, fmt: pct },
   { tab: 'Quality', key: 'clouds', label: 'Clouds' },
+  { tab: 'Quality', key: 'cloudQuality', label: 'Cloud Style', values: [0, 1], labels: ['Flat', 'Volumetric'] },
+  { tab: 'Quality', key: 'ssao', label: 'Contact Shadows (SSAO)' },
+  { tab: 'Quality', key: 'aa', label: 'Anti-aliasing' },
+  { tab: 'Quality', key: 'sharpen', label: 'Sharpening', min: 0, max: 1.5, step: 0.1, fmt: pct },
   { tab: 'Quality', key: 'particles', label: 'Rain, Snow, Spores', min: 0, max: 1, step: 0.1, fmt: pct },
   { tab: 'Sky & Time', key: 'dayCycle', label: 'Time', values: ['normal', 'day', 'night', 'fixed'], labels: ['Day and night', 'Always day', 'Always night', 'Fixed hour'] },
   { tab: 'Sky & Time', key: 'fixedHour', label: 'Fixed Hour', min: 0, max: 23.75, step: 0.25, fmt: (x) => `${String(Math.floor(x)).padStart(2, '0')}:${String(Math.round((x % 1) * 60)).padStart(2, '0')}` },

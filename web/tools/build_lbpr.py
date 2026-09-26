@@ -677,10 +677,15 @@ def main():
         for t in (b["top"], b["side"], b["bottom"]):
             if b.get("tint"):
                 tints[t] = {"foliage": MC_FOLIAGE, "grass": MC_GRASS, "birch": (0x80, 0xa7, 0x55), "spruce": MC_SPRUCE}[b["tint"]]
+    for t, info in catalog.get("texinfo", {}).items():
+        if info.get("tint"):
+            tints[t] = {"foliage": MC_FOLIAGE, "grass": MC_GRASS}[info["tint"]]
     cat = []
     for t in catalog["textures"]:
         if t.startswith("@dense:"):
             a = dense_leaves(p, "block/" + t[7:], None)
+        elif t.startswith("@rot90:"):
+            a = np.ascontiguousarray(np.rot90(arr(fit(p.img("block/" + t[7:])))))
         else:
             a = arr(fit(p.img("block/" + t)))
         if t in tints:

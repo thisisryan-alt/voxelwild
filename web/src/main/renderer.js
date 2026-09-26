@@ -45,6 +45,10 @@ export class Renderer {
       glow: compile(gl, C + S.TERRAIN_VS, C + L + S.TERRAIN_FS, 'portal', '#define TRANSLUCENT 1'),
       far: compile(gl, C + S.FAR_VS, C + L + S.FAR_FS, 'far'),
       mob: compile(gl, C + S.MOB_VS, C + L + S.MOB_FS, 'mob'),
+      clouds: compile(gl, S.FULLSCREEN_VS, C + S.SKYMODEL + S.CLOUDS_FS, 'clouds'),
+      ssao: compile(gl, S.FULLSCREEN_VS, C + S.SSAO_FS, 'ssao'),
+      aoBlur: compile(gl, S.FULLSCREEN_VS, C + S.AO_BLUR_FS, 'ao-blur'),
+      fxaa: compile(gl, S.FULLSCREEN_VS, C + S.FXAA_FS, 'fxaa'),
       mobShadow: compile(gl, C + S.MOB_VS, C + S.MOB_SHADOW_FS, 'mob-shadow'),
       shadow: compile(gl, C + S.SHADOW_VS, C + S.SHADOW_FS, 'shadow'),
       shadowCut: compile(gl, C + S.SHADOW_VS, C + S.SHADOW_FS, 'shadow-cutout', '#define CUTOUT 1'),
@@ -321,7 +325,7 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
-    if (this.aniso) gl.texParameterf(gl.TEXTURE_2D_ARRAY, this.aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(this.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+    if (this.aniso) gl.texParameterf(gl.TEXTURE_2D_ARRAY, this.aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, gl.getParameter(this.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
     gl.deleteTexture(this[which]);
     this[which] = tx;
     this.gpuBytes += size * size * 4 * layers * 1.33;
@@ -556,7 +560,7 @@ export class Renderer {
     this.width = w; this.height = h;
     this.canvas.width = w; this.canvas.height = h;
     const del = (t) => t && gl.deleteTexture(t);
-    for (const t of [this.hdr, this.depth, this.copyColor, this.copyDepth, this.half, this.quarter, this.eighth, this.eighth2, this.raysTex]) del(t);
+    for (const t of [this.hdr, this.depth, this.copyColor, this.copyDepth, this.half, this.quarter, this.eighth, this.eighth2, this.raysTex, this.cloudRT, this.aoTex, this.aoTex2, this.ldr]) del(t);
     const hdr = (ww, hh) => texture2D(gl, ww, hh, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT);
     const depthTex = () => {
       const t = gl.createTexture();
@@ -580,6 +584,11 @@ export class Renderer {
     this.halfFbo = framebuffer(gl, this.half); this.quarterFbo = framebuffer(gl, this.quarter);
     this.eighthFbo = framebuffer(gl, this.eighth); this.eighth2Fbo = framebuffer(gl, this.eighth2);
     this.raysFbo = framebuffer(gl, this.raysTex);
+    // volumetric clouds (quarter), occlusion (half), the tone-mapped image before anti-aliasing (full, 8 bit)
+    this.cloudRT = hdr(Math.max(1, w >> 2), Math.max(1, h >> 2)); this.cloudFbo = framebuffer(gl, this.cloudRT);
+    const ao = () => texture2D(gl, hw, hh, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE);
+    this.aoTex = ao(); this.aoTex2 = ao(); this.aoFbo = framebuffer(gl, this.aoTex); this.aoFbo2 = framebuffer(gl, this.aoTex2);
+    this.ldr = texture2D(gl, w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE); this.ldrFbo = framebuffer(gl, this.ldr);
   }
 
   bindTex(unit, target, tex) { const gl = this.gl; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(target, tex); }
@@ -748,7 +757,18 @@ export class Renderer {
     gl.clearDepth(1);
     gl.clear(gl.DEPTH_BUFFER_BIT);
     gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
-    this.use(this.progs.sky, { uInvViewProj: this.invViewProj, uSunDir: sky.sun, uMoonDir: sky.moon,
+    const volClouds = this.settings.clouds !== false && (this.settings.cloudQuality ?? 1) > 0 && !f.dim && wth.cloudCover > 0.01;
+    if (volClouds) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.cloudFbo);
+      gl.viewport(0, 0, this.cloudFbo.w, this.cloudFbo.h);
+      gl.disable(gl.DEPTH_TEST);
+      this.use(this.progs.clouds, { uInvViewProj: this.invViewProj, uSunDir: sky.sun, uMoonDir: sky.moon, uSunColorC: sky.sunColorClouds, uZenith: sky.zenith });
+      this.fullscreen();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.hdrFbo);
+      gl.viewport(0, 0, W, H);
+    }
+    this.bindTex(19, gl.TEXTURE_2D, this.cloudRT);
+    this.use(this.progs.sky, { uCloudRT: 19, uCloudVol: volClouds ? 1 : 0, uInvViewProj: this.invViewProj, uSunDir: sky.sun, uMoonDir: sky.moon,
       uSunParams: [sky.sunVisible * (1 - wth.cloudCover * 0.85), sky.illum, (1 - wth.cloudCover) * 1.2, sky.starRot],
       uSunColorC: sky.sunColorClouds, uZenith: sky.zenith });
     this.fullscreen();
@@ -847,8 +867,12 @@ export class Renderer {
       gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       gl.depthMask(false); gl.depthFunc(gl.LEQUAL);
       const k = f.camSky * 0.9 + 0.1;
-      this.use(this.progs.line, { uOffset: f.selection.map((v) => v - 0.002), uScale: 1.004, uColor: [0.02 * k, 0.02 * k, 0.02 * k, 0.75] });
-      gl.bindVertexArray(this.lineVao); gl.drawArrays(gl.LINES, 0, this.lineVao.count);
+      gl.bindVertexArray(this.lineVao);
+      for (const b of f.selectionBoxes || [[0, 0, 0, 1, 1, 1]]) {
+        this.use(this.progs.line, { uOffset: [f.selection[0] + b[0] - 0.002, f.selection[1] + b[1] - 0.002, f.selection[2] + b[2] - 0.002],
+          uScale: [b[3] - b[0] + 0.004, b[4] - b[1] + 0.004, b[5] - b[2] + 0.004], uColor: [0.02 * k, 0.02 * k, 0.02 * k, 0.75] });
+        gl.drawArrays(gl.LINES, 0, this.lineVao.count);
+      }
     }
     if (f.particles) this.drawParticles(f.particles, f);
     gl.depthMask(true); gl.depthFunc(gl.LESS); gl.disable(gl.BLEND);
@@ -1060,13 +1084,25 @@ export class Renderer {
     }
     if (rays > 0.002) pass(this.raysFbo, P.rays, { uColor: 10, uDepth: 11, uSunUV: sunUV, uStrength: rays }, [this.hdr, this.raysDepth]);
     else { gl.bindFramebuffer(gl.FRAMEBUFFER, this.raysFbo); gl.viewport(0, 0, this.raysFbo.w, this.raysFbo.h); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); }
+    // screen-space ambient occlusion from the scene depth (before the hand)
+    const ssao = (this.settings.ssao ?? true) && this.settings.ao > 0;
+    if (ssao) {
+      const invProj = mat4.invert(mat4.create(), this.proj);
+      pass(this.aoFbo, P.ssao, { uDepth: 10, uInvProj: invProj, uProj: this.proj, uTexel: [1 / W, 1 / H], uRadius: 0.55 }, [this.raysDepth]);
+      pass(this.aoFbo2, P.aoBlur, { uAOIn: 10, uDepth: 11, uDir: [1 / this.aoTex.w, 0], uInvProj: invProj }, [this.aoTex, this.raysDepth]);
+      pass(this.aoFbo, P.aoBlur, { uAOIn: 10, uDepth: 11, uDir: [0, 1 / this.aoTex.h], uInvProj: invProj }, [this.aoTex2, this.raysDepth]);
+    }
     const underground = 1 - f.camSky;
     const nightK = 1 + ((this.settings.nightBrightness ?? 1) - 1) * (sky.night || 0);
     const exposure = sky.exposure * (1 + underground * 1.6) * (f.underwater ? 1.3 : 1) * (this.settings.brightness ?? 1) * nightK;
-    pass(null, P.composite, { uColor: 10, uBloom: 11, uBloom2: 12, uRays: 13, uExposure: exposure, uBloomAmt: bloom ? 0.07 * (this.settings.bloomStrength ?? 1) : 0,
+    const aa = this.settings.aa ?? true, sharpen = this.settings.sharpen ?? 0.6;
+    const post2 = aa || sharpen > 0;
+    this.bindTex(22, gl.TEXTURE_2D, this.aoTex);
+    pass(post2 ? this.ldrFbo : null, P.composite, { uAO: 22, uAOAmt: ssao ? 0.85 * Math.min(1, this.settings.ao) : 0, uColor: 10, uBloom: 11, uBloom2: 12, uRays: 13, uExposure: exposure, uBloomAmt: bloom ? 0.07 * (this.settings.bloomStrength ?? 1) : 0,
       uUnderwater: f.underwater ? 1 : 0, uUnderwaterColor: f.underwaterColor || [0.01, 0.06, 0.08], uSaturation: 1.08 * (this.settings.saturation ?? 1), uVignette: 0.55, uDamage: f.damage || 0, uPortal: f.portal || 0, uNight: f.dim ? 0 : (sky.night || 0) * f.camSky },
       [this.hdr, bloom ? this.quarter : this.half, bloom ? this.eighth2 : this.half, this.raysTex]);
-    for (let i = 10; i < 14; i++) this.bindTex(i, gl.TEXTURE_2D, null);
+    if (post2) pass(null, P.fxaa, { uLdr: 10, uTexel: [1 / W, 1 / H], uAA: aa ? 1 : 0, uSharpen: sharpen }, [this.ldr]);
+    for (const i of [10, 11, 12, 13, 22]) this.bindTex(i, gl.TEXTURE_2D, null);
     gl.depthMask(true);
   }
 }
