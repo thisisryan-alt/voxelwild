@@ -669,10 +669,35 @@ def main():
         rows.append(dict(name=name, mode=e["mode"], w=e.get("w", 1), h=e.get("h", 1), flags=e["flags"], slots=e["slots"],
                          side=(LAYER_NAMES + VIRTUAL).index(e["side"]) if e.get("side") else 255, **({"bands": e["bands"]} if e.get("bands") else {})))
 
+    # 3b) the block catalog (src/shared/catalog.json): colour only, in parts of PART textures; normal and material maps
+    # are generated in the browser (shared/surface.js)
+    catalog = json.loads((ROOT / "src" / "shared" / "catalog.json").read_text())
+    tints = {}
+    for b in catalog["blocks"]:
+        for t in (b["top"], b["side"], b["bottom"]):
+            if b.get("tint"):
+                tints[t] = {"foliage": MC_FOLIAGE, "grass": MC_GRASS, "birch": (0x80, 0xa7, 0x55), "spruce": MC_SPRUCE}[b["tint"]]
+    cat = []
+    for t in catalog["textures"]:
+        if t.startswith("@dense:"):
+            a = dense_leaves(p, "block/" + t[7:], None)
+        else:
+            a = arr(fit(p.img("block/" + t)))
+        if t in tints:
+            a = tint(a, tints[t])
+        if a[..., 3].min() < 0.99:
+            a = bleed(a)
+        cat.append(a)
+    cparts = (len(cat) + PART - 1) // PART
+    for k in range(cparts):
+        strip = np.concatenate(cat[k * PART:(k + 1) * PART], axis=0)
+        to_img(strip).save(OUT / f"catalog{'' if k == 0 else '.' + str(k)}.webp", quality=90, alpha_quality=100, method=6, exact=True)
+
     # 4) items, crack stages, moon, sounds
     items = {"Stick": "stick", "Coal": "coal", "IronChunk": "raw_iron", "GoldChunk": "raw_gold", "Diamond": "diamond",
              "Apple": "apple", "Berries": "sweet_berries", "Flint": "flint", "FlintAndSteel": "flint_and_steel", "NetherQuartz": "quartz",
-             "GlowstoneDust": "glowstone_dust", "EyeOfEnder": "ender_eye"}
+             "GlowstoneDust": "glowstone_dust", "EyeOfEnder": "ender_eye", "RawCopper": "raw_copper", "Emerald": "emerald",
+             "LapisLazuli": "lapis_lazuli", "Redstone": "redstone"}
     for tier in ("wooden", "stone", "iron", "diamond"):
         for tool in ("pickaxe", "axe", "shovel"):
             items[f"{tier.capitalize()}{tool.capitalize()}"] = f"{tier}_{tool}"
@@ -707,7 +732,7 @@ def main():
             (OUT / (s.replace("/", "_") + ".ogg")).write_bytes(p.raw(f"assets/minecraft/sounds/{s}.ogg"))
     sound_files = {k: [s.replace("/", "_") + ".ogg" for s in v] for k, v in sounds.items()}
 
-    meta = dict(size=SIZE, layers=n, parts=parts, slots=SLOTS, names=names, tuning=tuning, variants=rows, items=keys, sounds=sound_files,
+    meta = dict(size=SIZE, layers=n, parts=parts, baseLayers=len(LAYER_NAMES), catalog=dict(count=len(cat), parts=cparts), slots=SLOTS, names=names, tuning=tuning, variants=rows, items=keys, sounds=sound_files,
                 credit=CREDIT, licence=p.raw("Licence.txt").decode("utf-8", "replace").strip())
     (OUT / "lbpr.json").write_text(json.dumps(meta, indent=1))
     for f in sorted(OUT.iterdir()):

@@ -5,13 +5,19 @@ import { decorateColumn } from './shared/decorate.js';
 import { Mesher } from './shared/mesh.js';
 import { CS3, SECTIONS } from './shared/const.js';
 import { farGrid } from './shared/far.js';
+import { surfaceMaps } from './shared/surface.js';
 
 const mesher = new Mesher();
 
 self.onmessage = (e) => {
   const m = e.data;
   try {
-    if (m.type === 'far') {
+    if (m.type === 'surface') {
+      // normal / material maps for textures that come without them
+      const L = m.size * m.size * 4, A = new Uint8Array(L * m.count), N = new Uint8Array(L * m.count), M = new Uint8Array(L * m.count);
+      for (let k = 0; k < m.count; k++) surfaceMaps(m.data.subarray(k * L, (k + 1) * L), m.size, m.opts[k] || {}, A, N, M, k * L);
+      self.postMessage({ type: 'surface', id: m.id, A, N, M }, [A.buffer, N.buffer, M.buffer]);
+    } else if (m.type === 'far') {
       const data = farGrid(m.seed, m.x0, m.z0, m.cell, m.n);
       self.postMessage({ type: 'far', id: m.id, level: m.level, seed: m.seed, x0: m.x0, z0: m.z0, data }, [data.buffer]);
     } else if (m.type === 'gen') {

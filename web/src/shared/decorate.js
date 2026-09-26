@@ -2,12 +2,12 @@
 // (its own and its 8 neighbours') in one global order, writing only its own blocks - seamless and deterministic.
 // Also computes the sky-light heightmap (topmost light-blocking block per x,z).
 import { CS, CS2, MIN_Y, MAX_Y, SEA, colIdx } from './const.js';
-import { B, BLOCKS, F } from './blocks.js';
+import { B, BLOCKS, F, C, CAT } from './blocks.js';
 import { Biome } from './terrain.js';
 import { hash4, mulberry32 } from './noise.js';
 import { placeProps } from './props.js';
 
-const K = { Oak: 0, BigOak: 1, Birch: 2, Spruce: 3, TallSpruce: 4, Jungle: 5, JungleGiant: 6, Bush: 7, SwampOak: 8 };
+const K = { Oak: 0, BigOak: 1, Birch: 2, Spruce: 3, TallSpruce: 4, Jungle: 5, JungleGiant: 6, Bush: 7, SwampOak: 8, Acacia: 9, DarkOak: 10, Cherry: 11 };
 const GRID = 5;
 const fdiv = (a, b) => Math.floor(a / b);
 
@@ -31,14 +31,14 @@ export function decorateColumn(vox, cx, cz, seed, neighbours, dim = 0) {
     switch (biome) {
       case Biome.Plains: chance = 0.05; kind = r2 < 0.4 ? K.BigOak : K.Oak; break;
       case Biome.Forest: chance = 0.55; kind = r2 < 0.45 ? K.Oak : r2 < 0.8 ? K.Birch : K.BigOak; break;
-      case Biome.DenseForest: chance = 0.85; kind = r2 < 0.5 ? K.BigOak : r2 < 0.82 ? K.Oak : K.Birch; break;
+      case Biome.DenseForest: chance = 0.85; kind = r2 < 0.3 ? K.BigOak : r2 < 0.62 ? K.DarkOak : r2 < 0.85 ? K.Oak : K.Birch; break;
       case Biome.Jungle: chance = 0.9; kind = r2 < 0.16 ? K.JungleGiant : r2 < 0.58 ? K.Jungle : K.Bush; break;
-      case Biome.Savanna: chance = 0.08; kind = K.SwampOak; break;
+      case Biome.Savanna: chance = 0.09; kind = K.Acacia; break;
       case Biome.Swamp: chance = 0.3; kind = K.SwampOak; break;
       case Biome.Taiga: chance = 0.6; kind = r2 < 0.7 ? K.Spruce : K.TallSpruce; break;
       case Biome.SnowyTaiga: chance = 0.45; kind = r2 < 0.6 ? K.Spruce : K.TallSpruce; break;
       case Biome.SnowyTundra: chance = 0.03; kind = K.Spruce; break;
-      case Biome.Mountains: chance = height < 126 ? 0.14 : 0; kind = K.Spruce; break;
+      case Biome.Mountains: chance = height < 126 ? 0.14 : 0; kind = height < 110 && r2 < 0.35 ? K.Cherry : K.Spruce; break;
     }
     if (r1 >= chance) continue;
     trees.push({ x: px, y: height + 1, z: pz, kind, seed: hash4(px, pz, seed, 2) | 1 });
@@ -48,7 +48,7 @@ export function decorateColumn(vox, cx, cz, seed, neighbours, dim = 0) {
   const ox = cx * CS, oz = cz * CS;
   const inside = (x, y, z) => x >= ox && z >= oz && x < ox + CS && z < oz + CS && y >= MIN_Y && y < MAX_Y;
   const soft = (b) => b === B.Air || ((BLOCKS[b].flags & F.Replaceable) && !(BLOCKS[b].flags & F.Liquid));
-  const isLeaves = (b) => b >= B.OakLeaves && b <= B.JungleLeaves;
+  const isLeaves = (b) => (b >= B.OakLeaves && b <= B.JungleLeaves) || (CAT[b] && CAT[b].cat === 'leaves');
   const w = {
     log(x, y, z, id) { if (!inside(x, y, z)) return; const i = colIdx(x - ox, y, z - oz); const c = vox[i]; if (soft(c) || isLeaves(c)) vox[i] = id; },
     leaf(x, y, z, id) { if (!inside(x, y, z)) return; const i = colIdx(x - ox, y, z - oz); if (soft(vox[i])) vox[i] = id; },
@@ -243,5 +243,34 @@ function build(t, w) {
     }
     case K.Bush: trunk(t.x, t.y, t.z, 1, B.JungleLog); blob(t.x, t.y + 1, t.z, 2.3, 1.6, 2.3, B.JungleLeaves); break;
     case K.SwampOak: { const h = ri(5, 8); trunk(t.x, t.y, t.z, h, B.OakLog); blob(t.x, t.y + h, t.z, 4.2, 1.6, 4.2, B.OakLeaves); break; }
+    case K.Acacia: {
+      // a leaning trunk that forks into flat, wide crowns
+      const log = C.acacia_log || B.OakLog, leaf = C.acacia_leaves || B.OakLeaves;
+      const h = ri(4, 7), dx = rng() < 0.5 ? 1 : -1, dz = rng() < 0.5 ? 1 : -1;
+      trunk(t.x, t.y, t.z, h - 2, log);
+      let x = t.x, z = t.z, y = t.y + h - 2;
+      for (let k = 0; k < 3; k++) { x += dx * (k > 0 ? 1 : 0); z += dz * (k === 2 ? 1 : 0); w.log(x, y + k, z, log); }
+      const top = y + 2;
+      for (let yy = 0; yy <= 1; yy++) { const r = yy === 0 ? 3.2 : 2.1; blob(x, top + yy, z, r, 0.6, r, leaf); }
+      if (rng() < 0.6) { const bx = t.x - dx * 2, bz = t.z - dz; w.log(t.x - dx, t.y + h - 3, t.z, log); w.log(bx, t.y + h - 2, bz, log); blob(bx, t.y + h - 1, bz, 2.3, 0.6, 2.3, leaf); }
+      break;
+    }
+    case K.DarkOak: {
+      // 2 x 2 trunk under a heavy, low dome
+      const log = C.dark_oak_log || B.OakLog, leaf = C.dark_oak_leaves || B.OakLeaves, h = ri(6, 9);
+      for (let dz = 0; dz <= 1; dz++) for (let dx = 0; dx <= 1; dx++) trunk(t.x + dx, t.y, t.z + dz, h, log);
+      blob(t.x + 1, t.y + h, t.z + 1, 4.2, 2.4, 4.2, leaf);
+      blob(t.x + 1, t.y + h + 2, t.z + 1, 2.6, 1.4, 2.6, leaf);
+      break;
+    }
+    case K.Cherry: {
+      const log = C.cherry_log || B.OakLog, leaf = C.cherry_leaves || B.OakLeaves, h = ri(5, 8);
+      trunk(t.x, t.y, t.z, h, log);
+      blob(t.x, t.y + h, t.z, 3.6, 2.2, 3.6, leaf);
+      const dx = rng() < 0.5 ? 2 : -2;
+      for (let k = 1; k <= 2; k++) w.log(t.x + Math.sign(dx) * k, t.y + h - 3 + k, t.z, log);
+      blob(t.x + dx, t.y + h - 1, t.z, 2.6, 1.8, 2.6, leaf);
+      break;
+    }
   }
 }

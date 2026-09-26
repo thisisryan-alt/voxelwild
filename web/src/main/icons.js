@@ -16,7 +16,7 @@ export class Icons {
     this.canvas.width = CELL * COLS; this.canvas.height = CELL * rows;
     this.index = new Map(this.ids.map((id, i) => [id, i]));
     this.layerAvg = [];
-    this.thumbs = albedoBitmap ? this.makeThumbs(albedoBitmap) : null;
+    this.thumbs = albedoBitmap ? this.makeThumbs(albedoBitmap, opts.thumb) : null;
     const ctx = this.canvas.getContext('2d');
     ctx.imageSmoothingEnabled = true;
     for (const id of this.ids) {
@@ -25,16 +25,22 @@ export class Icons {
       try { this.draw(ctx, id); } catch (e) { console.warn('icon', id, e); }
       ctx.restore();
     }
-    this.url = this.canvas.toDataURL('image/png');
+    // a short blob: URL (a data: URL of the whole atlas repeated in every slot's CSS grows past string limits)
+    const data = atob(this.canvas.toDataURL('image/png').split(',')[1]), bytes = new Uint8Array(data.length);
+    for (let i = 0; i < data.length; i++) bytes[i] = data.charCodeAt(i);
+    this.url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
   }
 
   /** 64px tinted thumbnails of every texture layer, plus the average colour (linear) for particles. */
-  makeThumbs(bmp) {
-    const size = bmp.width, n = Math.min(Math.round(bmp.height / size), this.tuning.length), T = 64;   // the layers, not their variants
+  /** thumb(l): [image, sx, sy, sw, sh] of a layer's picture, or null to read layer l of the vertical strip bmp. */
+  makeThumbs(bmp, thumb) {
+    const size = bmp.width, T = 64;
+    const n = thumb ? this.tuning.length : Math.min(Math.round(bmp.height / size), this.tuning.length);
     const c = document.createElement('canvas'); c.width = T; c.height = T * n;
     const x = c.getContext('2d', { willReadFrequently: true });
     x.imageSmoothingQuality = 'high';
-    x.drawImage(bmp, 0, 0, size, size * n, 0, 0, T, T * n);
+    if (thumb) for (let l = 0; l < n; l++) { const s = thumb(l); if (s) x.drawImage(s[0], s[1], s[2], s[3], s[4], 0, l * T, T, T); }
+    else x.drawImage(bmp, 0, 0, size, size * n, 0, 0, T, T * n);
     const img = x.getImageData(0, 0, T, T * n), d = img.data;
     const thumbs = [];
     for (let l = 0; l < n; l++) {

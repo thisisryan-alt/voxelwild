@@ -1,7 +1,7 @@
 // Port of ColumnGenerationJob: 3D density terrain (height + overhang noise on a 4-block lattice), per-biome surface
 // strata, water/ice, caves (spaghetti tunnels, cheese caverns, flooded aquifers), ores, cave floors, plants, springs.
 import { CS, CS2, CS3, MIN_Y, MAX_Y, HEIGHT, SEA, colIdx } from './const.js';
-import { B } from './blocks.js';
+import { B, C } from './blocks.js';
 import { Terrain, Biome, seedOffset } from './terrain.js';
 import { hash4, mulberry32, smoothstep } from './noise.js';
 import { generateNether } from './nether.js';
@@ -119,6 +119,7 @@ export function generateColumn(cx, cz, seed, dim = 0) {
     if (vox[i] === B.Lava && vox[colIdx(x, LAVA_LEVEL + 1, z)] === B.Water) vox[i] = B.Obsidian;
   }
   placeOres(vox, cx, cz, seed);
+  stoneVariety(vox, ox, oz, seed);
   applyStrongholds(vox, ox, oz, seed);
   decorateCaveFloors(vox, sHeight, ox, oz, seed, n);
   placeSurfacePlants(vox, sHeight, sTop, sBiome, ox, oz, seed, n);
@@ -186,6 +187,51 @@ function placeOres(vox, cx, cz, seed) {
   cluster(B.IronOre, 12, -60, 64, 4, 9);
   cluster(B.GoldOre, 4, -64, 8, 3, 7);
   cluster(B.DiamondOre, 2, -64, -36, 2, 5);
+  if (C.copper_ore) cluster(C.copper_ore, 10, -16, 96, 5, 10);
+  if (C.lapis_ore) cluster(C.lapis_ore, 3, -60, 32, 3, 7);
+  if (C.redstone_ore) cluster(C.redstone_ore, 5, -64, -16, 4, 8);
+  if (C.emerald_ore) cluster(C.emerald_ore, 3, 60, 180, 1, 2);
+}
+
+/**
+ * Minecraft 1.18-style underground: deepslate below y 0 (a ragged boundary), pockets of granite, diorite and andesite
+ * (tuff down deep) placed on a 3D grid so they cross columns seamlessly, and the ores in deepslate turned to their
+ * deepslate forms.
+ */
+const DEEP_ORE = () => ({ [B.CoalOre]: C.deepslate_coal_ore, [B.IronOre]: C.deepslate_iron_ore, [B.GoldOre]: C.deepslate_gold_ore,
+  [B.DiamondOre]: C.deepslate_diamond_ore, [C.copper_ore]: C.deepslate_copper_ore, [C.lapis_ore]: C.deepslate_lapis_ore,
+  [C.redstone_ore]: C.deepslate_redstone_ore, [C.emerald_ore]: C.deepslate_emerald_ore });
+function stoneVariety(vox, ox, oz, seed) {
+  if (!C.deepslate) return;
+  const deepOre = DEEP_ORE();
+  // pockets: one candidate per 16^3 cell
+  const G = 16;
+  for (let gy = Math.floor(MIN_Y / G); gy <= Math.floor(130 / G); gy++) for (let gz = Math.floor((oz - 8) / G); gz <= Math.floor((oz + CS + 8) / G); gz++)
+    for (let gx = Math.floor((ox - 8) / G); gx <= Math.floor((ox + CS + 8) / G); gx++) {
+      const h = hash4(gx, gy, gz, seed ^ 0x570E);
+      if ((h & 255) > 95) continue;
+      const cx0 = gx * G + ((h >>> 8) & 15), cy0 = gy * G + ((h >>> 12) & 15), cz0 = gz * G + ((h >>> 16) & 15);
+      const rad = 3 + ((h >>> 20) & 3) * 1.1;
+      const kind = cy0 < -8 ? (((h >>> 24) & 3) === 0 ? C.tuff : C.andesite) : [C.granite, C.diorite, C.andesite, C.granite][(h >>> 24) & 3];
+      if (!kind) continue;
+      const R = Math.ceil(rad);
+      for (let y = cy0 - R; y <= cy0 + R; y++) for (let z = cz0 - R; z <= cz0 + R; z++) for (let x = cx0 - R; x <= cx0 + R; x++) {
+        if (x < ox || z < oz || x >= ox + CS || z >= oz + CS || y <= MIN_Y + 4 || y >= MAX_Y) continue;
+        const d = ((x - cx0) ** 2 + ((y - cy0) * 1.3) ** 2 + (z - cz0) ** 2) / (rad * rad);
+        if (d > 1 - ((hash4(x, y, z, h) & 255) / 255) * 0.3) continue;
+        const i = colIdx(x - ox, y, z - oz);
+        if (vox[i] === B.Stone) vox[i] = kind;
+      }
+    }
+  // deepslate below 0
+  for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+    const top = 2 + (hash4(ox + x, 0, oz + z, seed ^ 0xDEE9) & 7) - 4;
+    for (let y = MIN_Y + 1; y <= top; y++) {
+      const i = colIdx(x, y, z), b = vox[i];
+      if (b === B.Stone || b === C.andesite || b === C.granite || b === C.diorite) vox[i] = y > top - 2 && (hash4(ox + x, y, oz + z, seed) & 1) ? b : C.deepslate;
+      else if (deepOre[b]) vox[i] = deepOre[b];
+    }
+  }
 }
 
 function decorateCaveFloors(vox, sHeight, ox, oz, seed, n) {
@@ -229,8 +275,27 @@ function placeSurfacePlants(vox, sHeight, sTop, sBiome, ox, oz, seed, n) {
         case Biome.Swamp: grass = 0.2; break;
       }
       const patch = Math.max(0, Math.min(1, n.noise2(wx * 0.03 + 300, wz * 0.03 + 300) * 2));
-      if (r < flowers * patch * 3) plant = n.noise2(wx * 0.02 + 77, wz * 0.02 + 77) > 0 ? B.FlowerRed : B.FlowerYellow;
-      else if (r < grass * clump + flowers * patch * 3) plant = B.TallGrass;
+      if (r < flowers * patch * 3) {
+        // flower fields: one or two kinds per patch
+        const kinds = [B.FlowerRed, B.FlowerYellow, C.azure_bluet, C.cornflower, C.allium, C.red_tulip, C.orange_tulip, C.white_tulip, C.pink_tulip, C.blue_orchid];
+        const pick = Math.floor((n.noise2(wx * 0.02 + 77, wz * 0.02 + 77) * 0.5 + 0.5) * kinds.length * 0.999);
+        plant = kinds[Math.max(0, Math.min(kinds.length - 1, pick + ((hsh >>> 24) & 1)))] || B.FlowerRed;
+        if (biome === Biome.Swamp && C.blue_orchid) plant = C.blue_orchid;
+      }
+      else if (r < grass * clump + flowers * patch * 3) plant = (biome === Biome.Taiga || biome === Biome.Jungle) && ((hsh >>> 20) & 3) === 0 && C.fern ? C.fern : B.TallGrass;
+      else if ((biome === Biome.Taiga || biome === Biome.SnowyTaiga) && r < grass * clump + 0.012 && C.sweet_berry_bush_stage3) plant = C.sweet_berry_bush_stage3;
+      else if ((biome === Biome.DenseForest || biome === Biome.Swamp) && r > 0.994 && C.brown_mushroom) plant = (hsh >>> 16) & 1 ? C.brown_mushroom : C.red_mushroom;
+      else if (r > 0.9993 && C.pumpkin && (biome === Biome.Plains || biome === Biome.Forest)) plant = C.pumpkin;
+      // sugar cane on the shore
+      if (plant === B.Air && C.sugar_cane && r < 0.25 && h === SEA && (vox[colIdx(Math.min(CS - 1, x + 1), SEA, z)] === B.Water || vox[colIdx(Math.max(0, x - 1), SEA, z)] === B.Water
+        || vox[colIdx(x, SEA, Math.min(CS - 1, z + 1))] === B.Water || vox[colIdx(x, SEA, Math.max(0, z - 1))] === B.Water)) {
+        const tall = 1 + ((hsh >>> 18) % 3);
+        for (let q = 0; q < tall; q++) vox[colIdx(x, y + q, z)] = C.sugar_cane;
+        continue;
+      }
+      // taiga floors
+      if ((biome === Biome.Taiga) && C.podzol && n.noise2(wx * 0.05 + 11, wz * 0.05) > 0.35) vox[colIdx(x, h, z)] = C.podzol;
+      else if ((biome === Biome.Taiga || biome === Biome.Savanna) && C.coarse_dirt && n.noise2(wx * 0.07 - 31, wz * 0.07) > 0.55) vox[colIdx(x, h, z)] = C.coarse_dirt;
     } else if (top === B.Sand && biome === Biome.Desert) {
       if (r < 0.004) {
         const height = 1 + ((hsh >>> 20) % 3);

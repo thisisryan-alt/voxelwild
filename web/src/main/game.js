@@ -10,7 +10,8 @@ import { Icons } from './icons.js';
 import { FarTerrain } from './far.js';
 import { SaveStore, PackStore } from './save.js';
 import { readPackZip, convertPack, decodeLarge, fetchBuiltinPack, square } from './respack.js';
-import { LAYER_TUNING, LAYER_NAMES, I } from '../shared/blocks.js';
+import { LAYER_TUNING, LAYER_NAMES, I, BASE_LAYERS, CAT } from '../shared/blocks.js';
+import CATALOG from '../shared/catalog.json';
 import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, isLava, isPortal, Dim, breakSeconds, drops, canHarvest, itemName, layerFor } from '../shared/blocks.js';
 import { strongholds, frameRing } from '../shared/stronghold.js';
 import { END_ARRIVAL, END_GATEWAY, outerGateway } from '../shared/end.js';
@@ -132,6 +133,7 @@ export class Game {
       }));
       set = { name, albedo, normal, mask, parts: { albedo: albedoP, normal: normalP, mask: maskP }, tuning: meta.tuning, variants: meta.variants,
         items: itemImages, crack, moon, stars, sounds, credit: meta.credit };
+      await this.addCatalog(set, meta, load, parts);
     } else {
       const [albedo, normal, mask] = await Promise.all([load('albedo.webp'), load('normal.webp'), load('mask.webp')]);
       set = { name: 'original', albedo, normal, mask, tuning: LAYER_TUNING, variants: null, items: null, crack: null, moon: null, sounds: null, credit: null };
@@ -144,14 +146,82 @@ export class Game {
     return set;
   }
 
+  /** The block catalog's textures: colour strips from the set, normal and material maps generated in a worker,
+   *  appended after the set's own textures; variant rows, tuning and icon sources for the catalog layers. */
+  async addCatalog(set, meta, load, parts) {
+    const base = meta.baseLayers || BASE_LAYERS, texBase = meta.layers, n = LAYER_NAMES.length, size = meta.size;
+    const cat = meta.catalog || { count: 0, parts: 0 };
+    const bmps = await Promise.all(Array.from({ length: cat.parts }, (_, k) => load(`lbpr/catalog${k ? '.' + k : ''}.webp`)));
+    const L = size * size * 4, colour = new Uint8Array(L * cat.count);
+    let o = 0;
+    for (const b of bmps) { const d = (await decodeLarge(b)).data; colour.set(d.subarray(0, Math.min(d.length, colour.length - o)), o); o += d.length; }
+    // generation settings per texture from the blocks that use it
+    const opts = CATALOG.textures.map((t) => {
+      const tu = LAYER_TUNING[LAYER_NAMES.indexOf('c:' + t)] || {};
+      const e = CATALOG.blocks.find((b) => b.top === t || b.side === t || b.bottom === t) || {};
+      const rough = { metal: 0.35, glass: 0.12, ice: 0.12, wool: 0.95, wood: 0.72, leaves: 0.75, plant: 0.7, dirt: 0.92, sand: 0.9 }[e.cat] ?? 0.82;
+      return { cutout: tu.cutout > 0, normal: e.cat === 'wool' ? 0.8 : 1.6, rough, emission: e.emission ? 0.3 : null };
+    });
+    const maps = await new Promise((resolve, reject) => {
+      const w = new Worker(this.workerUrl);
+      w.onmessage = (e) => { w.terminate(); resolve(e.data); };
+      w.onerror = (e) => { w.terminate(); reject(new Error(e.message)); };
+      w.postMessage({ type: 'surface', id: 1, size, count: cat.count, data: colour, opts }, [colour.buffer]);
+    });
+    set.extra = { albedo: { data: maps.A, count: cat.count }, normal: { data: maps.N, count: cat.count }, mask: { data: maps.M, count: cat.count } };
+    // rows: the set's own layers, the catalog layers (identity onto their textures), then the virtual rows moved past them
+    const rows = [];
+    for (let i = 0; i < base; i++) rows[i] = meta.variants[i];
+    const catIndex = new Map(CATALOG.textures.map((t, k) => [t, k]));
+    for (let i = base; i < n; i++) {
+      const k = catIndex.get(LAYER_NAMES[i].slice(2));
+      rows[i] = { mode: 0, w: 1, h: 1, flags: 0, slots: new Array(32).fill(k == null ? 0 : texBase + k), side: 255 };
+    }
+    const virtual = meta.variants.slice(base);
+    virtual.forEach((r, k) => { rows[n + k] = r; });
+    for (const r of rows) if (r && r.side != null && r.side !== 255 && r.side >= base) r.side = r.side - base + n;
+    set.variants = rows;
+    set.tuning = [...meta.tuning.slice(0, base), ...LAYER_TUNING.slice(base)];
+    // icons: base layers from the first strip, catalog layers from a sheet of the colour textures
+    const cols = 16, sheet = document.createElement('canvas');
+    sheet.width = cols * size; sheet.height = Math.ceil(cat.count / cols) * size;
+    const sx = sheet.getContext('2d');
+    for (let k = 0; k < cat.count; k++) {
+      const px = new Uint8ClampedArray(maps.A.buffer, k * L, L).slice();
+      for (let p = 3; p < L; p += 4) if (!opts[k].cutout) px[p] = 255;
+      sx.putImageData(new ImageData(px, size, size), (k % cols) * size, Math.floor(k / cols) * size);
+    }
+    const first = set.parts.albedo[0], perPart = Math.round(first.height / first.width);
+    set.thumb = (l) => {
+      const t = rows[l] ? rows[l].slots[0] : l;
+      if (t < texBase) { const part = set.parts.albedo[Math.floor(t / perPart)]; return [part, 0, (t % perPart) * size, size, size]; }
+      const k = t - texBase;
+      return [sheet, (k % cols) * size, Math.floor(k / cols) * size, size, size];
+    };
+    // a layer's own picture as raw RGBA (for resource packs that leave it out, and for the original art's borrowing)
+    set.rawLayer = async (which, l) => {
+      const t = rows[l] ? rows[l].slots[0] : l;
+      if (t >= texBase) return set.extra[which].data.subarray((t - texBase) * L, (t - texBase + 1) * L);
+      set.decoded = set.decoded || {};
+      if (!set.decoded[which]) set.decoded[which] = await Promise.all(set.parts[which].map(async (b) => (await decodeLarge(b)).data));
+      const part = set.decoded[which][Math.floor(t / perPart)];
+      return part.subarray((t % perPart) * L, (t % perPart + 1) * L);
+    };
+  }
+
   /** Completes a set with fewer layers than the game has from another set: its layers from there on, plus the variant
    *  textures those layers use, resampled to this set's size (and the variant table renumbered to match). */
   async borrowLayers(set, from) {
-    const n = LAYER_NAMES.length, own = Math.round(set.albedo.height / set.albedo.width), S = set.albedo.width;
+    const n = LAYER_NAMES.length, own = Math.round(set.albedo.height / set.albedo.width), S0 = set.albedo.width, S = Math.min(S0, from.albedo.width);
     const dec = async (bmps) => { const out = []; for (const b of bmps) out.push(await decodeLarge(b)); return out; };
     const src = { albedo: await dec(from.parts.albedo), normal: await dec(from.parts.normal), mask: await dec(from.parts.mask) };
     const fs = from.albedo.width, perPart = Math.round(from.parts.albedo[0].height / fs);
-    const layerOf = (which, t) => { const part = src[which][Math.floor(t / perPart)], k = t % perPart; return { w: fs, h: fs, data: part.data.subarray(k * fs * fs * 4, (k + 1) * fs * fs * 4) }; };
+    const partsTotal = from.parts.albedo.reduce((a, b) => a + Math.round(b.height / fs), 0), FL = fs * fs * 4;
+    const layerOf = (which, t) => {
+      if (t >= partsTotal) return { w: fs, h: fs, data: from.extra[which].data.subarray((t - partsTotal) * FL, (t - partsTotal + 1) * FL) };
+      const part = src[which][Math.floor(t / perPart)], k = t % perPart;
+      return { w: fs, h: fs, data: part.data.subarray(k * FL, (k + 1) * FL) };
+    };
     // which source textures: the borrowed layers themselves, then every texture their variant rows reach
     const map = new Map(), order = [];
     for (let i = own; i < n; i++) { map.set(i, i); order.push(i); }
@@ -168,7 +238,8 @@ export class Game {
     set.raw = { size: S, layers: total };
     for (const which of ['albedo', 'normal', 'mask']) {
       const out = new Uint8Array(L * total);
-      out.set(own3[which].subarray(0, L * own));
+      // the set's own pictures, brought to the shared size
+      for (let i = 0; i < own; i++) out.set(square({ w: S0, h: S0, data: own3[which].subarray(i * S0 * S0 * 4, (i + 1) * S0 * S0 * 4) }, S), i * L);
       order.forEach((t, k) => out.set(square(layerOf(which, t), S), (own + k) * L));
       set.raw[which] = out;
     }
@@ -176,12 +247,16 @@ export class Game {
     set.variants = rows;
     set.items = new Map([...from.items].filter(([id]) => ITEMS[id] && ITEMS[id].id >= I.Flint));
     set.stars = from.stars;
-    // thumbnails for the item icons: an opaque copy of the base layers
-    const flat = new Uint8ClampedArray(set.raw.albedo.subarray(0, L * n));
-    for (let i = 0; i < n; i++) if (!set.tuning[i].cutout) for (let p = i * L + 3; p < (i + 1) * L; p += 4) flat[p] = 255;
-    const c = document.createElement('canvas'); c.width = S; c.height = S * n;
-    c.getContext('2d').putImageData(new ImageData(flat, S, S * n), 0, 0);
-    set.thumbs = await createImageBitmap(c);
+    // thumbnails for the item icons: an opaque copy of the base layers on a sheet (a strip would be too tall for a canvas)
+    const cols = 16, sheet = document.createElement('canvas');
+    sheet.width = cols * S; sheet.height = Math.ceil(n / cols) * S;
+    const sx = sheet.getContext('2d');
+    for (let i = 0; i < n; i++) {
+      const px = new Uint8ClampedArray(set.raw.albedo.subarray(i * L, (i + 1) * L));
+      if (!set.tuning[i].cutout) for (let p = 3; p < L; p += 4) px[p] = 255;
+      sx.putImageData(new ImageData(px, S, S), (i % cols) * S, Math.floor(i / cols) * S);
+    }
+    set.thumb = (l) => [sheet, (l % cols) * S, Math.floor(l / cols) * S, S, S];
   }
 
   /** Makes a texture set the block materials (under any resource pack the player loaded). */
@@ -190,13 +265,13 @@ export class Game {
     this.builtinRaw = set.raw ? { size: set.raw.size, albedo: set.raw.albedo, normal: set.raw.normal, mask: set.raw.mask } : null;
     const r = this.renderer;
     if (set.raw) for (const w of ['albedo', 'normal', 'mask']) r.uploadLayersRaw(w, set.raw[w], set.raw.size, set.raw.layers);
-    else for (const w of ['albedo', 'normal', 'mask']) r.uploadLayers(w, set.parts ? set.parts[w] : set[w]);
+    else for (const w of ['albedo', 'normal', 'mask']) r.uploadLayers(w, set.parts ? set.parts[w] : set[w], set.extra ? set.extra[w] : null);
     r.setTuning(set.tuning);
     r.setVariants(set.variants);
     r.setCrackTexture(set.crack);
     r.setMoonTexture(set.moon);
     r.setStarsTexture(set.stars || null);
-    this.icons = new Icons(set.thumbs || set.albedo, { tuning: set.tuning, items: set.items });
+    this.icons = new Icons(set.thumbs || set.albedo, { tuning: set.tuning, items: set.items, thumb: set.thumbs ? null : set.thumb });
     r.uploadAtlas(this.icons.canvas);
     this.updateFarPalette();
     this.audio.setSamples(set.sounds);
@@ -246,8 +321,11 @@ export class Game {
   /** Converts a pack (from a ZIP or from storage) into the block materials. */
   async applyPack(pack, fresh) {
     if (!this.builtinRaw) {
-      const d = async (bmp) => (await decodeLarge(bmp)).data;   // the strips are taller than some GPUs' texture limit
-      this.builtinRaw = { size: this.builtin.albedo.width, albedo: await d(this.builtin.albedo), normal: await d(this.builtin.normal), mask: await d(this.builtin.mask) };
+      // every layer's own picture, one per layer, for the blocks a pack leaves out
+      const set = this.builtin, n = LAYER_NAMES.length, S = set.albedo.width, L = S * S * 4;
+      const raw = { size: S, albedo: new Uint8Array(L * n), normal: new Uint8Array(L * n), mask: new Uint8Array(L * n) };
+      for (const w of ['albedo', 'normal', 'mask']) for (let i = 0; i < n; i++) raw[w].set(await set.rawLayer(w, i), i * L);
+      this.builtinRaw = raw;
     }
     const conv = await convertPack(pack, this.builtinRaw, pack.opts || {});
     const n = LAYER_NAMES.length;

@@ -95,11 +95,11 @@ export class Renderer {
   setVariants(rows) {
     const gl = this.gl, W = 34;
     const n = Math.max(LAYER_NAMES.length, rows ? rows.length : 0);
-    const data = new Uint8Array(W * n * 4);
+    const data = new Uint16Array(W * n * 4);
     for (let r = 0; r < n; r++) {
       const row = rows && rows[r];
       const o = r * W * 4;
-      for (let k = 0; k < 32; k++) data[o + k * 4] = row ? row.slots[k] : Math.min(r, 255);
+      for (let k = 0; k < 32; k++) data[o + k * 4] = row ? row.slots[k] : r;
       if (row) data.set([row.mode, row.w || 1, row.h || 1, row.flags || 0], o + 32 * 4);
       if (row && row.bands) row.bands.forEach((b, k) => data.set(b, o + (k + 1) * 4));   // (texture, minY, maxY, faces)
       data[o + 33 * 4] = row && row.side != null ? row.side : 255;
@@ -107,9 +107,7 @@ export class Renderer {
     if (this.varTex) gl.deleteTexture(this.varTex);
     this.varTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.varTex);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8UI, W, n, 0, gl.RGBA_INTEGER, gl.UNSIGNED_BYTE, data);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16UI, W, n, 0, gl.RGBA_INTEGER, gl.UNSIGNED_SHORT, data);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   }
@@ -297,10 +295,11 @@ export class Renderer {
   }
 
   /** Uploads one material strip (layers stacked vertically) as a mipmapped texture array. */
-  uploadLayers(which, bitmaps) {
+  /** bitmaps: strips (one or more parts); extra: { data: Uint8Array, count } raw layers appended after them. */
+  uploadLayers(which, bitmaps, extra) {
     const gl = this.gl;
     const parts = Array.isArray(bitmaps) ? bitmaps : [bitmaps];
-    const size = parts[0].width, layers = parts.reduce((n, b) => n + Math.round(b.height / size), 0);
+    const size = parts[0].width, layers = parts.reduce((n, b) => n + Math.round(b.height / size), 0) + (extra ? extra.count : 0);
     const tx = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, tx);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -314,6 +313,7 @@ export class Renderer {
       gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, z, size, size, n, gl.RGBA, gl.UNSIGNED_BYTE, b);
       z += n;
     }
+    if (extra && extra.count) gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, z, size, size, extra.count, gl.RGBA, gl.UNSIGNED_BYTE, extra.data);
     gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -520,10 +520,11 @@ export class Renderer {
         f32[o / 4] = 0.5 + n[0] * 0.5 + (t[0] * su + b[0] * sv) * 0.5;
         f32[o / 4 + 1] = 0.5 + n[1] * 0.5 + (t[1] * su + b[1] * sv) * 0.5;
         f32[o / 4 + 2] = 0.5 + n[2] * 0.5 + (t[2] * su + b[2] * sv) * 0.5;
-        u8[o + 12] = f | ((cut ? 0 : 15) << 3); u8[o + 13] = layerFor(d, f); u8[o + 14] = 255;
+        const lay = layerFor(d, f);
+        u8[o + 12] = f | ((cut ? 0 : 15) << 3); u8[o + 13] = lay & 255; u8[o + 14] = 255;
         u8[o + 15] = f === 2 || f === 3 ? (f === 2 && d.overlay !== NONE ? NONE : NONE) : d.overlay;
         u8[o + 16] = 255; u8[o + 17] = 0; u8[o + 18] = 150; u8[o + 19] = 120;
-        u8[o + 20] = d.tint; u8[o + 21] = 0; u8[o + 22] = 128; u8[o + 23] = 128;
+        u8[o + 20] = d.tint; u8[o + 21] = 0; u8[o + 22] = lay >> 8; u8[o + 23] = 128;
         v++;
       }
       idx.set([0, 1, 2, 0, 2, 3].map((k) => f * 4 + k), f * 6);

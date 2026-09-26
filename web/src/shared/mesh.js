@@ -7,11 +7,12 @@ import { CS, CS2, CS3, RS, RS2, RS3, RM, MAX_LIGHT, MIN_SY, MAX_SY } from './con
 import { BLOCKS, B, F, Shape, NONE, layerFor, waterLevel, isWater, lavaLevel, isLava } from './blocks.js';
 
 const N = BLOCKS.length;
-const EXT = new Uint8Array(BLOCKS.length).fill(255);
+const EXT = new Uint16Array(BLOCKS.length).fill(NONE);
 BLOCKS.forEach((d, i) => { if (d && d.ext != null) EXT[i] = d.ext; });
 const OPAQUE = new Uint8Array(N), OPACITY = new Uint8Array(N), EMIT = new Uint8Array(N), SHAPE = new Uint8Array(N);
 for (let i = 0; i < N; i++) {
   const d = BLOCKS[i];
+  if (!d) continue;
   OPAQUE[i] = d.flags & F.Opaque ? 1 : 0;
   OPACITY[i] = d.opacity; EMIT[i] = d.emission; SHAPE[i] = d.shape;
 }
@@ -79,6 +80,9 @@ export class Mesher {
       else if (shape === Shape.Torch) this.torch(x, y, z, id, opaque);
       else if (shape === Shape.Liquid) { if (isLava(id)) this.water(x, y, z, id, opaque, true); else this.water(x, y, z, id, water, false); }
       else if (shape === Shape.Portal) this.portal(x, y, z, id, glow);
+      else if (shape === Shape.Glass) {
+        for (let f = 0; f < 6; f++) { const n = FN[f], nb = region[RI(x + n[0], y + n[1], z + n[2])]; if (nb !== id && !OPAQUE[nb]) this.cubeFace(x, y, z, f, id, glow, true); }
+      }
       else if (shape === Shape.EndPortal) this.endPortal(x, y, z, id, opaque);
     }
     const vertices = vb.buf.slice(0, vb.len);
@@ -195,11 +199,11 @@ export class Mesher {
   light(x, y, z) { const i = RI(x, y, z); return [this.sky[i], this.blk[i]]; }
   clim(x, z) { return this.climate[(x + RM) + (z + RM) * RS]; }
 
-  vert(px, py, pz, face, edges, layer, ao, overlay, sky, bl, clim, tint, wind, fx = 128, fz = 128) {
+  vert(px, py, pz, face, edges, layer, ao, overlay, sky, bl, clim, tint, wind, fx = layer === NONE ? 128 : layer >> 8, fz = 128) {
     const vb = this.vb; vb.ensure(24);
     const o = vb.len; const f = vb.f32, u = vb.u8, fi = o >> 2;
     f[fi] = px; f[fi + 1] = py; f[fi + 2] = pz;
-    u[o + 12] = face | (edges << 3); u[o + 13] = layer; u[o + 14] = ao * 85; u[o + 15] = overlay;
+    u[o + 12] = face | (edges << 3); u[o + 13] = layer & 255; u[o + 14] = ao * 85; u[o + 15] = overlay;
     u[o + 16] = sky * 17; u[o + 17] = bl * 17; u[o + 18] = clim & 255; u[o + 19] = clim >> 8;
     u[o + 20] = tint; u[o + 21] = wind; u[o + 22] = fx; u[o + 23] = fz;
     vb.len = o + 24;
@@ -418,8 +422,9 @@ export class Mesher {
       }
       const d2 = falling && f !== 2 && f !== 3 ? 255 : 0;
       const tint = lava ? 0 : d2;
-      const s = this.vert(corners[0][0], corners[0][1], corners[0][2], f, 0, layer, 3, NONE, s1, b1, clim, tint, 0, fxe, fze);
-      for (let k = 1; k < 4; k++) this.vert(corners[k][0], corners[k][1], corners[k][2], f, 0, layer, 3, NONE, s1, b1, clim, tint, 0, fxe, fze);
+      const hx = lava ? layer >> 8 : fxe, hz = lava ? 128 : fze;   // lava needs the layer's high byte, not a flow
+      const s = this.vert(corners[0][0], corners[0][1], corners[0][2], f, 0, layer, 3, NONE, s1, b1, clim, tint, 0, hx, hz);
+      for (let k = 1; k < 4; k++) this.vert(corners[k][0], corners[k][1], corners[k][2], f, 0, layer, 3, NONE, s1, b1, clim, tint, 0, hx, hz);
       list.push6(s, 0, 1, 2, 0, 2, 3);
     }
   }

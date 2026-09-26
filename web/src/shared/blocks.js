@@ -1,3 +1,4 @@
+import CATALOG from './catalog.json';
 // Blocks, texture layers, items, mining and recipes - mirrors the Unity registry (BlockId, BlockRegistry,
 // ItemRegistry, Mining, Recipes) so both builds play by the same rules.
 
@@ -38,11 +39,14 @@ export const LAYER_NAMES = ['Stone', 'Dirt', 'GrassTop', 'Sand', 'Gravel', 'Snow
   'CrimsonFungus', 'WarpedFungus', 'CrimsonRoots', 'WarpedRoots', 'WeepingVines', 'TwistingVines', 'EndStone', 'EndStoneBricks', 'Purpur',
   'EndFrameTop', 'EndFrameSide', 'EndFrameEye', 'EndPortal', 'ChorusPlant', 'ChorusFlower', 'StoneBricks', 'MossyStoneBricks',
   'CrackedStoneBricks', 'LeavesExt', 'NeedlesExt'];
+// the catalog's textures follow ('c:' + Minecraft texture name); index 255 stays unused (it means "no layer")
+export const BASE_LAYERS = LAYER_NAMES.length;
+for (const t of CATALOG.textures) { if (LAYER_NAMES.length === 255) LAYER_NAMES.push('_none'); LAYER_NAMES.push('c:' + t); }
 export const L = Object.fromEntries(LAYER_NAMES.map((n, i) => [n, i]));
 export const NONE = 255;
 
 export const F = { Solid: 1, Opaque: 2, Liquid: 4, Replaceable: 8, Breakable: 16, NeedsSupport: 32 };
-export const Shape = { None: 0, Cube: 1, Cutout: 2, Cross: 3, Torch: 4, Liquid: 5, Portal: 6, EndPortal: 7 };
+export const Shape = { None: 0, Cube: 1, Cutout: 2, Cross: 3, Torch: 4, Liquid: 5, Portal: 6, EndPortal: 7, Glass: 8 };
 export const Tint = { None: 0, Grass: 1, Foliage: 2, Birch: 3, Spruce: 4 };
 
 const T = F.Solid | F.Opaque | F.Breakable;
@@ -141,6 +145,27 @@ BLOCKS[B.StoneBricks] = cube('Stone Bricks', L.StoneBricks);
 BLOCKS[B.MossyStoneBricks] = cube('Mossy Stone Bricks', L.MossyStoneBricks);
 BLOCKS[B.CrackedStoneBricks] = cube('Cracked Stone Bricks', L.CrackedStoneBricks);
 
+// ---------------------------------------------------------------- the catalog (catalog.json): ids from 1000
+export const CATALOG_START = 1000;
+export const C = {};                       // catalog key -> block id
+export const CAT = [];                     // block id -> catalog entry
+const TINTS = { grass: Tint.Grass, foliage: Tint.Foliage, birch: Tint.Birch, spruce: Tint.Spruce };
+CATALOG.blocks.forEach((e, k) => {
+  const id = CATALOG_START + k, lt = (t) => L['c:' + t];
+  const top = lt(e.top), side = lt(e.side), bottom = lt(e.bottom), tint = TINTS[e.tint] || 0, emission = e.emission || 0;
+  let d;
+  switch (e.shape) {
+    case 'cross': d = cross(e.name, side, tint, emission, e.cat === 'plant' && !/mushroom|cobweb|coral|lily|kelp|seagrass|spore/.test(e.key) ? 200 : 0); break;
+    case 'leaves': d = { ...leaves(e.name, side, tint), ext: side }; break;
+    case 'clear': d = { ...cube(e.name, top, side, bottom, NONE, tint, F.Solid | F.Breakable), shape: Shape.Cutout, opacity: 1, wind: 0 }; break;
+    case 'glass': d = { ...cube(e.name, top, side, bottom, NONE, tint, F.Solid | F.Breakable), shape: Shape.Glass, opacity: 1 }; break;
+    default: d = cube(e.name, top, side, bottom, NONE, tint);
+  }
+  d.emission = emission;
+  if (e.key.startsWith('sugar_cane')) d.flags = PLANT;
+  BLOCKS[id] = d; C[e.key] = id; CAT[id] = e;
+});
+
 export const has = (id, f) => (BLOCKS[id].flags & f) !== 0;
 export const isOpaque = (id) => (BLOCKS[id].flags & F.Opaque) !== 0;
 export const isSolid = (id) => (BLOCKS[id].flags & F.Solid) !== 0;
@@ -185,6 +210,20 @@ export const LAYER_TUNING = LAYER_NAMES.map((n) => {
     if (['CrimsonFungus', 'WarpedFungus', 'CrimsonRoots', 'WarpedRoots', 'WeepingVines', 'TwistingVines', 'ChorusPlant', 'ChorusFlower'].includes(n)) { t.cutout = 1; t.trans = 0.5; }
     if (n === 'Obsidian') { t.rough = 0.35; t.spec = 1.5; }
   }
+  if (n.startsWith('c:') || n === '_none') {
+    // catalog textures: one Minecraft texture per block face, settings from the blocks that use them
+    Object.assign(t, { tile: 1, normal: 1, rough: 1, macro: 0.04, tint: [1, 1, 1], spec: 1, emission: 0, trans: 0, biome: 0, cutout: 0, pom: 0.015 });
+    for (const e of CATALOG.blocks) {
+      if (e.top !== n.slice(2) && e.side !== n.slice(2) && e.bottom !== n.slice(2)) continue;
+      if (e.shape === 'cross' || e.shape === 'leaves' || e.shape === 'clear' || e.shape === 'glass') { t.cutout = 1; t.pom = 0; }
+      if (e.shape === 'cross' || e.shape === 'leaves') { t.trans = 0.7; t.macro = 0.15; }
+      if (e.tint) t.biome = 1;
+      if (e.emission) t.emission = e.emission / 4;
+      if (e.cat === 'glass' || e.cat === 'metal') { t.rough = 0.4; t.spec = 1.4; }
+      if (e.cat === 'ice') { t.rough = 0.15; t.spec = 1.5; }
+      if (e.cat === 'wool') { t.rough = 1.3; t.spec = 0.4; t.pom = 0.008; }
+    }
+  }
   if (n === 'LeavesExt' || n === 'NeedlesExt') {
     const base = n === 'LeavesExt' ? 'Leaves' : 'Needles';
     Object.assign(t, { tile: 1, macro: 0.25, rough: 1.5, tint: n === 'LeavesExt' ? [0.62, 0.78, 0.48] : [1, 1, 1], biome: 1, cutout: 1, trans: base === 'Leaves' ? 0.9 : 0.5, spec: 0.3, emission: 0 });
@@ -200,6 +239,7 @@ export const I = {
   WoodenAxe: 274, StoneAxe: 275, IronAxe: 276, DiamondAxe: 277,
   WoodenShovel: 278, StoneShovel: 279, IronShovel: 280, DiamondShovel: 281,
   Flint: 282, FlintAndSteel: 283, NetherQuartz: 284, GlowstoneDust: 285, EyeOfEnder: 286,
+  RawCopper: 287, Emerald: 288, LapisLazuli: 289, Redstone: 290,
 };
 export const Kind = { Block: 0, Material: 1, Tool: 2, Food: 3, Use: 4 };   // Use: right-click items (flint and steel, eye of ender)
 export const ToolType = { None: 0, Pickaxe: 1, Axe: 2, Shovel: 3 };
@@ -214,10 +254,12 @@ const placeable = [B.Stone, B.Dirt, B.Grass, B.Sand, B.Gravel, B.Snow, B.Cobbles
   B.CrimsonFungus, B.WarpedFungus, B.CrimsonRoots, B.WarpedRoots, B.WeepingVines, B.TwistingVines, B.EndStone, B.EndStoneBricks, B.Purpur,
   B.EndPortalFrame, B.ChorusPlant, B.ChorusFlower, B.StoneBricks, B.MossyStoneBricks, B.CrackedStoneBricks];
 for (const b of placeable) ITEMS[b] = { id: b, name: BLOCKS[b].name, kind: Kind.Block, stack: 64, block: b };
+for (const k in C) { const b = C[k]; if (CAT[b].hard !== 'unbreakable') ITEMS[b] = { id: b, name: BLOCKS[b].name, kind: Kind.Block, stack: 64, block: b }; }
 const mat = (id, name) => (ITEMS[id] = { id, name, kind: Kind.Material, stack: 64 });
 const food = (id, name, f, sat) => (ITEMS[id] = { id, name, kind: Kind.Food, stack: 64, food: f, sat });
 mat(I.Stick, 'Stick'); mat(I.Coal, 'Coal'); mat(I.IronChunk, 'Iron Chunk'); mat(I.GoldChunk, 'Gold Chunk'); mat(I.Diamond, 'Diamond');
 food(I.Apple, 'Apple', 4, 2.4); food(I.Berries, 'Wild Berries', 2, 0.4);
+mat(I.RawCopper, 'Raw Copper'); mat(I.Emerald, 'Emerald'); mat(I.LapisLazuli, 'Lapis Lazuli'); mat(I.Redstone, 'Redstone Dust');
 mat(I.Flint, 'Flint'); mat(I.NetherQuartz, 'Nether Quartz'); mat(I.GlowstoneDust, 'Glowstone Dust');
 ITEMS[I.FlintAndSteel] = { id: I.FlintAndSteel, name: 'Flint and Steel', kind: Kind.Use, stack: 1, durability: 64 };
 ITEMS[I.EyeOfEnder] = { id: I.EyeOfEnder, name: 'Eye of Ender', kind: Kind.Use, stack: 64 };
@@ -265,9 +307,29 @@ export function mining(block) {
     case B.CrimsonStem: case B.WarpedStem: return { hardness: 2, tool: ToolType.Axe, required: Tier.Hand };
     case B.ChorusPlant: case B.ChorusFlower: return { hardness: 0.4, tool: ToolType.Axe, required: Tier.Hand };
     case B.NetherWartBlock: case B.WarpedWartBlock: case B.Shroomlight: return { hardness: 1, tool: ToolType.None, required: Tier.Hand };
-    default: return { hardness: 0, tool: ToolType.None, required: Tier.Hand };
+    default: {
+      const e = CAT[block];
+      if (!e) return { hardness: 0, tool: ToolType.None, required: Tier.Hand };
+      if (e.hard === 'unbreakable') return { hardness: -1, tool: ToolType.None, required: Tier.Hand };
+      if (e.hard === 'obsidian') return { hardness: 50, tool: ToolType.Pickaxe, required: Tier.Diamond };
+      switch (e.cat) {
+        case 'stone': return { hardness: 1.5, tool: ToolType.Pickaxe, required: Tier.Wood };
+        case 'metal': return { hardness: 5, tool: ToolType.Pickaxe, required: Tier.Stone };
+        case 'ore': return { hardness: 3, tool: ToolType.Pickaxe, required: [Tier.Hand, Tier.Wood, Tier.Stone, Tier.Iron][e.tier || 1] };
+        case 'dirt': case 'sand': return { hardness: 0.5, tool: ToolType.Shovel, required: Tier.Hand };
+        case 'wood': return { hardness: 2, tool: ToolType.Axe, required: Tier.Hand };
+        case 'wool': return { hardness: 0.8, tool: ToolType.None, required: Tier.Hand };
+        case 'glass': return { hardness: 0.3, tool: ToolType.None, required: Tier.Hand };
+        case 'ice': return { hardness: 0.5, tool: ToolType.Pickaxe, required: Tier.Hand };
+        case 'leaves': return { hardness: 0.2, tool: ToolType.None, required: Tier.Hand };
+        case 'plant_block': return { hardness: 0.5, tool: ToolType.None, required: Tier.Hand };
+        default: return { hardness: 0, tool: ToolType.None, required: Tier.Hand };
+      }
+    }
   }
 }
+// footstep / breaking sound family for the catalog
+export const catSurface = (block) => (CAT[block] ? CAT[block].cat : null);
 const toolSpeed = (tier) => [1, 2, 4, 6, 8][tier];
 export function canHarvest(block, held) {
   const m = mining(block);
@@ -309,7 +371,21 @@ export function drops(block, held, rnd) {
     case B.BirchLeaves: case B.SpruceLeaves: return rnd < 0.1 ? [[I.Stick, 1]] : [];
     case B.TallGrass: return rnd < 0.12 ? [[I.Berries, 1]] : [];
     case B.DeadBush: return rnd < 0.5 ? [[I.Stick, 1]] : [];
-    default: return ITEMS[block] ? [[block, 1]] : [];
+    default: {
+      const e = CAT[block];
+      if (e) {
+        if (e.cat === 'glass' && e.key !== 'sea_lantern' && !e.key.endsWith('froglight') && e.key !== 'redstone_lamp') return [];
+        if (e.cat === 'leaves') { const sap = C[e.key.replace('_leaves', '_sapling')]; return rnd < 0.05 && sap ? [[sap, 1]] : rnd < 0.1 ? [[I.Stick, 1]] : []; }
+        if (e.cat === 'ore') {
+          const k = e.key.replace('deepslate_', '').replace('_ore', '');
+          const out = { coal: I.Coal, iron: I.IronChunk, copper: I.RawCopper, gold: I.GoldChunk, redstone: I.Redstone, emerald: I.Emerald, lapis: I.LapisLazuli, diamond: I.Diamond }[k];
+          const n = k === 'lapis' ? 4 + Math.floor(rnd * 5) : k === 'redstone' ? 4 + Math.floor(rnd * 2) : k === 'copper' ? 2 + Math.floor(rnd * 4) : 1;
+          return out ? [[out, n]] : [];
+        }
+        if (e.key === 'deepslate') return [[C.cobbled_deepslate, 1]];
+      }
+      return ITEMS[block] ? [[block, 1]] : [];
+    }
   }
 }
 
@@ -329,6 +405,14 @@ recipe(B.StoneBricks, 4, [[B.Cobblestone, 4]]);
 recipe(B.NetherBricks, 1, [[B.Netherrack, 4]]);
 recipe(B.EndStoneBricks, 4, [[B.EndStone, 4]]);
 recipe(B.Planks, 4, [[B.CrimsonStem, 1]]);
+for (const w of ['acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak']) if (C[`${w}_log`] && C[`${w}_planks`]) recipe(C[`${w}_planks`], 4, [[C[`${w}_log`], 1]]);
+for (const [block, item] of [['iron_block', I.IronChunk], ['gold_block', I.GoldChunk], ['diamond_block', I.Diamond], ['emerald_block', I.Emerald],
+  ['lapis_block', I.LapisLazuli], ['redstone_block', I.Redstone], ['coal_block', I.Coal], ['raw_copper_block', I.RawCopper]]) if (C[block]) recipe(C[block], 1, [[item, 9]]);
+if (C.glass) recipe(C.glass, 1, [[B.Sand, 1], [I.Coal, 1]]);
+if (C.polished_granite) recipe(C.polished_granite, 4, [[C.granite, 4]]);
+if (C.polished_diorite) recipe(C.polished_diorite, 4, [[C.diorite, 4]]);
+if (C.polished_andesite) recipe(C.polished_andesite, 4, [[C.andesite, 4]]);
+if (C.torch) recipe(B.Torch, 4, [[I.Coal, 1], [I.Stick, 1]]);
 recipe(B.Planks, 4, [[B.WarpedStem, 1]]);
 const toolMats = [B.Planks, B.Cobblestone, I.IronChunk, I.Diamond];
 toolMats.forEach((m, t) => {

@@ -67,6 +67,31 @@ if (!only || only === 'portal') {
   await shot('overworld-portal', -1.57, -0.05);
 }
 
+if (only === 'catalog') {
+  // every catalog block on a floor, 24 to a row
+  const placed = await G(() => {
+    const g = window.voxelwild.game, w = g.world, p = g.player.body.pos.map(Math.floor);
+    const x0 = p[0] + 4, y0 = p[1] + 1, z0 = p[2] - 12;
+    let k = 0;
+    for (let id = 1000; id < 1400; id++) {
+      if (!window.voxelwild.blocks[id]) continue;
+      const x = x0 + (k % 24) * 2, z = z0 + Math.floor(k / 24) * 2;
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (let dy = 0; dy < 4; dy++) w.setBlock(x + dx, y0 + dy, z + dz, dy === 0 ? 1 : 0);
+      w.setBlock(x, y0 + 1, z, id);
+      k++;
+    }
+    g.player.flying = true;
+    g.player.teleport([x0 + 23, y0 + 10, z0 - 6]);
+    return k;
+  });
+  await new Promise((r) => setTimeout(r, 8000));
+  await shot('catalog-a', 3.3, -0.6);
+  await G(() => { const g = window.voxelwild.game, p = g.player.body.pos; g.player.teleport([p[0], p[1] - 3, p[2] + 14]); });
+  await new Promise((r) => setTimeout(r, 4000));
+  await shot('catalog-b', 3.14, -0.35);
+  results.catalog = placed;
+}
+
 if (!only || only === 'stronghold') {
   const s = await G(() => window.voxelwild.game.findPlace('stronghold'));
   await G((s) => window.voxelwild.game.player.teleport([s.x + 0.5, s.y + 60, s.z + 5.5]), s);

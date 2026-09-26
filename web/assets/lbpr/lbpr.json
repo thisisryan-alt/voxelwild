@@ -2,6 +2,11 @@
  "size": 128,
  "layers": 237,
  "parts": 2,
+ "baseLayers": 81,
+ "catalog": {
+  "count": 418,
+  "parts": 4
+ },
  "slots": 32,
  "names": [
   "Stone",
@@ -5156,6 +5161,10 @@
   "NetherQuartz",
   "GlowstoneDust",
   "EyeOfEnder",
+  "RawCopper",
+  "Emerald",
+  "LapisLazuli",
+  "Redstone",
   "WoodenPickaxe",
   "WoodenAxe",
   "WoodenShovel",

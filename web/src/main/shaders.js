@@ -253,7 +253,7 @@ void main() {
 #endif
   vPos = p;
   vTexPos = aPos + uTexOrigin;
-  vFace = ivec4(int(a.x & 7u), int((a.x >> 3u) & 15u), int(a.y), int(a.w));
+  vFace = ivec4(int(a.x & 7u), int((a.x >> 3u) & 15u), int(a.y) + (int(c.z) << 8), int(a.w));
   vLight = uEntityLight.x < 0.0 ? vec3(aD0.z, aD1.x, aD1.y) : vec3(aD0.z, uEntityLight);
   vClim = vec4(aD1.z, aD1.w, float(c.x), 0.0);
   vCorner = vec2(float((a.x >> 3u) & 1u), float((a.x >> 4u) & 1u));
@@ -381,11 +381,13 @@ void main() {
   }
   float alpha = TLP2(layer).w > 0.5 ? s.alpha : 1.0;
 #ifdef TRANSLUCENT
+  if (special > 1.5) {
   // nether portal: glowing, see-through, gently swirling
   vec3 pc = s.albedo * (0.5 + TLP2(layer).x * 0.3);
   pc *= 0.8 + 0.4 * vnoise(vTexPos.xy * 3.0 + vTexPos.zy * 3.0 + uTime * 0.6);
   outColor = vec4(applyFog(pc, vPos), clamp(s.alpha * 0.62, 0.0, 0.75));
   return;
+  }
 #endif
 #ifdef CUTOUT
   // keep foliage coverage in distant mips
@@ -452,7 +454,11 @@ void main() {
   vec3 col = shade(s.albedo * directShade, n, s.rough, s.metal, s.ao * vao, TLT(layer).w, s.albedo * s.emis,
                    TLP2(layer).y, vPos, vLight.y, vLight.z, pomShadow, uSkyLut);
   col += s.albedo * uFlash * vLight.y * 2.0;
+#ifdef TRANSLUCENT
+  outColor = vec4(applyFog(col, vPos), clamp(s.alpha, 0.15, 1.0));   // stained glass, slime, honey
+#else
   outColor = vec4(applyFog(col, vPos), 1.0);
+#endif
   if (uDebug == 1) outColor = vec4(s.albedo, 1.0);
   else if (uDebug == 2) outColor = vec4(n * 0.5 + 0.5, 1.0);
   else if (uDebug == 3) outColor = vec4(s.ao, s.rough, s.metal, 1.0);
@@ -481,7 +487,8 @@ void main() {
   p += windOffset(p, aD2.y);
 #endif
   vTexPos = aPos + uTexOrigin;
-  vFL = ivec2(face, int(a.y));
+  uvec4 c2 = uvec4(round(aD2 * 255.0));
+  vFL = ivec2(face, int(a.y) + (int(c2.z) << 8));
   vCorner = vec2(float((a.x >> 3u) & 1u), float((a.x >> 4u) & 1u));
   vCell = plantCell(vTexPos, face, vCorner);
   gl_Position = uViewProj * vec4(p, 1.0);

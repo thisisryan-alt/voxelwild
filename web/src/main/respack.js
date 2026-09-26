@@ -204,7 +204,9 @@ export async function convertPack(pack, builtin, opts = {}) {
   }
   if (!found.length) throw new Error('None of the textures the game uses are in this pack.');
   // array resolution: the pack's own (at least the built-in 256, at most 512 to fit GPU memory)
-  const R = Math.min(MAX_RES, Math.max(256, 1 << Math.ceil(Math.log2(res))));
+  // at the pack's own resolution (at least the built-in one), within a memory budget for all the layers
+  let R = Math.min(MAX_RES, Math.max(builtin.size, 1 << Math.ceil(Math.log2(res))));
+  while (R > builtin.size && n * R * R * 4 * 3 > 240e6) R >>= 1;
   const L = R * R * 4, A = new Uint8Array(L * n), N = new Uint8Array(L * n), M = new Uint8Array(L * n);
   const tuning = LAYER_TUNING.map((t) => ({ ...t, tint: [...t.tint] }));
   const bs = builtin.size;
