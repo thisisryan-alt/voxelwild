@@ -7,6 +7,8 @@ import { CS, CS2, CS3, RS, RS2, RS3, RM, MAX_LIGHT, MIN_SY, MAX_SY } from './con
 import { BLOCKS, B, F, Shape, NONE, layerFor, waterLevel, isWater, lavaLevel, isLava } from './blocks.js';
 
 const N = BLOCKS.length;
+const EXT = new Uint8Array(BLOCKS.length).fill(255);
+BLOCKS.forEach((d, i) => { if (d && d.ext != null) EXT[i] = d.ext; });
 const OPAQUE = new Uint8Array(N), OPACITY = new Uint8Array(N), EMIT = new Uint8Array(N), SHAPE = new Uint8Array(N);
 for (let i = 0; i < N; i++) {
   const d = BLOCKS[i];
@@ -48,7 +50,8 @@ export class Mesher {
    * region: Uint16Array(RS3); heightPatch: Int32Array(RS2) world y of top light-blocker; climate: Uint16Array(RS2)
    * Returns transferable result.
    */
-  mesh(region, heightPatch, climate, sx, sy, sz, fancyLeaves) {
+  mesh(region, heightPatch, climate, sx, sy, sz, leafBits) {
+    const fancyLeaves = (leafBits & 1) !== 0, tufts = (leafBits & 2) !== 0;
     this.region = region; this.heightPatch = heightPatch; this.climate = climate;
     this.sy = sy; this.sx = sx; this.sz = sz;
     this.computeLight();
@@ -70,6 +73,7 @@ export class Mesher {
           if (OPAQUE[nb]) continue;
           if (!fancyLeaves && SHAPE[nb] === Shape.Cutout) continue;
           this.cubeFace(x, y, z, f, id, cutout, true);
+          if (tufts && EXT[id] !== NONE && SHAPE[nb] !== Shape.Cutout && !(f === 3 && !fancyLeaves)) this.leafTuft(x, y, z, f, id, cutout);
         }
       } else if (shape === Shape.Cross) this.cross(x, y, z, id, cutout);
       else if (shape === Shape.Torch) this.torch(x, y, z, id, opaque);
@@ -242,6 +246,30 @@ export class Mesher {
     const s02 = ao0 + ao2 + ((l0[0] + l2[0]) >> 3), s13 = ao1 + ao3 + ((l1[0] + l3[0]) >> 3);
     // counter-clockwise seen from outside (WebGL's default front face)
     if (s02 >= s13) list.push6(s, 0, 1, 2, 0, 2, 3); else list.push6(s, 1, 2, 3, 1, 3, 0);
+  }
+
+  /** A loose leaf cluster outside an exposed leaf face: pushed out, oversized and jittered so canopies read round and fluffy. */
+  leafTuft(x, y, z, face, id, list) {
+    const d = BLOCKS[id], n = FN[face], t = FT[face], b = FB[face];
+    const wx = this.sx * CS + x, wy = this.sy * CS + y, wz = this.sz * CS + z;
+    let h = (Math.imul(wx, 73856093) ^ Math.imul(wy, 19349663) ^ Math.imul(wz, 83492791) ^ Math.imul(face + 1, 2654435761)) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0;
+    const r = (k) => ((h >>> (k * 5)) & 31) / 31;
+    const out = 0.12 + r(0) * 0.26, half = 0.62 + r(1) * 0.22, ju = (r(2) - 0.5) * 0.35, jv = (r(3) - 0.5) * 0.35;
+    const [sl, bl] = this.light(x + n[0], y + n[1], z + n[2]);
+    const clim = this.clim(x, z);
+    const cx = x + 0.5 + n[0] * (0.5 + out) + t[0] * ju + b[0] * jv, cy = y + 0.5 + n[1] * (0.5 + out) + t[1] * ju + b[1] * jv;
+    const cz = z + 0.5 + n[2] * (0.5 + out) + t[2] * ju + b[2] * jv;
+    // tilt the cluster a little toward the face normal's neighbours so the silhouette is not a stack of planes
+    const tilt = (r(4) - 0.5) * 0.5;
+    const tx = t[0] * half, ty = t[1] * half, tz = t[2] * half;
+    const bx = b[0] * half + n[0] * tilt, by = b[1] * half + n[1] * tilt, bz = b[2] * half + n[2] * tilt;
+    const layer = EXT[id];
+    const s = this.vert(cx - tx - bx, cy - ty - by, cz - tz - bz, face, 0, layer, 2, NONE, sl, bl, clim, d.tint, d.wind);
+    this.vert(cx - tx + bx, cy - ty + by, cz - tz + bz, face, 0, layer, 3, NONE, sl, bl, clim, d.tint, d.wind);
+    this.vert(cx + tx + bx, cy + ty + by, cz + tz + bz, face, 0, layer, 3, NONE, sl, bl, clim, d.tint, d.wind);
+    this.vert(cx + tx - bx, cy + ty - by, cz + tz - bz, face, 0, layer, 2, NONE, sl, bl, clim, d.tint, d.wind);
+    list.push6(s, 0, 1, 2, 0, 2, 3);
   }
 
   cross(x, y, z, id, list) {

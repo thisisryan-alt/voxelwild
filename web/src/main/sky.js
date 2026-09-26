@@ -125,20 +125,23 @@ export class TimeOfDay {
     if (useSun) { lightDir = sun; lightColor = trans.map((c) => c * lightScale * sunWeight * dim); }
     else {
       lightDir = moon;
-      const k = 0.32 * illum * smoothstep(-0.02, 0.12, moon[1]) * (1 - sunWeight) * dim;
-      lightColor = [0.62 * k, 0.72 * k, 1.0 * k];
+      // moonlight: cold and dim, never quite gone (starlight carries the new moon)
+      const k = (0.06 + 0.22 * illum) * smoothstep(-0.02, 0.12, moon[1]) * (1 - sunWeight) * dim;
+      lightColor = [0.52 * k, 0.68 * k, 1.0 * k];
     }
     const s = this.state;
     s.sun = sun; s.moon = moon; s.illum = illum; s.daylight = daylight; s.sunWeight = sunWeight;
     s.lightDir = lightDir; s.lightColor = lightColor; s.lightIsSun = useSun;
     s.sunVisible = smoothstep(-0.03, 0.01, sun[1]);
     s.starRot = (this.day + this.hour / 24) * Math.PI * 2 * 1.0027;
-    s.exposure = lerp(1.0, 2.6, 1 - daylight);
+    s.exposure = lerp(1.0, 3.4, 1 - daylight);
+    s.night = 1 - daylight;
+    s.moonVisible = smoothstep(-0.03, 0.06, moon[1]) * (1 - daylight);
 
     if (time >= this.nextAmbient || !s.ambUp) {
       this.nextAmbient = time + 0.3;
-      const night = [0.010, 0.014, 0.028];
-      const moonAmb = [0.62, 0.72, 1].map((c) => c * 0.04 * illum * saturate(moon[1] * 3));
+      const night = [0.024, 0.036, 0.07];
+      const moonAmb = [0.55, 0.7, 1].map((c) => c * (0.03 + 0.07 * illum) * saturate(moon[1] * 3));
       const zenith = skyRadiance([0, 1, 0], sun, 100, 8);
       let horizon = [0, 0, 0];
       for (let k = 0; k < 6; k++) {
@@ -156,7 +159,7 @@ export class TimeOfDay {
       s.ambDown = ground.map((v, i) => v * (1 - weather.cloudCover * 0.3) + night[i] * 0.4);
       s.fogColor = mixGrey(horizon).map((v, i) => v + night[i] * 1.2 + moonAmb[i]);
       s.fogSun = trans.map((t) => t * sunWeight * SKY.exposure * 1.5 * dim);
-      s.sunColorClouds = trans.map((t, i) => t * lightScale * 0.9 * sunWeight + moonAmb[i] * 8);
+      s.sunColorClouds = trans.map((t, i) => t * lightScale * 0.9 * sunWeight + moonAmb[i] * 3);
       s.zenith = zenith.map((v, i) => v + night[i] * 3);
       s.skyDirty = true;
     }

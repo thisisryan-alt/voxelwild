@@ -432,6 +432,7 @@ await step('LBPR textures by default, switch to the originals and back', async (
   if (before.set !== 'lbpr' || before.layers < 100 || !before.items || !before.credit) throw new Error(JSON.stringify(before));
   await page.keyboard.press('Escape');
   await page.click('#btnSettingsP');
+  await G(() => window.voxelwild.ui.showTab('Textures'));
   const credit = await G(() => document.getElementById('texCredit').textContent);
   if (!/1LotS/.test(credit) || !(await G(() => !!document.querySelector('#texCredit a[href*="curseforge"]')))) throw new Error('credit missing: ' + credit);
   await page.click('#btnTexOriginal');
@@ -457,6 +458,7 @@ await step('resource pack: load a LabPBR pack ZIP', async () => {
   });
   await page.keyboard.press('Escape');
   await page.click('#btnSettingsP');
+  await G(() => window.voxelwild.ui.showTab('Textures'));
   const input = await page.$('#packFile');
   await input.uploadFile(join(root, 'test', 'fixtures', 'labpbr-test-pack.zip'));
   await waitFor(() => /Using|Could not/.test(document.getElementById('packStatus').textContent), 30000, 'pack import');

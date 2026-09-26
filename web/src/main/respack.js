@@ -32,6 +32,7 @@ export const PACK_NAMES = {
   EndFrameSide: ['end_portal_frame_side', 'endframe_side'], ChorusPlant: ['chorus_plant'], ChorusFlower: ['chorus_flower'],
   StoneBricks: ['stone_bricks', 'stonebrick'], MossyStoneBricks: ['mossy_stone_bricks', 'stonebrick_mossy'],
   CrackedStoneBricks: ['cracked_stone_bricks', 'stonebrick_cracked'],
+  LeavesExt: ['oak_leaves', 'leaves_oak'], NeedlesExt: ['spruce_leaves', 'leaves_spruce'],
   // Glowcap, Torch and Cactus keep the game's own art: Minecraft's versions are shaped for different models
 };
 // Minecraft paints these grey and tints them with the biome colour map; a grey pack texture gets the default tint

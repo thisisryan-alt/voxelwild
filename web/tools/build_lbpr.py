@@ -46,7 +46,7 @@ LAYER_NAMES = ['Stone', 'Dirt', 'GrassTop', 'Sand', 'Gravel', 'Snow', 'Bedrock',
                'WarpedNyliumSide', 'CrimsonStem', 'CrimsonStemTop', 'WarpedStem', 'WarpedStemTop', 'NetherWart', 'WarpedWart', 'Shroomlight',
                'CrimsonFungus', 'WarpedFungus', 'CrimsonRoots', 'WarpedRoots', 'WeepingVines', 'TwistingVines', 'EndStone', 'EndStoneBricks', 'Purpur',
                'EndFrameTop', 'EndFrameSide', 'EndFrameEye', 'EndPortal', 'ChorusPlant', 'ChorusFlower', 'StoneBricks', 'MossyStoneBricks',
-               'CrackedStoneBricks']
+               'CrackedStoneBricks', 'LeavesExt', 'NeedlesExt']
 # rows of the variant table past the layers: textures only reached through another layer
 VIRTUAL = ['GrassSideOverlay', 'SnowSideOverlay']
 
@@ -269,6 +269,8 @@ MATERIALS = {
     'StoneBricks': dict(rough=0.82, normal=1.8, pom=0.025, broad=0.55, ao=3.0),
     'MossyStoneBricks': dict(rough=0.88, normal=1.8, pom=0.025, broad=0.55, ao=3.0),
     'CrackedStoneBricks': dict(rough=0.85, normal=2.0, pom=0.03, broad=0.55, ao=3.0),
+    'LeavesExt': dict(rough=0.75, normal=1.4, cutout=1, biome=1, trans=0.9, spec=0.4),
+    'NeedlesExt': dict(rough=0.8, normal=1.4, cutout=1, biome=1, trans=0.5, spec=0.3),
 }
 # Nether, End and stronghold layers: pack texture (first animation frame), made opaque where the block is a full cube
 SIMPLE = {
@@ -484,6 +486,8 @@ def main():
         elif name == 'TorchTop': a = torch_top
         elif name == 'Cactus': a = bleed(opaque(bleed(arr(fit(p.img("block/cactus_side")))), (60, 110, 50)))
         elif name == 'CactusTop': a = opaque(arr(fit(p.img("block/cactus_top"))), (60, 110, 50))
+        elif name == 'LeavesExt': a = bleed(tint(arr(fit(p.img("block/oak_leaves_better"))), MC_FOLIAGE))
+        elif name == 'NeedlesExt': a = bleed(tint(arr(fit(p.img("block/spruce_leaves_better"))), MC_SPRUCE))
         elif name == 'EndFrameEye':
             # the frame top with the eye set in it
             a = arr(fit(p.img("block/end_portal_frame_top")))

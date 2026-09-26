@@ -19,6 +19,7 @@ export class World {
     this.columns = new Map();
     this.modified = modified || new Map();       // key3 -> Uint16Array (edited sections, survives unload; saved)
     this.fancyDistance = 2;
+    this.leafMode = 'fluffy';
     const n = Math.max(2, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
     this.workers = [];
     for (let i = 0; i < n; i++) {
@@ -233,10 +234,11 @@ export class World {
     s.needsMesh = false;
     const fancy = this.wantsFancy(s);
     s.fancy = fancy;
+    const leafBits = (fancy ? 1 : 0) | (this.leafMode === 'fluffy' ? 2 : 0);
     const props = this.props.cellsFor(s.key, s.cx * CS, s.sy * CS, s.cz * CS);
     s.propsSent = props;
     this.post(w, { type: 'mesh', id: this.jobId++, key: s.key, version: s.version, region: buf.region, heightPatch: buf.heightPatch,
-      climate: buf.climate, sx: s.cx, sy: s.sy, sz: s.cz, fancy, propCells: props ? props.cells : null }, [buf.region.buffer, buf.heightPatch.buffer, buf.climate.buffer]);
+      climate: buf.climate, sx: s.cx, sy: s.sy, sz: s.cz, fancy: leafBits, propCells: props ? props.cells : null }, [buf.region.buffer, buf.heightPatch.buffer, buf.climate.buffer]);
   }
 
   buildRegion(s, region, hp, clim) {
@@ -347,6 +349,14 @@ export class World {
       }
       this.columns.delete(k);
     }
+  }
+
+  /** 'fast': solid leaf cubes; 'fancy': see-through near the camera; 'fluffy': fancy plus loose clusters on every canopy. */
+  setLeaves(mode) {
+    if (mode === this.leafMode) return;
+    this.leafMode = mode;
+    this.fancyDistance = mode === 'fast' ? -1 : 2;
+    for (const col of this.columns.values()) for (const s of col.render) if (s.hasLeaves && !s.needsMesh) { s.version++; s.needsMesh = true; }
   }
 
   wantsFancy(s) {

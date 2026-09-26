@@ -7,7 +7,47 @@ import { PACK_NAMES, listBuiltinPacks } from './respack.js';
 
 const $ = (id) => document.getElementById(id);
 const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, volume: 0.8, sfx: 1, ambience: 0.7, particles: 1,
-  shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr' };
+  shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr',
+  farDistance: 1500, dynamicRes: true, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
+  rayStrength: 1, clouds: true, ao: 1, dayCycle: 'normal', fixedHour: 12, dayLength: 20, weatherMode: 'dynamic', brightness: 1,
+  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true };
+const pct = (x) => `${Math.round(x * 100)}%`;
+// every option: tab, key, label and either a range (min/max/step/fmt) or a choice list (values + labels) or a toggle
+const OPTIONS = [
+  { tab: 'Video', key: 'viewDistance', label: 'Render Distance', min: 3, max: 16, step: 1, fmt: (x) => `${x} chunks (${x * 32} m)` },
+  { tab: 'Video', key: 'farDistance', label: 'Far Terrain', min: 0, max: 2000, step: 250, fmt: (x) => (x ? `${x} m` : 'OFF') },
+  { tab: 'Video', key: 'renderScale', label: 'Render Scale', min: 0.4, max: 1, step: 0.05, fmt: pct },
+  { tab: 'Video', key: 'dynamicRes', label: 'Dynamic Resolution' },
+  { tab: 'Video', key: 'fov', label: 'FOV', min: 55, max: 110, step: 1, fmt: (x) => `${x}°` },
+  { tab: 'Video', key: 'viewBob', label: 'View Bobbing' },
+  { tab: 'Video', key: 'showFps', label: 'Show FPS' },
+  { tab: 'Video', key: 'brightness', label: 'Brightness', min: 0.5, max: 2, step: 0.05, fmt: pct },
+  { tab: 'Quality', key: 'shadows', label: 'Shadows' },
+  { tab: 'Quality', key: 'shadowQuality', label: 'Shadow Quality', values: [1024, 2048, 4096], labels: ['Low', 'High', 'Ultra'] },
+  { tab: 'Quality', key: 'shadowDistance', label: 'Shadow Distance', min: 40, max: 200, step: 8, fmt: (x) => `${x} m` },
+  { tab: 'Quality', key: 'leaves', label: 'Leaves', values: ['fast', 'fancy', 'fluffy'], labels: ['Fast', 'Fancy', 'Fluffy'] },
+  { tab: 'Quality', key: 'pom', label: 'Surface Relief', min: 0, max: 2, step: 0.1, fmt: (x) => (x ? pct(x) : 'OFF') },
+  { tab: 'Quality', key: 'ao', label: 'Ambient Occlusion', min: 0, max: 1.5, step: 0.05, fmt: pct },
+  { tab: 'Quality', key: 'bloom', label: 'Bloom' },
+  { tab: 'Quality', key: 'bloomStrength', label: 'Bloom Strength', min: 0, max: 2.5, step: 0.1, fmt: pct },
+  { tab: 'Quality', key: 'godRays', label: 'Light Shafts' },
+  { tab: 'Quality', key: 'rayStrength', label: 'Light Shaft Strength', min: 0, max: 2.5, step: 0.1, fmt: pct },
+  { tab: 'Quality', key: 'clouds', label: 'Clouds' },
+  { tab: 'Quality', key: 'particles', label: 'Rain, Snow, Spores', min: 0, max: 1, step: 0.1, fmt: pct },
+  { tab: 'Sky & Time', key: 'dayCycle', label: 'Time', values: ['normal', 'day', 'night', 'fixed'], labels: ['Day and night', 'Always day', 'Always night', 'Fixed hour'] },
+  { tab: 'Sky & Time', key: 'fixedHour', label: 'Fixed Hour', min: 0, max: 23.75, step: 0.25, fmt: (x) => `${String(Math.floor(x)).padStart(2, '0')}:${String(Math.round((x % 1) * 60)).padStart(2, '0')}` },
+  { tab: 'Sky & Time', key: 'dayLength', label: 'Day Length', min: 5, max: 60, step: 5, fmt: (x) => `${x} min` },
+  { tab: 'Sky & Time', key: 'weatherMode', label: 'Weather', values: ['dynamic', 'clear', 'cloudy', 'rain', 'storm', 'fog'], labels: ['Changing', 'Always clear', 'Cloudy', 'Rain', 'Storm', 'Fog'] },
+  { tab: 'Sky & Time', key: 'nightBrightness', label: 'Night Brightness', min: 0.4, max: 3, step: 0.1, fmt: pct },
+  { tab: 'Sky & Time', key: 'saturation', label: 'Colour', min: 0, max: 1.6, step: 0.05, fmt: pct },
+  { tab: 'Sky & Time', key: 'fog', label: 'Haze', min: 0, max: 2.5, step: 0.1, fmt: pct },
+  { tab: 'Audio', key: 'volume', label: 'Master Volume', min: 0, max: 1, step: 0.05, fmt: pct },
+  { tab: 'Audio', key: 'sfx', label: 'Blocks and Items', min: 0, max: 1, step: 0.05, fmt: pct },
+  { tab: 'Audio', key: 'ambience', label: 'Ambient', min: 0, max: 1, step: 0.05, fmt: pct },
+  { tab: 'Controls', key: 'sensitivity', label: 'Sensitivity', min: 0.2, max: 3, step: 0.05, fmt: (x) => x.toFixed(2) },
+  { tab: 'Controls', key: 'invertY', label: 'Invert Mouse' },
+];
+const TABS = ['Video', 'Quality', 'Sky & Time', 'Audio', 'Controls', 'Textures'];
 const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'KeyE', 'KeyQ', 'KeyF',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F3', 'Tab', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9']);
 const CAUSES = { fall: 'You hit the ground too hard.', drowning: 'You ran out of air.', starvation: 'You starved.', void: 'You fell out of the world.',
@@ -327,26 +367,56 @@ export class UI {
   // ---------------------------------------------------------------- settings
 
   openSettings() {
-    const s = this.settings, g = this.game;
-    const bind = (key, fmt) => {
-      const el = $('s' + key[0].toUpperCase() + key.slice(1)), v = $('v' + key[0].toUpperCase() + key.slice(1));
-      if (el.type === 'checkbox') { el.checked = !!s[key]; el.onchange = () => { s[key] = el.checked; g.applySettings(s); storeSettings(s); }; return; }
-      el.value = s[key];
-      const upd = () => { v.textContent = fmt(+el.value); };
-      upd();
-      el.oninput = () => { s[key] = +el.value; upd(); g.applySettings(s); };
-      el.onchange = () => storeSettings(s);
-    };
-    bind('viewDistance', (x) => `${x} sections · ${x * 32} m`);
-    bind('renderScale', (x) => `${Math.round(x * 100)}%`);
-    bind('fov', (x) => `${x}°`);
-    bind('sensitivity', (x) => x.toFixed(2));
-    for (const k of ['volume', 'sfx', 'ambience', 'particles']) bind(k, (x) => `${Math.round(x * 100)}%`);
-    for (const k of ['shadows', 'bloom', 'godRays', 'invertY']) bind(k);
-    bind('pom', (x) => (x ? `${Math.round(x * 100)}%` : 'off'));
     this.renderPack();
     this.renderTextures();
+    this.showTab(this.settingsTab || 'Video');
     this.show('settings');
+  }
+
+  /** Builds one tab of options (sliders, cycling buttons, toggles) from OPTIONS. */
+  showTab(tab) {
+    const s = this.settings, g = this.game;
+    this.settingsTab = tab;
+    const bar = $('settingsTabs');
+    bar.innerHTML = '';
+    for (const t of TABS) {
+      const b = document.createElement('button'); b.textContent = t; b.setAttribute('role', 'tab');
+      b.classList.toggle('on', t === tab); b.onclick = () => { g.audio.click(); this.showTab(t); };
+      bar.appendChild(b);
+    }
+    $('settingsTextures').hidden = tab !== 'Textures';
+    const body = $('settingsBody');
+    body.hidden = tab === 'Textures';
+    body.innerHTML = '';
+    const apply = () => { g.applySettings(s); storeSettings(s); };
+    for (const o of OPTIONS.filter((x) => x.tab === tab)) {
+      if (o.values) {
+        const b = document.createElement('button'); b.className = 'cycle'; b.id = 'opt-' + o.key;
+        const label = () => { b.textContent = `${o.label}: ${o.labels[Math.max(0, o.values.indexOf(s[o.key]))]}`; };
+        label();
+        b.onclick = (e) => { const i = o.values.indexOf(s[o.key]); s[o.key] = o.values[(i + (e.shiftKey ? o.values.length - 1 : 1)) % o.values.length]; label(); g.audio.click(); apply(); };
+        body.appendChild(b);
+      } else if (o.min != null) {
+        const l = document.createElement('label'); l.className = 'slider';
+        const v = document.createElement('span'); v.className = 'val';
+        const i = document.createElement('input'); i.type = 'range'; i.min = o.min; i.max = o.max; i.step = o.step; i.value = s[o.key]; i.id = 'opt-' + o.key;
+        const upd = () => { v.textContent = o.fmt(+i.value); };
+        l.append(o.label, v, i); upd();
+        i.oninput = () => { s[o.key] = +i.value; upd(); g.applySettings(s); };
+        i.onchange = () => storeSettings(s);
+        body.appendChild(l);
+      } else {
+        const l = document.createElement('label'); l.className = 'toggle';
+        const i = document.createElement('input'); i.type = 'checkbox'; i.checked = !!s[o.key]; i.id = 'opt-' + o.key;
+        i.onchange = () => { s[o.key] = i.checked; apply(); };
+        l.append(i, o.label);
+        body.appendChild(l);
+      }
+    }
+    $('settingsHint').textContent = { Video: 'Far Terrain shows the landscape beyond the loaded world, up to 2 km. Lower the render distance or render scale if the game stutters.',
+      Quality: 'Shift-click a choice to step back. Fluffy leaves add loose clusters around tree canopies.',
+      'Sky & Time': '"Always day" and "Always night" stop the clock; "Fixed hour" holds the time you pick.',
+      Audio: '', Controls: 'WASD move, Space jump, Ctrl sprint, E inventory, Q drop, F fly (creative), F3 debug.', Textures: '' }[tab] || '';
   }
 
   // ---------------------------------------------------------------- resource pack
@@ -715,6 +785,10 @@ export class UI {
   governResolution(dt) {
     const r = this.game.renderer;
     if (!r || this.screen !== 'playing' || document.hidden) return;
+    const fpsTag = $('fpsTag');
+    fpsTag.hidden = !this.settings.showFps;
+    if (this.settings.showFps) { this.fpsT = (this.fpsT || 0) - dt; if (this.fpsT <= 0) { this.fpsT = 0.5; fpsTag.textContent = `${Math.round(1 / (this.avgDt || dt))} fps · ${(r.width)}x${r.height}`; } }
+    if (this.settings.dynamicRes === false) { r.dynScale = 1; this.avgDt = this.avgDt ? this.avgDt * 0.95 + dt * 0.05 : dt; return; }
     this.avgDt = this.avgDt ? this.avgDt * 0.95 + dt * 0.05 : dt;
     this.govTimer = (this.govTimer || 0) + dt;
     if (this.govTimer < 1.5) return;

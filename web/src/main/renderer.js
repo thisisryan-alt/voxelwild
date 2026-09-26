@@ -64,6 +64,29 @@ export class Renderer {
     this.setStarsTexture(null);
   }
 
+  /** Shadow map resolution (both cascades). */
+  setShadowSize(size) {
+    const gl = this.gl;
+    if (size === this.shadowSize) return;
+    if (this.shadowTex) { for (const t of this.shadowTex) gl.deleteTexture(t); for (const f of this.shadowFbo) gl.deleteFramebuffer(f); }
+    this.shadowSize = size;
+    this.shadowTex = [0, 1].map(() => {
+      const tx = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tx);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.DEPTH_COMPONENT24, size, size);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
+      tx.w = tx.h = size;
+      return tx;
+    });
+    this.shadowFbo = this.shadowTex.map((tx) => framebuffer(gl, null, tx));
+    this.shadowFresh = false;
+  }
+
   /**
    * Texture variant table (VARIANTS in shaders.js): rows from lbpr.json, or null = every layer is its own texture.
    * Row: { mode, w, h, flags, slots[32] texture layers, side (row of the side overlay, 255 = none) }.
@@ -219,8 +242,8 @@ export class Renderer {
     gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(2, 1);
     gl.bindVertexArray(null);
 
-    // shadow maps
-    this.shadowTex = [0, 1].map(() => {
+    this.shadowSize = 0;
+    this.setShadowSize(SHADOW_SIZE);
       const tx = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, tx);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.DEPTH_COMPONENT24, SHADOW_SIZE, SHADOW_SIZE);
@@ -230,10 +253,6 @@ export class Renderer {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
-      tx.w = tx.h = SHADOW_SIZE;
-      return tx;
-    });
-    this.shadowFbo = this.shadowTex.map((tx) => framebuffer(gl, null, tx));
 
     // sky LUT (equirectangular, mipmapped for rough reflections)
     this.skyLut = gl.createTexture();
@@ -590,11 +609,12 @@ export class Renderer {
     const sky = f.sky, wth = f.weather;
 
     // ---- frame uniforms
-    const fogDensity = f.underwaterColor ? 0.9 : f.underwater ? 0.09 : f.dimFog != null ? f.dimFog : 0.0016 + wth.fog * 0.012;
+    const fogMul = this.settings.fogMul ?? 1;
+    const fogDensity = f.underwaterColor ? 0.9 : f.underwater ? 0.09 : (f.dimFog != null ? f.dimFog : (this.settings.farDistance > 0 ? 0.0007 : 0.0016) + wth.fog * 0.012) * fogMul;
     const fogColor = f.underwaterColor ? [1.6, 0.4, 0.05] : f.underwater ? sky.ambUp.map((c, i) => c * [0.05, 0.28, 0.35][i] * 1.2) : sky.fogColor;
     this.cloudOff = this.cloudOff || [0, 0];
     this.cloudOff[0] += wth.windX * f.dt * 6; this.cloudOff[1] += wth.windZ * f.dt * 6;
-    const shadowsOn = this.settings.shadows && sky.lightColor[0] + sky.lightColor[1] > 0.02;
+    const shadowsOn = this.settings.shadows && sky.lightColor[0] + sky.lightColor[1] > 0.004;
     this.U = {
       uTime: f.time, uWind: [wth.windX, wth.windStrength, wth.windZ, wth.gust],
       uViewProj: this.viewProj, uCamPos: f.camPos,
@@ -603,13 +623,13 @@ export class Renderer {
       uFogColor: fogColor, uFogSun: f.underwater ? [0, 0, 0] : sky.fogSun,
       uFog: [fogDensity, f.underwater || f.dim ? 0 : 0.018, 64, 0], uFogEdge: f.underwater ? [1e5, 1e5 + 1] : [f.viewDistance * CS * 0.6, f.viewDistance * CS * 0.96],
       uBlockColor: [1.0 * 2.4, 0.62 * 2.4, 0.3 * 2.4], uCamSky: f.camSky,
-      uShadowVP: this.shadowVPFlat, uShadowDist: [22, 88], uShadowOn: shadowsOn ? 1 : 0,
+      uShadowVP: this.shadowVPFlat, uShadowDist: [Math.min(22, (this.settings.shadowDistance || 88) * 0.4), this.settings.shadowDistance || 88], uShadowSize: this.shadowSize, uShadowOn: shadowsOn ? 1 : 0,
       uShadow0: 4, uShadow1: 5, uCloudTex: 6, uSkyLut: 3, uAlbedo: 0, uNormal: 1, uMask: 2, uSceneColor: 7, uSceneDepth: 8, uAtlas: 9, uBakeN: 14, uBakeM: 15, uVar: 16, uCrack: 17, uMoonTex: 18,
       uCrackTex: this.crackTex ? 1 : 0, uMoonTexOn: this.moonTex ? 1 : 0,
-      uCloud: [wth.cloudCover, 1 / 5200, 420, 0.55 * wth.cloudCover + 0.1], uCloudOff: [this.cloudOff[0], this.cloudOff[1], 2.2, 1 - wth.storm * 0.55],
+      uCloud: [this.settings.clouds === false ? 0 : wth.cloudCover, 1 / 5200, 420, 0.55 * wth.cloudCover + 0.1], uCloudOff: [this.cloudOff[0], this.cloudOff[1], 2.2, 1 - wth.storm * 0.55],
       uWet: wth.wetness, uSnow: wth.snowCover,
       uTune: 20, uStars: 21, uDim: f.dim || 0, uDimAmb: f.dimAmb || [0, 0, 0], uPom: this.settings.pom ?? 1, uPomDist: 28,
-      uBevelWidth: 0.07, uBevelStrength: 0.55, uEdgeWear: 0.3, uAOStrength: 1, uAODirect: 0.55, uOverhang: 0.2, uCutoff: 0.45,
+      uBevelWidth: 0.07, uBevelStrength: 0.55, uEdgeWear: 0.3, uAOStrength: this.settings.ao ?? 1, uAODirect: 0.55, uOverhang: 0.2, uCutoff: 0.45,
       uFlash: f.flash || 0, uEntityLight: [-1, 0], uModelRot: [1, 0, 0, 0, 1, 0, 0, 0, 1],
       uNearFar: [near, far], uViewport: [W, H], uDebug: this.debugView | 0,
     };
@@ -791,7 +811,7 @@ export class Renderer {
     const L = sky.lightDir;
     const up = Math.abs(L[1]) > 0.99 ? [1, 0, 0] : [0, 1, 0];
     const lightView = mat4.lookDir(mat4.create(), [0, 0, 0], [-L[0], -L[1], -L[2]], up);
-    const radii = [22, 88];
+    const far = this.settings.shadowDistance || 88, radii = [Math.min(22, far * 0.4), far];
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.depthMask(true);
     gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
     gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1.5, 3);
@@ -808,7 +828,7 @@ export class Renderer {
       let lx = lv[0] * center[0] + lv[4] * center[1] + lv[8] * center[2];
       let ly = lv[1] * center[0] + lv[5] * center[1] + lv[9] * center[2];
       const lz = lv[2] * center[0] + lv[6] * center[1] + lv[10] * center[2];
-      const texel = (2 * r) / SHADOW_SIZE;
+      const texel = (2 * r) / this.shadowSize;
       lx = Math.round(lx / texel) * texel; ly = Math.round(ly / texel) * texel;
       const depth = 260;
       const proj = mat4.ortho(mat4.create(), lx - r, lx + r, ly - r, ly + r, -lz - depth, -lz + depth);
@@ -816,7 +836,7 @@ export class Renderer {
       this.shadowVPFlat.set(vp, c * 16);
       const planes = frustumPlanes(vp, []);
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFbo[c]);
-      gl.viewport(0, 0, SHADOW_SIZE, SHADOW_SIZE);
+      gl.viewport(0, 0, this.shadowSize, this.shadowSize);
       gl.clear(gl.DEPTH_BUFFER_BIT);
       for (const pass of [0, 1]) {
         const prog = pass === 0 ? this.progs.shadow : this.progs.shadowCut;
@@ -955,23 +975,28 @@ export class Renderer {
     // god rays toward the sun when it is on screen
     const sky = f.sky;
     let rays = 0, sunUV = [0.5, 0.5];
-    if (this.settings.godRays && !f.underwater && sky.sunVisible > 0) {
-      const p = [f.camPos[0] + sky.sun[0] * 1000, f.camPos[1] + sky.sun[1] * 1000, f.camPos[2] + sky.sun[2] * 1000, 1];
+    // rays toward the sun, or at night toward the moon (fainter, and only with a bright moon)
+    const moonRays = !(sky.sunVisible > 0) && (sky.moonVisible || 0) > 0;
+    const src = moonRays ? sky.moon : sky.sun;
+    if (this.settings.godRays && !f.underwater && (sky.sunVisible > 0 || moonRays)) {
+      const p = [f.camPos[0] + src[0] * 1000, f.camPos[1] + src[1] * 1000, f.camPos[2] + src[2] * 1000, 1];
       const m = this.viewProj;
       const cx = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12], cyy = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
       const cw = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
       if (cw > 0) {
         sunUV = [cx / cw * 0.5 + 0.5, cyy / cw * 0.5 + 0.5];
         const edge = Math.max(Math.abs(sunUV[0] - 0.5), Math.abs(sunUV[1] - 0.5));
-        rays = 0.35 * sky.sunVisible * Math.max(0, 1 - Math.max(0, edge - 0.5) / 0.6) * (1 - f.weather.cloudCover * 0.8) * f.camSky;
+        const vis = moonRays ? sky.moonVisible * (0.25 + 0.75 * sky.illum) * 0.9 : sky.sunVisible * 0.35;
+        rays = vis * (this.settings.rayStrength ?? 1) * Math.max(0, 1 - Math.max(0, edge - 0.5) / 0.6) * (1 - f.weather.cloudCover * 0.8) * f.camSky;
       }
     }
     if (rays > 0.002) pass(this.raysFbo, P.rays, { uColor: 10, uDepth: 11, uSunUV: sunUV, uStrength: rays }, [this.hdr, this.raysDepth]);
     else { gl.bindFramebuffer(gl.FRAMEBUFFER, this.raysFbo); gl.viewport(0, 0, this.raysFbo.w, this.raysFbo.h); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); }
     const underground = 1 - f.camSky;
-    const exposure = sky.exposure * (1 + underground * 1.6) * (f.underwater ? 1.3 : 1);
-    pass(null, P.composite, { uColor: 10, uBloom: 11, uBloom2: 12, uRays: 13, uExposure: exposure, uBloomAmt: bloom ? 0.07 : 0,
-      uUnderwater: f.underwater ? 1 : 0, uUnderwaterColor: f.underwaterColor || [0.01, 0.06, 0.08], uSaturation: 1.08, uVignette: 0.55, uDamage: f.damage || 0, uPortal: f.portal || 0 },
+    const nightK = 1 + ((this.settings.nightBrightness ?? 1) - 1) * (sky.night || 0);
+    const exposure = sky.exposure * (1 + underground * 1.6) * (f.underwater ? 1.3 : 1) * (this.settings.brightness ?? 1) * nightK;
+    pass(null, P.composite, { uColor: 10, uBloom: 11, uBloom2: 12, uRays: 13, uExposure: exposure, uBloomAmt: bloom ? 0.07 * (this.settings.bloomStrength ?? 1) : 0,
+      uUnderwater: f.underwater ? 1 : 0, uUnderwaterColor: f.underwaterColor || [0.01, 0.06, 0.08], uSaturation: 1.08 * (this.settings.saturation ?? 1), uVignette: 0.55, uDamage: f.damage || 0, uPortal: f.portal || 0, uNight: f.dim ? 0 : (sky.night || 0) * f.camSky },
       [this.hdr, bloom ? this.quarter : this.half, bloom ? this.eighth2 : this.half, this.raysTex]);
     for (let i = 10; i < 14; i++) this.bindTex(i, gl.TEXTURE_2D, null);
     gl.depthMask(true);

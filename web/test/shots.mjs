@@ -71,9 +71,10 @@ for (let v of views) {
     v = { ...v, abs: await page.evaluate(() => [...window.voxelwild.game.player.body.pos]) };
   }
   await page.evaluate((v, base, hour) => {
-    const g = window.voxelwild.game; g.player.flying = true; g.tod.hour = v.hour ?? hour; g.tod.running = false; g.tod.nextAmbient = 0; if (v.weather != null) { g.weather.force(v.weather); g.weather.blend = 1; g.weather.frozen = true; g.weather.nextLightning = 1e9; g.flash = 0; }
+    const g = window.voxelwild.game; g.player.flying = true; g.tod.hour = v.hour ?? hour; if (v.day != null) g.tod.day = v.day; g.tod.running = false; g.tod.nextAmbient = 0; if (v.weather != null) { g.weather.force(v.weather); g.weather.blend = 1; g.weather.frozen = true; g.weather.nextLightning = 1e9; g.flash = 0; }
     g.player.teleport(v.abs || [base[0] + (v.dx || 0), base[1] + v.dy, base[2] + (v.dz || 0)], v.yaw, v.pitch); g.player.body.vel = [0, 0, 0];
     if (!v.hud) document.getElementById('hud').hidden = true; g.renderer.debugView = v.debug || 0;
+    if (v.aim === 'moon' || v.aim === 'sun') { g.tod.update(g.time, { cloudCover: 0.3, sunDim: 1 }); const d = g.tod.state[v.aim]; g.player.yaw = Math.atan2(-d[0], -d[2]); g.player.pitch = Math.asin(d[1]) - (v.below || 0); }
   }, v, base, hour);
   await new Promise((r) => setTimeout(r, v.dy > 20 ? 6000 : 2500));
   await page.screenshot({ path: join(out, `shot-${v.name}.png`) });

@@ -58,6 +58,7 @@ uniform float uCamSky;        // 0 underground .. 1
 uniform mat4 uShadowVP[2];
 uniform sampler2DShadow uShadow0, uShadow1;
 uniform vec2 uShadowDist;     // cascade far distances
+uniform float uShadowSize;
 uniform float uShadowOn;
 uniform sampler2D uCloudTex;
 uniform vec4 uCloud;          // coverage, 1/size, height, shadow strength
@@ -82,12 +83,12 @@ float shadowAt(vec3 p, vec3 n) {
   float d = distance(p, uCamPos);
   int c = d < uShadowDist.x ? 0 : 1;
   if (d > uShadowDist.y) return 1.0;
-  float texel = c == 0 ? uShadowDist.x * 2.0 / 2048.0 : uShadowDist.y * 2.0 / 2048.0;
+  float texel = c == 0 ? uShadowDist.x * 2.0 / uShadowSize : uShadowDist.y * 2.0 / uShadowSize;
   vec3 pb = p + n * texel * 1.5 + uLightDir * texel * 1.0;
   vec4 s = uShadowVP[c] * vec4(pb, 1.0);
   vec3 q = s.xyz / s.w * 0.5 + 0.5;
   if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0 || q.z > 1.0) return 1.0;
-  float o = 1.0 / 2048.0;
+  float o = 1.0 / uShadowSize;
   float sum;
   if (c == 0) sum = texture(uShadow0, q + vec3(-o, -o, 0)) + texture(uShadow0, q + vec3(o, -o, 0)) + texture(uShadow0, q + vec3(-o, o, 0)) + texture(uShadow0, q + vec3(o, o, 0));
   else sum = texture(uShadow1, q + vec3(-o, -o, 0)) + texture(uShadow1, q + vec3(o, -o, 0)) + texture(uShadow1, q + vec3(-o, o, 0)) + texture(uShadow1, q + vec3(o, o, 0));
@@ -429,6 +430,8 @@ void main() {
   n = normalize(uModelRot * n);
 #ifdef CUTOUT
   if (!gl_FrontFacing) n = -n;
+  // foliage: normals lean up and out so a canopy shades as one soft, rounded mass
+  if (TLP2(layer).z > 0.5) n = normalize(mix(n, vec3(0.0, 1.0, 0.0), 0.45));
 #endif
   float wear = edgeAmt * edgeAmt * uEdgeWear * fade;
   s.albedo = mix(s.albedo, s.albedo * 1.3 + 0.02, wear);
@@ -594,6 +597,17 @@ vec3 stars(vec3 V) {
   float mag = pow(clamp((h - 0.965) / 0.035, 0.0, 1.0), 3.0);
   return mix(vec3(0.75, 0.82, 1.0), vec3(1.0, 0.86, 0.7), h31(cell + 9.9)) * st * tw * (0.3 + 4.0 * mag) * uSunParams.z;
 }
+// a band of faint, patchy light across the sky, turning with the stars
+vec3 milkyWay(vec3 V) {
+  float s = uSunParams.w, cs = cos(s), sn = sin(s);
+  vec3 v = vec3(V.x, V.y * 0.766 - V.z * 0.643, V.y * 0.643 + V.z * 0.766);
+  v = vec3(v.x * cs - v.z * sn, v.y, v.x * sn + v.z * cs);
+  float band = exp(-pow((v.x * 0.35 + v.y * 0.94) * 3.4, 2.0));
+  vec2 p = vec2(atan(v.z, v.x), v.y) * vec2(1.3, 2.2);
+  float n = texture(uCloudTex, p * 0.35).r * 0.6 + texture(uCloudTex, p * 1.1 + 0.3).g * 0.4;
+  float dustLane = smoothstep(0.35, 0.7, texture(uCloudTex, p * 0.8 + 1.7).r);
+  return vec3(0.55, 0.6, 0.85) * band * (0.25 + n) * (1.0 - dustLane * 0.6) * 0.035 * uSunParams.z;
+}
 float cloudD(vec2 xz) {
   vec2 uv = (xz + uCloudOff.xy) * uCloud.y;
   float n = texture(uCloudTex, uv).r * 0.78 + texture(uCloudTex, uv * 3.7 + 0.31).g * 0.22;
@@ -615,25 +629,28 @@ void main() {
     return;
   }
   float dayLum = dot(sky, vec3(0.2126, 0.7152, 0.0722));
-  if (V.y > 0.0) sky += stars(V) * clamp(1.0 - dayLum * 25.0, 0.0, 1.0);
+  if (V.y > 0.0) sky += (stars(V) + milkyWay(V)) * clamp(1.0 - dayLum * 25.0, 0.0, 1.0);
   float r = acos(clamp(dot(V, uSunDir), -1.0, 1.0)) / 0.0125;
   if (r < 1.0 && V.y > -0.02) sky += sunTrans(uSunDir, 150.0) * 900.0 * SKY_EXP * (1.0 - 0.6 * (1.0 - sqrt(max(0.0, 1.0 - r * r)))) * uSunParams.x * smoothstep(1.0, 0.9, r);
   // moon: sphere lit by the sun direction
   vec3 M = uMoonDir;
-  if (M.y > -0.02 && dot(V, M) > cos(0.02)) {
+  if (M.y > -0.02 && dot(V, M) > cos(0.032)) {
     vec3 up = abs(M.y) < 0.99 ? vec3(0, 1, 0) : vec3(1, 0, 0);
     vec3 right = normalize(cross(up, M)); up = cross(M, right);
-    vec2 q = vec2(dot(V - M, right), dot(V - M, up)) / 0.018;
+    vec2 q = vec2(dot(V - M, right), dot(V - M, up)) / 0.028;
     float r2 = dot(q, q);
     if (r2 < 1.0) {
       vec3 nm = normalize(right * q.x + up * q.y - M * sqrt(1.0 - r2));
       float lit = clamp(dot(nm, uSunDir) * 1.5 + 0.05, 0.0, 1.0);
       float maria = 0.75 + 0.25 * sin(q.x * 5.1 + 1.3) * sin(q.y * 4.3 + 0.7);
-      if (uMoonTexOn > 0.5) { vec3 mt = texture(uMoonTex, q * vec2(0.5, -0.5) + 0.5).rgb; maria = dot(mt, vec3(0.333)) * 1.45; }
-      sky = mix(sky, vec3(0.9, 0.92, 0.98) * lit * maria * 0.8 + 0.02, smoothstep(1.0, 0.94, r2) * clamp(1.0 - dayLum * 3.0, 0.0, 1.0));
+      if (uMoonTexOn > 0.5) { vec3 mt = texture(uMoonTex, q * vec2(0.5, -0.5) + 0.5).rgb; maria = pow(dot(mt, vec3(0.333)) * 1.45, 2.2); }
+      sky = mix(sky, vec3(0.9, 0.92, 0.98) * lit * maria * 0.09 + 0.002, smoothstep(1.0, 0.94, r2) * clamp(1.0 - dayLum * 3.0, 0.0, 1.0));
     }
   }
-  sky += pow(max(dot(V, M), 0.0), 600.0) * 0.15 * uSunParams.y * step(-0.02, M.y) * vec3(0.6, 0.7, 1.0);
+  // moon halo: a tight corona and a wide, faint glow in the air around it
+  float mm = max(dot(V, M), 0.0), dark = clamp(1.0 - dayLum * 12.0, 0.0, 1.0);
+  float outside = smoothstep(cos(0.0262), cos(0.0285), mm);
+  sky += (pow(mm, 2200.0) * 0.12 * outside + pow(mm, 260.0) * 0.05 + pow(mm, 18.0) * 0.01) * (0.25 + uSunParams.y) * step(-0.02, M.y) * dark * vec3(0.62, 0.72, 1.0);
   // clouds
   if (V.y > 0.01 && uCloud.x > 0.0) {
     float t = (uCloud.z - uCamPos.y) / V.y;
@@ -784,6 +801,7 @@ uniform float uExposure, uBloomAmt, uUnderwater, uSaturation, uVignette;
 uniform vec3 uUnderwaterColor;
 uniform float uDamage;
 uniform float uPortal;
+uniform float uNight;
 in vec2 vUV; out vec4 outColor;
 vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 void main() {
@@ -795,6 +813,11 @@ void main() {
   c += texture(uRays, uv).rgb;
   if (uUnderwater > 0.5) c = mix(c, uUnderwaterColor, 0.35);
   c *= uExposure;
+  if (uNight > 0.0) {
+    float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    float dim = uNight * (1.0 - smoothstep(0.08, 0.6, lum));
+    c = mix(c, vec3(lum) * vec3(0.62, 0.8, 1.2), dim * 0.55);
+  }
   c = aces(c);
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(vec3(l), c, uSaturation);

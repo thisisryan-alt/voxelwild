@@ -37,7 +37,7 @@ export const LAYER_NAMES = ['Stone', 'Dirt', 'GrassTop', 'Sand', 'Gravel', 'Snow
   'WarpedNyliumSide', 'CrimsonStem', 'CrimsonStemTop', 'WarpedStem', 'WarpedStemTop', 'NetherWart', 'WarpedWart', 'Shroomlight',
   'CrimsonFungus', 'WarpedFungus', 'CrimsonRoots', 'WarpedRoots', 'WeepingVines', 'TwistingVines', 'EndStone', 'EndStoneBricks', 'Purpur',
   'EndFrameTop', 'EndFrameSide', 'EndFrameEye', 'EndPortal', 'ChorusPlant', 'ChorusFlower', 'StoneBricks', 'MossyStoneBricks',
-  'CrackedStoneBricks'];
+  'CrackedStoneBricks', 'LeavesExt', 'NeedlesExt'];
 export const L = Object.fromEntries(LAYER_NAMES.map((n, i) => [n, i]));
 export const NONE = 255;
 
@@ -71,10 +71,11 @@ BLOCKS[B.OakLog] = cube('Oak Log', L.LogTop, L.OakLog, L.LogTop);
 BLOCKS[B.BirchLog] = cube('Birch Log', L.LogTop, L.BirchLog, L.LogTop);
 BLOCKS[B.SpruceLog] = cube('Spruce Log', L.LogTop, L.SpruceLog, L.LogTop);
 BLOCKS[B.JungleLog] = cube('Jungle Log', L.LogTop, L.JungleLog, L.LogTop);
-BLOCKS[B.OakLeaves] = leaves('Oak Leaves', L.Leaves, Tint.Foliage);
-BLOCKS[B.BirchLeaves] = leaves('Birch Leaves', L.Leaves, Tint.Birch);
-BLOCKS[B.SpruceLeaves] = leaves('Spruce Leaves', L.Needles, Tint.Spruce);
-BLOCKS[B.JungleLeaves] = leaves('Jungle Leaves', L.Leaves, Tint.Foliage);
+// leaves carry an extension layer: loose clusters that stick out past the cube (fancy leaves, like better-leaves packs)
+BLOCKS[B.OakLeaves] = { ...leaves('Oak Leaves', L.Leaves, Tint.Foliage), ext: L.LeavesExt };
+BLOCKS[B.BirchLeaves] = { ...leaves('Birch Leaves', L.Leaves, Tint.Birch), ext: L.LeavesExt };
+BLOCKS[B.SpruceLeaves] = { ...leaves('Spruce Leaves', L.Needles, Tint.Spruce), ext: L.NeedlesExt };
+BLOCKS[B.JungleLeaves] = { ...leaves('Jungle Leaves', L.Leaves, Tint.Foliage), ext: L.LeavesExt };
 BLOCKS[B.Sandstone] = cube('Sandstone', L.Sandstone);
 BLOCKS[B.RedSandstone] = cube('Red Sandstone', L.RedSandstone);
 BLOCKS[B.Mud] = cube('Mud', L.Mud);
@@ -183,6 +184,10 @@ export const LAYER_TUNING = LAYER_NAMES.map((n) => {
     if (n === 'EndPortal') t.emission = 3;
     if (['CrimsonFungus', 'WarpedFungus', 'CrimsonRoots', 'WarpedRoots', 'WeepingVines', 'TwistingVines', 'ChorusPlant', 'ChorusFlower'].includes(n)) { t.cutout = 1; t.trans = 0.5; }
     if (n === 'Obsidian') { t.rough = 0.35; t.spec = 1.5; }
+  }
+  if (n === 'LeavesExt' || n === 'NeedlesExt') {
+    const base = n === 'LeavesExt' ? 'Leaves' : 'Needles';
+    Object.assign(t, { tile: 1, macro: 0.25, rough: 1.5, tint: n === 'LeavesExt' ? [0.62, 0.78, 0.48] : [1, 1, 1], biome: 1, cutout: 1, trans: base === 'Leaves' ? 0.9 : 0.5, spec: 0.3, emission: 0 });
   }
   return t;
 });

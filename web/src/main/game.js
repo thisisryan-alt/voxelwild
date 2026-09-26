@@ -278,9 +278,34 @@ export class Game {
     this.settings = s;
     const r = this.renderer.settings;
     r.renderScale = s.renderScale; r.shadows = s.shadows; r.bloom = s.bloom; r.godRays = s.godRays; r.fov = s.fov; r.pom = s.pom;
-    if (this.world) this.world.viewDistance = s.viewDistance;
+    Object.assign(r, { bloomStrength: s.bloomStrength ?? 1, rayStrength: s.rayStrength ?? 1, clouds: s.clouds !== false, ao: s.ao ?? 1,
+      brightness: s.brightness ?? 1, nightBrightness: s.nightBrightness ?? 1, saturation: s.saturation ?? 1, fogMul: s.fog ?? 1,
+      shadowDistance: s.shadowDistance ?? 88, farDistance: s.farDistance ?? 0 });
+    this.renderer.setShadowSize(s.shadowQuality || 2048);
+    if (this.world) { this.world.viewDistance = s.viewDistance; this.world.setLeaves(s.leaves || 'fluffy'); }
+    this.applyClock();
     this.audio.volumes = { master: s.volume, sfx: s.sfx, ambience: s.ambience };
     this.audio.applyVolumes();
+  }
+
+  /** Day cycle, fixed hours and forced weather from the settings (not for the title-screen backdrop). */
+  applyClock() {
+    const s = this.settings;
+    if (!this.tod || !s || (this.meta && this.meta.menu)) return;
+    this.tod.dayMinutes = s.dayLength || 20;
+    const mode = s.dayCycle || 'normal';
+    if (mode === 'normal') this.tod.running = true;
+    else {
+      this.tod.running = false;
+      if (mode === 'day') this.tod.hour = 12;
+      else if (mode === 'night') { this.tod.hour = 0.5; this.tod.day = 4; }   // a full moon high in the sky
+      else this.tod.hour = s.fixedHour ?? 12;
+    }
+    const forced = { clear: 0, cloudy: 1, rain: 2, storm: 4, fog: 5 }[s.weatherMode];
+    if (this.weather) {
+      if (forced == null) this.weather.frozen = false;
+      else if (this.weather.current !== forced || !this.weather.frozen) { this.weather.force(forced); this.weather.frozen = true; this.weather.blend = 0; }
+    }
   }
 
   // ---------------------------------------------------------------- session
@@ -350,6 +375,8 @@ export class Game {
     }
     this.state = 'loading';
     this.loadStart = performance.now();
+    this.world.setLeaves((this.settings && this.settings.leaves) || 'fluffy');
+    this.applyClock();
     this.nextAutosave = this.time + 60;
     this.emit('state', this.state);
     this.emit('inventory');
@@ -735,6 +762,7 @@ export class Game {
     this.dim = dim;
     this.meta.dim = dim;
     this.world = this.makeWorld(dim);
+    this.world.setLeaves((this.settings && this.settings.leaves) || 'fluffy');
     this.entities = [];
     this.particles = { break: [], rain: [], snow: [], motes: [] };
     this.mining = null;
@@ -1335,7 +1363,8 @@ export class Game {
       const held = inv.held, def = held ? ITEMS[held.item] : null;
       const moving = Math.hypot(pl.body.vel[0], pl.body.vel[2]);
       this.bobPhase = (this.bobPhase || 0) + dt * moving * 1.6 * (pl.body.grounded || pl.body.probeGround(w) ? 1 : 0);
-      const bob = [Math.sin(this.bobPhase) * 0.012 * Math.min(1, moving / 4), -Math.abs(Math.cos(this.bobPhase)) * 0.014 * Math.min(1, moving / 4)];
+      const bobK = this.settings && this.settings.viewBob === false ? 0 : 1;
+      const bob = [Math.sin(this.bobPhase) * 0.012 * bobK * Math.min(1, moving / 4), -Math.abs(Math.cos(this.bobPhase)) * 0.014 * bobK * Math.min(1, moving / 4)];
       const L = this.lightProbe;
       this.handSwap = Math.max(0, (this.handSwap || 0) - dt * 5);
       if (held && def) {
