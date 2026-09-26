@@ -5,6 +5,8 @@ import { SEA, MIN_Y, MAX_Y } from './const.js';
 export const Biome = {
   Ocean: 0, FrozenOcean: 1, Beach: 2, SnowyBeach: 3, River: 4, FrozenRiver: 5, Desert: 6, Badlands: 7, Savanna: 8, Plains: 9,
   Forest: 10, DenseForest: 11, Jungle: 12, Swamp: 13, Taiga: 14, SnowyTaiga: 15, SnowyTundra: 16, Mountains: 17, SnowyPeaks: 18,
+  NetherWastes: 19, CrimsonForest: 20, WarpedForest: 21, SoulSandValley: 22, BasaltDeltas: 23,
+  TheEnd: 24, EndHighlands: 25, EndMidlands: 26, SmallEndIslands: 27,
 };
 export const BIOME_NAMES = Object.keys(Biome);
 

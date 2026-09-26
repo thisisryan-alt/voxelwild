@@ -10,7 +10,8 @@ const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, vol
   shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr' };
 const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'KeyE', 'KeyQ', 'KeyF',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F3', 'Tab', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9']);
-const CAUSES = { fall: 'You hit the ground too hard.', drowning: 'You ran out of air.', starvation: 'You starved.', void: 'You fell out of the world.' };
+const CAUSES = { fall: 'You hit the ground too hard.', drowning: 'You ran out of air.', starvation: 'You starved.', void: 'You fell out of the world.',
+  lava: 'You tried to swim in lava.', magma: 'You discovered the floor was lava.' };
 
 function svgHeart(fill) {
   const f = fill === 2 ? 'var(--heart)' : fill === 1 ? 'url(#half)' : 'rgba(0,0,0,0.45)';
@@ -64,6 +65,7 @@ export class UI {
     g.on('toast', (t) => this.toast(t));
     g.on('pickup', (item, n) => this.pickup(item, n));
     g.on('loading', (p) => this.loadingProgress(p));
+    g.on('travel', (d) => { this.travelTitle = ['Returning to the overworld', 'Entering the Nether', 'Entering the End'][d]; });
     g.on('saved', (manual) => { if (manual) this.toast('Saved'); });
     await this.refreshWorlds();
     requestAnimationFrame((t) => this.loop(t));
@@ -92,7 +94,7 @@ export class UI {
   onState(s, cause) {
     const g = this.game;
     if (g.meta && g.meta.menu) return;
-    if (s === 'loading') { this.show('loading'); $('loadTitle').textContent = g.meta.name; }
+    if (s === 'loading') { this.show('loading'); $('loadTitle').textContent = this.travelTitle || g.meta.name; this.travelTitle = null; }
     else if (s === 'playing') { this.show('playing'); this.renderHotbar(); this.renderStats(); this.lock(); }
     else if (s === 'dead') {
       this.unlock();
@@ -481,7 +483,7 @@ export class UI {
     const def = ITEMS[stack.item];
     let h = `<div class="ico" style="${this.game.icons.css(stack.item, px)}"></div>`;
     if (stack.count > 1) h += `<span class="n">${stack.count}</span>`;
-    if (def && def.kind === Kind.Tool && stack.wear) {
+    if (def && def.durability && stack.wear) {
       const f = 1 - stack.wear / def.durability;
       h += `<div class="wear"><i style="width:${Math.round(f * 100)}%;background:hsl(${Math.round(f * 110)},70%,50%)"></i></div>`;
     }

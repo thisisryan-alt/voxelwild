@@ -12,13 +12,13 @@ self.onmessage = (e) => {
   try {
     if (m.type === 'gen') {
       const t0 = performance.now();
-      const { voxels, surface } = generateColumn(m.cx, m.cz, m.seed);
+      const { voxels, surface } = generateColumn(m.cx, m.cz, m.seed, m.dim | 0);
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, voxels, surface, ms: performance.now() - t0 },
         [voxels.buffer, surface.height.buffer, surface.top.buffer, surface.biome.buffer, surface.temp.buffer, surface.humid.buffer]);
     } else if (m.type === 'decorate') {
       const t0 = performance.now();
       const vox = m.voxels;
-      const { heightmap, props } = decorateColumn(vox, m.cx, m.cz, m.seed, m.neighbours);
+      const { heightmap, props } = decorateColumn(vox, m.cx, m.cz, m.seed, m.neighbours, m.dim | 0);
       // split into sections; a section of one block id is sent as that id only
       const sections = new Array(SECTIONS), transfer = [heightmap.buffer, props.buffer];
       for (let s = 0; s < SECTIONS; s++) {
@@ -37,7 +37,7 @@ self.onmessage = (e) => {
       const propLight = m.propCells ? mesher.lightAtCells(m.propCells) : null;
       self.postMessage({ type: 'mesh', id: m.id, key: m.key, version: m.version, ...r, propLight, region: m.region, heightPatch: m.heightPatch, climate: m.climate,
         ms: performance.now() - t0 },
-        [r.vertices, r.opaque.buffer, r.cutout.buffer, r.water.buffer, m.region.buffer, m.heightPatch.buffer, m.climate.buffer, ...(propLight ? [propLight.buffer] : [])]);
+        [r.vertices, r.opaque.buffer, r.cutout.buffer, r.water.buffer, r.glow.buffer, m.region.buffer, m.heightPatch.buffer, m.climate.buffer, ...(propLight ? [propLight.buffer] : [])]);
     }
   } catch (err) {
     self.postMessage({ type: 'error', id: m.id, message: String(err && err.stack || err) });

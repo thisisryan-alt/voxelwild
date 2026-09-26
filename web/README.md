@@ -27,8 +27,9 @@ Unity project; the renderer and UI are rebuilt for the browser.
 ```sh
 npm install
 npm run build            # dist/index.html + dist/assets/
-npm test                 # 22-step gameplay test in Chrome (CSP=1 adds an artifact-like Content-Security-Policy)
+npm test                 # 26-step gameplay test in Chrome (CSP=1 adds an artifact-like Content-Security-Policy)
 node test/shots.mjs      # screenshots into test/out/
+node test/dims.mjs       # the Nether's biomes and a fortress, the End, a stronghold (screenshots)
 blender -b -P web/tools/export_props.py   # re-export props after changing the Blender assets
 python tools/build_lbpr.py "<path>/LBPR Reload! v.6.6 for mc1.21.8.zip"   # re-bake the default textures
 ```
@@ -73,6 +74,21 @@ LBPR is a 128px colour-only pack built around Minecraft's model system, so `buil
 Not carried over: OptiFine connected glass, random mob skins, custom entity models, animated water/lava
 (the game's water shader stays), the pack's sky/cloud pictures (the game's sky is physically based) and the
 swamp ambience (10 MB).
+
+## The Nether and the End
+
+| | How | What's there |
+| --- | --- | --- |
+| **Obsidian** | Lava meets water: a lava source sets to obsidian, flowing lava to cobblestone. Lava lakes fill caves below y -54, and obsidian already lines them where aquifers rest on them. Mine it with a diamond pickaxe. | |
+| **The Nether** | Build an obsidian frame (2x3 to 21x21 inside), light it with **Flint and Steel** (iron + flint; flint drops from gravel), stand in it for 4 s. Distances are 1:8; the other end is found (portals are remembered) or built. | y 0-127 between bedrock, caverns over a lava sea at y 31: nether wastes, crimson and warped forests (huge fungi, vines, roots), soul sand valleys (basalt pillars), basalt deltas (columns, magma, lava pools). Glowstone, quartz and gold ores, lava falls, nether brick fortresses. Biome fog, spores and ash. |
+| **Strongholds** | Three, 450-800 blocks from the origin, buried around y -24..6. Throw an **Eye of Ender** (2 nether quartz + glowstone dust) and it flies toward the nearest. | Stone-brick portal room with twelve end portal frames over a lava pit, corridors out to the sides. |
+| **The End** | Put eyes into all twelve frames; the portal opens (a starfield). | Main island ringed by ten obsidian pillars, an open exit portal home in the middle (no dragon), an end gateway at its edge to the outer islands beyond 1000 blocks (chorus plants, purpur towers). |
+
+Lava burns (and keeps you burning a few seconds), magma hurts unless you sneak, soul sand slows you. Dying outside the
+overworld sends you back to your spawn. Every dimension keeps its own edits in the save.
+
+Not like Minecraft (yet): no mobs (so no blazes, endermen, piglins or dragon: eyes are crafted from Nether
+materials and the exit portal is open from the start), no fire blocks, no buckets, no bastions or end ships.
 
 ## Controls
 

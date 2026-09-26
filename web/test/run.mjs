@@ -341,6 +341,80 @@ await step('props: placed, lit, removed with their support', async () => {
   return r;
 });
 
+await step('lava meets water: obsidian and cobblestone', async () => {
+  const at = await G(() => {
+    const g = window.voxelwild.game, w = g.world, p = g.player.body.pos.map(Math.floor);
+    const x = p[0] + 4, y = p[1] + 6, z = p[2];
+    // a stone tub: lava source on one side, a water source dropped next to it
+    for (let dx = -1; dx <= 3; dx++) for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 1; dy++) w.setBlock(x + dx, y + dy, z + dz, dy === -1 || dz !== 0 || dx === -1 || dx === 3 ? 1 : 0);
+    w.setBlock(x, y, z, 45);
+    w.setBlock(x + 2, y, z, 8);
+    window.__lavaAt = [x, y, z];
+    return [x, y, z];
+  });
+  await waitFor(() => { const w = window.voxelwild.game.world, at = window.__lavaAt; const b = w.getBlock(at[0], at[1], at[2]); return b === 53 || b === 9; }, 20000, 'lava to set');
+  const b = await G((at) => window.voxelwild.game.world.getBlock(at[0], at[1], at[2]), at);
+  return { set: b === 53 ? 'obsidian' : 'cobblestone' };
+});
+
+await step('nether portal: light, travel, come back', async () => {
+  const lit = await G(() => {
+    const g = window.voxelwild.game, w = g.world, p = g.player.body.pos.map(Math.floor);
+    const x0 = p[0] + 2, y0 = p[1] + 1, z0 = p[2] + 3;
+    for (let i = 0; i < 4; i++) for (let k = -1; k <= 4; k++) w.setBlock(x0 + i, y0 + k, z0, i === 0 || i === 3 || k === -1 || k === 4 ? 53 : 0);
+    for (let i = 0; i < 4; i++) for (const dz of [-1, 1]) for (let k = 0; k < 4; k++) w.setBlock(x0 + i, y0 + k, z0 + dz, 0);
+    const ok = g.lightPortal(x0 + 1, y0, z0);
+    g.player.flying = false;
+    g.player.teleport([x0 + 2, y0, z0 + 0.5]);
+    g.portalLock = false;
+    return { ok, block: w.getBlock(x0 + 1, y0 + 1, z0), from: [x0 + 2, y0, z0] };
+  });
+  if (!lit.ok || lit.block !== 54) throw new Error('portal did not light: ' + JSON.stringify(lit));
+  await waitFor(() => window.voxelwild.game.dim === 1 && window.voxelwild.game.state === 'playing', 90000, 'arrival in the Nether');
+  const there = await G(() => { const g = window.voxelwild.game, p = g.player.body.pos; return { pos: p.map((v) => +v.toFixed(1)), inPortal: g.world.getBlock(Math.floor(p[0]), Math.floor(p[1] + 0.2), Math.floor(p[2])), portals: g.meta.portals.length }; });
+  await new Promise((r) => setTimeout(r, 1500));
+  await shot('15-nether');
+  if (there.inPortal !== 54) throw new Error('not standing in the arrival portal: ' + JSON.stringify(there));
+  // step out and back in
+  await G(() => { const g = window.voxelwild.game, p = g.player.body.pos; g.player.teleport([p[0], p[1], p[2] + 1.6]); });
+  await new Promise((r) => setTimeout(r, 400));
+  await G(() => { const g = window.voxelwild.game, p = g.player.body.pos; g.player.teleport([p[0], p[1], p[2] - 1.6]); });
+  await waitFor(() => window.voxelwild.game.dim === 0 && window.voxelwild.game.state === 'playing', 90000, 'return to the overworld');
+  const back = await G(() => window.voxelwild.game.player.body.pos.map((v) => +v.toFixed(1)));
+  const d = Math.hypot(back[0] - lit.from[0], back[2] - lit.from[2]);
+  if (d > 6) throw new Error(`came back ${d.toFixed(1)} blocks from the portal we left by`);
+  return { nether: there.pos, back, linked: d.toFixed(1) };
+});
+
+await step('eyes of ender open the end portal; the End and back', async () => {
+  const r = await G(() => {
+    const g = window.voxelwild.game, w = g.world, p = g.player.body.pos.map(Math.floor);
+    const cx = p[0] + 6, cy = p[1] + 2, cz = p[2];
+    const ring = [];
+    for (let i = -1; i <= 1; i++) ring.push([cx + i, cz - 2], [cx + i, cz + 2], [cx - 2, cz + i], [cx + 2, cz + i]);
+    for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { w.setBlock(cx + dx, cy - 1, cz + dz, 88); w.setBlock(cx + dx, cy, cz + dz, 0); }
+    ring.forEach(([x, z], i) => w.setBlock(x, cy, z, i === 0 ? 82 : 83));
+    // the last eye by hand
+    const [lx, lz] = ring[0];
+    g.inventory.slots[g.inventory.selected] = { item: 286, count: 3 };
+    g.useItem(window.voxelwild.game.inventory.heldItem, { hit: [lx, cy, lz], prev: [lx, cy + 1, lz], block: 82 });
+    return { center: w.getBlock(cx, cy, cz), frame: w.getBlock(lx, cy, lz), at: [cx, cy, cz] };
+  });
+  if (r.center !== 84 || r.frame !== 83) throw new Error('portal did not open: ' + JSON.stringify(r));
+  await G((at) => { const g = window.voxelwild.game; g.player.flying = false; g.portalLock = false; g.player.teleport([at[0] + 0.5, at[1] + 0.2, at[2] + 0.5]); }, r.at);
+  await waitFor(() => window.voxelwild.game.dim === 2 && window.voxelwild.game.state === 'playing', 90000, 'arrival in the End');
+  await new Promise((r) => setTimeout(r, 1500));
+  await shot('16-end');
+  const end = await G(() => { const g = window.voxelwild.game, p = g.player.body.pos; return { pos: p.map((v) => +v.toFixed(1)), floor: g.world.getBlock(Math.floor(p[0]), Math.floor(p[1]) - 1, Math.floor(p[2])) }; });
+  if (end.floor !== 53) throw new Error('no obsidian platform: ' + JSON.stringify(end));
+  // the exit portal in the middle of the island takes us home
+  await G(() => { const g = window.voxelwild.game; g.player.flying = true; g.player.teleport([1.5, 80, 1.5]); });
+  await waitFor(() => { const g = window.voxelwild.game; return g.world.isAreaReady(1, 1, 1); }, 60000, 'the island centre');
+  await G(() => { const g = window.voxelwild.game, w = g.world; let y = 120; while (y > 0 && w.getBlock(1, y, 1) !== 84) y--; g.player.flying = false; g.portalLock = false; g.player.teleport([1.5, y + 0.2, 1.5]); });
+  await waitFor(() => window.voxelwild.game.dim === 0 && window.voxelwild.game.state === 'playing', 90000, 'home from the End');
+  return { end: end.pos, home: await G(() => window.voxelwild.game.player.body.pos.map((v) => +v.toFixed(1))) };
+});
+
 await step('save and reload', async () => {
   await G(() => window.voxelwild.game.save());
   const worlds = await G(() => window.voxelwild.game.store.listWorlds().then((w) => w.length));
@@ -417,6 +491,25 @@ await step('edits persist across a page reload', async () => {
   if (pack !== 'labpbr-test-pack') throw new Error('resource pack not restored after reload: ' + pack);
   await G(() => window.voxelwild.game.removePack());
   return { bricksAt: mark, packRestored: pack };
+});
+
+await step('the Nether is saved and loaded with its edits', async () => {
+  await G(() => { const g = window.voxelwild.game; g.travel(1, [8.5, 70, 8.5], 0, () => g.arrivePortal(1, 8, 8, null)); });
+  await waitFor(() => window.voxelwild.game.dim === 1 && window.voxelwild.game.state === 'playing', 90000, 'the Nether');
+  const mark = await G(async () => {
+    const g = window.voxelwild.game, p = g.player.body.pos.map(Math.floor);
+    const at = [p[0] + 1, p[1] + 2, p[2] + 2];
+    g.world.setBlock(at[0], at[1], at[2], 72);
+    await g.save();
+    return at;
+  });
+  await page.reload({ waitUntil: 'load' });
+  await waitFor(() => window.voxelwild && window.voxelwild.game.icons && !document.getElementById('btnContinue').hidden, 30000, 'title with a saved world');
+  await page.click('#btnContinue');
+  await waitFor(() => window.voxelwild.game.state === 'playing', 120000, 'reload into the Nether');
+  const r = await G((at) => ({ dim: window.voxelwild.game.dim, b: window.voxelwild.game.world.getBlock(at[0], at[1], at[2]), portals: window.voxelwild.game.meta.portals.length }), mark);
+  if (r.dim !== 1 || r.b !== 72) throw new Error('Nether not restored: ' + JSON.stringify(r));
+  return { ...r, at: mark };
 });
 
 await step('no console errors', async () => {

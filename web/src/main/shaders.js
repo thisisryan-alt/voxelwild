@@ -14,7 +14,14 @@ const vec3 FT[8] = vec3[8](vec3(0,0,1), vec3(0,0,-1), vec3(1,0,0), vec3(-1,0,0),
 const vec3 FB[8] = vec3[8](vec3(0,1,0), vec3(0,1,0), vec3(0,0,1), vec3(0,0,1), vec3(0,1,0), vec3(0,1,0), vec3(0,1,0), vec3(0,1,0));
 
 uniform float uTime;
-uniform vec4 uWind;          // x,z dir, y strength, w gust
+uniform vec4 uWind;
+// per-layer material tuning (renderer.setTuning): x 0 = 1/tile, normal, roughness, macro; 1 = tint rgb, specular;
+// 2 = emission, translucency, biome tint, cutout; 3 = relief depth, special (1 starfield, 2 portal), 0, 0
+uniform highp sampler2D uTune;
+#define TLP(i) texelFetch(uTune, ivec2(0, (i)), 0)
+#define TLT(i) texelFetch(uTune, ivec2(1, (i)), 0)
+#define TLP2(i) texelFetch(uTune, ivec2(2, (i)), 0)
+#define TLP3(i) texelFetch(uTune, ivec2(3, (i)), 0)          // x,z dir, y strength, w gust
 
 // block cell of a cross-plant vertex (mesh.js cross(): corner x 0/1 sit 0.84 blocks apart along the diagonal)
 vec3 plantCell(vec3 texPos, int face, vec2 corner) {
@@ -57,6 +64,8 @@ uniform vec4 uCloud;          // coverage, 1/size, height, shadow strength
 uniform vec4 uCloudOff;       // offset xy, sharpness, brightness
 uniform float uWet, uSnow;    // weather: ground wetness 0..1, snow cover 0..1
 uniform sampler2D uSkyLut;
+uniform vec3 uDimAmb;         // ambient light independent of the sky (the Nether, the End)
+uniform float uDim;           // 0 overworld, 1 nether, 2 end
 
 float cloudDensity(vec2 xz, float lod) {
   vec2 uv = (xz + uCloudOff.xy) * uCloud.y;
@@ -131,7 +140,7 @@ vec3 shade(vec3 albedo, vec3 n, float rough, float metal, float ao, float spec, 
   vec3 Fs = F0 + (1.0 - F0) * pow(1.0 - max(dot(H, V), 0.0), 5.0);
   vec3 specular = D * G * Fs / max(4.0 * ndl * nv, 1e-3) * ndl;
   vec3 direct = (diff * ndl * directShade + specular) * uLightColor * sh;
-  vec3 ambient = diff * hemi(n) * skyAmb * ao;
+  vec3 ambient = diff * (hemi(n) * skyAmb + uDimAmb) * ao;
   vec3 R = reflect(-V, n);
   vec2 luv = vec2(atan(R.z, R.x) / (2.0 * PI) + 0.5, asin(clamp(R.y, -1.0, 1.0)) / PI + 0.5);
   vec3 env = textureLod(skyLut, luv, rough * 5.0).rgb;
@@ -160,9 +169,29 @@ uint vhash(ivec3 c) {
   return h ^ (h >> 15u);
 }
 vec2 rot90(vec2 d, uint r) { return r == 1u ? vec2(d.y, -d.x) : r == 2u ? -d : r == 3u ? vec2(-d.y, d.x) : d; }
+// animation (mode 3): w frames at h/10 frames per second, blended; the second frame and weight go out through these
+int gTl2; float gBlend;
 int pickLayer(int row, int face, vec3 cell, vec2 uvB, inout vec2 uv, inout vec2 gx, inout vec2 gy) {
   uvec4 inf = texelFetch(uVar, ivec2(32, row), 0);
+  gBlend = 0.0;
   if (inf.x == 0u) return int(texelFetch(uVar, ivec2(0, row), 0).r);
+  if (inf.x == 3u) {
+    float f = uTime * float(inf.z) * 0.1;
+    int n = int(inf.y), a = int(mod(floor(f), float(n)));
+    gTl2 = int(texelFetch(uVar, ivec2((a + 1) % n, row), 0).r);
+    gBlend = fract(f);
+    return int(texelFetch(uVar, ivec2(a, row), 0).r);
+  }
+  if (inf.x == 4u) {
+    // height bands (OptiFine method=fixed with min/maxHeight): slot k+1 = (texture, minY, maxY, face mask)
+    int y = int(cell.y);
+    uint fm = face == 2 ? 2u : face == 3 ? 4u : 1u;
+    for (int k = 0; k < int(inf.y); k++) {
+      uvec4 b = texelFetch(uVar, ivec2(k + 1, row), 0);
+      if (y >= int(b.g) && y <= int(b.b) && (b.a & fm) != 0u) return int(b.r);
+    }
+    return int(texelFetch(uVar, ivec2(0, row), 0).r);
+  }
   if (inf.x == 2u) {
     ivec2 t = ivec2(floor(uvB + 1e-4)); int w = int(inf.y), h = int(inf.z);
     return int(texelFetch(uVar, ivec2(((t.x % w) + w) % w + (((t.y % h) + h) % h) * w, row), 0).r);
@@ -217,14 +246,11 @@ void main() {
 
 export const TERRAIN_FS = VARIANTS + /* glsl */ `
 uniform sampler2DArray uAlbedo, uNormal, uMask;
-uniform vec4 uLP[35];     // 1/tile, normal strength, roughness scale, macro variation
-uniform vec4 uLT[35];     // tint rgb, specular
-uniform vec4 uLP2[35];    // emission, translucency, biome tint, cutout
-uniform vec4 uLP3[35];    // relief depth in blocks (parallax occlusion mapping)
 uniform float uPom, uPomDist;   // relief multiplier (0 = off), fade-out distance
 uniform mat3 uModelRot;
 uniform float uBevelWidth, uBevelStrength, uEdgeWear, uAOStrength, uAODirect, uOverhang, uCutoff;
 uniform float uFlash;     // lightning
+uniform sampler2D uStars;  // end portal starfield
 uniform int uDebug;       // 0 lit, 1 albedo, 2 normal, 3 ao/rough/metal, 4 vertex light, 5 uv/layer
 in vec3 vPos;
 in vec3 vTexPos;
@@ -254,11 +280,11 @@ Layer sampleLayer(int layer, int tl, vec2 uv, vec2 gx, vec2 gy) {
   vec4 n = textureGrad(uNormal, vec3(uv, float(tl)), gx, gy);
   vec4 m = textureGrad(uMask, vec3(uv, float(tl)), gx, gy);
   Layer s;
-  s.albedo = pow(a.rgb, vec3(2.2)) * uLT[layer].rgb;
-  if (uLP2[layer].z > 0.5) s.albedo *= biomeTint(int(vClim.z + 0.5), vClim.x, vClim.y);
+  s.albedo = pow(a.rgb, vec3(2.2)) * TLT(layer).rgb;
+  if (TLP2(layer).z > 0.5) s.albedo *= biomeTint(int(vClim.z + 0.5), vClim.x, vClim.y);
   s.alpha = a.a;
-  s.nts = n.xyz * 2.0 - 1.0; s.nts.xy *= uLP[layer].y; s.nts = normalize(s.nts);
-  s.ao = m.r; s.rough = clamp(m.g * uLP[layer].z, 0.0, 1.0); s.metal = m.b; s.emis = m.a * uLP2[layer].x;
+  s.nts = n.xyz * 2.0 - 1.0; s.nts.xy *= TLP(layer).y; s.nts = normalize(s.nts);
+  s.ao = m.r; s.rough = clamp(m.g * TLP(layer).z, 0.0, 1.0); s.metal = m.b; s.emis = m.a * TLP2(layer).x;
   return s;
 }
 
@@ -268,7 +294,7 @@ void main() {
   bool plant = face >= 6;
   // image rows run top-down, so v is flipped against the up axis
   vec2 uvBlocks = vec2(dot(vTexPos, T), -dot(vTexPos, B));
-  vec2 uv = plant ? vec2(vCorner.x, 1.0 - vCorner.y) : uvBlocks * uLP[layer].x;
+  vec2 uv = plant ? vec2(vCorner.x, 1.0 - vCorner.y) : uvBlocks * TLP(layer).x;
   vec3 cell = floor(vTexPos - N * 0.5);
   vec3 local = vTexPos - cell;
   float u = dot(local - 0.5, T) + 0.5, w = dot(local - 0.5, B) + 0.5;
@@ -282,13 +308,13 @@ void main() {
 #ifndef CUTOUT
   // parallax occlusion mapping: march the view ray through the height field (albedo alpha, 1 = surface)
   float vdist = distance(uCamPos, vPos);
-  float depthBlocks = uLP3[layer].x * uPom;
-  if (!plant && depthBlocks > 0.0 && vdist < uPomDist && uLP2[layer].w < 0.5) {
+  float depthBlocks = TLP3(layer).x * uPom;
+  if (!plant && depthBlocks > 0.0 && vdist < uPomDist && TLP2(layer).w < 0.5) {
     vec3 V = normalize(uCamPos - vPos);
     vec3 Nw = normalize(uModelRot * N), Tw = normalize(uModelRot * T), Bw = normalize(uModelRot * B);
     float ndv = max(dot(V, Nw), 0.02);
     float fade = 1.0 - smoothstep(uPomDist * 0.6, uPomDist, vdist);
-    float k = uLP[layer].x * depthBlocks * fade;
+    float k = TLP(layer).x * depthBlocks * fade;
     vec2 dir = vec2(-dot(V, Tw), dot(V, Bw)) / max(ndv, 0.2) * k;
     int steps = int(mix(40.0, 10.0, ndv));
     float stepD = 1.0 / float(steps);
@@ -319,12 +345,43 @@ void main() {
       }
       pomShadow = 1.0 - clamp(occ, 0.0, 1.0) * fade * 0.85;
     }
-    uvBlocks += (cur - uv) / uLP[layer].x;
+    uvBlocks += (cur - uv) / TLP(layer).x;
     uv = cur;
   }
 #endif
   Layer s = sampleLayer(layer, tl, uv, gx, gy);
-  float alpha = uLP2[layer].w > 0.5 ? s.alpha : 1.0;
+  if (gBlend > 0.0) {
+    Layer s2 = sampleLayer(layer, gTl2, uv, gx, gy);
+    s.albedo = mix(s.albedo, s2.albedo, gBlend); s.alpha = mix(s.alpha, s2.alpha, gBlend); s.emis = mix(s.emis, s2.emis, gBlend);
+    s.nts = normalize(mix(s.nts, s2.nts, gBlend));
+  }
+  float special = TLP3(layer).y;
+  if (special > 0.5 && special < 1.5) {
+    // end portal / gateway: layers of stars drifting at different depths behind the surface (Minecraft's end portal)
+    vec3 V = normalize(vPos - uCamPos);
+    vec3 acc = vec3(0.012, 0.02, 0.03);
+    for (int i = 0; i < 7; i++) {
+      float fi = float(i + 1), depth = 0.6 + fi * 0.9;
+      vec3 q = vPos + V * depth;
+      float a = fi * 1.93 + uTime * 0.01 * fi;
+      vec2 st = mat2(cos(a), -sin(a), sin(a), cos(a)) * (q.xz + q.y * vec2(0.7, -0.4)) * (0.07 + 0.035 * fi) + vec2(uTime * 0.004 * fi, 0.0);
+      float t = texture(uStars, st).r;
+      float star = pow(clamp((t - 0.13) * 3.2, 0.0, 1.0), 2.0);   // only the bright specks
+      vec3 tintc = 0.5 + 0.5 * cos(vec3(0.0, 2.1, 4.2) + fi * 1.7);
+      acc += star * tintc * (1.1 / fi);
+    }
+    vec3 colS = acc * 1.3;
+    outColor = vec4(applyFog(colS, vPos), 1.0);
+    return;
+  }
+  float alpha = TLP2(layer).w > 0.5 ? s.alpha : 1.0;
+#ifdef TRANSLUCENT
+  // nether portal: glowing, see-through, gently swirling
+  vec3 pc = s.albedo * (0.5 + TLP2(layer).x * 0.3);
+  pc *= 0.8 + 0.4 * vnoise(vTexPos.xy * 3.0 + vTexPos.zy * 3.0 + uTime * 0.6);
+  outColor = vec4(applyFog(pc, vPos), clamp(s.alpha * 0.62, 0.0, 0.75));
+  return;
+#endif
 #ifdef CUTOUT
   // keep foliage coverage in distant mips
   float lod = max(0.0, log2(max(length(dFdx(uv)), length(dFdy(uv))) * 256.0));
@@ -341,7 +398,7 @@ void main() {
     s.ao = mix(s.ao, o.ao, o.alpha);
     s.rough = mix(s.rough, o.rough, o.alpha);
   } else if (overlay != 255) {
-    Layer o = sampleLayer(overlay, overlay, uvBlocks * uLP[overlay].x, ogx * uLP[overlay].x, ogy * uLP[overlay].x);
+    Layer o = sampleLayer(overlay, overlay, uvBlocks * TLP(overlay).x, ogx * TLP(overlay).x, ogy * TLP(overlay).x);
     float jitter = hash21(cell.xz + cell.y * 17.0) - 0.5;
     float edge = 1.0 - uOverhang + (o.alpha - 0.5) * 0.28 + jitter * 0.06;
     float m = smoothstep(edge - 0.035, edge + 0.035, w);
@@ -351,7 +408,7 @@ void main() {
     s.ao = mix(s.ao * (1.0 - 0.35 * band), o.ao, m);
     s.rough = mix(s.rough, o.rough, m);
   }
-  float macroAmt = uLP[layer].w;
+  float macroAmt = TLP(layer).w;
   vec2 mp = vTexPos.xz + vTexPos.y * vec2(0.37, -0.21);
   float macro = vnoise(mp * 0.035) * 0.65 + vnoise(mp * 0.11 + 13.1) * 0.35;
   s.albedo *= mix(1.0, 0.8 + 0.4 * macro, macroAmt);
@@ -385,15 +442,15 @@ void main() {
   float vao = mix(0.28, 1.0, smoothstep(0.0, 1.0, vLight.x));
   vao = mix(1.0, vao, uAOStrength);
   float directShade = mix(1.0, vao, uAODirect);
-  vec3 col = shade(s.albedo * directShade, n, s.rough, s.metal, s.ao * vao, uLT[layer].w, s.albedo * s.emis,
-                   uLP2[layer].y, vPos, vLight.y, vLight.z, pomShadow, uSkyLut);
+  vec3 col = shade(s.albedo * directShade, n, s.rough, s.metal, s.ao * vao, TLT(layer).w, s.albedo * s.emis,
+                   TLP2(layer).y, vPos, vLight.y, vLight.z, pomShadow, uSkyLut);
   col += s.albedo * uFlash * vLight.y * 2.0;
   outColor = vec4(applyFog(col, vPos), 1.0);
   if (uDebug == 1) outColor = vec4(s.albedo, 1.0);
   else if (uDebug == 2) outColor = vec4(n * 0.5 + 0.5, 1.0);
   else if (uDebug == 3) outColor = vec4(s.ao, s.rough, s.metal, 1.0);
   else if (uDebug == 4) outColor = vec4(vLight, 1.0);
-  else if (uDebug == 5) outColor = vec4(uv.x - floor(uv.x), uv.y - floor(uv.y), float(layer) / 35.0, 1.0);
+  else if (uDebug == 5) outColor = vec4(uv.x - floor(uv.x), uv.y - floor(uv.y), float(layer) / 80.0, 1.0);
 }
 `;
 
@@ -429,7 +486,6 @@ void main() {
 `;
 export const SHADOW_FS = VARIANTS + /* glsl */ `
 uniform sampler2DArray uAlbedo;
-uniform vec4 uLP[35];
 uniform float uCutoff;
 in vec3 vTexPos;
 flat in ivec2 vFL;
@@ -440,7 +496,7 @@ void main() {
 #ifdef CUTOUT
   int face = vFL.x, layer = vFL.y;
   vec2 uvB = vec2(dot(vTexPos, FT[face]), -dot(vTexPos, FB[face]));
-  vec2 uv = face >= 6 ? vec2(vCorner.x, 1.0 - vCorner.y) : uvB * uLP[layer].x;
+  vec2 uv = face >= 6 ? vec2(vCorner.x, 1.0 - vCorner.y) : uvB * TLP(layer).x;
   vec2 gx = dFdx(uv), gy = dFdy(uv);
   int tl = pickLayer(layer, face, face >= 6 ? vCell : floor(vTexPos - FN[face] * 0.5), uvB, uv, gx, gy);
   if (textureGrad(uAlbedo, vec3(uv, float(tl)), gx, gy).a < uCutoff) discard;
@@ -489,10 +545,13 @@ export const SKYLUT_FS = /* glsl */ `
 uniform vec3 uSunDir;
 uniform vec3 uNight;
 uniform float uCloudGrey;
+uniform float uDim;
+uniform vec3 uDimColor;
 in vec2 vUV;
 out vec4 outColor;
 void main() {
   float az = (vUV.x - 0.5) * 2.0 * PI, el = (vUV.y - 0.5) * PI;
+  if (uDim > 0.5) { outColor = vec4(uDimColor * (uDim > 1.5 ? 0.6 + 0.6 * clamp(sin(el) + 0.3, 0.0, 1.0) : 1.0), 1.0); return; }
   vec3 V = vec3(cos(el) * cos(az), sin(el), cos(el) * sin(az));
   // single scattering alone turns the last few degrees above the horizon khaki (no multiple scattering); look it up
   // a little higher so the horizon stays a pale, hazy blue
@@ -518,6 +577,7 @@ uniform vec4 uCloud, uCloudOff;
 uniform float uFlash;
 uniform sampler2D uMoonTex;
 uniform float uMoonTexOn;
+uniform float uDim;
 in vec2 vUV;
 out vec4 outColor;
 float h31(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
@@ -544,6 +604,16 @@ void main() {
   vec3 V = normalize(wp.xyz / wp.w - uCamPos);
   vec2 luv = vec2(atan(V.z, V.x) / (2.0 * PI) + 0.5, asin(clamp(V.y, -1.0, 1.0)) / PI + 0.5);
   vec3 sky = textureLod(uSkyLut, luv, 0.0).rgb;   // explicit LOD: no mip seam where atan wraps
+  if (uDim > 0.5) {
+    if (uDim > 1.5) {
+      // the End: dark violet murk with slow streaks and faint stars
+      vec2 q = V.xz / (abs(V.y) + 0.4);
+      float streak = texture(uCloudTex, q * vec2(0.05, 0.16) + uTime * 0.0004).r * texture(uCloudTex, q * 0.11 - uTime * 0.0003).g;
+      sky = sky * (0.45 + streak * 1.6) + stars(V) * 0.35;
+    }
+    outColor = vec4(sky, 1.0);
+    return;
+  }
   float dayLum = dot(sky, vec3(0.2126, 0.7152, 0.0722));
   if (V.y > 0.0) sky += stars(V) * clamp(1.0 - dayLum * 25.0, 0.0, 1.0);
   float r = acos(clamp(dot(V, uSunDir), -1.0, 1.0)) / 0.0125;
@@ -713,11 +783,13 @@ uniform sampler2D uColor, uBloom, uBloom2, uRays;
 uniform float uExposure, uBloomAmt, uUnderwater, uSaturation, uVignette;
 uniform vec3 uUnderwaterColor;
 uniform float uDamage;
+uniform float uPortal;
 in vec2 vUV; out vec4 outColor;
 vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 void main() {
   vec2 uv = vUV;
   if (uUnderwater > 0.5) uv += vec2(sin(uv.y * 30.0 + uTime * 2.0), cos(uv.x * 25.0 + uTime * 1.7)) * 0.0025;
+  if (uPortal > 0.0) { vec2 d = uv - 0.5; float a = uPortal * 1.2 * (1.0 - length(d)); uv = 0.5 + mat2(cos(a), -sin(a), sin(a), cos(a)) * d * (1.0 - uPortal * 0.15); }
   vec3 c = texture(uColor, uv).rgb;
   c += (texture(uBloom, uv).rgb * 0.45 + texture(uBloom2, uv).rgb * 0.55) * uBloomAmt;
   c += texture(uRays, uv).rgb;
@@ -729,6 +801,7 @@ void main() {
   vec2 v = vUV - 0.5;
   c *= 1.0 - dot(v, v) * uVignette;
   c = mix(c, vec3(0.6, 0.0, 0.0), uDamage * smoothstep(0.2, 0.75, length(v)));
+  c = mix(c, vec3(0.45, 0.1, 0.75), uPortal * (0.35 + 0.4 * smoothstep(0.1, 0.7, length(v))));
   outColor = vec4(pow(c, vec3(1.0 / 2.2)), 1.0);
 }
 `;
@@ -830,7 +903,6 @@ void main() {
 export const PROP_FS = /* glsl */ `
 uniform sampler2DArray uAlbedo, uNormal, uMask;
 uniform sampler2DArray uBakeN, uBakeM;
-uniform vec4 uLP[35]; uniform vec4 uLT[35]; uniform vec4 uLP2[35];
 uniform float uMapping, uLayer, uTiling, uMoss, uFoliage, uBake, uRoughness, uEdgeWear;
 uniform vec3 uTint;
 in vec3 vPos; in vec3 vN; in vec4 vT; in vec4 vColor; in vec4 vUV; flat in vec4 vLight;
@@ -860,22 +932,22 @@ void main() {
     float L = float(layer);
     albedo = pow(texture(uAlbedo, vec3(uvX, L)).rgb, vec3(2.2)) * w.x + pow(texture(uAlbedo, vec3(uvY, L)).rgb, vec3(2.2)) * w.y + pow(texture(uAlbedo, vec3(uvZ, L)).rgb, vec3(2.2)) * w.z;
     vec4 m = texture(uMask, vec3(uvX, L)) * w.x + texture(uMask, vec3(uvY, L)) * w.y + texture(uMask, vec3(uvZ, L)) * w.z;
-    float st = uLP[layer].y;
+    float st = TLP(layer).y;
     vec3 nX = texture(uNormal, vec3(uvX, L)).xyz * 2.0 - 1.0, nY = texture(uNormal, vec3(uvY, L)).xyz * 2.0 - 1.0, nZ = texture(uNormal, vec3(uvZ, L)).xyz * 2.0 - 1.0;
     nX.xy *= st; nY.xy *= st; nZ.xy *= st;
     nX = vec3(nX.xy + N.zy, abs(nX.z) * N.x); nY = vec3(nY.xy + N.xz, abs(nY.z) * N.y); nZ = vec3(nZ.xy + N.xy, abs(nZ.z) * N.z);
     N = normalize(nX.zyx * w.x + nY.xzy * w.y + nZ.xyz * w.z);
-    albedo *= uLT[layer].rgb; rough = clamp(m.g * uLP[layer].z, 0.0, 1.0); metal = m.b; spec = uLT[layer].w; layerAO = m.r;
+    albedo *= TLT(layer).rgb; rough = clamp(m.g * TLP(layer).z, 0.0, 1.0); metal = m.b; spec = TLT(layer).w; layerAO = m.r;
   } else if (uMapping < 1.5) {
     vec2 uv = vUV.zw * uTiling;
     uv.y = -uv.y;
     float L = float(layer);
-    albedo = pow(texture(uAlbedo, vec3(uv, L)).rgb, vec3(2.2)) * uLT[layer].rgb;
+    albedo = pow(texture(uAlbedo, vec3(uv, L)).rgb, vec3(2.2)) * TLT(layer).rgb;
     vec4 m = texture(uMask, vec3(uv, L));
-    vec3 nts = texture(uNormal, vec3(uv, L)).xyz * 2.0 - 1.0; nts.xy *= uLP[layer].y;
+    vec3 nts = texture(uNormal, vec3(uv, L)).xyz * 2.0 - 1.0; nts.xy *= TLP(layer).y;
     vec3 T = normalize(vT.xyz - N * dot(N, vT.xyz)); vec3 Bt = cross(N, T) * vT.w;
     N = normalize(nts.x * T + nts.y * Bt + max(nts.z, 1e-3) * N);
-    rough = clamp(m.g * uLP[layer].z, 0.0, 1.0); spec = uLT[layer].w; layerAO = m.r;
+    rough = clamp(m.g * TLP(layer).z, 0.0, 1.0); spec = TLT(layer).w; layerAO = m.r;
   } else {
     albedo = pow(vColor.rgb, vec3(2.2));
     if (uFoliage > 0.5) {
@@ -892,7 +964,7 @@ void main() {
     if (moss > 0.001) {
       vec2 muv = vPos.xz * 0.5;
       vec4 ma = texture(uAlbedo, vec3(muv, 20.0));
-      vec3 mc = pow(ma.rgb, vec3(2.2)) * uLT[20].rgb * grassTint(vLight.z, vLight.w);
+      vec3 mc = pow(ma.rgb, vec3(2.2)) * TLT(20).rgb * grassTint(vLight.z, vLight.w);
       moss = smoothstep(0.35, 0.65, moss + (ma.a - 0.5) * 0.5);
       albedo = mix(albedo, mc, moss); rough = mix(rough, 0.95, moss); spec = mix(spec, 0.3, moss);
     }

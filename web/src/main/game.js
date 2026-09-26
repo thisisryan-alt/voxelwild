@@ -8,9 +8,13 @@ import { Inventory, SurvivalStats, Weather, CREATIVE_HOTBAR, HOTBAR, WEATHER_NAM
 import { GameAudio } from './audio.js';
 import { Icons } from './icons.js';
 import { SaveStore, PackStore } from './save.js';
-import { readPackZip, convertPack, decodeLarge, fetchBuiltinPack } from './respack.js';
+import { readPackZip, convertPack, decodeLarge, fetchBuiltinPack, square } from './respack.js';
 import { LAYER_TUNING, LAYER_NAMES, I } from '../shared/blocks.js';
-import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, breakSeconds, drops, canHarvest, itemName, layerFor } from '../shared/blocks.js';
+import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, isLava, isPortal, Dim, breakSeconds, drops, canHarvest, itemName, layerFor } from '../shared/blocks.js';
+import { strongholds, frameRing } from '../shared/stronghold.js';
+import { END_ARRIVAL, END_GATEWAY, outerGateway } from '../shared/end.js';
+import { netherClimate, nearestFortress } from '../shared/nether.js';
+import { Simplex } from '../shared/noise.js';
 import { terrainFor } from '../shared/gen.js';
 import { Biome, BIOME_NAMES } from '../shared/terrain.js';
 import { VoxelBody } from './player.js';
@@ -104,8 +108,11 @@ export class Game {
       const res = await fetch(this.assetBase + 'lbpr/lbpr.json');
       if (!res.ok) throw new Error(`lbpr.json (${res.status})`);
       const meta = await res.json();
-      const [albedo, normal, mask, items, crack, moon] = await Promise.all(
-        ['albedo', 'normal', 'mask', 'items', 'crack', 'moon'].map((f) => load(`lbpr/${f}.webp`)));
+      const parts = meta.parts || 1, sfx = (k) => (k ? `.${k}` : '');
+      const strip = (name) => Promise.all(Array.from({ length: parts }, (_, k) => load(`lbpr/${name}${sfx(k)}.webp`)));
+      const [albedoP, normalP, maskP, items, crack, moon, stars] = await Promise.all([strip('albedo'), strip('normal'), strip('mask'),
+        ...['items', 'crack', 'moon', 'stars'].map((f) => load(`lbpr/${f}.webp`).catch(() => null))]);
+      const [albedo, normal, mask] = [albedoP[0], normalP[0], maskP[0]];
       const itemImages = new Map();
       meta.items.forEach((key, k) => {
         if (I[key] == null) return;
@@ -120,28 +127,73 @@ export class Game {
         }));
         sounds[group] = sounds[group].filter(Boolean);
       }));
-      set = { name, albedo, normal, mask, tuning: meta.tuning, variants: meta.variants, items: itemImages, crack, moon, sounds, credit: meta.credit };
+      set = { name, albedo, normal, mask, parts: { albedo: albedoP, normal: normalP, mask: maskP }, tuning: meta.tuning, variants: meta.variants,
+        items: itemImages, crack, moon, stars, sounds, credit: meta.credit };
     } else {
       const [albedo, normal, mask] = await Promise.all([load('albedo.webp'), load('normal.webp'), load('mask.webp')]);
       set = { name: 'original', albedo, normal, mask, tuning: LAYER_TUNING, variants: null, items: null, crack: null, moon: null, sounds: null, credit: null };
+      // the Unity art has nothing for the Nether, the End or strongholds: those layers (and their variants) come from LBPR
+      if (Math.round(albedo.height / albedo.width) < LAYER_NAMES.length) {
+        try { await this.borrowLayers(set, await this.loadSet('lbpr')); } catch (e) { console.warn('no textures for the new blocks:', e && e.message); }
+      }
     }
     this.sets[name] = set;
     return set;
   }
 
+  /** Completes a set with fewer layers than the game has from another set: its layers from there on, plus the variant
+   *  textures those layers use, resampled to this set's size (and the variant table renumbered to match). */
+  async borrowLayers(set, from) {
+    const n = LAYER_NAMES.length, own = Math.round(set.albedo.height / set.albedo.width), S = set.albedo.width;
+    const dec = async (bmps) => { const out = []; for (const b of bmps) out.push(await decodeLarge(b)); return out; };
+    const src = { albedo: await dec(from.parts.albedo), normal: await dec(from.parts.normal), mask: await dec(from.parts.mask) };
+    const fs = from.albedo.width, perPart = Math.round(from.parts.albedo[0].height / fs);
+    const layerOf = (which, t) => { const part = src[which][Math.floor(t / perPart)], k = t % perPart; return { w: fs, h: fs, data: part.data.subarray(k * fs * fs * 4, (k + 1) * fs * fs * 4) }; };
+    // which source textures: the borrowed layers themselves, then every texture their variant rows reach
+    const map = new Map(), order = [];
+    for (let i = own; i < n; i++) { map.set(i, i); order.push(i); }
+    const rows = [];
+    for (let i = own; i < n; i++) {
+      const row = from.variants && from.variants[i];
+      if (!row) continue;
+      const tex = [...row.slots, ...(row.bands || []).map((b) => b[0])];
+      for (const t of tex) if (!map.has(t)) { map.set(t, n + order.length - (n - own)); order.push(t); }
+      rows[i] = { ...row, slots: row.slots.map((t) => map.get(t)), bands: row.bands ? row.bands.map((b) => [map.get(b[0]), b[1], b[2], b[3]]) : undefined };
+    }
+    const total = own + order.length, L = S * S * 4;
+    const own3 = { albedo: (await decodeLarge(set.albedo)).data, normal: (await decodeLarge(set.normal)).data, mask: (await decodeLarge(set.mask)).data };
+    set.raw = { size: S, layers: total };
+    for (const which of ['albedo', 'normal', 'mask']) {
+      const out = new Uint8Array(L * total);
+      out.set(own3[which].subarray(0, L * own));
+      order.forEach((t, k) => out.set(square(layerOf(which, t), S), (own + k) * L));
+      set.raw[which] = out;
+    }
+    set.tuning = LAYER_TUNING.map((t, i) => (i < own ? t : from.tuning[i]));
+    set.variants = rows;
+    set.items = new Map([...from.items].filter(([id]) => ITEMS[id] && ITEMS[id].id >= I.Flint));
+    set.stars = from.stars;
+    // thumbnails for the item icons: an opaque copy of the base layers
+    const flat = new Uint8ClampedArray(set.raw.albedo.subarray(0, L * n));
+    for (let i = 0; i < n; i++) if (!set.tuning[i].cutout) for (let p = i * L + 3; p < (i + 1) * L; p += 4) flat[p] = 255;
+    const c = document.createElement('canvas'); c.width = S; c.height = S * n;
+    c.getContext('2d').putImageData(new ImageData(flat, S, S * n), 0, 0);
+    set.thumbs = await createImageBitmap(c);
+  }
+
   /** Makes a texture set the block materials (under any resource pack the player loaded). */
   applySet(set) {
     this.builtin = set;
-    this.builtinRaw = null;
+    this.builtinRaw = set.raw ? { size: set.raw.size, albedo: set.raw.albedo, normal: set.raw.normal, mask: set.raw.mask } : null;
     const r = this.renderer;
-    r.uploadLayers('albedo', set.albedo);
-    r.uploadLayers('normal', set.normal);
-    r.uploadLayers('mask', set.mask);
+    if (set.raw) for (const w of ['albedo', 'normal', 'mask']) r.uploadLayersRaw(w, set.raw[w], set.raw.size, set.raw.layers);
+    else for (const w of ['albedo', 'normal', 'mask']) r.uploadLayers(w, set.parts ? set.parts[w] : set[w]);
     r.setTuning(set.tuning);
     r.setVariants(set.variants);
     r.setCrackTexture(set.crack);
     r.setMoonTexture(set.moon);
-    this.icons = new Icons(set.albedo, { tuning: set.tuning, items: set.items });
+    r.setStarsTexture(set.stars || null);
+    this.icons = new Icons(set.thumbs || set.albedo, { tuning: set.tuning, items: set.items });
     r.uploadAtlas(this.icons.canvas);
     this.audio.setSamples(set.sounds);
     this.emit('inventory'); this.emit('textures', set);
@@ -233,17 +285,33 @@ export class Game {
 
   // ---------------------------------------------------------------- session
 
-  async startWorld(meta, isNew) {
-    this.stopWorld();
-    this.meta = meta;
-    const modified = isNew ? new Map() : await this.store.loadSections(meta.id);
-    this.world = new World({
-      seed: meta.seed, workerUrl: this.workerUrl, viewDistance: this.settings.viewDistance, modified,
+  /** A streaming world for a dimension; edits of every dimension are kept in dimModified between visits. */
+  makeWorld(dim) {
+    const w = new World({
+      seed: this.meta.seed, workerUrl: this.workerUrl, viewDistance: this.settings.viewDistance, modified: this.dimModified[dim], dim,
       onMesh: (s, m) => this.renderer.uploadSection(s, m),
       onUnloadSection: (s) => this.renderer.freeSection(s),
     });
-    if (meta.removedProps) for (const a of meta.removedProps) this.world.props.removed.add(a);
-    if (this.propLib) this.world.props.setLibrary(this.propLib);
+    if (dim === Dim.Overworld) {
+      if (this.meta.removedProps) for (const a of this.meta.removedProps) w.props.removed.add(a);
+      if (this.propLib) w.props.setLibrary(this.propLib);
+    }
+    return w;
+  }
+
+  async startWorld(meta, isNew) {
+    this.stopWorld();
+    this.meta = meta;
+    // saved sections: overworld keys as they were, the Nether's and the End's prefixed N/ and E/
+    const all = isNew ? new Map() : await this.store.loadSections(meta.id);
+    this.dimModified = [new Map(), new Map(), new Map()];
+    for (const [k, v] of all) {
+      const d = k.startsWith('N/') ? 1 : k.startsWith('E/') ? 2 : 0;
+      this.dimModified[d].set(d ? k.slice(2) : k, v);
+    }
+    this.dim = isNew ? Dim.Overworld : meta.dim || Dim.Overworld;
+    meta.portals = meta.portals || [];
+    this.world = this.makeWorld(this.dim);
     this.player = new Player();
     this.inventory = new Inventory();
     this.stats = new SurvivalStats();
@@ -289,6 +357,7 @@ export class Game {
 
   stopWorld() {
     if (this.world) {
+      if (this.dimModified && !this.meta.menu) this.dimModified[this.dim] = this.world.editedSections();
       for (const col of this.world.columns.values()) for (const s of col.render) this.renderer.freeSection(s);
       this.world.dispose();
       this.world = null;
@@ -348,10 +417,10 @@ export class Game {
     const p = this.player;
     return {
       ...this.meta,
-      player: { pos: [...p.body.pos], yaw: p.yaw, pitch: p.pitch, spawn: this.spawn, flying: p.flying },
+      player: { pos: [...p.body.pos], yaw: p.yaw, pitch: p.pitch, spawn: this.spawn, flying: p.flying }, dim: this.dim, portals: this.meta.portals || [],
       inventory: this.inventory.toJSON(), stats: this.stats.toJSON(),
       time: { hour: this.tod.hour, day: this.tod.day }, weather: this.weather.toJSON(),
-      removedProps: [...this.world.props.removed],
+      removedProps: this.dim === Dim.Overworld ? [...this.world.props.removed] : this.meta.removedProps || [],
     };
   }
 
@@ -366,7 +435,12 @@ export class Game {
     if (!this.world || this.state === 'loading' || this.meta.menu || this.meta.unsaved) return;
     try {
       const meta = this.metaSnapshot();
-      await this.store.saveWorld(meta, this.world.editedSections());
+      const sections = new Map();
+      for (let d = 0; d < 3; d++) {
+        const src = d === this.dim ? this.world.editedSections() : this.dimModified[d];
+        for (const [k, v] of src) sections.set((d === 1 ? 'N/' : d === 2 ? 'E/' : '') + k, v);
+      }
+      await this.store.saveWorld(meta, sections);
       this.meta = meta;
       this.emit('saved', manual);
     } catch (e) { console.error('save failed', e); this.emit('toast', 'Saving failed: ' + (e && e.message)); }
@@ -390,6 +464,13 @@ export class Game {
 
   respawn() {
     this.stats.reset();
+    this.burning = 0;
+    if (this.dim !== Dim.Overworld) {
+      this.player.flying = false;
+      this.travel(Dim.Overworld, this.spawn, this.player.yaw, null);
+      this.emit('hud');
+      return;
+    }
     this.player.teleport(this.spawn, this.player.yaw, 0);
     this.player.flying = false;
     this.state = 'loading';
@@ -466,7 +547,8 @@ export class Game {
       this.emit('loading', prog);
       const c = w.column(Math.floor(pl.body.pos[0]) >> 5, Math.floor(pl.body.pos[2]) >> 5);
       if (prog >= 1 && c && c.state === 'ready') {
-        if (this.needGround) { this.settleOnGround(); this.needGround = false; }
+        if (this.arrival) { const a = this.arrival; this.arrival = null; a(); }
+        else if (this.needGround) { this.settleOnGround(); this.needGround = false; }
         this.state = 'playing';
         this.emit('state', this.state);
         this.emit('hud');
@@ -513,6 +595,7 @@ export class Game {
     }
     const before = pl.body.pos[1];
     pl.update(w, dt, inp);
+    this.updateHazards(dt);
     if (pl.body.pos[1] < MIN_Y - 40) { if (this.creative) pl.teleport([pl.body.pos[0], MAX_Y - 4, pl.body.pos[2]]); else this.stats.damage(1000, 'void'); }
     const wasHead = this.headWet;
     this.headWet = pl.headInWater;
@@ -524,6 +607,7 @@ export class Game {
       this.interact(dt);
     }
     this.updateEntities(dt);
+    this.updateEyes(dt);
 
     const [jumps, dist] = pl.consumeActivity();
     if (!this.creative) this.stats.tick(dt, dist, pl.sprinting, jumps, pl.headInWater);
@@ -587,7 +671,8 @@ export class Game {
     if ((this.mouse.rightClicked || (this.mouse.right && this.useCooldown <= 0))) {
       this.useCooldown = 0.25;
       const def = inv.heldItem;
-      if (def && def.kind === Kind.Food) {
+      if (def && def.kind === Kind.Use) this.useItem(def, hit);
+      else if (def && def.kind === Kind.Food) {
         if (!this.creative && this.stats.hunger < 20) { this.stats.eat(def.food, def.sat); inv.consumeHeld(); this.audio.eat(); this.swing = 1; this.emit('hud'); }
       } else if (hit && def && def.kind === Kind.Block) this.place(hit, def.block);
     }
@@ -598,6 +683,7 @@ export class Game {
     const [x, y, z] = pos;
     const inv = this.inventory, held = inv.held ? inv.held.item : 0;
     if (!w.setBlock(x, y, z, B.Air)) return;
+    if (block === B.Obsidian) this.breakPortalsAround(x, y, z);
     this.audio.break(block);
     this.spawnBreakParticles(pos, block, 26);
     if (survival) {
@@ -641,6 +727,324 @@ export class Game {
     if (!this.creative) this.inventory.consumeHeld();
   }
 
+  // ---------------------------------------------------------------- dimensions and portals
+
+  /** Leaves this dimension for another: the new world streams in around pos, then arrive() places the player. */
+  travel(dim, pos, yaw, arrive) {
+    this.stopWorld();
+    this.dim = dim;
+    this.meta.dim = dim;
+    this.world = this.makeWorld(dim);
+    this.entities = [];
+    this.particles = { break: [], rain: [], snow: [], motes: [] };
+    this.mining = null;
+    this.portalTime = 0; this.portalLock = true;
+    this.player.teleport(pos, yaw ?? this.player.yaw, 0);
+    this.player.body.vel = [0, 0, 0];
+    this.arrival = arrive;
+    this.needGround = !arrive;
+    this.state = 'loading';
+    this.loadStart = performance.now();
+    this.lutDirty = true;
+    this.emit('travel', dim);
+    this.emit('state', this.state);
+  }
+
+  /** Called every frame while playing: portals, lava, magma, burning. */
+  updateHazards(dt) {
+    const pl = this.player, w = this.world, p = pl.body.pos;
+    const bx = Math.floor(p[0]), bz = Math.floor(p[2]);
+    const feet = w.getBlock(bx, Math.floor(p[1] + 0.2), bz), head = w.getBlock(bx, Math.floor(p[1] + 1.4), bz);
+    const eye = pl.eye();
+    this.headInLava = isLava(w.getBlock(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2])));
+    // nether portal: stand in it (4 s, 1 s in creative)
+    const inPortal = isPortal(feet) || isPortal(head);
+    if (inPortal && !this.portalLock && (this.dim !== Dim.End)) {
+      this.portalTime = (this.portalTime || 0) + dt;
+      this.portalHum = (this.portalHum || 0) - dt;
+      if (this.portalTime >= (this.creative ? 1 : 4)) { this.portalTime = 0; this.netherTravel(); return; }
+    } else if (!inPortal) { this.portalTime = Math.max(0, (this.portalTime || 0) - dt * 2); this.portalLock = false; }
+    // end portal: straight through
+    if ((feet === B.EndPortal || head === B.EndPortal) && !this.portalLock) {
+      this.portalLock = true;
+      if (this.dim === Dim.End) this.travel(Dim.Overworld, this.spawn, this.player.yaw, () => { this.settleOnGround(); this.emit('toast', 'Back in the overworld'); });
+      else this.travel(Dim.End, END_ARRIVAL, Math.PI / 2, () => this.arriveEnd());
+      return;
+    }
+    if ((feet === B.EndGateway || head === B.EndGateway || w.getBlock(bx, Math.floor(p[1] + 1.9), bz) === B.EndGateway) && !this.gatewayLock) {
+      this.gatewayLock = true;
+      const g = outerGateway(this.meta.seed);
+      const out = Math.abs(p[0] - END_GATEWAY[0]) < 8;
+      const target = out ? [g[0] + 4.5, g[1] + 4, g[2] + 0.5] : [END_GATEWAY[0] + 16.5, 64, END_GATEWAY[2] + 0.5];
+      pl.teleport(target, pl.yaw, 0);
+      this.state = 'loading'; this.needGround = true; this.emit('state', 'loading');
+      this.arrival = () => { this.settleOnGround(); };
+      return;
+    } else if (feet !== B.EndGateway && head !== B.EndGateway) this.gatewayLock = false;
+    if (this.creative) { this.burning = 0; return; }
+    // lava burns, and keeps burning a while after
+    const inLava = isLava(feet) || isLava(head);
+    if (inLava) this.burning = 3.5;
+    else if (isWater(feet) || isWater(head)) this.burning = 0;
+    this.hurtTimer = (this.hurtTimer || 0) - dt;
+    if (this.hurtTimer <= 0) {
+      if (inLava) { this.stats.damage(4, 'lava'); this.hurtTimer = 0.5; this.spawnEmbers([p[0], p[1] + 0.5, p[2]], 6); }
+      else if (this.burning > 0) { this.stats.damage(1, 'lava'); this.hurtTimer = 1; }
+      else if (this.blockUnderFeet() === B.Magma && !this.keys.has('ShiftLeft') && pl.body.grounded) { this.stats.damage(1, 'magma'); this.hurtTimer = 1; }
+    }
+    this.burning = Math.max(0, (this.burning || 0) - dt);
+  }
+
+  netherTravel() {
+    const to = this.dim === Dim.Nether ? Dim.Overworld : Dim.Nether;
+    const p = this.player.body.pos, k = to === Dim.Nether ? 1 / 8 : 8;
+    const tx = Math.floor(p[0] * k), tz = Math.floor(p[2] * k);
+    // a portal already linked near the target (Minecraft searches 16 blocks in the Nether, 128 in the overworld)
+    const radius = to === Dim.Nether ? 16 : 128;
+    let best = null, bd = Infinity;
+    for (const q of this.meta.portals) {
+      if (q.dim !== to) continue;
+      const d = Math.hypot(q.x - tx, q.z - tz);
+      if (d <= radius && d < bd) { bd = d; best = q; }
+    }
+    const at = best ? [best.x + 0.5, best.y, best.z + 0.5] : [tx + 0.5, to === Dim.Nether ? 70 : 90, tz + 0.5];
+    this.travel(to, at, this.player.yaw, () => this.arrivePortal(to, tx, tz, best));
+  }
+
+  arrivePortal(dim, tx, tz, known) {
+    const w = this.world;
+    if (known) {
+      if (isPortal(w.getBlock(known.x, known.y, known.z))) { this.player.teleport([known.x + 0.5, known.y, known.z + 0.5]); this.portalLock = true; return; }
+      this.meta.portals = this.meta.portals.filter((q) => q !== known);
+    }
+    // find a flat, open spot for a 4 x 5 frame near the target; failing that, carve one out
+    const ok = (x, y, z) => {
+      for (let i = 0; i < 4; i++) {
+        const fl = w.getBlock(x + i, y - 1, z);
+        if (fl < 0 || !(BLOCKS[fl].flags & F.Solid)) return false;
+        for (let k = 0; k < 5; k++) for (let dz = -1; dz <= 1; dz++) if (w.getBlock(x + i, y + k, z + dz) !== B.Air) return false;
+      }
+      return true;
+    };
+    let spot = null;
+    const yLo = dim === Dim.Nether ? 33 : 40, yHi = dim === Dim.Nether ? 110 : 180;
+    outer: for (let r = 0; r <= 12; r++) for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+      const x = tx + dx - 1, z = tz + dz;
+      if (dim === Dim.Overworld) {
+        const h = w.heightmapAt(x, z);
+        if (h != null && h >= yLo && h < yHi && !isWater(w.getBlock(x, h, z)) && ok(x, h + 1, z)) { spot = [x, h + 1, z]; break outer; }
+      } else {
+        for (let y = 70 - Math.floor(r / 2); y >= yLo; y--) if (ok(x, y, z)) { spot = [x, y, z]; break outer; }
+        for (let y = 71; y < yHi; y++) if (ok(x, y, z)) { spot = [x, y, z]; break outer; }
+      }
+    }
+    if (!spot) spot = [tx - 1, dim === Dim.Nether ? 70 : Math.max(70, (w.heightmapAt(tx, tz) ?? 69) + 1), tz];
+    const [x0, y0, z0] = spot;
+    // Minecraft's smallest frame: 4 wide, 5 tall, a 2 x 3 pane; open space in front and behind
+    for (let i = 0; i < 4; i++) for (let k = -1; k <= 3; k++) {
+      const frame = i === 0 || i === 3 || k === -1 || k === 3;
+      w.setBlock(x0 + i, y0 + k, z0, frame ? B.Obsidian : B.NetherPortalX);
+      if (k >= 0) for (const dz of [-1, 1]) if (w.getBlock(x0 + i, y0 + k, z0 + dz) !== B.Air) w.setBlock(x0 + i, y0 + k, z0 + dz, B.Air);
+    }
+    // a ledge on both sides when the frame stands over nothing (or over lava)
+    for (let i = 0; i < 4; i++) for (const dz of [-1, 1]) {
+      const b = w.getBlock(x0 + i, y0 - 1, z0 + dz);
+      if (b === B.Air || isLava(b) || (b >= 0 && BLOCKS[b].flags & F.Replaceable)) w.setBlock(x0 + i, y0 - 1, z0 + dz, B.Obsidian);
+    }
+    this.meta.portals.push({ dim, x: x0 + 1, y: y0, z: z0 });
+    this.player.teleport([x0 + 2, y0, z0 + 0.5], this.player.yaw, 0);
+    this.portalLock = true;
+    this.audio.portal && this.audio.portal();
+  }
+
+  /** The End: Minecraft's obsidian landing platform in the void, rebuilt on every visit. */
+  arriveEnd() {
+    const w = this.world, [ax, ay, az] = END_ARRIVAL.map(Math.floor);
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+      w.setBlock(ax + dx, ay - 1, az + dz, B.Obsidian);
+      for (let k = 0; k < 3; k++) w.setBlock(ax + dx, ay + k, az + dz, B.Air);
+    }
+    this.player.teleport([ax + 0.5, ay, az + 0.5], Math.PI / 2, 0);
+    this.portalLock = true;
+    this.emit('toast', 'The End');
+  }
+
+  /** Flint and steel on an obsidian frame lights a portal; an eye of ender goes into a frame or flies toward a stronghold. */
+  useItem(def, hit) {
+    const inv = this.inventory, w = this.world;
+    if (def.id === I.FlintAndSteel) {
+      if (!hit) return;
+      const [x, y, z] = hit.prev;
+      this.swing = 1;
+      if (this.dim !== Dim.End && this.lightPortal(x, y, z)) {
+        this.audio.place(B.Obsidian);
+        if (!this.creative) inv.wearHeld();
+        this.emit('toast', 'The portal hums');
+      } else this.spawnEmbers([x + 0.5, y + 0.2, z + 0.5], 6);
+      return;
+    }
+    if (def.id === I.EyeOfEnder) {
+      if (hit && hit.block === B.EndPortalFrame) {
+        const [x, y, z] = hit.hit;
+        w.setBlock(x, y, z, B.EndPortalFrameEye);
+        if (!this.creative) inv.consumeHeld();
+        this.swing = 1;
+        this.audio.place(B.Obsidian);
+        for (let cz = z - 2; cz <= z + 2; cz++) for (let cx = x - 2; cx <= x + 2; cx++) {
+          if (frameRing(cx, cz).every(([fx, fz]) => w.getBlock(fx, y, fz) === B.EndPortalFrameEye)) {
+            for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) w.setBlock(cx + dx, y, cz + dz, B.EndPortal);
+            this.emit('toast', 'The End portal opens');
+            return;
+          }
+        }
+        return;
+      }
+      if (this.dim !== Dim.Overworld) { this.emit('toast', 'The eye drifts aimlessly here'); return; }
+      const p = this.player.body.pos;
+      let best = null, bd = Infinity;
+      for (const s of strongholds(this.meta.seed)) { const d = Math.hypot(s.x - p[0], s.z - p[2]); if (d < bd) { bd = d; best = s; } }
+      if (!this.creative) inv.consumeHeld();
+      const e = this.player.eye(), dir = [best.x + 0.5 - e[0], best.z + 0.5 - e[2]], l = Math.hypot(dir[0], dir[1]) || 1;
+      const close = bd < 12;
+      (this.eyes || (this.eyes = [])).push({ p: [...e], d: [dir[0] / l, dir[1] / l], t: 0, close, drop: Math.random() < 0.8 });
+      const card = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'][Math.round(Math.atan2(dir[1], dir[0]) / (Math.PI / 4) + 8) % 8];
+      this.emit('toast', close ? 'The eye sinks into the ground: dig down' : `The eye flies ${card}, about ${Math.round(bd / 10) * 10} blocks`);
+      this.swing = 1;
+    }
+  }
+
+  updateEyes(dt) {
+    if (!this.eyes) return;
+    for (let i = this.eyes.length - 1; i >= 0; i--) {
+      const e = this.eyes[i];
+      e.t += dt;
+      if (e.t < 1.6) {
+        const k = e.close ? 0 : 7 * dt;
+        e.p[0] += e.d[0] * k; e.p[2] += e.d[1] * k; e.p[1] += (e.close ? -2 : 1.2) * dt;
+        if (Math.random() < 0.5) this.particles.break.push({ p: [...e.p], v: [0, 0.3, 0], life: 0.5, size: 0.025, c: [0.25, 0.9, 0.6], sky: 1, blk: 1 });
+      } else {
+        if (e.drop) this.spawnItem(I.EyeOfEnder, 1, e.p, [0, 1, 0], undefined, 0.3);
+        else this.spawnEmbers(e.p, 14, [0.3, 0.9, 0.55]);
+        this.eyes.splice(i, 1);
+      }
+    }
+  }
+
+  /** Flood the air inside an obsidian frame (either axis, 2x3 up to 21x21) with portal blocks. */
+  lightPortal(x, y, z) {
+    const w = this.world;
+    if (w.getBlock(x, y, z) !== B.Air) return false;
+    for (const alongX of [true, false]) {
+      const cells = [], seen = new Set([`${x},${y}`]), q = [[x, y, z]];
+      let ok = true;
+      while (q.length && ok) {
+        const [cx, cy, cz] = q.pop();
+        cells.push([cx, cy, cz]);
+        if (cells.length > 441) { ok = false; break; }
+        const nbs = alongX ? [[cx + 1, cy, cz], [cx - 1, cy, cz], [cx, cy + 1, cz], [cx, cy - 1, cz]] : [[cx, cy, cz + 1], [cx, cy, cz - 1], [cx, cy + 1, cz], [cx, cy - 1, cz]];
+        for (const [nx, ny, nz] of nbs) {
+          const key = `${alongX ? nx : nz},${ny}`;
+          if (seen.has(key)) continue;
+          const b = w.getBlock(nx, ny, nz);
+          if (b === B.Obsidian) continue;
+          if (b !== B.Air) { ok = false; break; }
+          seen.add(key); q.push([nx, ny, nz]);
+        }
+      }
+      if (!ok) continue;
+      const us = cells.map((c) => (alongX ? c[0] : c[2])), vs = cells.map((c) => c[1]);
+      const wdt = Math.max(...us) - Math.min(...us) + 1, hgt = Math.max(...vs) - Math.min(...vs) + 1;
+      if (wdt < 2 || hgt < 3 || wdt > 21 || hgt > 21) continue;
+      for (const [cx, cy, cz] of cells) w.setBlock(cx, cy, cz, alongX ? B.NetherPortalX : B.NetherPortalZ);
+      this.meta.portals.push({ dim: this.dim, x: cells[0][0], y: Math.min(...vs), z: cells[0][2] });
+      return true;
+    }
+    return false;
+  }
+
+  breakPortalsAround(x, y, z) {
+    const w = this.world;
+    const start = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].map(([dx, dy, dz]) => [x + dx, y + dy, z + dz]).filter(([a, b, c]) => isPortal(w.getBlock(a, b, c)));
+    const q = [...start], seen = new Set();
+    while (q.length) {
+      const [a, b, c] = q.pop(), k = `${a},${b},${c}`;
+      if (seen.has(k) || !isPortal(w.getBlock(a, b, c)) || seen.size > 600) continue;
+      seen.add(k);
+      w.setBlock(a, b, c, B.Air);
+      q.push([a + 1, b, c], [a - 1, b, c], [a, b + 1, c], [a, b - 1, c], [a, b, c + 1], [a, b, c - 1]);
+    }
+  }
+
+  spawnEmbers(pos, n, color = [1.6, 0.55, 0.12]) {
+    const list = this.particles.break;
+    for (let i = 0; i < n; i++) list.push({ p: [pos[0] + (Math.random() - 0.5) * 0.6, pos[1] + Math.random() * 0.5, pos[2] + (Math.random() - 0.5) * 0.6],
+      v: [(Math.random() - 0.5) * 1.5, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 1.5], life: 0.4 + Math.random() * 0.5, size: 0.02 + Math.random() * 0.02,
+      c: color, sky: 0, blk: 1 });
+  }
+
+  // ---------------------------------------------------------------- the Nether's and the End's sky, fog and air
+
+  dimSky(dt) {
+    const s = this.dimSkyState || (this.dimSkyState = {});
+    const e = this.player.eye();
+    let fog, amb, density, exposure = 1.9;
+    if (this.dim === Dim.Nether) {
+      const clim = this.world.climateAt(Math.floor(e[0]), Math.floor(e[2]));
+      const b = clim ? clim.biome : Biome.NetherWastes;
+      fog = { [Biome.CrimsonForest]: [0.13, 0.012, 0.008], [Biome.WarpedForest]: [0.018, 0.04, 0.05], [Biome.SoulSandValley]: [0.03, 0.06, 0.062],
+        [Biome.BasaltDeltas]: [0.07, 0.062, 0.078] }[b] || [0.11, 0.02, 0.013];
+      density = b === Biome.BasaltDeltas ? 0.022 : b === Biome.SoulSandValley ? 0.016 : 0.011;
+      amb = fog.map((c) => c * 1.6 + 0.012);
+    } else {
+      fog = [0.016, 0.011, 0.026];
+      amb = [0.05, 0.042, 0.075];
+      density = 0.0035;
+      exposure = 1.2;
+    }
+    // ease from biome to biome
+    const k = s.fogColor ? 1 - Math.exp(-(dt || 0) * 1.5) : 1;
+    const ease = (a, b) => (a ? a.map((v, i) => v + (b[i] - v) * k) : b.slice());
+    s.fogColor = ease(s.fogColor, fog); s.dimAmb = ease(s.dimAmb, amb);
+    s.fogDensity = s.fogDensity == null ? density : s.fogDensity + (density - s.fogDensity) * k;
+    const end = this.dim === Dim.End;
+    s.sun = [0, -1, 0]; s.moon = [0, -1, 0]; s.illum = 0; s.daylight = 0; s.sunWeight = 0; s.sunVisible = 0; s.starRot = this.time * 0.002;
+    s.lightDir = end ? [0.38, 0.84, 0.39] : [0, 1, 0];
+    s.lightColor = end ? [0.3, 0.27, 0.42] : [0, 0, 0];
+    s.lightIsSun = false; s.exposure = exposure;
+    s.ambUp = end ? [0.07, 0.055, 0.1] : s.fogColor.map((c) => c * 0.3); s.ambHorizon = end ? [0.05, 0.04, 0.075] : s.ambUp; s.ambDown = end ? [0.03, 0.025, 0.04] : s.ambUp;
+    s.fogSun = [0, 0, 0]; s.sunColorClouds = [0, 0, 0]; s.zenith = s.fogColor;
+    this.lutT = (this.lutT || 0) - (dt || 0);
+    if (this.lutT <= 0 || this.lutDirty) { this.lutT = 0.25; this.lutDirty = false; s.skyDirty = true; }
+    return s;
+  }
+
+  /** Floating spores, ash and embers around the camera. */
+  updateMotes(dt) {
+    const list = this.particles.motes || (this.particles.motes = []);
+    const e = this.player.eye(), w = this.world;
+    let color = [0.5, 0.4, 0.8], want = 60, a = 0.7, rise = 0.05;
+    if (this.dim === Dim.Nether) {
+      const clim = w.climateAt(Math.floor(e[0]), Math.floor(e[2]));
+      const b = clim ? clim.biome : Biome.NetherWastes;
+      if (b === Biome.CrimsonForest) { color = [0.9, 0.12, 0.08]; want = 320; }
+      else if (b === Biome.WarpedForest) { color = [0.22, 0.75, 0.85]; want = 320; }
+      else if (b === Biome.SoulSandValley) { color = [0.55, 0.62, 0.66]; want = 260; rise = -0.15; }
+      else if (b === Biome.BasaltDeltas) { color = [0.7, 0.7, 0.72]; want = 600; rise = -0.35; }
+      else { color = [1.6, 0.5, 0.1]; want = 70; a = 0.9; rise = 0.25; }
+    }
+    want = Math.floor(want * (this.settings.particles ?? 1));
+    while (list.length < want) list.push({ p: [e[0] + (Math.random() - 0.5) * 36, e[1] + (Math.random() - 0.5) * 20, e[2] + (Math.random() - 0.5) * 36], life: 2 + Math.random() * 6, ph: Math.random() * 6.28, size: 0.012 + Math.random() * 0.025, c: color, a });
+    if (list.length > want) list.length = want;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const m = list[i];
+      m.life -= dt; m.ph += dt;
+      m.p[0] += Math.sin(m.ph * 0.7) * 0.25 * dt; m.p[1] += (rise + Math.sin(m.ph) * 0.1) * dt; m.p[2] += Math.cos(m.ph * 0.5) * 0.25 * dt;
+      if (m.life <= 0 || Math.abs(m.p[0] - e[0]) > 20 || Math.abs(m.p[2] - e[2]) > 20) list.splice(i, 1);
+      else m.c = color;
+    }
+  }
+
   // ---------------------------------------------------------------- item entities
 
   spawnItem(item, count, pos, vel, wear, delay = 0.5) {
@@ -657,7 +1061,9 @@ export class Game {
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const e = this.entities[i], b = e.body;
       e.age += dt; e.pickup -= dt; e.rot += dt * 1.4;
-      const inWater = isWater(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + 0.1), Math.floor(b.pos[2])));
+      const here = w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + 0.1), Math.floor(b.pos[2]));
+      if (isLava(here)) { this.spawnEmbers(b.pos, 8); this.entities.splice(i, 1); continue; }
+      const inWater = isWater(here);
       if (inWater) { b.vel[1] += (1.5 - b.vel[1]) * Math.min(1, dt * 3); b.vel[0] *= 0.95; b.vel[2] *= 0.95; }
       else b.vel[1] = Math.max(b.vel[1] - 20 * dt, -30);
       const col = w.column(Math.floor(b.pos[0]) >> 5, Math.floor(b.pos[2]) >> 5);
@@ -775,6 +1181,7 @@ export class Game {
       if (w.isSolidAt(Math.floor(nx), Math.floor(ny), Math.floor(nz))) { p.v[0] *= 0.3; p.v[2] *= 0.3; p.v[1] = 0; }
       else { p.p[0] = nx; p.p[1] = ny; p.p[2] = nz; }
     }
+    if (this.dim !== Dim.Overworld) { this.updateMotes(dt); this.particles.rain.length = 0; this.particles.snow.length = 0; return; }
     // precipitation around the camera, only where the sky is open
     const wp = this.weather.params, eye = this.player.eye();
     const clim = w.climateAt(Math.floor(eye[0]), Math.floor(eye[2]));
@@ -804,7 +1211,7 @@ export class Game {
   }
 
   packParticles(f) {
-    const s = this.tod.state;
+    const s = this.skyNow || this.tod.state;
     const amb = s.ambUp.map((a, i) => a * 0.7 + s.lightColor[i] * 0.35);
     const groups = [];
     const pack = (list, color, size, stretch, round) => {
@@ -833,6 +1240,7 @@ export class Game {
     const wind = this.windVec || [0, 0];
     pack(this.particles.rain, () => [amb[0] * 0.55, amb[1] * 0.6, amb[2] * 0.7, 0.32], 0.012, [-wind[0] * 0.03 * 3, 0.42, -wind[1] * 0.03 * 3], false);
     pack(this.particles.snow, () => [amb[0] * 0.95, amb[1] * 0.95, amb[2], 0.9], 0.045, null, true);
+    if (this.particles.motes && this.particles.motes.length) pack(this.particles.motes, (p) => [p.c[0], p.c[1], p.c[2], Math.min(1, p.life) * p.a], 0.03, null, true);
     return groups;
   }
 
@@ -843,7 +1251,7 @@ export class Game {
     this.tod.advance(dt);
     const wp = this.weather.params;
     const sunUp = Math.max(0, this.tod.state.sun ? this.tod.state.sun[1] : 0);
-    if (dt > 0 && this.weather.step(dt, !!this.cold, Math.min(1, sunUp * 3))) {
+    if (dt > 0 && this.dim === Dim.Overworld && this.weather.step(dt, !!this.cold, Math.min(1, sunUp * 3))) {
       this.flash = 1;
       const near = Math.random() < 0.3;
       this.audio.thunder(near, near ? 0.15 : 0.6 + Math.random() * 2.5);
@@ -854,6 +1262,7 @@ export class Game {
     const ws = wp.wind;
     this.windVec = [Math.cos(a) * ws * 20, Math.sin(a) * ws * 20];
     this.tod.update(this.time, { cloudCover: wp.cloud, sunDim: wp.light });
+    this.skyNow = this.dim === Dim.Overworld ? this.tod.state : this.dimSky(dt);
     this.updateParticles(dt);
 
     // light at the camera (exposure / fog darkening underground) - smoothed
@@ -861,7 +1270,7 @@ export class Game {
     if (this.time - this.lightProbe.at > 0.25) {
       this.lightProbe = { ...this.lightAt(e[0], e[1], e[2]), at: this.time };
     }
-    const target = this.lightProbe.sky;
+    const target = this.dim === Dim.Overworld ? this.lightProbe.sky : 1;
     this.camSky += (target - this.camSky) * (1 - Math.exp(-dt * 2));
     if (dt === 0) this.camSky = this.camSky || target;
 
@@ -876,15 +1285,23 @@ export class Game {
       this.waterScanT = 0.5;
       const [px, py, pz] = Array.from(pl.body.pos, Math.floor);
       let still = 0, flow = 0;
+      let lava = 0;
       for (let dz = -8; dz <= 8; dz += 2) for (let dx = -8; dx <= 8; dx += 2) for (let dy = -4; dy <= 3; dy++) {
         const id = this.world.getBlock(px + dx, py + dy, pz + dz);
+        if (isLava(id)) { lava++; continue; }
         if (!isWater(id)) continue;
         if (id !== B.Water) flow++;
         else if (!isWater(this.world.getBlock(px + dx, py + dy + 1, pz + dz))) still++;
       }
-      this.nearWater = { still: Math.min(1, still / 18), flow: Math.min(1, flow / 5) };
+      this.nearWater = { still: Math.min(1, still / 18), flow: Math.min(1, flow / 5), lava: Math.min(1, lava / 14) };
     }
-    const nw = this.nearWater || { still: 0, flow: 0 };
+    const nw = this.nearWater || { still: 0, flow: 0, lava: 0 };
+    if (this.dim !== Dim.Overworld) {
+      this.audio.setAmbience(under ? { underwater: 1 } : this.dim === Dim.Nether
+        ? { nether: 0.85, lava: 0.15 + nw.lava * 0.8, water: 0, waterfall: 0 }
+        : { end: 0.8, water: 0, waterfall: 0 }, Math.max(dt, 0.016));
+      return;
+    }
     this.audio.setAmbience(under ? { underwater: 1 } : {
       water: nw.still * 0.55,
       waterfall: nw.flow * 0.7,
@@ -927,18 +1344,36 @@ export class Game {
           sky: L.sky, blockLight: L.block };
       }
     }
+    const other = this.dim !== Dim.Overworld, sky = this.skyNow || this.tod.state;
+    const inLava = this.headInLava;
     const f = {
-      dt, time: this.time, camPos: eye, yaw: pl.yaw, pitch: pl.pitch, sky: this.tod.state,
-      weather: { cloudCover: wp.cloud, windX: this.windVec[0] / 20 || 0, windZ: this.windVec[1] / 20 || 0, windStrength: 0.35 + wp.wind * 5, gust: wp.gust,
+      dt, time: this.time, camPos: eye, yaw: pl.yaw, pitch: pl.pitch, sky,
+      dim: this.dim, dimAmb: sky.dimAmb, dimFog: inLava ? 1.2 : other ? sky.fogDensity : null, portal: Math.min(1, (this.portalTime || 0) / 3),
+      weather: other ? { cloudCover: 0, windX: 0.2, windZ: 0.1, windStrength: 0.3, gust: 0.2, fog: 0, storm: 0, wetness: 0, snowCover: 0 } : { cloudCover: wp.cloud, windX: this.windVec[0] / 20 || 0, windZ: this.windVec[1] / 20 || 0, windStrength: 0.35 + wp.wind * 5, gust: wp.gust,
         fog: (wp.fog - 1) * 0.02 + (1 - wp.fogDist) * 0.3, storm: Math.max(0, (wp.precip - 0.5) * 2), wetness: this.weather.wetness,
         snowCover: this.weather.snowCover * (clim && clim.temp < 0.25 ? 1 : 0) },
-      viewDistance: this.world.viewDistance, camSky: this.camSky, underwater: pl.headInWater,
+      viewDistance: this.world.viewDistance, camSky: this.camSky, underwater: pl.headInWater || inLava, underwaterColor: inLava ? [0.9, 0.25, 0.02] : null,
       selection: this.target && this.state === 'playing' ? this.target.hit : null,
       crack: this.mining && this.mining.progress > 0 ? { pos: this.mining.pos, progress: Math.min(1, this.mining.progress) } : null,
       entities,
       sprites, particles: this.packParticles(), hand, damage: this.damageFlash * 0.6, flash: this.flash, props: this.world.props,
     };
     this.renderer.render(f);
+  }
+
+  /** Debug/test helper: places in the Nether and End (biomes, fortresses) and the overworld's strongholds. */
+  findPlace(kind, name) {
+    const p = this.player.body.pos, seed = this.meta.seed;
+    if (kind === 'stronghold') { const l = strongholds(seed); return l.reduce((a, b) => (Math.hypot(a.x - p[0], a.z - p[2]) < Math.hypot(b.x - p[0], b.z - p[2]) ? a : b)); }
+    if (kind === 'fortress') return nearestFortress(p[0], p[2], seed);
+    if (kind === 'netherBiome') {
+      const n = new Simplex((seed ^ 0x4E7E4) >>> 0), want = Biome[name], c = {};
+      for (let r = 0; r <= 3000; r += 16) for (let i = 0, k = Math.max(1, Math.floor(r / 8)); i < k; i++) {
+        const a = (i / k) * Math.PI * 2, x = Math.floor(p[0] + Math.cos(a) * r), z = Math.floor(p[2] + Math.sin(a) * r);
+        if (netherClimate(n, x, z, c).biome === want && netherClimate(n, x + 24, z + 24, c).biome === want && netherClimate(n, x - 24, z - 24, c).biome === want) return [x + 0.5, 70, z + 0.5];
+      }
+    }
+    return null;
   }
 
   /** Debug/test helper: the nearest column of a biome (by name) on a spiral from the player. */
@@ -958,7 +1393,7 @@ export class Game {
     const clim = w.climateAt(Math.floor(p[0]), Math.floor(p[2]));
     const r = this.renderer;
     return {
-      pos: p.map((v) => v.toFixed(1)).join(' '), biome: clim ? BIOME_NAMES[clim.biome] : '-',
+      pos: p.map((v) => v.toFixed(1)).join(' '), dim: ['overworld', 'nether', 'end'][this.dim], biome: clim ? BIOME_NAMES[clim.biome] : '-',
       fps: this.fps.toFixed(0), ms: this.frameMs.toFixed(1), sections: r.sections.size, drawn: r.stats.drawn, tris: Math.round(r.stats.tris / 1000) + 'k',
       props: `${r.stats.props || 0}/${w.props.loaded}`, columns: w.columns.size, gpuMB: (r.gpuBytes / 1048576).toFixed(0), time: `day ${this.tod.day + 1} ${Math.floor(this.tod.hour).toString().padStart(2, '0')}:${Math.floor((this.tod.hour % 1) * 60).toString().padStart(2, '0')}`,
       weather: WEATHER_NAMES[this.weather.current], entities: this.entities.length, workers: w.workers.length, errors: w.errors.length,

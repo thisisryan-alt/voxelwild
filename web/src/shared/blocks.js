@@ -8,21 +8,41 @@ export const B = {
   TallGrass: 29, FlowerRed: 30, FlowerYellow: 31, DeadBush: 32, Glowcap: 33, Torch: 34, Cactus: 35, SnowyGrass: 36,
   PropBarrier: 37,   // invisible collision inside dead trees, stumps and fallen logs (props)
   Flow1: 38, Flow7: 44,
+  // lava (source 45, flowing levels 1..7 = 46..52), the Nether, the End and strongholds
+  Lava: 45, LavaFlow1: 46, LavaFlow7: 52,
+  Obsidian: 53, NetherPortalX: 54, NetherPortalZ: 55, Netherrack: 56, NetherQuartzOre: 57, NetherGoldOre: 58, Glowstone: 59,
+  SoulSand: 60, SoulSoil: 61, Basalt: 62, Blackstone: 63, Magma: 64, NetherBricks: 65, CrimsonNylium: 66, WarpedNylium: 67,
+  CrimsonStem: 68, WarpedStem: 69, NetherWartBlock: 70, WarpedWartBlock: 71, Shroomlight: 72, CrimsonFungus: 73, WarpedFungus: 74,
+  CrimsonRoots: 75, WarpedRoots: 76, WeepingVines: 77, TwistingVines: 78,
+  EndStone: 79, EndStoneBricks: 80, Purpur: 81, EndPortalFrame: 82, EndPortalFrameEye: 83, EndPortal: 84, EndGateway: 85,
+  ChorusPlant: 86, ChorusFlower: 87, StoneBricks: 88, MossyStoneBricks: 89, CrackedStoneBricks: 90,
 };
-export const BLOCK_COUNT = 45;
+export const BLOCK_COUNT = 91;
 export const waterLevel = (id) => (id === B.Water ? 8 : id >= B.Flow1 && id <= B.Flow7 ? id - 37 : 0);
 export const isWater = (id) => id === B.Water || (id >= B.Flow1 && id <= B.Flow7);
+export const lavaLevel = (id) => (id === B.Lava ? 8 : id >= B.LavaFlow1 && id <= B.LavaFlow7 ? id - 45 : 0);
+export const isLava = (id) => id >= B.Lava && id <= B.LavaFlow7;
+export const isLiquid = (id) => isWater(id) || isLava(id);
+export const isPortal = (id) => id === B.NetherPortalX || id === B.NetherPortalZ;
+/** Dimensions: the overworld, the Nether (y 0..127 between bedrock) and the End (islands over the void). */
+export const Dim = { Overworld: 0, Nether: 1, End: 2 };
 
 // Texture layers (order of SourceArt/Textures/block_layers.json)
 export const LAYER_NAMES = ['Stone', 'Dirt', 'GrassTop', 'Sand', 'Gravel', 'Snow', 'Bedrock', 'Cobblestone', 'Planks', 'Bricks',
   'OakLog', 'BirchLog', 'SpruceLog', 'JungleLog', 'LogTop', 'Leaves', 'Needles', 'Sandstone', 'RedSandstone', 'Mud', 'Moss', 'Ice',
   'CoalOre', 'IronOre', 'GoldOre', 'DiamondOre', 'GrassTuft', 'FlowerRed', 'FlowerYellow', 'DeadBush', 'Glowcap', 'Torch', 'TorchTop',
-  'Cactus', 'CactusTop'];
+  'Cactus', 'CactusTop',
+  'Lava', 'Obsidian', 'NetherPortal', 'Netherrack', 'NetherQuartzOre', 'NetherGoldOre', 'Glowstone', 'SoulSand', 'SoulSoil', 'BasaltTop',
+  'BasaltSide', 'BlackstoneTop', 'Blackstone', 'Magma', 'NetherBricks', 'CrimsonNylium', 'CrimsonNyliumSide', 'WarpedNylium',
+  'WarpedNyliumSide', 'CrimsonStem', 'CrimsonStemTop', 'WarpedStem', 'WarpedStemTop', 'NetherWart', 'WarpedWart', 'Shroomlight',
+  'CrimsonFungus', 'WarpedFungus', 'CrimsonRoots', 'WarpedRoots', 'WeepingVines', 'TwistingVines', 'EndStone', 'EndStoneBricks', 'Purpur',
+  'EndFrameTop', 'EndFrameSide', 'EndFrameEye', 'EndPortal', 'ChorusPlant', 'ChorusFlower', 'StoneBricks', 'MossyStoneBricks',
+  'CrackedStoneBricks'];
 export const L = Object.fromEntries(LAYER_NAMES.map((n, i) => [n, i]));
 export const NONE = 255;
 
 export const F = { Solid: 1, Opaque: 2, Liquid: 4, Replaceable: 8, Breakable: 16, NeedsSupport: 32 };
-export const Shape = { None: 0, Cube: 1, Cutout: 2, Cross: 3, Torch: 4, Liquid: 5 };
+export const Shape = { None: 0, Cube: 1, Cutout: 2, Cross: 3, Torch: 4, Liquid: 5, Portal: 6, EndPortal: 7 };
 export const Tint = { None: 0, Grass: 1, Foliage: 2, Birch: 3, Spruce: 4 };
 
 const T = F.Solid | F.Opaque | F.Breakable;
@@ -74,6 +94,51 @@ BLOCKS[B.Cactus] = cube('Cactus', L.CactusTop, L.Cactus, L.CactusTop);
 BLOCKS[B.SnowyGrass] = cube('Snowy Grass', L.Snow, L.Dirt, L.Dirt, L.Snow);
 BLOCKS[B.PropBarrier] = { name: 'Dead Wood', flags: F.Solid | F.Breakable, shape: Shape.None, top: NONE, side: NONE, bottom: NONE, overlay: NONE, emission: 0, opacity: 0, tint: 0, wind: 0 };
 for (let lv = 1; lv <= 7; lv++) BLOCKS[37 + lv] = water('Flowing Water');
+// ---- lava: an opaque, glowing liquid (meshed like water, drawn with the terrain)
+const lava = (name) => ({ name, flags: F.Liquid | F.Replaceable, shape: Shape.Liquid, top: L.Lava, side: L.Lava, bottom: L.Lava, overlay: NONE, emission: 15, opacity: 15, tint: 0, wind: 0 });
+BLOCKS[B.Lava] = lava('Lava');
+for (let lv = 1; lv <= 7; lv++) BLOCKS[B.Lava + lv] = lava('Flowing Lava');
+const glow = (d, e) => { d.emission = e; return d; };
+const portal = (name) => ({ name, flags: 0, shape: Shape.Portal, top: L.NetherPortal, side: L.NetherPortal, bottom: L.NetherPortal, overlay: NONE, emission: 11, opacity: 0, tint: 0, wind: 0 });
+BLOCKS[B.Obsidian] = cube('Obsidian', L.Obsidian);
+BLOCKS[B.NetherPortalX] = portal('Nether Portal');
+BLOCKS[B.NetherPortalZ] = portal('Nether Portal');
+BLOCKS[B.Netherrack] = cube('Netherrack', L.Netherrack);
+BLOCKS[B.NetherQuartzOre] = cube('Nether Quartz Ore', L.NetherQuartzOre);
+BLOCKS[B.NetherGoldOre] = cube('Nether Gold Ore', L.NetherGoldOre);
+BLOCKS[B.Glowstone] = glow(cube('Glowstone', L.Glowstone), 15);
+BLOCKS[B.SoulSand] = cube('Soul Sand', L.SoulSand);
+BLOCKS[B.SoulSoil] = cube('Soul Soil', L.SoulSoil);
+BLOCKS[B.Basalt] = cube('Basalt', L.BasaltTop, L.BasaltSide, L.BasaltTop);
+BLOCKS[B.Blackstone] = cube('Blackstone', L.BlackstoneTop, L.Blackstone, L.BlackstoneTop);
+BLOCKS[B.Magma] = glow(cube('Magma Block', L.Magma), 3);
+BLOCKS[B.NetherBricks] = cube('Nether Bricks', L.NetherBricks);
+BLOCKS[B.CrimsonNylium] = cube('Crimson Nylium', L.CrimsonNylium, L.CrimsonNyliumSide, L.Netherrack);
+BLOCKS[B.WarpedNylium] = cube('Warped Nylium', L.WarpedNylium, L.WarpedNyliumSide, L.Netherrack);
+BLOCKS[B.CrimsonStem] = cube('Crimson Stem', L.CrimsonStemTop, L.CrimsonStem, L.CrimsonStemTop);
+BLOCKS[B.WarpedStem] = cube('Warped Stem', L.WarpedStemTop, L.WarpedStem, L.WarpedStemTop);
+BLOCKS[B.NetherWartBlock] = cube('Nether Wart Block', L.NetherWart);
+BLOCKS[B.WarpedWartBlock] = cube('Warped Wart Block', L.WarpedWart);
+BLOCKS[B.Shroomlight] = glow(cube('Shroomlight', L.Shroomlight), 15);
+BLOCKS[B.CrimsonFungus] = cross('Crimson Fungus', L.CrimsonFungus, 0, 0, 0);
+BLOCKS[B.WarpedFungus] = cross('Warped Fungus', L.WarpedFungus, 0, 0, 0);
+BLOCKS[B.CrimsonRoots] = cross('Crimson Roots', L.CrimsonRoots, 0, 0, 60);
+BLOCKS[B.WarpedRoots] = cross('Warped Roots', L.WarpedRoots, 0, 0, 60);
+// vines hang from ceilings (weeping) or climb from the floor (twisting): no support check
+BLOCKS[B.WeepingVines] = { ...cross('Weeping Vines', L.WeepingVines, 0, 0, 0), flags: F.Replaceable | F.Breakable };
+BLOCKS[B.TwistingVines] = { ...cross('Twisting Vines', L.TwistingVines, 0, 0, 0), flags: F.Replaceable | F.Breakable };
+BLOCKS[B.EndStone] = cube('End Stone', L.EndStone);
+BLOCKS[B.EndStoneBricks] = cube('End Stone Bricks', L.EndStoneBricks);
+BLOCKS[B.Purpur] = cube('Purpur Block', L.Purpur);
+BLOCKS[B.EndPortalFrame] = cube('End Portal Frame', L.EndFrameTop, L.EndFrameSide, L.EndStone, NONE, 0, F.Solid | F.Opaque);
+BLOCKS[B.EndPortalFrameEye] = glow(cube('End Portal Frame', L.EndFrameEye, L.EndFrameSide, L.EndStone, NONE, 0, F.Solid | F.Opaque), 1);
+BLOCKS[B.EndPortal] = { name: 'End Portal', flags: 0, shape: Shape.EndPortal, top: L.EndPortal, side: L.EndPortal, bottom: L.EndPortal, overlay: NONE, emission: 15, opacity: 0, tint: 0, wind: 0 };
+BLOCKS[B.EndGateway] = { name: 'End Gateway', flags: 0, shape: Shape.Cube, top: L.EndPortal, side: L.EndPortal, bottom: L.EndPortal, overlay: NONE, emission: 15, opacity: 15, tint: 0, wind: 0 };
+BLOCKS[B.ChorusPlant] = { ...leaves('Chorus Plant', L.ChorusPlant, 0), wind: 0 };
+BLOCKS[B.ChorusFlower] = glow({ ...leaves('Chorus Flower', L.ChorusFlower, 0), wind: 0 }, 0);
+BLOCKS[B.StoneBricks] = cube('Stone Bricks', L.StoneBricks);
+BLOCKS[B.MossyStoneBricks] = cube('Mossy Stone Bricks', L.MossyStoneBricks);
+BLOCKS[B.CrackedStoneBricks] = cube('Cracked Stone Bricks', L.CrackedStoneBricks);
 
 export const has = (id, f) => (BLOCKS[id].flags & f) !== 0;
 export const isOpaque = (id) => (BLOCKS[id].flags & F.Opaque) !== 0;
@@ -109,6 +174,16 @@ export const LAYER_TUNING = LAYER_NAMES.map((n) => {
     case 'Torch': case 'TorchTop': t.tile = 1; t.macro = 0; t.emission = 9; break;
     case 'Cactus': case 'CactusTop': t.tile = 1; t.macro = 0.1; break;
   }
+  if (LAYER_NAMES.indexOf(n) >= LAYER_NAMES.indexOf('Lava')) {
+    // the Nether, End and stronghold layers have no counterpart in the Unity art: one Minecraft-style texture per block
+    Object.assign(t, { tile: 1, normal: 1, rough: 1, macro: 0.05, tint: [1, 1, 1] });
+    if (['Lava', 'Glowstone', 'Shroomlight'].includes(n)) t.emission = 4;
+    if (n === 'Magma') t.emission = 1.5;
+    if (n === 'NetherPortal') { t.emission = 3; t.cutout = 1; }
+    if (n === 'EndPortal') t.emission = 3;
+    if (['CrimsonFungus', 'WarpedFungus', 'CrimsonRoots', 'WarpedRoots', 'WeepingVines', 'TwistingVines', 'ChorusPlant', 'ChorusFlower'].includes(n)) { t.cutout = 1; t.trans = 0.5; }
+    if (n === 'Obsidian') { t.rough = 0.35; t.spec = 1.5; }
+  }
   return t;
 });
 
@@ -119,20 +194,28 @@ export const I = {
   WoodenPickaxe: 270, StonePickaxe: 271, IronPickaxe: 272, DiamondPickaxe: 273,
   WoodenAxe: 274, StoneAxe: 275, IronAxe: 276, DiamondAxe: 277,
   WoodenShovel: 278, StoneShovel: 279, IronShovel: 280, DiamondShovel: 281,
+  Flint: 282, FlintAndSteel: 283, NetherQuartz: 284, GlowstoneDust: 285, EyeOfEnder: 286,
 };
-export const Kind = { Block: 0, Material: 1, Tool: 2, Food: 3 };
+export const Kind = { Block: 0, Material: 1, Tool: 2, Food: 3, Use: 4 };   // Use: right-click items (flint and steel, eye of ender)
 export const ToolType = { None: 0, Pickaxe: 1, Axe: 2, Shovel: 3 };
 export const Tier = { Hand: 0, Wood: 1, Stone: 2, Iron: 3, Diamond: 4 };
 
 export const ITEMS = {};
 const placeable = [B.Stone, B.Dirt, B.Grass, B.Sand, B.Gravel, B.Snow, B.Cobblestone, B.Planks, B.Bricks, B.OakLog, B.BirchLog, B.SpruceLog,
   B.JungleLog, B.OakLeaves, B.BirchLeaves, B.SpruceLeaves, B.JungleLeaves, B.Sandstone, B.RedSandstone, B.Mud, B.Moss, B.Ice, B.CoalOre,
-  B.IronOre, B.GoldOre, B.DiamondOre, B.TallGrass, B.FlowerRed, B.FlowerYellow, B.DeadBush, B.Glowcap, B.Torch, B.Cactus, B.SnowyGrass];
+  B.IronOre, B.GoldOre, B.DiamondOre, B.TallGrass, B.FlowerRed, B.FlowerYellow, B.DeadBush, B.Glowcap, B.Torch, B.Cactus, B.SnowyGrass,
+  B.Obsidian, B.Netherrack, B.NetherQuartzOre, B.NetherGoldOre, B.Glowstone, B.SoulSand, B.SoulSoil, B.Basalt, B.Blackstone, B.Magma,
+  B.NetherBricks, B.CrimsonNylium, B.WarpedNylium, B.CrimsonStem, B.WarpedStem, B.NetherWartBlock, B.WarpedWartBlock, B.Shroomlight,
+  B.CrimsonFungus, B.WarpedFungus, B.CrimsonRoots, B.WarpedRoots, B.WeepingVines, B.TwistingVines, B.EndStone, B.EndStoneBricks, B.Purpur,
+  B.EndPortalFrame, B.ChorusPlant, B.ChorusFlower, B.StoneBricks, B.MossyStoneBricks, B.CrackedStoneBricks];
 for (const b of placeable) ITEMS[b] = { id: b, name: BLOCKS[b].name, kind: Kind.Block, stack: 64, block: b };
 const mat = (id, name) => (ITEMS[id] = { id, name, kind: Kind.Material, stack: 64 });
 const food = (id, name, f, sat) => (ITEMS[id] = { id, name, kind: Kind.Food, stack: 64, food: f, sat });
 mat(I.Stick, 'Stick'); mat(I.Coal, 'Coal'); mat(I.IronChunk, 'Iron Chunk'); mat(I.GoldChunk, 'Gold Chunk'); mat(I.Diamond, 'Diamond');
 food(I.Apple, 'Apple', 4, 2.4); food(I.Berries, 'Wild Berries', 2, 0.4);
+mat(I.Flint, 'Flint'); mat(I.NetherQuartz, 'Nether Quartz'); mat(I.GlowstoneDust, 'Glowstone Dust');
+ITEMS[I.FlintAndSteel] = { id: I.FlintAndSteel, name: 'Flint and Steel', kind: Kind.Use, stack: 1, durability: 64 };
+ITEMS[I.EyeOfEnder] = { id: I.EyeOfEnder, name: 'Eye of Ender', kind: Kind.Use, stack: 64 };
 const tiers = [['Wooden', Tier.Wood, 60], ['Stone', Tier.Stone, 132], ['Iron', Tier.Iron, 251], ['Diamond', Tier.Diamond, 1562]];
 tiers.forEach(([prefix, tier, dur], t) => {
   ITEMS[I.WoodenPickaxe + t] = { id: I.WoodenPickaxe + t, name: `${prefix} Pickaxe`, kind: Kind.Tool, stack: 1, tool: ToolType.Pickaxe, tier, durability: dur };
@@ -161,7 +244,22 @@ export function mining(block) {
     case B.Moss: return { hardness: 0.3, tool: ToolType.Shovel, required: Tier.Hand };
     case B.OakLeaves: case B.BirchLeaves: case B.SpruceLeaves: case B.JungleLeaves:
       return { hardness: 0.2, tool: ToolType.None, required: Tier.Hand };
-    case B.Bedrock: return { hardness: -1, tool: ToolType.None, required: Tier.Hand };
+    case B.Bedrock: case B.EndPortalFrame: case B.EndPortalFrameEye: case B.NetherPortalX: case B.NetherPortalZ: case B.EndPortal: case B.EndGateway:
+      return { hardness: -1, tool: ToolType.None, required: Tier.Hand };
+    case B.Obsidian: return { hardness: 50, tool: ToolType.Pickaxe, required: Tier.Diamond };
+    case B.Netherrack: case B.CrimsonNylium: case B.WarpedNylium: return { hardness: 0.4, tool: ToolType.Pickaxe, required: Tier.Wood };
+    case B.NetherQuartzOre: case B.NetherGoldOre: return { hardness: 3, tool: ToolType.Pickaxe, required: Tier.Wood };
+    case B.Basalt: return { hardness: 1.25, tool: ToolType.Pickaxe, required: Tier.Wood };
+    case B.Blackstone: case B.StoneBricks: case B.MossyStoneBricks: case B.CrackedStoneBricks: case B.Purpur:
+      return { hardness: 1.5, tool: ToolType.Pickaxe, required: Tier.Wood };
+    case B.NetherBricks: return { hardness: 2, tool: ToolType.Pickaxe, required: Tier.Wood };
+    case B.EndStone: case B.EndStoneBricks: return { hardness: 3, tool: ToolType.Pickaxe, required: Tier.Wood };
+    case B.Magma: return { hardness: 0.5, tool: ToolType.Pickaxe, required: Tier.Wood };
+    case B.SoulSand: case B.SoulSoil: return { hardness: 0.5, tool: ToolType.Shovel, required: Tier.Hand };
+    case B.Glowstone: return { hardness: 0.3, tool: ToolType.None, required: Tier.Hand };
+    case B.CrimsonStem: case B.WarpedStem: return { hardness: 2, tool: ToolType.Axe, required: Tier.Hand };
+    case B.ChorusPlant: case B.ChorusFlower: return { hardness: 0.4, tool: ToolType.Axe, required: Tier.Hand };
+    case B.NetherWartBlock: case B.WarpedWartBlock: case B.Shroomlight: return { hardness: 1, tool: ToolType.None, required: Tier.Hand };
     default: return { hardness: 0, tool: ToolType.None, required: Tier.Hand };
   }
 }
@@ -194,6 +292,13 @@ export function drops(block, held, rnd) {
     case B.GoldOre: return [[I.GoldChunk, 1]];
     case B.DiamondOre: return [[I.Diamond, 1]];
     case B.Ice: return [];
+    case B.Gravel: return rnd < 0.1 ? [[I.Flint, 1]] : [[B.Gravel, 1]];
+    case B.NetherQuartzOre: return [[I.NetherQuartz, 1 + (rnd < 0.2 ? 1 : 0)]];
+    case B.NetherGoldOre: return [[I.GoldChunk, 1]];
+    case B.Glowstone: return [[I.GlowstoneDust, 2 + Math.floor(rnd * 3)]];
+    case B.CrimsonNylium: case B.WarpedNylium: return [[B.Netherrack, 1]];
+    case B.ChorusPlant: return [];
+    case B.WeepingVines: case B.TwistingVines: return rnd < 0.33 ? [[block, 1]] : [];
     case B.PropBarrier: return [[B.OakLog, 3]];   // dead wood yields logs
     case B.OakLeaves: case B.JungleLeaves: return rnd < 0.06 ? [[I.Apple, 1]] : rnd < 0.14 ? [[I.Stick, 1]] : [];
     case B.BirchLeaves: case B.SpruceLeaves: return rnd < 0.1 ? [[I.Stick, 1]] : [];
@@ -212,6 +317,14 @@ recipe(I.Stick, 4, [[B.Planks, 2]]);
 recipe(B.Torch, 4, [[I.Coal, 1], [I.Stick, 1]]);
 recipe(B.Sandstone, 1, [[B.Sand, 4]]);
 recipe(B.Bricks, 1, [[B.Cobblestone, 2], [B.Sand, 2]]);
+recipe(I.FlintAndSteel, 1, [[I.IronChunk, 1], [I.Flint, 1]]);
+recipe(I.EyeOfEnder, 1, [[I.NetherQuartz, 2], [I.GlowstoneDust, 1]]);
+recipe(B.Glowstone, 1, [[I.GlowstoneDust, 4]]);
+recipe(B.StoneBricks, 4, [[B.Cobblestone, 4]]);
+recipe(B.NetherBricks, 1, [[B.Netherrack, 4]]);
+recipe(B.EndStoneBricks, 4, [[B.EndStone, 4]]);
+recipe(B.Planks, 4, [[B.CrimsonStem, 1]]);
+recipe(B.Planks, 4, [[B.WarpedStem, 1]]);
 const toolMats = [B.Planks, B.Cobblestone, I.IronChunk, I.Diamond];
 toolMats.forEach((m, t) => {
   recipe(I.WoodenPickaxe + t, 1, [[m, 3], [I.Stick, 2]]);

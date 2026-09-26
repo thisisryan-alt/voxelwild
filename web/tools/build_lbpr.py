@@ -34,11 +34,19 @@ OUT = ROOT / "assets" / "lbpr"
 BUILTIN = ROOT / "assets"
 SIZE = 128
 SLOTS = 32
+PART = 120
 
 LAYER_NAMES = ['Stone', 'Dirt', 'GrassTop', 'Sand', 'Gravel', 'Snow', 'Bedrock', 'Cobblestone', 'Planks', 'Bricks',
                'OakLog', 'BirchLog', 'SpruceLog', 'JungleLog', 'LogTop', 'Leaves', 'Needles', 'Sandstone', 'RedSandstone', 'Mud', 'Moss', 'Ice',
                'CoalOre', 'IronOre', 'GoldOre', 'DiamondOre', 'GrassTuft', 'FlowerRed', 'FlowerYellow', 'DeadBush', 'Glowcap', 'Torch', 'TorchTop',
-               'Cactus', 'CactusTop']
+               'Cactus', 'CactusTop',
+               # the Nether, the End and strongholds (blocks.js)
+               'Lava', 'Obsidian', 'NetherPortal', 'Netherrack', 'NetherQuartzOre', 'NetherGoldOre', 'Glowstone', 'SoulSand', 'SoulSoil', 'BasaltTop',
+               'BasaltSide', 'BlackstoneTop', 'Blackstone', 'Magma', 'NetherBricks', 'CrimsonNylium', 'CrimsonNyliumSide', 'WarpedNylium',
+               'WarpedNyliumSide', 'CrimsonStem', 'CrimsonStemTop', 'WarpedStem', 'WarpedStemTop', 'NetherWart', 'WarpedWart', 'Shroomlight',
+               'CrimsonFungus', 'WarpedFungus', 'CrimsonRoots', 'WarpedRoots', 'WeepingVines', 'TwistingVines', 'EndStone', 'EndStoneBricks', 'Purpur',
+               'EndFrameTop', 'EndFrameSide', 'EndFrameEye', 'EndPortal', 'ChorusPlant', 'ChorusFlower', 'StoneBricks', 'MossyStoneBricks',
+               'CrackedStoneBricks']
 # rows of the variant table past the layers: textures only reached through another layer
 VIRTUAL = ['GrassSideOverlay', 'SnowSideOverlay']
 
@@ -217,7 +225,71 @@ MATERIALS = {
     'TorchTop': dict(rough=0.7, normal=0.5, emission=9),
     'Cactus': dict(rough=0.55, normal=1.8, pom=0.015),
     'CactusTop': dict(rough=0.55, normal=1.4, pom=0.012, rot=ROT_TOP),
+    'Lava': dict(rough=0.55, normal=1.3, emission=3, glow=0.3),
+    'Obsidian': dict(rough=0.22, normal=1.2, pom=0.012, spec=1.6),
+    'NetherPortal': dict(rough=0.4, normal=0.6, cutout=1, emission=4, glow=0.0),
+    'Netherrack': dict(rough=0.85, normal=2.0, pom=0.02),
+    'NetherQuartzOre': dict(rough=0.75, normal=2.0, pom=0.02),
+    'NetherGoldOre': dict(rough=0.75, normal=2.0, pom=0.02),
+    'Glowstone': dict(rough=0.6, normal=1.6, emission=3.2, glow=0.3),
+    'SoulSand': dict(rough=0.95, normal=1.8, pom=0.02),
+    'SoulSoil': dict(rough=0.95, normal=1.6, pom=0.015),
+    'BasaltTop': dict(rough=0.8, normal=1.6, pom=0.015, rot=ROT_TOP),
+    'BasaltSide': dict(rough=0.8, normal=2.0, pom=0.02),
+    'BlackstoneTop': dict(rough=0.8, normal=1.6, pom=0.015, rot=ROT_TOP),
+    'Blackstone': dict(rough=0.8, normal=1.8, pom=0.02),
+    'Magma': dict(rough=0.7, normal=1.8, pom=0.015, emission=3, glow=0.35),
+    'NetherBricks': dict(rough=0.8, normal=1.8, pom=0.025, broad=0.55, ao=3.0),
+    'CrimsonNylium': dict(rough=0.9, normal=1.4, pom=0.012, rot=ROT_TOP),
+    'CrimsonNyliumSide': dict(rough=0.9, normal=1.6, pom=0.015),
+    'WarpedNylium': dict(rough=0.9, normal=1.4, pom=0.012, rot=ROT_TOP),
+    'WarpedNyliumSide': dict(rough=0.9, normal=1.6, pom=0.015),
+    'CrimsonStem': dict(rough=0.8, normal=2.0, pom=0.015),
+    'CrimsonStemTop': dict(rough=0.75, normal=1.3, pom=0.01, rot=ROT_TOP),
+    'WarpedStem': dict(rough=0.8, normal=2.0, pom=0.015),
+    'WarpedStemTop': dict(rough=0.75, normal=1.3, pom=0.01, rot=ROT_TOP),
+    'NetherWart': dict(rough=0.9, normal=1.5, pom=0.012),
+    'WarpedWart': dict(rough=0.9, normal=1.5, pom=0.012),
+    'Shroomlight': dict(rough=0.7, normal=1.4, emission=3.5, glow=0.2),
+    'CrimsonFungus': dict(rough=0.7, normal=1.0, cutout=1, trans=0.5, rot=MIRROR),
+    'WarpedFungus': dict(rough=0.7, normal=1.0, cutout=1, trans=0.5, rot=MIRROR),
+    'CrimsonRoots': dict(rough=0.8, normal=1.0, cutout=1, trans=0.6, rot=MIRROR),
+    'WarpedRoots': dict(rough=0.8, normal=1.0, cutout=1, trans=0.6, rot=MIRROR),
+    'WeepingVines': dict(rough=0.8, normal=1.0, cutout=1, trans=0.6, rot=MIRROR),
+    'TwistingVines': dict(rough=0.8, normal=1.0, cutout=1, trans=0.6, rot=MIRROR),
+    'EndStone': dict(rough=0.85, normal=1.6, pom=0.02, rot=ROT_TOP),
+    'EndStoneBricks': dict(rough=0.75, normal=1.6, pom=0.02, broad=0.55),
+    'Purpur': dict(rough=0.7, normal=1.5, pom=0.015, broad=0.55),
+    'EndFrameTop': dict(rough=0.6, normal=1.4, pom=0.01),
+    'EndFrameSide': dict(rough=0.65, normal=1.6, pom=0.015),
+    'EndFrameEye': dict(rough=0.45, normal=1.4, pom=0.01, emission=2, glow=0.5),
+    'EndPortal': dict(rough=1.0, normal=0.0),
+    'ChorusPlant': dict(rough=0.7, normal=1.5, cutout=1, trans=0.3),
+    'ChorusFlower': dict(rough=0.6, normal=1.4, cutout=1, trans=0.4),
+    'StoneBricks': dict(rough=0.82, normal=1.8, pom=0.025, broad=0.55, ao=3.0),
+    'MossyStoneBricks': dict(rough=0.88, normal=1.8, pom=0.025, broad=0.55, ao=3.0),
+    'CrackedStoneBricks': dict(rough=0.85, normal=2.0, pom=0.03, broad=0.55, ao=3.0),
 }
+# Nether, End and stronghold layers: pack texture (first animation frame), made opaque where the block is a full cube
+SIMPLE = {
+    'Lava': "block/lava_still", 'Obsidian': "block/obsidian", 'NetherPortal': "block/nether_portal", 'Netherrack': "block/netherrack",
+    'NetherQuartzOre': "block/nether_quartz_ore", 'NetherGoldOre': "block/nether_gold_ore", 'Glowstone': "block/glowstone",
+    'SoulSand': "block/soul_sand", 'SoulSoil': "block/soul_soil", 'BasaltTop': "block/basalt_top", 'BasaltSide': "block/basalt_side",
+    'BlackstoneTop': "block/blackstone_top", 'Blackstone': "block/blackstone", 'Magma': "block/magma", 'NetherBricks': "block/nether_bricks",
+    'CrimsonNylium': "block/crimson_nylium", 'CrimsonNyliumSide': "block/crimson_nylium_side", 'WarpedNylium': "block/warped_nylium",
+    'WarpedNyliumSide': "block/warped_nylium_side", 'CrimsonStem': "block/crimson_stem", 'CrimsonStemTop': "block/crimson_stem_top",
+    'WarpedStem': "block/warped_stem", 'WarpedStemTop': "block/warped_stem_top", 'NetherWart': "block/nether_wart_block",
+    'WarpedWart': "block/warped_wart_block", 'Shroomlight': "block/shroomlight", 'CrimsonFungus': "block/crimson_fungus",
+    'WarpedFungus': "block/warped_fungus", 'CrimsonRoots': "block/crimson_roots", 'WarpedRoots': "block/warped_roots",
+    'WeepingVines': "block/weeping_vines_plant", 'TwistingVines': "block/twisting_vines_plant", 'EndStone': "block/end_stone",
+    'EndStoneBricks': "block/end_stone_bricks", 'Purpur': "block/purpur_block", 'EndFrameTop': "block/end_portal_frame_top",
+    'EndFrameSide': "block/end_portal_frame_side", 'EndPortal': "block/obsidian", 'ChorusPlant': "block/chorus_plant",
+    'ChorusFlower': "block/chorus_flower", 'StoneBricks': "block/stone_bricks", 'MossyStoneBricks': "block/mossy_stone_bricks",
+    'CrackedStoneBricks': "block/cracked_stone_bricks",
+}
+# animations: (texture, frames to keep, frames per second after thinning)
+ANIMS = {'Lava': ("block/lava_still", 20, 10), 'NetherPortal': ("block/nether_portal", 32, 5), 'Magma': ("block/magma", 3, 1.3),
+         'CrimsonStem': ("block/crimson_stem", 6, 4), 'WarpedStem': ("block/warped_stem", 6, 4)}
 
 
 # ---------------------------------------------------------------- composed textures
@@ -412,6 +484,18 @@ def main():
         elif name == 'TorchTop': a = torch_top
         elif name == 'Cactus': a = bleed(opaque(bleed(arr(fit(p.img("block/cactus_side")))), (60, 110, 50)))
         elif name == 'CactusTop': a = opaque(arr(fit(p.img("block/cactus_top"))), (60, 110, 50))
+        elif name == 'EndFrameEye':
+            # the frame top with the eye set in it
+            a = arr(fit(p.img("block/end_portal_frame_top")))
+            a = over(a, arr(fit(p.img("block/end_portal_frame_eye"))))
+            a[..., 3] = 1
+        elif name in SIMPLE:
+            a = arr(fit(p.img(SIMPLE[name])))
+            if not m.get("cutout"):
+                avg = (a[..., :3] * a[..., 3:4]).sum((0, 1)) / max(1e-4, a[..., 3].sum())
+                a = opaque(a, tuple(int(v * 255) for v in avg))
+            else:
+                a = bleed(a)
         if a is None:
             add(None, m, name)
         else:
@@ -467,6 +551,35 @@ def main():
         if flags:
             table[layer] = dict(mode=1, flags=flags, slots=[base[layer]] * SLOTS)
 
+    # animated layers: frames thinned to fit 32 slots, blended in the shader
+    def frames(rel):
+        im = p.img(rel, frame=False)
+        w = im.width
+        return [im.crop((0, k * w, w, (k + 1) * w)) for k in range(im.height // w)]
+    for layer, (rel, keep, fps) in ANIMS.items():
+        m = MATERIALS[layer]
+        fr = frames(rel)
+        step = max(1, len(fr) // keep)
+        fr = fr[::step][:keep]
+        idx = [base[layer]]
+        for k, f in enumerate(fr[1:]):
+            a = arr(fit(f))
+            a = bleed(a) if m.get("cutout") else opaque(a, (80, 20, 10))
+            idx.append(add(a, m, f"{layer}:frame{k + 1}"))
+        table[layer] = dict(mode=3, w=len(idx), h=int(round(fps * 10)), flags=0, slots=idx + [idx[0]] * (SLOTS - len(idx)))
+
+    # height bands (OptiFine method=fixed with min/maxHeight): netherrack and nether bricks lit by the lava sea
+    def ctm(folder, name):
+        return arr(fit(Image.open(io.BytesIO(p.raw(f"assets/minecraft/optifine/ctm/{folder}/{name}.png"))).convert("RGBA")))
+    ALL, SIDES, BOTTOM = 7, 1, 4
+    glow_n = add(opaque(ctm("netherrack", "netherrack_glow"), (90, 30, 25)), MATERIALS['Netherrack'], "Netherrack:glow")
+    lava_n = add(opaque(ctm("netherrack", "netherrack_lava"), (120, 40, 20)), dict(MATERIALS['Netherrack'], emission=1.5, glow=0.45), "Netherrack:lava")
+    table['Netherrack'] = dict(mode=4, w=2, flags=0, slots=[base['Netherrack']] * SLOTS, bands=[[glow_n, 35, 38, ALL], [lava_n, 0, 34, ALL]])
+    above_b = add(opaque(ctm("nether_bricks", "nether_bricks_above"), (60, 20, 20)), MATERIALS['NetherBricks'], "NetherBricks:above")
+    lava_b = add(opaque(ctm("nether_bricks", "nether_bricks_lava"), (90, 30, 20)), dict(MATERIALS['NetherBricks'], emission=1.5, glow=0.45), "NetherBricks:lava")
+    table['NetherBricks'] = dict(mode=4, w=3, flags=0, slots=[base['NetherBricks']] * SLOTS,
+                                 bands=[[above_b, 33, 33, SIDES], [lava_b, 33, 33, BOTTOM], [lava_b, 0, 32, ALL]])
+
     # virtual rows: grass and snow side overlays (Minecraft-style fringe over the dirt side)
     ov = [add(bleed(tint(arr(fit(p.img("block/grass_block_side_overlay"))), MC_GRASS)), MATERIALS['GrassTop'], "GrassSideOverlay")]
     for k in range(1, 6):
@@ -508,10 +621,14 @@ def main():
         A[sl, :, 3] = a[..., 3] if cut else np.maximum(h, 1 / 255)
         N[sl] = nn * 0.5 + 0.5
         emis = np.zeros_like(h)
+        if m.get("glow") is not None:
+            L = lum(a)
+            emis = np.clip((L - m["glow"]) / max(0.05, 1 - m["glow"]) * 1.6, 0, 1) if nm.split(':')[0] != 'EndFrameEye' else \
+                np.clip((a[..., 1] - a[..., 0]) * 3, 0, 1)
         if nm in ('Torch', 'TorchTop'):
             emis = flame_emission(a) if nm == 'Torch' else np.ones_like(h)
         metal = np.zeros_like(h)
-        if nm.startswith('GoldOre'):
+        if nm.startswith('GoldOre') or nm.startswith('NetherGoldOre'):
             rr, gg, bb = a[..., 0], a[..., 1], a[..., 2]
             metal = np.clip(((rr + gg) * 0.5 - bb - 0.25) * 4, 0, 1)
             r = r * (1 - metal * 0.6)
@@ -521,9 +638,14 @@ def main():
         M[sl] = np.stack([ao, r, metal, emis], -1)
 
     OUT.mkdir(parents=True, exist_ok=True)
-    to_img(A).save(OUT / "albedo.webp", quality=92, alpha_quality=100, method=6, exact=True)
-    to_img(N, "RGB").save(OUT / "normal.webp", lossless=True, method=6, exact=True)
-    to_img(M).save(OUT / "mask.webp", lossless=True, method=6, exact=True)
+    # WebP is limited to 16383 px a side: strips of at most PART layers (albedo.webp, albedo.1.webp, ...)
+    parts = (n + PART - 1) // PART
+    for k in range(parts):
+        sl = slice(k * PART * SIZE, min(n, (k + 1) * PART) * SIZE)
+        sfx = "" if k == 0 else f".{k}"
+        to_img(A[sl]).save(OUT / f"albedo{sfx}.webp", quality=92, alpha_quality=100, method=6, exact=True)
+        to_img(N[sl], "RGB").save(OUT / f"normal{sfx}.webp", lossless=True, method=6, exact=True)
+        to_img(M[sl]).save(OUT / f"mask{sfx}.webp", lossless=True, method=6, exact=True)
 
     # 3) tuning (renderer uLP/uLT/uLP2/uLP3) and the variant table
     tuning = []
@@ -541,11 +663,12 @@ def main():
         if name in LAYER_NAMES and e is None:
             e = dict(mode=0, flags=0, slots=[LAYER_NAMES.index(name)] * SLOTS)
         rows.append(dict(name=name, mode=e["mode"], w=e.get("w", 1), h=e.get("h", 1), flags=e["flags"], slots=e["slots"],
-                         side=(LAYER_NAMES + VIRTUAL).index(e["side"]) if e.get("side") else 255))
+                         side=(LAYER_NAMES + VIRTUAL).index(e["side"]) if e.get("side") else 255, **({"bands": e["bands"]} if e.get("bands") else {})))
 
     # 4) items, crack stages, moon, sounds
     items = {"Stick": "stick", "Coal": "coal", "IronChunk": "raw_iron", "GoldChunk": "raw_gold", "Diamond": "diamond",
-             "Apple": "apple", "Berries": "sweet_berries"}
+             "Apple": "apple", "Berries": "sweet_berries", "Flint": "flint", "FlintAndSteel": "flint_and_steel", "NetherQuartz": "quartz",
+             "GlowstoneDust": "glowstone_dust", "EyeOfEnder": "ender_eye"}
     for tier in ("wooden", "stone", "iron", "diamond"):
         for tool in ("pickaxe", "axe", "shovel"):
             items[f"{tier.capitalize()}{tool.capitalize()}"] = f"{tier}_{tool}"
@@ -555,6 +678,10 @@ def main():
         im = p.img("item/" + items[key]).resize((64, 64), Image.LANCZOS)
         strip.paste(im, (0, k * 64))
     strip.save(OUT / "items.webp", quality=92, alpha_quality=100, method=6)
+
+    # the end portal's star layers
+    stars = Image.open(io.BytesIO(p.raw(T + "entity/end_portal.png"))).convert("RGBA")
+    stars.resize((256, 256), Image.LANCZOS).save(OUT / "stars.webp", quality=92, method=6)
 
     crack = Image.new("RGBA", (SIZE, SIZE * 10))
     for k in range(10):
@@ -576,7 +703,7 @@ def main():
             (OUT / (s.replace("/", "_") + ".ogg")).write_bytes(p.raw(f"assets/minecraft/sounds/{s}.ogg"))
     sound_files = {k: [s.replace("/", "_") + ".ogg" for s in v] for k, v in sounds.items()}
 
-    meta = dict(size=SIZE, layers=n, slots=SLOTS, names=names, tuning=tuning, variants=rows, items=keys, sounds=sound_files,
+    meta = dict(size=SIZE, layers=n, parts=parts, slots=SLOTS, names=names, tuning=tuning, variants=rows, items=keys, sounds=sound_files,
                 credit=CREDIT, licence=p.raw("Licence.txt").decode("utf-8", "replace").strip())
     (OUT / "lbpr.json").write_text(json.dumps(meta, indent=1))
     for f in sorted(OUT.iterdir()):

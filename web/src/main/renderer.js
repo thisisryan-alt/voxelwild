@@ -42,6 +42,7 @@ export class Renderer {
     this.progs = {
       opaque: compile(gl, C + S.TERRAIN_VS, C + L + S.TERRAIN_FS, 'terrain'),
       cutout: compile(gl, C + S.TERRAIN_VS, C + L + S.TERRAIN_FS, 'foliage', '#define CUTOUT 1'),
+      glow: compile(gl, C + S.TERRAIN_VS, C + L + S.TERRAIN_FS, 'portal', '#define TRANSLUCENT 1'),
       shadow: compile(gl, C + S.SHADOW_VS, C + S.SHADOW_FS, 'shadow'),
       shadowCut: compile(gl, C + S.SHADOW_VS, C + S.SHADOW_FS, 'shadow-cutout', '#define CUTOUT 1'),
       water: compile(gl, C + S.WATER_VS, C + L + S.WATER_FS, 'water'),
@@ -60,6 +61,7 @@ export class Renderer {
     };
     this.setTuning(LAYER_TUNING);
     this.setVariants(null);
+    this.setStarsTexture(null);
   }
 
   /**
@@ -75,6 +77,7 @@ export class Renderer {
       const o = r * W * 4;
       for (let k = 0; k < 32; k++) data[o + k * 4] = row ? row.slots[k] : Math.min(r, 255);
       if (row) data.set([row.mode, row.w || 1, row.h || 1, row.flags || 0], o + 32 * 4);
+      if (row && row.bands) row.bands.forEach((b, k) => data.set(b, o + (k + 1) * 4));   // (texture, minY, maxY, faces)
       data[o + 33 * 4] = row && row.side != null ? row.side : 255;
     }
     if (this.varTex) gl.deleteTexture(this.varTex);
@@ -126,14 +129,44 @@ export class Renderer {
 
   /** Per-layer material tables (the built-in tuning, or a resource pack's). */
   setTuning(tuning) {
-    const n = LAYER_NAMES.length;
-    this.uLP = new Float32Array(n * 4); this.uLT = new Float32Array(n * 4); this.uLP2 = new Float32Array(n * 4); this.uLP3 = new Float32Array(n * 4);
-    tuning.forEach((t, i) => {
-      this.uLP.set([1 / t.tile, t.normal, t.rough, t.macro], i * 4);
-      this.uLT.set([t.tint[0], t.tint[1], t.tint[2], t.spec], i * 4);
-      this.uLP2.set([t.emission, t.trans, t.biome, t.cutout], i * 4);
-      this.uLP3.set([t.pom ?? (t.cutout ? 0 : 0.12), 0, 0, 0], i * 4);
-    });
+    const gl = this.gl, n = LAYER_NAMES.length;
+    const data = new Float32Array(4 * 4 * n);
+    for (let i = 0; i < n; i++) {
+      const t = tuning[i] || LAYER_TUNING[i], o = i * 16;
+      data.set([1 / t.tile, t.normal, t.rough, t.macro], o);
+      data.set([t.tint[0], t.tint[1], t.tint[2], t.spec], o + 4);
+      data.set([t.emission, t.trans, t.biome, t.cutout], o + 8);
+      // specials: the end portal's starfield, the nether portal's glow (whatever the texture set)
+      const name = LAYER_NAMES[i];
+      data.set([t.pom ?? (t.cutout ? 0 : 0.12), name === 'EndPortal' ? 1 : name === 'NetherPortal' ? 2 : 0, 0, 0], o + 12);
+    }
+    if (!this.tuneTex) this.tuneTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.tuneTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 4, n, 0, gl.RGBA, gl.FLOAT, data);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  }
+
+  /** The end portal's star layers (a resource pack picture), or a generated star field. */
+  setStarsTexture(bitmap) {
+    const gl = this.gl;
+    if (!this.starsTex) this.starsTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.starsTex);
+    if (bitmap) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
+    else {
+      const N = 256, d = new Uint8Array(N * N * 4);
+      let h = 1234567;
+      for (let i = 0; i < N * N; i++) {
+        h = Math.imul(h ^ (h >>> 15), 2246822519) + 374761393 | 0;
+        const v = ((h >>> 8) & 1023) < 14 ? 160 + ((h >>> 20) & 95) : 0;
+        d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
+      }
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N, N, 0, gl.RGBA, gl.UNSIGNED_BYTE, d);
+    }
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
   }
 
   /** Replaces one material array with raw RGBA strips (a resource pack), keeping mipmaps and filtering. */
@@ -244,9 +277,10 @@ export class Renderer {
   }
 
   /** Uploads one material strip (layers stacked vertically) as a mipmapped texture array. */
-  uploadLayers(which, bitmap) {
+  uploadLayers(which, bitmaps) {
     const gl = this.gl;
-    const size = bitmap.width, layers = Math.round(bitmap.height / size);
+    const parts = Array.isArray(bitmaps) ? bitmaps : [bitmaps];
+    const size = parts[0].width, layers = parts.reduce((n, b) => n + Math.round(b.height / size), 0);
     const tx = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, tx);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -254,7 +288,12 @@ export class Renderer {
     gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
     const mips = Math.floor(Math.log2(size)) + 1;
     gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mips, gl.RGBA8, size, size, layers);
-    gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, 0, size, size, layers, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
+    let z = 0;
+    for (const b of parts) {
+      const n = Math.round(b.height / size);
+      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, z, size, size, n, gl.RGBA, gl.UNSIGNED_BYTE, b);
+      z += n;
+    }
     gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -413,10 +452,10 @@ export class Renderer {
     this.freeSection(s);
     if (!m || m.vertexCount === 0) return;
     const gl = this.gl;
-    const n0 = m.opaque.length, n1 = m.cutout.length, n2 = m.water.length;
+    const n0 = m.opaque.length, n1 = m.cutout.length, n2 = m.water.length, n3 = m.glow ? m.glow.length : 0;
     const small = m.vertexCount < 65536;
-    const idx = small ? new Uint16Array(n0 + n1 + n2) : new Uint32Array(n0 + n1 + n2);
-    idx.set(m.opaque); idx.set(m.cutout, n0); idx.set(m.water, n0 + n1);
+    const idx = small ? new Uint16Array(n0 + n1 + n2 + n3) : new Uint32Array(n0 + n1 + n2 + n3);
+    idx.set(m.opaque); idx.set(m.cutout, n0); idx.set(m.water, n0 + n1); if (n3) idx.set(m.glow, n0 + n1 + n2);
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
     const vbo = gl.createBuffer();
@@ -427,7 +466,7 @@ export class Renderer {
     gl.bindVertexArray(null);
     const bytes = m.vertices.byteLength + idx.byteLength;
     this.gpuBytes += bytes;
-    s.gl = { vao, vbo, ibo, n0, n1, n2, type: small ? gl.UNSIGNED_SHORT : gl.UNSIGNED_INT, isz: small ? 2 : 4, bytes,
+    s.gl = { vao, vbo, ibo, n0, n1, n2, n3, type: small ? gl.UNSIGNED_SHORT : gl.UNSIGNED_INT, isz: small ? 2 : 4, bytes,
       model: mat4.translation(new Float32Array(16), s.cx * CS, s.sy * CS, s.cz * CS), origin: [s.cx * CS, s.sy * CS, s.cz * CS] };
     this.sections.add(s);
   }
@@ -551,8 +590,8 @@ export class Renderer {
     const sky = f.sky, wth = f.weather;
 
     // ---- frame uniforms
-    const fogDensity = f.underwater ? 0.09 : 0.0016 + wth.fog * 0.012;
-    const fogColor = f.underwater ? sky.ambUp.map((c, i) => c * [0.05, 0.28, 0.35][i] * 1.2) : sky.fogColor;
+    const fogDensity = f.underwaterColor ? 0.9 : f.underwater ? 0.09 : f.dimFog != null ? f.dimFog : 0.0016 + wth.fog * 0.012;
+    const fogColor = f.underwaterColor ? [1.6, 0.4, 0.05] : f.underwater ? sky.ambUp.map((c, i) => c * [0.05, 0.28, 0.35][i] * 1.2) : sky.fogColor;
     this.cloudOff = this.cloudOff || [0, 0];
     this.cloudOff[0] += wth.windX * f.dt * 6; this.cloudOff[1] += wth.windZ * f.dt * 6;
     const shadowsOn = this.settings.shadows && sky.lightColor[0] + sky.lightColor[1] > 0.02;
@@ -562,14 +601,14 @@ export class Renderer {
       uLightDir: sky.lightDir, uLightColor: sky.lightColor,
       uAmbUp: sky.ambUp, uAmbHorizon: sky.ambHorizon, uAmbDown: sky.ambDown,
       uFogColor: fogColor, uFogSun: f.underwater ? [0, 0, 0] : sky.fogSun,
-      uFog: [fogDensity, f.underwater ? 0 : 0.018, 64, 0], uFogEdge: f.underwater ? [1e5, 1e5 + 1] : [f.viewDistance * CS * 0.6, f.viewDistance * CS * 0.96],
+      uFog: [fogDensity, f.underwater || f.dim ? 0 : 0.018, 64, 0], uFogEdge: f.underwater ? [1e5, 1e5 + 1] : [f.viewDistance * CS * 0.6, f.viewDistance * CS * 0.96],
       uBlockColor: [1.0 * 2.4, 0.62 * 2.4, 0.3 * 2.4], uCamSky: f.camSky,
       uShadowVP: this.shadowVPFlat, uShadowDist: [22, 88], uShadowOn: shadowsOn ? 1 : 0,
       uShadow0: 4, uShadow1: 5, uCloudTex: 6, uSkyLut: 3, uAlbedo: 0, uNormal: 1, uMask: 2, uSceneColor: 7, uSceneDepth: 8, uAtlas: 9, uBakeN: 14, uBakeM: 15, uVar: 16, uCrack: 17, uMoonTex: 18,
       uCrackTex: this.crackTex ? 1 : 0, uMoonTexOn: this.moonTex ? 1 : 0,
       uCloud: [wth.cloudCover, 1 / 5200, 420, 0.55 * wth.cloudCover + 0.1], uCloudOff: [this.cloudOff[0], this.cloudOff[1], 2.2, 1 - wth.storm * 0.55],
       uWet: wth.wetness, uSnow: wth.snowCover,
-      uLP: this.uLP, uLT: this.uLT, uLP2: this.uLP2, uLP3: this.uLP3, uPom: this.settings.pom ?? 1, uPomDist: 28,
+      uTune: 20, uStars: 21, uDim: f.dim || 0, uDimAmb: f.dimAmb || [0, 0, 0], uPom: this.settings.pom ?? 1, uPomDist: 28,
       uBevelWidth: 0.07, uBevelStrength: 0.55, uEdgeWear: 0.3, uAOStrength: 1, uAODirect: 0.55, uOverhang: 0.2, uCutoff: 0.45,
       uFlash: f.flash || 0, uEntityLight: [-1, 0], uModelRot: [1, 0, 0, 0, 1, 0, 0, 0, 1],
       uNearFar: [near, far], uViewport: [W, H], uDebug: this.debugView | 0,
@@ -584,18 +623,21 @@ export class Renderer {
     this.bindTex(6, gl.TEXTURE_2D, this.cloudTex);
     this.bindTex(9, gl.TEXTURE_2D, this.atlas);
     this.bindTex(16, gl.TEXTURE_2D, this.varTex);
+    this.bindTex(20, gl.TEXTURE_2D, this.tuneTex);
+    this.bindTex(21, gl.TEXTURE_2D, this.starsTex);
     this.bindTex(17, gl.TEXTURE_2D_ARRAY, this.crackTex || null);
     this.bindTex(18, gl.TEXTURE_2D, this.moonTex || null);
 
     // ---- sky LUT
     this.bindTex(3, gl.TEXTURE_2D, null);
-    if (sky.skyDirty || !this.lutReady) {
+    if (sky.skyDirty || !this.lutReady || this.lutDim !== (f.dim || 0)) {
+      this.lutDim = f.dim || 0;
       sky.skyDirty = false; this.lutReady = true;
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.skyLutFbo);
       gl.viewport(0, 0, 128, 64);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
       const nightK = 1;
-      this.use(this.progs.skyLut, { uSunDir: sky.sun, uCloudGrey: wth.cloudCover * 0.55,
+      this.use(this.progs.skyLut, { uSunDir: sky.sun, uCloudGrey: wth.cloudCover * 0.55, uDim: f.dim || 0, uDimColor: sky.fogColor,
         uNight: [0.0022 * nightK + sky.illum * 0.004 * Math.max(0, sky.moon[1]), 0.0032 + sky.illum * 0.005 * Math.max(0, sky.moon[1]), 0.0068 + sky.illum * 0.008 * Math.max(0, sky.moon[1])] });
       this.fullscreen();
       gl.bindTexture(gl.TEXTURE_2D, this.skyLut);
@@ -690,6 +732,22 @@ export class Renderer {
       }
       this.bindTex(7, gl.TEXTURE_2D, null);
       this.bindTex(8, gl.TEXTURE_2D, null);
+    }
+
+    // ---- nether portal panes: translucent and glowing, back to front
+    if (visible.some((s) => s.gl.n3 > 0)) {
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.depthMask(false); gl.disable(gl.CULL_FACE);
+      this.use(this.progs.glow);
+      const gModel = this.progs.glow.u.uModel.loc, gOrigin = this.progs.glow.u.uTexOrigin.loc;
+      for (let i = visible.length - 1; i >= 0; i--) {
+        const g = visible[i].gl;
+        if (!g.n3) continue;
+        gl.uniformMatrix4fv(gModel, false, g.model); gl.uniform3fv(gOrigin, g.origin);
+        gl.bindVertexArray(g.vao);
+        gl.drawElements(gl.TRIANGLES, g.n3, g.type, (g.n0 + g.n1 + g.n2) * g.isz);
+      }
+      gl.depthMask(true); gl.disable(gl.BLEND);
     }
 
     // ---- overlays: crack, outline, particles
@@ -913,7 +971,7 @@ export class Renderer {
     const underground = 1 - f.camSky;
     const exposure = sky.exposure * (1 + underground * 1.6) * (f.underwater ? 1.3 : 1);
     pass(null, P.composite, { uColor: 10, uBloom: 11, uBloom2: 12, uRays: 13, uExposure: exposure, uBloomAmt: bloom ? 0.07 : 0,
-      uUnderwater: f.underwater ? 1 : 0, uUnderwaterColor: [0.01, 0.06, 0.08], uSaturation: 1.08, uVignette: 0.55, uDamage: f.damage || 0 },
+      uUnderwater: f.underwater ? 1 : 0, uUnderwaterColor: f.underwaterColor || [0.01, 0.06, 0.08], uSaturation: 1.08, uVignette: 0.55, uDamage: f.damage || 0, uPortal: f.portal || 0 },
       [this.hdr, bloom ? this.quarter : this.half, bloom ? this.eighth2 : this.half, this.raysTex]);
     for (let i = 10; i < 14; i++) this.bindTex(i, gl.TEXTURE_2D, null);
     gl.depthMask(true);

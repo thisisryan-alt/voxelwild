@@ -1,6 +1,6 @@
 // Port of Player.VoxelBody (swept axis-separated AABB collision) and PlayerController movement: walking, sprinting,
 // jumping, swimming, creative flight (double-tap space or F), fall tracking.
-import { BLOCKS, F, isWater } from '../shared/blocks.js';
+import { BLOCKS, B, F, isWater, isLava } from '../shared/blocks.js';
 
 const SKIN = 0.001;
 
@@ -110,25 +110,29 @@ export class Player {
     const eyeB = world.getBlock(Math.floor(e[0]), Math.floor(e[1]), Math.floor(e[2]));
     this.inWater = feet >= 0 && isWater(feet);
     this.headInWater = eyeB >= 0 && isWater(eyeB);
+    this.inLava = feet >= 0 && isLava(feet);
+    const swimming = this.inWater || this.inLava;
 
     if (this.flying) {
       const sp = this.flySpeed * (input.sprint ? 2 : 1);
       const k = 1 - Math.exp(-10 * dt);
       const ty = ((input.jump ? 1 : 0) - (input.descend ? 1 : 0)) * sp * 0.7;
       v[0] += (wx * sp - v[0]) * k; v[1] += (ty - v[1]) * k; v[2] += (wz * sp - v[2]) * k;
-    } else if (this.inWater) {
-      const sp = this.walkSpeed * 0.55 * (input.sprint ? 1.35 : 1);
+    } else if (swimming) {
+      const sp = this.walkSpeed * (this.inLava ? 0.3 : 0.55) * (input.sprint ? 1.35 : 1);
       const k = 1 - Math.exp(-6 * dt);
       v[0] += (wx * sp - v[0]) * k; v[2] += (wz * sp - v[2]) * k;
       v[1] -= this.gravity * 0.18 * dt;
-      if (input.jump) v[1] += 16 * dt;
+      if (input.jump) v[1] += (this.inLava ? 11 : 16) * dt;
       if (input.descend) v[1] -= 8 * dt;
       v[1] = Math.max(-3, Math.min(3.2, v[1] * Math.exp(-2.5 * dt)));
       // climbing out onto a ledge
       if (input.jump && b.hitWall && !this.headInWater) v[1] = Math.max(v[1], 5.2);
     } else {
       const grounded = b.probeGround(world);
-      const sp = input.sprint ? this.sprintSpeed : this.walkSpeed;
+      // soul sand drags at the feet
+      const under = grounded ? world.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] - 0.05), Math.floor(b.pos[2])) : -1;
+      const sp = (input.sprint ? this.sprintSpeed : this.walkSpeed) * (under === B.SoulSand ? 0.45 : 1);
       const k = 1 - Math.exp(-(grounded ? this.groundAccel : this.airAccel) * dt);
       v[0] += (wx * sp - v[0]) * k; v[2] += (wz * sp - v[2]) * k;
       if (grounded && input.jump && v[1] <= 0.01) { v[1] = Math.sqrt(2 * this.gravity * this.jumpHeight); this.jumps++; }
@@ -141,7 +145,7 @@ export class Player {
     b.move(world, [v[0] * dt, v[1] * dt, v[2] * dt]);
     const moved = Math.hypot(b.pos[0] - before[0], b.pos[2] - before[1]);
     this.distance += moved;
-    if (b.grounded && !this.flying && !this.inWater) {
+    if (b.grounded && !this.flying && !swimming) {
       this.stepDist += moved;
       if (this.stepDist > (this.sprinting ? 1.9 : 1.6)) { this.stepDist = 0; if (this.onStep) this.onStep(); }
     }
@@ -151,7 +155,7 @@ export class Player {
 
   trackFall() {
     const b = this.body;
-    if (this.flying || this.inWater) {
+    if (this.flying || this.inWater || this.inLava) {
       if (!Number.isNaN(this.fallStart) && this.inWater && this.onLand) this.onLand(this.fallStart - b.pos[1], true);
       this.fallStart = NaN;
       return;

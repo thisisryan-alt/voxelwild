@@ -20,6 +20,18 @@ export const PACK_NAMES = {
   Ice: ['ice'], CoalOre: ['coal_ore'], IronOre: ['iron_ore'], GoldOre: ['gold_ore'], DiamondOre: ['diamond_ore'],
   GrassTuft: ['short_grass', 'grass', 'tallgrass'], FlowerRed: ['poppy', 'flower_rose'], FlowerYellow: ['dandelion', 'flower_dandelion'],
   DeadBush: ['dead_bush', 'deadbush'],
+  Lava: ['lava_still'], Obsidian: ['obsidian'], NetherPortal: ['nether_portal', 'portal'], Netherrack: ['netherrack'],
+  NetherQuartzOre: ['nether_quartz_ore', 'quartz_ore'], NetherGoldOre: ['nether_gold_ore'], Glowstone: ['glowstone'], SoulSand: ['soul_sand'],
+  SoulSoil: ['soul_soil'], BasaltTop: ['basalt_top'], BasaltSide: ['basalt_side'], BlackstoneTop: ['blackstone_top'], Blackstone: ['blackstone'],
+  Magma: ['magma'], NetherBricks: ['nether_bricks', 'nether_brick'], CrimsonNylium: ['crimson_nylium'], CrimsonNyliumSide: ['crimson_nylium_side'],
+  WarpedNylium: ['warped_nylium'], WarpedNyliumSide: ['warped_nylium_side'], CrimsonStem: ['crimson_stem'], CrimsonStemTop: ['crimson_stem_top'],
+  WarpedStem: ['warped_stem'], WarpedStemTop: ['warped_stem_top'], NetherWart: ['nether_wart_block'], WarpedWart: ['warped_wart_block'],
+  Shroomlight: ['shroomlight'], CrimsonFungus: ['crimson_fungus'], WarpedFungus: ['warped_fungus'], CrimsonRoots: ['crimson_roots'],
+  WarpedRoots: ['warped_roots'], WeepingVines: ['weeping_vines_plant'], TwistingVines: ['twisting_vines_plant'], EndStone: ['end_stone'],
+  EndStoneBricks: ['end_stone_bricks'], Purpur: ['purpur_block'], EndFrameTop: ['end_portal_frame_top', 'endframe_top'],
+  EndFrameSide: ['end_portal_frame_side', 'endframe_side'], ChorusPlant: ['chorus_plant'], ChorusFlower: ['chorus_flower'],
+  StoneBricks: ['stone_bricks', 'stonebrick'], MossyStoneBricks: ['mossy_stone_bricks', 'stonebrick_mossy'],
+  CrackedStoneBricks: ['cracked_stone_bricks', 'stonebrick_cracked'],
   // Glowcap, Torch and Cactus keep the game's own art: Minecraft's versions are shaped for different models
 };
 // Minecraft paints these grey and tints them with the biome colour map; a grey pack texture gets the default tint
@@ -145,7 +157,7 @@ export function decodeBitmap(bmp) {
 }
 
 /** Square frame (animated textures are vertical strips: first frame) resampled to R x R, bilinear, wrapping. */
-function square(img, R) {
+export function square(img, R) {
   const s = img.w, src = img.data, out = new Uint8Array(R * R * 4);
   if (s === R) { out.set(src.subarray(0, R * R * 4)); return out; }
   const k = s / R;

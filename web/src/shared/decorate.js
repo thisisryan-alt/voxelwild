@@ -11,8 +11,9 @@ const K = { Oak: 0, BigOak: 1, Birch: 2, Spruce: 3, TallSpruce: 4, Jungle: 5, Ju
 const GRID = 5;
 const fdiv = (a, b) => Math.floor(a / b);
 
-/** neighbours: array of 9 surfaces (index (dx+1)+(dz+1)*3), each {height, top, biome}. */
-export function decorateColumn(vox, cx, cz, seed, neighbours) {
+/** neighbours: array of 9 surfaces (index (dx+1)+(dz+1)*3), each {height, top, biome}. dim: 0 overworld, 1 nether, 2 end. */
+export function decorateColumn(vox, cx, cz, seed, neighbours, dim = 0) {
+  if (dim) return decorateOther(vox, cx, cz, seed, neighbours, dim);
   const trees = [];
   const minX = (cx - 1) * CS, minZ = (cz - 1) * CS, maxX = (cx + 2) * CS, maxZ = (cz + 2) * CS;
   for (let gz = fdiv(minZ, GRID); gz <= fdiv(maxZ - 1, GRID); gz++) for (let gx = fdiv(minX, GRID); gx <= fdiv(maxX - 1, GRID); gx++) {
@@ -56,7 +57,10 @@ export function decorateColumn(vox, cx, cz, seed, neighbours) {
   for (const t of trees) build(t, w);
   // props after trees (they need open ground), before the heightmap (boulder cores block light)
   const props = placeProps(vox, cx, cz, seed, neighbours[4].height, neighbours[4].biome);
+  return { heightmap: heightmapOf(vox), props };
+}
 
+function heightmapOf(vox) {
   const heightmap = new Int32Array(CS2);
   for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
     let top = MIN_Y - 1;
@@ -66,7 +70,93 @@ export function decorateColumn(vox, cx, cz, seed, neighbours) {
     }
     heightmap[x + z * CS] = top;
   }
-  return { heightmap, props };
+  return heightmap;
+}
+
+// ---------------------------------------------------------------- the Nether's huge fungi, the End's chorus plants
+
+function decorateOther(vox, cx, cz, seed, neighbours, dim) {
+  const items = [];
+  const grid = dim === 1 ? 4 : 6;
+  const minX = (cx - 1) * CS, minZ = (cz - 1) * CS, maxX = (cx + 2) * CS, maxZ = (cz + 2) * CS;
+  for (let gz = fdiv(minZ, grid); gz <= fdiv(maxZ - 1, grid); gz++) for (let gx = fdiv(minX, grid); gx <= fdiv(maxX - 1, grid); gx++) {
+    const h = hash4(gx, gz, seed ^ 0x6F9, dim);
+    const px = gx * grid + (h % grid), pz = gz * grid + ((h >>> 4) % grid);
+    if (px < minX || pz < minZ || px >= maxX || pz >= maxZ) continue;
+    const lx = px - minX, lz = pz - minZ;
+    const sf = neighbours[(lx >> 5) + (lz >> 5) * 3];
+    const k = (lx & 31) + (lz & 31) * CS;
+    const height = sf.height[k], top = sf.top[k], biome = sf.biome[k];
+    if (height < -1000) continue;
+    const r = ((h >>> 8) & 0xFFF) / 4096;
+    if (dim === 1) {
+      if (top !== B.CrimsonNylium && top !== B.WarpedNylium) continue;
+      if (r >= 0.42) continue;
+      items.push({ x: px, y: height + 1, z: pz, crimson: top === B.CrimsonNylium, seed: hash4(px, pz, seed, 5) | 1 });
+    } else {
+      if (biome !== Biome.EndHighlands && biome !== Biome.EndMidlands) continue;
+      if (r >= (biome === Biome.EndHighlands ? 0.3 : 0.08)) continue;
+      items.push({ x: px, y: height + 1, z: pz, chorus: true, seed: hash4(px, pz, seed, 6) | 1 });
+    }
+  }
+  items.sort((a, b) => (a.z !== b.z ? a.z - b.z : a.x - b.x));
+  const ox = cx * CS, oz = cz * CS;
+  const inside = (x, y, z) => x >= ox && z >= oz && x < ox + CS && z < oz + CS && y >= MIN_Y && y < MAX_Y;
+  const soft = (b) => b === B.Air || ((BLOCKS[b].flags & F.Replaceable) && !(BLOCKS[b].flags & F.Liquid));
+  const put = (x, y, z, id, force) => { if (!inside(x, y, z)) return; const i = colIdx(x - ox, y, z - oz); if (force || soft(vox[i])) vox[i] = id; };
+  for (const t of items) (t.chorus ? chorus : fungus)(t, put);
+  return { heightmap: heightmapOf(vox), props: new Int32Array(0) };
+}
+
+/** Minecraft's huge fungus: a tall stem under a domed hat of wart blocks with shroomlights and (crimson) hanging vines. */
+function fungus(t, put) {
+  const rng = mulberry32(t.seed);
+  const stem = t.crimson ? B.CrimsonStem : B.WarpedStem, wart = t.crimson ? B.NetherWartBlock : B.WarpedWartBlock;
+  const h = 5 + Math.floor(rng() * 9) * (rng() < 0.1 ? 2 : 1);
+  const hat = Math.max(3, Math.min(h - 1, 3 + Math.floor(rng() * (h / 3))));
+  const top = t.y + h;
+  for (let k = 0; k <= h; k++) put(t.x, t.y + k, t.z, stem, true);
+  for (let i = 0; i < hat; i++) {
+    const y = top - i;
+    const r = i === 0 ? 1.5 : i === 1 ? 2.6 : 3.3 + (i > 3 ? 0.4 : 0);
+    const R = Math.ceil(r);
+    for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+      const d = Math.hypot(dx, dz);
+      if (d > r || (dx === 0 && dz === 0)) continue;
+      const shell = i === 0 || d > r - 1.15;
+      if (!shell) { if (i === hat - 1 && rng() < 0.08) put(t.x + dx, y, t.z + dz, B.Shroomlight); continue; }
+      if (rng() < 0.06) continue;                                   // ragged edge
+      put(t.x + dx, y, t.z + dz, rng() < 0.05 ? B.Shroomlight : wart);
+      if (i === hat - 1 && t.crimson && rng() < 0.3) {
+        const len = 1 + Math.floor(rng() * 4);
+        for (let k = 1; k <= len; k++) put(t.x + dx, y - k, t.z + dz, B.WeepingVines);
+      }
+    }
+  }
+}
+
+/** Chorus plant: a branching purple stalk with flowers at its tips (Minecraft's ChorusFlower.generatePlant). */
+function chorus(t, put) {
+  const rng = mulberry32(t.seed);
+  const grow = (x, y, z, depth) => {
+    const height = 1 + Math.floor(rng() * (depth === 0 ? 4 : 3)) + (depth === 0 ? 1 : 0);
+    for (let k = 0; k < height; k++) put(x, y + k, z, B.ChorusPlant);
+    const ty = y + height - 1;
+    let branched = false;
+    if (depth < 4) {
+      const n = depth === 0 ? 1 + Math.floor(rng() * 3) : Math.floor(rng() * 4);
+      for (let b = 0; b < n; b++) {
+        const d = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(rng() * 4)];
+        const nx = x + d[0], nz = z + d[1];
+        if (Math.abs(nx - t.x) > 7 || Math.abs(nz - t.z) > 7) continue;
+        put(nx, ty, nz, B.ChorusPlant);
+        grow(nx, ty + 1, nz, depth + 1);
+        branched = true;
+      }
+    }
+    if (!branched) put(x, ty + 1, z, B.ChorusFlower);
+  };
+  grow(t.x, t.y, t.z, 0);
 }
 
 function build(t, w) {

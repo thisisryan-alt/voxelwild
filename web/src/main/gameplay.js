@@ -53,7 +53,7 @@ export class Inventory {
   /** One use of the held tool. Returns true when it broke. */
   wearHeld() {
     const s = this.held, d = this.heldItem;
-    if (!s || !d || d.kind !== Kind.Tool) return false;
+    if (!s || !d || !d.durability) return false;
     s.wear = (s.wear || 0) + 1;
     if (s.wear >= d.durability) { this.slots[this.selected] = null; this.changed(); return true; }
     this.changed();

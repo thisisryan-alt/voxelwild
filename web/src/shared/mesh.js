@@ -4,7 +4,7 @@
 // Vertex = 24 bytes: float32 x,y,z | u8x4 d0 (face | edges<<3, layer, ao*85, overlay) | u8x4 d1 (sky*17, block*17, temp, humid)
 //                                   | u8x4 d2 (tint, wind, flowX, flowZ)
 import { CS, CS2, CS3, RS, RS2, RS3, RM, MAX_LIGHT, MIN_SY, MAX_SY } from './const.js';
-import { BLOCKS, B, F, Shape, NONE, layerFor, waterLevel, isWater } from './blocks.js';
+import { BLOCKS, B, F, Shape, NONE, layerFor, waterLevel, isWater, lavaLevel, isLava } from './blocks.js';
 
 const N = BLOCKS.length;
 const OPAQUE = new Uint8Array(N), OPACITY = new Uint8Array(N), EMIT = new Uint8Array(N), SHAPE = new Uint8Array(N);
@@ -54,7 +54,7 @@ export class Mesher {
     this.computeLight();
     const connectivity = this.connectivity();
     const vb = new Growable(1 << 18);
-    const opaque = new IdxList(1 << 14), cutout = new IdxList(1 << 12), water = new IdxList(1 << 12);
+    const opaque = new IdxList(1 << 14), cutout = new IdxList(1 << 12), water = new IdxList(1 << 12), glow = new IdxList(64);
     this.vb = vb; this.vcount = 0;
     let leaves = 0;
     for (let y = 0; y < CS; y++) for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
@@ -73,12 +73,14 @@ export class Mesher {
         }
       } else if (shape === Shape.Cross) this.cross(x, y, z, id, cutout);
       else if (shape === Shape.Torch) this.torch(x, y, z, id, opaque);
-      else if (shape === Shape.Liquid) this.water(x, y, z, id, water);
+      else if (shape === Shape.Liquid) { if (isLava(id)) this.water(x, y, z, id, opaque, true); else this.water(x, y, z, id, water, false); }
+      else if (shape === Shape.Portal) this.portal(x, y, z, id, glow);
+      else if (shape === Shape.EndPortal) this.endPortal(x, y, z, id, opaque);
     }
     const vertices = vb.buf.slice(0, vb.len);
     return {
       vertices, vertexCount: this.vcount,
-      opaque: opaque.a.slice(0, opaque.len), cutout: cutout.a.slice(0, cutout.len), water: water.a.slice(0, water.len),
+      opaque: opaque.a.slice(0, opaque.len), cutout: cutout.a.slice(0, cutout.len), water: water.a.slice(0, water.len), glow: glow.a.slice(0, glow.len),
       connectivity, leaves,
     };
   }
@@ -284,13 +286,57 @@ export class Mesher {
     }
   }
 
-  // ---------------------------------------------------------------- water with levels
+  /** A box's faces with flat light (portal panes, the end portal slab). faces: which of the 6 to emit. */
+  box(min, max, faces, layer, list, x, y, z) {
+    const [sl, bl] = this.light(x, y, z);
+    const clim = this.clim(x, z);
+    const c = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
+    const hf = [(max[0] - min[0]) / 2, (max[1] - min[1]) / 2, (max[2] - min[2]) / 2];
+    for (let f = 0; f < 6; f++) {
+      if (!(faces & (1 << f))) continue;
+      const n = FN[f], t = FT[f], b = FB[f];
+      const cx = c[0] + n[0] * hf[0], cy = c[1] + n[1] * hf[1], cz = c[2] + n[2] * hf[2];
+      const tx = t[0] * hf[0], ty = t[1] * hf[1], tz = t[2] * hf[2], bx = b[0] * hf[0], by = b[1] * hf[1], bz = b[2] * hf[2];
+      const s = this.vert(cx - tx - bx, cy - ty - by, cz - tz - bz, f, 0, layer, 3, NONE, sl, bl, clim, 0, 0);
+      this.vert(cx - tx + bx, cy - ty + by, cz - tz + bz, f, 0, layer, 3, NONE, sl, bl, clim, 0, 0);
+      this.vert(cx + tx + bx, cy + ty + by, cz + tz + bz, f, 0, layer, 3, NONE, sl, bl, clim, 0, 0);
+      this.vert(cx + tx - bx, cy + ty - by, cz + tz - bz, f, 0, layer, 3, NONE, sl, bl, clim, 0, 0);
+      list.push6(s, 0, 1, 2, 0, 2, 3);
+    }
+  }
+
+  /** Nether portal: a pane a quarter block thick across the frame (X: spans x, faces +-z). */
+  portal(x, y, z, id, list) {
+    const alongX = id === B.NetherPortalX, d = BLOCKS[id];
+    const min = alongX ? [x, y, z + 0.375] : [x + 0.375, y, z], max = alongX ? [x + 1, y + 1, z + 0.625] : [x + 0.625, y + 1, z + 1];
+    let faces = alongX ? (1 << 4) | (1 << 5) : 1 | 2;
+    // the thin edges only where the pane ends (not against more portal or the frame)
+    for (const f of alongX ? [0, 1, 2, 3] : [2, 3, 4, 5]) {
+      const n = FN[f], nb = this.region[RI(x + n[0], y + n[1], z + n[2])];
+      if (nb !== id && !OPAQUE[nb]) faces |= 1 << f;
+    }
+    this.box(min, max, faces, d.side, list, x, y, z);
+  }
+
+  /** End portal: a slab 3/4 high showing the starfield (top and, seen from below, bottom). */
+  endPortal(x, y, z, id, list) {
+    const d = BLOCKS[id];
+    let faces = (1 << 2) | (OPAQUE[this.region[RI(x, y - 1, z)]] ? 0 : 1 << 3);
+    for (const f of [0, 1, 4, 5]) {
+      const n = FN[f], nb = this.region[RI(x + n[0], y, z + n[2])];
+      if (nb !== id && !OPAQUE[nb]) faces |= 1 << f;
+    }
+    this.box([x, y, z], [x + 1, y + 0.75, z + 1], faces, d.top, list, x, y, z);
+  }
+
+  // ---------------------------------------------------------------- water (and lava) with levels
 
   surfaceHeight(x, y, z) {
     const id = this.region[RI(x, y, z)];
-    if (!isWater(id)) return -1;
-    if (isWater(this.region[RI(x, y + 1, z)])) return 1;
-    return waterLevel(id) / 8 * 0.88;
+    const same = this.lava ? isLava : isWater;
+    if (!same(id)) return -1;
+    if (same(this.region[RI(x, y + 1, z)])) return 1;
+    return (this.lava ? lavaLevel(id) : waterLevel(id)) / 8 * 0.88;
   }
 
   cornerHeight(x, y, z, cx, cz) {
@@ -304,16 +350,19 @@ export class Mesher {
     return n ? sum / n : 0;
   }
 
-  water(x, y, z, id, list) {
+  water(x, y, z, id, list, lava) {
     const region = this.region;
+    this.lava = lava;
+    const same = lava ? isLava : isWater;
+    const layer = lava ? BLOCKS[id].top : NONE;
     const above = region[RI(x, y + 1, z)];
-    const full = isWater(above);
+    const full = same(above);
     const h00 = full ? 1 : this.cornerHeight(x, y, z, 0, 0), h10 = full ? 1 : this.cornerHeight(x, y, z, 1, 0);
     const h11 = full ? 1 : this.cornerHeight(x, y, z, 1, 1), h01 = full ? 1 : this.cornerHeight(x, y, z, 0, 1);
     // flow: downhill direction of the surface; falling water flows straight down
     let fx = (h00 + h01) - (h10 + h11), fz = (h00 + h10) - (h01 + h11);
     const below = region[RI(x, y - 1, z)];
-    const falling = !isWater(below) && !OPAQUE[below] ? 1 : 0;
+    const falling = !same(below) && !OPAQUE[below] ? 1 : 0;
     const fl = Math.hypot(fx, fz);
     if (fl > 1e-3) { fx /= fl; fz /= fl; } else { fx = 0; fz = 0; }
     const fxe = Math.round(fx * 127 + 128), fze = Math.round(fz * 127 + 128);
@@ -324,7 +373,7 @@ export class Mesher {
       const n = FN[f];
       const other = region[RI(x + n[0], y + n[1], z + n[2])];
       if (f === 2) { if (full || OPAQUE[other]) continue; }          // free surface only
-      else if (isWater(other) || OPAQUE[other]) continue;          // sides/bottom only against air or see-through blocks
+      else if (same(other) || OPAQUE[other]) continue;          // sides/bottom only against air or see-through blocks
       const t = FT[f], b = FB[f];
       const ls = this.light(x + n[0], y + n[1], z + n[2]);
       const s1 = Math.max(sl, ls[0]), b1 = Math.max(bl, ls[1]);
@@ -340,8 +389,9 @@ export class Mesher {
         corners.push([px, py, pz]);
       }
       const d2 = falling && f !== 2 && f !== 3 ? 255 : 0;
-      const s = this.vert(corners[0][0], corners[0][1], corners[0][2], f, 0, NONE, 3, NONE, s1, b1, clim, d2, 0, fxe, fze);
-      for (let k = 1; k < 4; k++) this.vert(corners[k][0], corners[k][1], corners[k][2], f, 0, NONE, 3, NONE, s1, b1, clim, d2, 0, fxe, fze);
+      const tint = lava ? 0 : d2;
+      const s = this.vert(corners[0][0], corners[0][1], corners[0][2], f, 0, layer, 3, NONE, s1, b1, clim, tint, 0, fxe, fze);
+      for (let k = 1; k < 4; k++) this.vert(corners[k][0], corners[k][1], corners[k][2], f, 0, layer, 3, NONE, s1, b1, clim, tint, 0, fxe, fze);
       list.push6(s, 0, 1, 2, 0, 2, 3);
     }
   }

@@ -4,6 +4,11 @@ import { CS, CS2, CS3, MIN_Y, MAX_Y, HEIGHT, SEA, colIdx } from './const.js';
 import { B } from './blocks.js';
 import { Terrain, Biome, seedOffset } from './terrain.js';
 import { hash4, mulberry32, smoothstep } from './noise.js';
+import { generateNether } from './nether.js';
+import { generateEnd } from './end.js';
+import { applyStrongholds } from './stronghold.js';
+
+export const LAVA_LEVEL = -54;   // caves below this fill with lava (Minecraft's deep lava lakes)
 
 const STEP = 4, LX = CS / STEP + 1, LY = HEIGHT / STEP + 1;
 const terrainCache = new Map();
@@ -14,7 +19,9 @@ export function terrainFor(seed) {
 }
 
 /** Generates column (cx, cz). Returns { voxels: Uint16Array(HEIGHT*CS2) in colIdx order, surface: {...} }. */
-export function generateColumn(cx, cz, seed) {
+export function generateColumn(cx, cz, seed, dim = 0) {
+  if (dim === 1) return generateNether(cx, cz, seed);
+  if (dim === 2) return generateEnd(cx, cz, seed);
   const T = terrainFor(seed), n = T.n;
   const ox = cx * CS, oz = cz * CS;
   const P = CS + 2;
@@ -95,7 +102,7 @@ export function generateColumn(cx, cz, seed) {
           const below = groundTop - y;
           const underWater = groundTop < SEA + 1;
           const allowed = (below >= 6 || entrance) && !(underWater && below < 12) && s.river < 0.2;
-          if (allowed && isCave(sampleLat(x, y, z), y, below)) b = y <= lakeLevel ? B.Water : B.Air;
+          if (allowed && isCave(sampleLat(x, y, z), y, below)) b = y <= LAVA_LEVEL ? B.Lava : y <= lakeLevel ? B.Water : B.Air;
         }
       }
       vox[colIdx(x, y, z)] = b;
@@ -106,7 +113,13 @@ export function generateColumn(cx, cz, seed) {
     sTemp[k] = Math.round(Math.min(1, Math.max(0, s.temp)) * 255); sHumid[k] = Math.round(Math.min(1, Math.max(0, s.humid)) * 255);
   }
 
+  // where an aquifer rests on a lava lake the lava has already set to obsidian
+  for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+    const i = colIdx(x, LAVA_LEVEL, z);
+    if (vox[i] === B.Lava && vox[colIdx(x, LAVA_LEVEL + 1, z)] === B.Water) vox[i] = B.Obsidian;
+  }
   placeOres(vox, cx, cz, seed);
+  applyStrongholds(vox, ox, oz, seed);
   decorateCaveFloors(vox, sHeight, ox, oz, seed, n);
   placeSurfacePlants(vox, sHeight, sTop, sBiome, ox, oz, seed, n);
   placeSpring(vox, heights, P, sHeight, sBiome, cx, cz, seed);

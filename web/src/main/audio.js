@@ -192,6 +192,42 @@ const BEDS = {
       for (let i = 0; i < n && s + i + e < o.length; i++) o[s + i + e] += o[s + i] * 0.25;
     }
   }),
+  // the Nether: a deep, slow rumble with far-off groans
+  nether: () => makeLoop(16, 3, (o, rng) => {
+    let brown = 0, lp = 0, lp2 = 0; const aL = coef(70), aL2 = coef(240);
+    for (let i = 0; i < o.length; i++) {
+      const t = i / SR, swell = 0.6 + 0.4 * Math.sin(t * 0.39) * Math.sin(t * 0.23 + 1.1);
+      brown = brown * 0.9995 + rng.signed() * 0.03; lp += aL * (brown - lp); lp2 += aL2 * (rng.signed() - lp2);
+      o[i] = (lp * 4 + lp2 * 0.08) * swell;
+    }
+    for (let g = 0; g < 3; g++) {
+      const s0 = rng.range(0.5, 12), len = rng.range(1.8, 3.2), f0 = rng.range(55, 95), vol = rng.range(0.25, 0.45); let ph = 0;
+      for (let i = 0, n = Math.floor(len * SR), s = Math.floor(s0 * SR); i < n && s + i < o.length; i++) {
+        const u = i / n; ph += TAU * f0 * (1 - 0.25 * u) / SR;
+        o[s + i] += (Math.sin(ph) + 0.4 * Math.sin(ph * 2.01) + 0.2 * Math.sin(ph * 3.03)) * Math.sin(Math.PI * u) ** 2 * vol;
+      }
+    }
+  }),
+  // lava: thick bubbling with the odd pop
+  lava: () => makeLoop(8, 5, (o, rng) => {
+    let brown = 0, lp = 0; const aL = coef(180);
+    for (let i = 0; i < o.length; i++) { brown = brown * 0.998 + rng.signed() * 0.05; lp += aL * (brown - lp); o[i] = lp * 2.2; }
+    for (let b = 0; b < 26; b++) bubble(o, rng.range(0, o.length / SR - 0.2), rng.range(90, 260), rng.range(0.15, 0.4), rng);
+    for (let k = 0; k < 5; k++) {
+      const s = Math.floor(rng.range(0.2, o.length / SR - 0.2) * SR), n = Math.floor(0.05 * SR);
+      for (let i = 0; i < n && s + i < o.length; i++) o[s + i] += rng.signed() * Math.exp(-i / (0.008 * SR)) * 0.8;
+    }
+  }),
+  // the End: a hollow, slowly beating drone
+  end: () => makeLoop(12, 7, (o, rng) => {
+    let lp = 0; const aL = coef(900);
+    for (let i = 0; i < o.length; i++) {
+      const t = i / SR;
+      const drone = Math.sin(TAU * 49 * t) * 0.5 + Math.sin(TAU * 49.6 * t) * 0.5 + Math.sin(TAU * 73.5 * t) * 0.25 * (0.5 + 0.5 * Math.sin(t * 0.5));
+      lp += aL * (rng.signed() - lp);
+      o[i] = drone * 0.5 + lp * 0.05 * (0.6 + 0.4 * Math.sin(t * 0.8));
+    }
+  }),
   underwater: () => makeLoop(6, 1, (o, rng) => {
     let brown = 0, lp = 0; const aL = coef(260);
     for (let i = 0; i < o.length; i++) { brown = brown * 0.997 + rng.signed() * 0.06; lp += aL * (brown - lp); o[i] = lp * 2; }

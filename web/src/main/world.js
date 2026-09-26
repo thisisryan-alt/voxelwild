@@ -1,7 +1,7 @@
 // World on the page: streaming (generate -> decorate -> mesh on a worker pool), block storage and queries, edits with
 // relighting, persistence of edited sections, the cellular water simulation, and cave culling (section visibility).
 import { CS, CS2, CS3, MIN_SY, MAX_SY, SECTIONS, MIN_Y, MAX_Y, RS, RS2, RS3, RM, MAX_LIGHT } from '../shared/const.js';
-import { BLOCKS, B, F, isWater, waterLevel } from '../shared/blocks.js';
+import { BLOCKS, B, F, isWater, waterLevel, isLava, lavaLevel, isLiquid } from '../shared/blocks.js';
 import { PropField } from './props.js';
 
 const key2 = (cx, cz) => cx * 65536 + cz;              // cx, cz within +-32767 columns (~1000 km)
@@ -9,8 +9,10 @@ const key3 = (cx, sy, cz) => `${cx},${sy},${cz}`;
 const FN = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
 export class World {
-  constructor({ seed, workerUrl, viewDistance = 8, onMesh, onUnloadSection, modified }) {
+  constructor({ seed, workerUrl, viewDistance = 8, onMesh, onUnloadSection, modified, dim = 0 }) {
     this.seed = seed >>> 0;
+    this.dim = dim;                               // 0 overworld, 1 nether, 2 end
+    this.below = dim === 2 ? B.Air : B.Bedrock;   // what lies under the world: the End's void, bedrock elsewhere
     this.viewDistance = viewDistance;
     this.onMesh = onMesh;
     this.onUnloadSection = onUnloadSection;
@@ -36,6 +38,8 @@ export class World {
     this.stats = { genMs: 0, meshMs: 0, gens: 0, meshes: 0 };
     this.waterActive = new Set();
     this.waterTimer = 0;
+    this.lavaActive = new Set();
+    this.lavaTimer = 0;
     this.visStamp = 0;
     this.visibilityDirty = true;
     this.lastCamSection = null;
@@ -48,7 +52,7 @@ export class World {
   column(cx, cz) { return this.columns.get(key2(cx, cz)); }
 
   getBlock(x, y, z) {
-    if (y < MIN_Y) return B.Bedrock;
+    if (y < MIN_Y) return this.below;
     if (y >= MAX_Y) return B.Air;
     const c = this.columns.get(key2(x >> 5, z >> 5));
     if (!c || c.state !== 'ready') return -1;
@@ -128,7 +132,7 @@ export class World {
       if (!w) break;
       const col = { cx, cz, state: 'gen', surface: null, sections: null, heightmap: null, render: [], waterSeeds: null };
       this.columns.set(key2(cx, cz), col);
-      this.post(w, { type: 'gen', id: this.jobId++, cx, cz, seed: this.seed });
+      this.post(w, { type: 'gen', id: this.jobId++, cx, cz, seed: this.seed, dim: this.dim });
       started++;
     }
     // 2. decoration once all 8 neighbours have terrain
@@ -149,7 +153,7 @@ export class World {
       if (!w) break;
       col.state = 'decorating';
       const vox = col.voxels; col.voxels = null;
-      this.post(w, { type: 'decorate', id: this.jobId++, cx: col.cx, cz: col.cz, seed: this.seed, voxels: vox, neighbours }, [vox.buffer]);
+      this.post(w, { type: 'decorate', id: this.jobId++, cx: col.cx, cz: col.cz, seed: this.seed, dim: this.dim, voxels: vox, neighbours }, [vox.buffer]);
     }
     // 3. meshing: urgent (edits) first, then nearest sections within the view distance
     while (this.meshQueueUrgent.length) {
@@ -183,6 +187,7 @@ export class World {
     }
     this.pendingColumns = pending;
     this.stepWater(dt);
+    this.stepLava(dt);
   }
 
   neighboursReady(cx, cz) {
@@ -245,7 +250,7 @@ export class World {
         for (let dx = -1; dx <= 1; dx++) {
           const x0 = dx < 0 ? 16 : 0, x1 = dx > 0 ? 16 : 32, rx = dx * 32 + RM;
           let data;
-          if (sIdx < 0) data = B.Bedrock;
+          if (sIdx < 0) data = this.below;
           else if (sIdx >= SECTIONS) data = B.Air;
           else data = this.column(s.cx + dx, s.cz + dz).sections[sIdx];
           if (typeof data === 'number') {
@@ -304,6 +309,7 @@ export class World {
       col.state = 'ready';
       this.props.onColumnReady(col.cx, col.cz, m.props);
       this.seedWater(col);
+      this.seedLava(col);
       this.visibilityDirty = true;
     } else if (m.type === 'mesh') {
       this.stats.meshMs += m.ms; this.stats.meshes++;
@@ -402,7 +408,7 @@ export class World {
         if (urgent && near.has(s.key)) this.meshQueueUrgent.push(s);
       }
     }
-    this.wakeWater(x, y, z);   // any edit can open a path for nearby water, or be water itself
+    this.wakeWater(x, y, z);   // any edit can open a path for nearby water or lava, or be a liquid itself
     // props resting on, hanging from or built into this cell go with it, and take their barrier/core cells along
     for (const [cx2, cy2, cz2, b] of this.props.removeDependents(x, y, z)) {
       if ((cx2 !== x || cy2 !== y || cz2 !== z) && this.getBlock(cx2, cy2, cz2) === b) this.setBlock(cx2, cy2, cz2, B.Air, urgent);
@@ -456,7 +462,7 @@ export class World {
   canFlowInto(x, y, z) {
     const b = this.getBlock(x, y, z);
     if (b < 0) return false;
-    if (isWater(b)) return false;
+    if (isLiquid(b)) return false;
     const d = BLOCKS[b];
     return b === B.Air || ((d.flags & F.Replaceable) && !(d.flags & F.Solid));
   }
@@ -464,7 +470,82 @@ export class World {
   wakeWater(x, y, z) {
     for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
       if (Math.abs(dx) + Math.abs(dy) + Math.abs(dz) > 1) continue;
-      if (isWater(this.getBlock(x + dx, y + dy, z + dz))) this.waterActive.add(`${x + dx},${y + dy},${z + dz}`);
+      const b = this.getBlock(x + dx, y + dy, z + dz);
+      if (isWater(b)) this.waterActive.add(`${x + dx},${y + dy},${z + dz}`);
+      else if (isLava(b)) this.lavaActive.add(`${x + dx},${y + dy},${z + dz}`);
+    }
+  }
+
+  // ---------------------------------------------------------------- lava (source 8, flowing 1..7): slower and shorter in the
+  // overworld (levels drop by 2), quick and long in the Nether; where it meets water a source sets to obsidian, flowing
+  // lava to cobblestone
+
+  seedLava(col) {
+    if (this.dim !== 1) return;
+    const ox = col.cx * CS, oz = col.cz * CS;
+    let found = 0;
+    for (let si = 0; si < SECTIONS && found < 32; si++) {
+      const data = col.sections[si];
+      if (typeof data === 'number') continue;
+      for (let i = 0; i < CS3 && found < 32; i++) {
+        if (data[i] !== B.Lava) continue;
+        const wy = MIN_Y + si * CS + (i >> 10);
+        if (wy <= 32) continue;          // the lava sea is settled
+        const x = ox + (i & 31), z = oz + ((i >> 5) & 31);
+        if (this.canFlowInto(x, wy - 1, z) || this.canFlowInto(x + 1, wy, z) || this.canFlowInto(x - 1, wy, z)
+          || this.canFlowInto(x, wy, z + 1) || this.canFlowInto(x, wy, z - 1)) { this.lavaActive.add(`${x},${wy},${z}`); found++; }
+      }
+    }
+  }
+
+  stepLava(dt) {
+    this.lavaTimer += dt;
+    const nether = this.dim === 1;
+    if (this.lavaTimer < (nether ? 0.35 : 1.0)) return;
+    this.lavaTimer = 0;
+    const drop = nether ? 1 : 2, flow = (lv) => B.Lava + lv;
+    const active = [...this.lavaActive];
+    this.lavaActive.clear();
+    const changes = [];
+    let budget = 160;
+    const N6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    for (const k of active) {
+      if (budget-- <= 0) { this.lavaActive.add(k); continue; }
+      const [x, y, z] = k.split(',').map(Number);
+      const id = this.getBlock(x, y, z);
+      if (id < 0) { this.lavaActive.add(k); continue; }
+      if (!isLava(id)) continue;
+      const level = lavaLevel(id), source = id === B.Lava;
+      // touching water: it sets
+      let wet = false;
+      for (const [dx, dy, dz] of N6) if (isWater(this.getBlock(x + dx, y + dy, z + dz))) { wet = true; break; }
+      if (wet) { changes.push([x, y, z, source ? B.Obsidian : B.Cobblestone]); continue; }
+      if (!source) {
+        let fed = isLava(this.getBlock(x, y + 1, z));
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nb = this.getBlock(x + dx, y, z + dz);
+          if (isLava(nb) && lavaLevel(nb) > level) { fed = true; break; }
+        }
+        if (!fed) { changes.push([x, y, z, level > drop ? flow(level - drop) : B.Air]); continue; }
+      }
+      if (this.canFlowInto(x, y - 1, z)) { changes.push([x, y - 1, z, flow(7)]); continue; }
+      const below = this.getBlock(x, y - 1, z);
+      if (isLava(below) && below !== B.Lava && lavaLevel(below) < 7) { changes.push([x, y - 1, z, flow(7)]); continue; }
+      const next = level - drop;
+      if (next < 1) continue;
+      const onGround = below >= 0 && ((BLOCKS[below].flags & F.Solid) || below === B.Lava);
+      if (!onGround && !source) continue;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nb = this.getBlock(x + dx, y, z + dz);
+        if (nb < 0) { this.lavaActive.add(k); continue; }
+        if (this.canFlowInto(x + dx, y, z + dz) || (isLava(nb) && nb !== B.Lava && lavaLevel(nb) < next)) changes.push([x + dx, y, z + dz, flow(next)]);
+      }
+    }
+    for (const [x, y, z, nid] of changes) {
+      const cur = this.getBlock(x, y, z);
+      if (cur < 0 || cur === nid) continue;
+      if (!isLava(cur) && isLava(nid) && !this.canFlowInto(x, y, z)) continue;
+      this.setBlock(x, y, z, nid, false);
     }
   }
 
