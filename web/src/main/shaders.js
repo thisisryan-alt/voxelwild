@@ -37,10 +37,19 @@ float vnoise(vec2 p) {
 vec3 windOffset(vec3 p, float w) {
   if (w <= 0.0) return vec3(0);
   float t = uTime, phase = dot(p.xz, vec2(0.37, 0.29));
-  float gust = 0.6 + 0.4 * sin(t * 0.37 + p.x * 0.02) * uWind.w;
-  float sway = sin(t * 1.9 + phase) * 0.6 + sin(t * 3.3 + phase * 1.7) * 0.25;
-  float s = uWind.y * w * gust;
-  return vec3(uWind.x, 0.0, uWind.z) * (sway + 0.6) * s + vec3(0, -abs(sway) * s * 0.15, 0);
+  // gusts roll across the land with the wind: a noise field drifting downwind
+  vec2 wd = normalize(vec2(uWind.x, uWind.z) + 1e-4);
+  float field = vnoise(p.xz * 0.035 - wd * t * 0.9) * 0.7 + vnoise(p.xz * 0.11 - wd * t * 2.1) * 0.3;
+  float gust = 0.45 + (0.35 + 0.5 * uWind.w) * field;
+  float sway = sin(t * 1.7 + phase) * 0.6 + sin(t * 3.1 + phase * 1.7) * 0.25 + sin(t * 0.63 + phase * 0.4) * 0.35;
+  float s = max(uWind.y, 0.35) * w * gust;
+  vec3 o = vec3(wd.x, 0.0, wd.y) * (sway + 0.7) * s + vec3(0, -abs(sway) * s * 0.15, 0);
+  // leaves (w < 0.9) also rustle: small quick flutter in every direction
+  if (w < 0.9) {
+    float r = (0.5 + field) * s * 0.35;
+    o += vec3(sin(t * 6.3 + phase * 3.1), sin(t * 5.1 + phase * 2.3) * 0.6, cos(t * 7.1 + phase * 2.7)) * r;
+  }
+  return o;
 }
 `;
 

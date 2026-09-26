@@ -4,8 +4,8 @@
  "parts": 2,
  "baseLayers": 81,
  "catalog": {
-  "count": 540,
-  "parts": 5
+  "count": 770,
+  "parts": 7
  },
  "slots": 32,
  "names": [
@@ -5226,6 +5226,10 @@
   "DiamondChestplate",
   "DiamondLeggings",
   "DiamondBoots",
+  "Bow",
+  "Bucket",
+  "WaterBucket",
+  "LavaBucket",
   "fam:redstone_torch",
   "fam:lever",
   "fam:ladder",

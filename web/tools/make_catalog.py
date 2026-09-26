@@ -164,9 +164,9 @@ def main():
     add("smithing_table", "wood", top="smithing_table_top", side="smithing_table_front", bottom="smithing_table_bottom")
     add("cartography_table", "wood", top="cartography_table_top", side="cartography_table_side1")
     add("loom", "wood", top="loom_top", side="loom_front", bottom="loom_bottom")
-    add("observer", "stone", top="observer_top", side="observer_front")
-    add("dispenser", "stone", top="furnace_top", side="dispenser_front")
-    add("dropper", "stone", top="furnace_top", side="dropper_front")
+    add("fire", "fire", all="fire_0", shape="cross", emission=15, noitem=True)
+    add("soul_fire", "fire", all="soul_fire_0", shape="cross", emission=10, noitem=True)
+    add("tnt_flash", "plant_block", top="@bright:tnt_top", side="@bright:tnt_side", bottom="@bright:tnt_bottom", noitem=True, name="TNT")
     add("piston", "stone", top="piston_top", side="piston_side", bottom="piston_bottom")
     add("sticky_piston", "stone", top="piston_top_sticky", side="piston_side", bottom="piston_bottom")
     add("brown_mushroom_block", "wood", all="brown_mushroom_block"); add("red_mushroom_block", "wood", all="red_mushroom_block")
@@ -193,8 +193,25 @@ def main():
         for t in m.get("tex", []):
             if not t.startswith("B:") and t not in textures:
                 textures.append(t)
-    OUT.write_text(json.dumps({"textures": textures, "blocks": blocks, "models": models, "texinfo": texinfo}, separators=(",", ":")))
-    print(f"{len(blocks)} blocks, {len(models)} shaped families, {len(textures)} textures -> {OUT}")
+    anims = {}
+    from PIL import Image
+    import io
+    for t in list(textures):
+        if t.startswith("@") or f"assets/minecraft/textures/block/{t}.png.mcmeta" not in z.namelist():
+            continue
+        im = Image.open(io.BytesIO(z.read(f"assets/minecraft/textures/block/{t}.png")))
+        n = im.height // im.width
+        if n < 2:
+            continue
+        meta = json.loads(z.read(f"assets/minecraft/textures/block/{t}.png.mcmeta").decode("utf-8", "ignore") or "{}").get("animation", {})
+        ft = meta.get("frametime", 1)
+        step = max(1, -(-n // 12))
+        keep = list(range(0, n, step))[:12]
+        frames = [t] + [f"@frame:{k}:{t}" for k in keep[1:]]
+        textures.extend(frames[1:])
+        anims[t] = dict(frames=frames, fps=round(20 / (ft * step), 2))
+    OUT.write_text(json.dumps({"textures": textures, "blocks": blocks, "models": models, "texinfo": texinfo, "anims": anims}, separators=(",", ":")))
+    print(f"{len(blocks)} blocks, {len(models)} shaped families, {len(textures)} textures, {len(anims)} animated -> {OUT}")
 
 
 WOODS = ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak", "bamboo", "crimson", "warped"]
@@ -299,12 +316,21 @@ def model_families(have, keys):
     fam("lever", "lever", tex=["lever", "B:Cobblestone"], list="cutout", cat="plant")
     rep = [f"@rot{r}:repeater" for r in (0, 90, 180, 270)] + [f"@rot{r}:repeater_on" for r in (0, 90, 180, 270)]
     fam("repeater", "repeater", tex=rep + ["smooth_stone", "redstone_torch", "redstone_torch_off"], list="cutout", cat="stone", name="Redstone Repeater")
-    fam("piston", "piston", tex=["piston_top", "piston_side", "piston_bottom", "piston_inner"], cat="stone")
-    fam("sticky_piston", "piston", tex=["piston_top_sticky", "piston_side", "piston_bottom", "piston_inner"], cat="stone")
-    fam("piston_head", "head", tex=["piston_top", "piston_top_sticky", "piston_side"], cat="stone", noitem=True, name="Piston Head")
+    side = ["piston_side", "@rot90:piston_side", "@rot180:piston_side", "@rot270:piston_side"]
+    fam("piston", "piston", tex=["piston_top", side[0], "piston_bottom", "piston_inner"] + side[1:], cat="stone")
+    fam("sticky_piston", "piston", tex=["piston_top_sticky", side[0], "piston_bottom", "piston_inner"] + side[1:], cat="stone")
+    fam("piston_head", "head", tex=["piston_top", "piston_top_sticky"] + side, cat="stone", noitem=True, name="Piston Head")
+    comp = [f"@rot{r}:comparator" for r in (0, 90, 180, 270)] + [f"@rot{r}:comparator_on" for r in (0, 90, 180, 270)]
+    fam("comparator", "comparator", tex=comp + ["smooth_stone", "redstone_torch", "redstone_torch_off"], list="cutout", cat="stone", name="Redstone Comparator")
+    oside = ["observer_side", "@rot90:observer_side", "@rot180:observer_side", "@rot270:observer_side"]
+    fam("observer", "observer", tex=["observer_front", "observer_back", "observer_back_on"] + oside, cat="stone")
+    fam("dispenser", "dispenser", tex=["dispenser_front", "dispenser_front_vertical", "furnace_side", "furnace_top"], cat="stone")
+    fam("dropper", "dispenser", tex=["dropper_front", "dropper_front_vertical", "furnace_side", "furnace_top"], cat="stone")
+    fam("hopper", "hopper", tex=["hopper_outside", "hopper_top", "hopper_inside"], cat="metal")
     # ---- survival
-    beds = [f"@rot{r}:@crop:entity/bed/red:6,6,16,16" for r in (0, 90, 180, 270)] + [f"@rot{r}:@crop:entity/bed/red:6,28,16,16" for r in (0, 90, 180, 270)]
-    fam("red_bed", "bed", tex=beds + ["red_wool", "B:Planks"], cat="wool", name="Bed")
+    for c in COLORS:
+        beds = [f"@rot{r}:@crop:entity/bed/{c}:6,6,16,16" for r in (0, 90, 180, 270)] + [f"@rot{r}:@crop:entity/bed/{c}:6,28,16,16" for r in (0, 90, 180, 270)]
+        fam(f"{c}_bed", "bed", tex=beds + [f"{c}_wool", "B:Planks"], cat="wool")
     fam("wheat", "crop", tex=[f"wheat_stage{k}" for k in range(8)], list="cutout", cat="plant", noitem=True, name="Wheat Crops")
     return out, texinfo
 

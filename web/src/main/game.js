@@ -174,7 +174,8 @@ export class Game {
     let o = 0;
     for (const b of bmps) { const d = (await decodeLarge(b)).data; colour.set(d.subarray(0, Math.min(d.length, colour.length - o)), o); o += d.length; }
     // generation settings per texture from the blocks that use it
-    const opts = CATALOG.textures.map((t) => {
+    const opts = CATALOG.textures.map((t0) => {
+      const t = t0.startsWith('@frame:') ? t0.split(':').slice(2).join(':') : t0;     // animation frames share their texture's settings
       const tu = LAYER_TUNING[LAYER_NAMES.indexOf('c:' + t)] || {};
       const e = CATALOG.blocks.find((b) => b.top === t || b.side === t || b.bottom === t) || {};
       const rough = { metal: 0.35, glass: 0.12, ice: 0.12, wool: 0.95, wood: 0.72, leaves: 0.75, plant: 0.7, dirt: 0.92, sand: 0.9 }[e.cat] ?? 0.82;
@@ -194,6 +195,12 @@ export class Game {
     for (let i = base; i < n; i++) {
       const k = catIndex.get(LAYER_NAMES[i].slice(2));
       rows[i] = { mode: 0, w: 1, h: 1, flags: 0, slots: new Array(32).fill(k == null ? 0 : texBase + k), side: 255 };
+      // animated textures (fire, sea lanterns, seagrass ...): frames played in turn
+      const an = CATALOG.anims && CATALOG.anims[LAYER_NAMES[i].slice(2)];
+      if (an) {
+        const slots = an.frames.map((f) => texBase + catIndex.get(f));
+        rows[i] = { mode: 3, w: slots.length, h: Math.max(1, Math.round(an.fps * 10)), flags: 0, slots: [...slots, ...new Array(32 - slots.length).fill(slots[0])], side: 255 };
+      }
     }
     const virtual = meta.variants.slice(base);
     virtual.forEach((r, k) => { rows[n + k] = r; });
@@ -859,6 +866,20 @@ export class Game {
     }
     if (this.mouse.leftClicked && !hit) this.swing = 1;
 
+    // the bow: hold to draw, let go to shoot
+    const heldDef = inv.heldItem;
+    if (heldDef && heldDef.id === I.Bow && this.state === 'playing') {
+      if (this.mouse.right && (this.creative || inv.count(I.Arrow) > 0)) this.bowDraw = Math.min(1, (this.bowDraw || 0) + dt);
+      else if (this.bowDraw > 0) {
+        const k = this.bowDraw; this.bowDraw = 0;
+        if (k > 0.15) {
+          const f = pl.forward(), e = pl.eye();
+          this.mobs.projectiles.push({ kind: 'arrow', p: [e[0] + f[0] * 0.5, e[1] + f[1] * 0.5 - 0.1, e[2] + f[2] * 0.5], v: f.map((x) => x * (10 + 32 * k)), life: 8, owner: 'player', damage: Math.round(2 + 7 * k * k) });
+          this.audio.shoot('arrow'); this.swing = 1;
+          if (!this.creative) { inv.remove(I.Arrow, 1); if (inv.wearHeld()) this.emit('toast', 'Bow broke'); }
+        }
+      }
+    } else this.bowDraw = 0;
     // using / placing
     this.useCooldown = (this.useCooldown || 0) - dt;
     if ((this.mouse.rightClicked || (this.mouse.right && this.useCooldown <= 0))) {
@@ -941,14 +962,14 @@ export class Game {
 
   bkey(x, y, z) { return `${this.dim || 0}:${x},${y},${z}`; }
   /** Stored contents of a chest or furnace at pos (created empty). */
-  blockData(pos, kind) {
+  blockData(pos, kind, size) {
     const m = this.meta, k = this.bkey(...pos);
     m.blockData = m.blockData || {};
-    if (!m.blockData[k]) m.blockData[k] = kind === 'furnace' ? { kind, slots: [null, null, null], burn: 0, burnMax: 0, cook: 0 } : { kind, slots: new Array(27).fill(null) };
+    if (!m.blockData[k]) m.blockData[k] = kind === 'furnace' ? { kind, slots: [null, null, null], burn: 0, burnMax: 0, cook: 0 } : { kind, slots: new Array(size || 27).fill(null) };
     return m.blockData[k];
   }
   openStation(st) {
-    if (st.pos) { st.key = this.bkey(...st.pos); st.data = this.blockData(st.pos, st.kind); }
+    if (st.pos) { st.key = this.bkey(...st.pos); st.data = this.blockData(st.pos, st.kind, st.size); }
     this.station = st;
     this.emit('openStation', st);
   }
@@ -960,6 +981,10 @@ export class Game {
     this.blockTimer = (this.blockTimer || 0) + dt;
     if (this.blockTimer < 0.25) return;
     const step = this.blockTimer; this.blockTimer = 0;
+    this.updateFires(step);
+    this.blockAmbience(step);
+    this.hopperTimer = (this.hopperTimer || 0) + step;
+    if (this.hopperTimer >= 0.4) { this.hopperTimer = 0; this.updateHoppers(); }
     const prefix = `${this.dim || 0}:`;
     for (const [k, d] of Object.entries(m.blockData || {})) {
       if (d.kind !== 'furnace' || !k.startsWith(prefix)) continue;
@@ -1007,6 +1032,208 @@ export class Game {
     inv.slots[inv.selected] = old;
     this.audio.place(B.Planks); this.swing = 1;
     inv.changed(); this.emit('hud');
+  }
+
+  /** Buckets scoop up and pour out water and lava sources. */
+  useBucket(def) {
+    const inv = this.inventory, w = this.world, pl = this.player;
+    const hit = raycast(w, pl.eye(), pl.forward(), REACH, (b) => b !== 0);
+    if (!hit) return;
+    this.swing = 1;
+    if (def.id === I.Bucket) {
+      if (hit.block !== B.Water && hit.block !== B.Lava) return;
+      w.setBlock(...hit.hit, B.Air);
+      this.audio.splash();
+      const full = hit.block === B.Water ? I.WaterBucket : I.LavaBucket;
+      if (this.creative) return;
+      const s = inv.held;
+      if (s.count > 1) { s.count--; if (inv.add(full, 1)) this.spawnItem(full, 1, pl.eye(), [0, 1, 0]); } else inv.slots[inv.selected] = { item: full, count: 1 };
+      inv.changed();
+      return;
+    }
+    const tgt = BLOCKS[hit.block].flags & F.Replaceable ? hit.hit : hit.prev;
+    const cur = w.getBlock(...tgt);
+    if (cur < 0 || !(BLOCKS[cur].flags & F.Replaceable)) return;
+    if (def.id === I.WaterBucket && this.dim === Dim.Nether) { this.spawnEmbers([tgt[0] + 0.5, tgt[1] + 0.5, tgt[2] + 0.5], 12, [0.9, 0.9, 0.9]); this.emit('toast', 'The water boils away'); }
+    else w.setBlock(...tgt, def.id === I.WaterBucket ? B.Water : B.Lava);
+    this.audio.splash();
+    if (!this.creative) { inv.slots[inv.selected] = { item: I.Bucket, count: 1 }; inv.changed(); }
+  }
+
+  /** Little animations on working blocks: flames and smoke from fires and lit furnaces, redstone torch and dust sparks. */
+  blockAmbience(step) {
+    const m = this.meta, w = this.world, prefix = `${this.dim || 0}:`, e = this.player.eye();
+    const near = (x, y, z) => Math.abs(x - e[0]) < 24 && Math.abs(y - e[1]) < 16 && Math.abs(z - e[2]) < 24;
+    const pos = (k) => k.slice(prefix.length).split(',').map(Number);
+    const smoke = [0.35, 0.35, 0.36];
+    for (const k of Object.keys(m.fires || {})) {
+      if (!k.startsWith(prefix)) continue;
+      const [x, y, z] = pos(k);
+      if (!near(x, y, z)) continue;
+      if (Math.random() < step * 5) this.spawnEmbers([x + 0.5, y + 0.3, z + 0.5], 1);
+      if (Math.random() < step * 3) this.spawnEmbers([x + 0.5, y + 0.9, z + 0.5], 1, smoke);
+    }
+    for (const [k, d] of Object.entries(m.blockData || {})) {
+      if (!k.startsWith(prefix) || d.kind !== 'furnace' || !(d.burn > 0)) continue;
+      const [x, y, z] = pos(k);
+      if (!near(x, y, z)) continue;
+      if (Math.random() < step * 2) this.spawnEmbers([x + 0.5, y + 1.02, z + 0.5], 1, smoke);
+      if (Math.random() < step * 3) { const s = Math.floor(Math.random() * 4), o = [[0.55, 0], [-0.55, 0], [0, 0.55], [0, -0.55]][s]; this.spawnEmbers([x + 0.5 + o[0], y + 0.25, z + 0.5 + o[1]], 1); }
+    }
+    for (const k of (m.redstone && m.redstone[this.dim || 0]) || []) {
+      const [x, y, z] = k.split(',').map(Number);
+      if (!near(x, y, z)) continue;
+      const id = w.getBlock(x, y, z), md = id > 0 && BLOCKS[id].model;
+      if (!md) continue;
+      if (md.kind === K.RTorch && BLOCKS[id].emission > 0 && Math.random() < step * 2.5) {
+        const off = md.state < 2 ? [0, 0] : [[0.35, 0], [-0.35, 0], [0, 0.35], [0, -0.35]][(md.state - 2) >> 1];
+        this.spawnEmbers([x + 0.5 + off[0], y + (md.state < 2 ? 0.62 : 0.78), z + 0.5 + off[1]], 1, [1.8, 0.1, 0.05]);
+      }
+      if (md.kind === K.Wire && md.state > 0 && Math.random() < step * md.state / 30) this.spawnEmbers([x + 0.5, y + 0.05, z + 0.5], 1, [1.5 * md.state / 15 + 0.3, 0.05, 0.02]);
+    }
+  }
+
+  // ---------------------------------------------------------------- fire
+
+  flammable(b) {
+    if (b <= 0 || !BLOCKS[b]) return false;
+    if ([B.OakLog, B.BirchLog, B.SpruceLog, B.JungleLog, B.Planks, B.OakLeaves, B.BirchLeaves, B.SpruceLeaves, B.JungleLeaves, B.TallGrass, B.DeadBush].includes(b)) return true;
+    const c = CAT[b] || famOf(b);
+    return !!c && ['wood', 'leaves', 'wool', 'plant_block'].includes(c.cat) && !/crimson|warped/.test(c.key || '');
+  }
+  /** Sets a fire at x, y, z (air with something to stand on). Returns true when lit. */
+  ignite(x, y, z) {
+    const w = this.world, below = w.getBlock(x, y - 1, z);
+    if (w.getBlock(x, y, z) !== B.Air || below <= 0 || !(BLOCKS[below].flags & F.Solid)) return false;
+    const soul = below === B.SoulSand || below === B.SoulSoil;
+    w.setBlock(x, y, z, soul ? CK.soul_fire : CK.fire);
+    const m = this.meta;
+    m.fires = m.fires || {};
+    m.fires[this.bkey(x, y, z)] = (m.clock || 0) + 6 + Math.random() * 8;
+    return true;
+  }
+  updateFires(step) {
+    const m = this.meta, w = this.world, prefix = `${this.dim || 0}:`;
+    const wet = this.dim === Dim.Overworld && this.weather && this.weather.params && this.weather.params.precip > 0.3;
+    const list = Object.entries(m.fires || {}).filter(([k]) => k.startsWith(prefix));
+    for (const [k, until] of list) {
+      const [x, y, z] = k.slice(prefix.length).split(',').map(Number), id = w.getBlock(x, y, z);
+      if (id < 0) continue;
+      if (id !== CK.fire && id !== CK.soul_fire) { delete m.fires[k]; continue; }
+      const below = w.getBlock(x, y - 1, z), eternal = below === B.Netherrack || below === B.SoulSand || below === B.SoulSoil || below === B.Magma;
+      const rained = wet && (w.heightmapAt(x, z) ?? 0) < y;
+      if (below <= 0 || rained || (!eternal && m.clock > until)) {
+        w.setBlock(x, y, z, B.Air); delete m.fires[k];
+        // what it burned on may be gone too
+        if (!eternal && this.flammable(below) && Math.random() < 0.5) w.setBlock(x, y - 1, z, B.Air);
+        continue;
+      }
+      if (list.length > 160 || Math.random() > step * 0.8) continue;
+      // spread: next to something that burns
+      const dx = Math.floor(Math.random() * 3) - 1, dy = Math.floor(Math.random() * 3) - 1, dz = Math.floor(Math.random() * 3) - 1;
+      const nx = x + dx, ny = y + dy, nz = z + dz, nb = w.getBlock(nx, ny, nz);
+      if (nb === CK.tnt) { this.redstone.prime(nx, ny, nz); continue; }
+      if (this.flammable(nb) && Math.random() < 0.35) { w.setBlock(nx, ny, nz, B.Air); this.spawnEmbers([nx + 0.5, ny + 0.5, nz + 0.5], 6); if (!this.ignite(nx, ny, nz)) this.ignite(nx, ny + 1, nz); continue; }
+      if (nb === B.Air && [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(([a, b, c]) => this.flammable(w.getBlock(nx + a, ny + b, nz + c)))) this.ignite(nx, ny, nz);
+    }
+  }
+
+  // ---------------------------------------------------------------- containers, hoppers, dispensers
+
+  /** A comparator's reading of a container (0..15), or null when there is none. */
+  containerSignal(x, y, z) {
+    const d = this.meta.blockData && this.meta.blockData[this.bkey(x, y, z)];
+    if (!d) return null;
+    let f = 0;
+    for (const s of d.slots) if (s) f += s.count / ITEMS[s.item].stack;
+    f /= d.slots.length;
+    return f > 0 ? Math.floor(1 + f * 14) : 0;
+  }
+  /** Put one of item into the container data (slot range [from, to)); returns true when it fit. */
+  insertOne(d, s, from = 0, to = d.slots.length) {
+    const max = ITEMS[s.item].stack;
+    for (let i = from; i < to; i++) { const t = d.slots[i]; if (t && t.item === s.item && t.count < max) { t.count++; return true; } }
+    for (let i = from; i < to; i++) if (!d.slots[i]) { d.slots[i] = { item: s.item, count: 1, wear: s.wear }; return true; }
+    return false;
+  }
+  /** Where an item enters a container from direction dir (0..5 six-way, the way the item travels). */
+  /** Storage of the container block at x, y, z (made on first use), or null. */
+  containerAt(x, y, z) {
+    const id = this.world.getBlock(x, y, z), f = famOf(id);
+    if (id === CK.chest || id === CK.barrel) return this.blockData([x, y, z], 'chest', 27);
+    if (id === CK.furnace || id === CK.lit_furnace || id === CK.smoker || id === CK.blast_furnace) return this.blockData([x, y, z], 'furnace');
+    if (f && f.kind === K.Hopper) return this.blockData([x, y, z], 'chest', 5);
+    if (f && f.kind === K.Dispenser) return this.blockData([x, y, z], 'chest', 9);
+    return null;
+  }
+  insertInto(x, y, z, s, travel) {
+    const d = this.containerAt(x, y, z);
+    if (!d) return false;
+    if (d.kind === 'furnace') return travel === 5 ? (SMELT.has(s.item) && this.insertOne(d, s, 0, 1)) : (fuelTime(s.item) > 0 && this.insertOne(d, s, 1, 2));
+    return this.insertOne(d, s);
+  }
+  takeOne(d) {
+    const range = d.kind === 'furnace' ? [2] : d.slots.map((_, i) => i);
+    for (const i of range) { const t = d.slots[i]; if (t) { t.count--; if (t.count <= 0) d.slots[i] = null; return { item: t.item, count: 1, wear: t.wear }; } }
+    return null;
+  }
+  updateHoppers() {
+    const m = this.meta, w = this.world, prefix = `${this.dim || 0}:`;
+    for (const [k, d] of Object.entries(m.blockData || {})) {
+      if (!k.startsWith(prefix) || d.slots.length !== 5) continue;
+      const [x, y, z] = k.slice(prefix.length).split(',').map(Number), id = w.getBlock(x, y, z), f = famOf(id);
+      if (!f || f.kind !== K.Hopper) continue;
+      let moved = false;
+      // push one item on
+      const st = BLOCKS[id].model.state, dir6 = st === 0 ? 5 : st - 1, [dx, dy, dz] = DIR6[dir6];
+      const src = d.slots.findIndex((s) => s);
+      if (src >= 0) {
+        const s = d.slots[src];
+        if (this.insertInto(x + dx, y + dy, z + dz, s, dir6)) { s.count--; if (s.count <= 0) d.slots[src] = null; moved = true; }
+      }
+      // pull one from the container above
+      const above = this.containerAt(x, y + 1, z);
+      if (above) { const t = this.takeOne(above); if (t) { if (!this.insertOne(d, t)) this.insertInto(x, y + 1, z, t, 5); else moved = true; } }
+      // and gather dropped items on top
+      for (const e of this.entities) {
+        const p = e.body.pos;
+        if (p[0] > x && p[0] < x + 1 && p[2] > z && p[2] < z + 1 && p[1] >= y + 0.6 && p[1] < y + 1.6) {
+          while (e.count > 0 && this.insertOne(d, e)) e.count--;
+          if (e.count <= 0) e.dead = true;
+          moved = true;
+        }
+      }
+      if (moved && this.station && this.station.key === k) this.emit('station');
+    }
+    this.entities = this.entities.filter((e) => !e.dead);
+  }
+  /** A dispenser or dropper fires: one random item out of its face. */
+  dispense(x, y, z, id) {
+    const f = famOf(id), d = this.blockData([x, y, z], 'chest', 9), st = BLOCKS[id].model.state % 6, dir = DIR6[st];
+    const full = d.slots.map((s, i) => (s ? i : -1)).filter((i) => i >= 0);
+    const fx = x + dir[0], fy = y + dir[1], fz = z + dir[2], w = this.world;
+    if (!full.length) { this.audio.click(); return; }
+    const i = full[Math.floor(Math.random() * full.length)], s = d.slots[i];
+    const take = () => { s.count--; if (s.count <= 0) d.slots[i] = null; };
+    const front = w.getBlock(fx, fy, fz);
+    if (f.key === 'dispenser') {
+      if (s.item === I.Arrow) {
+        this.mobs.projectiles.push({ kind: 'arrow', p: [x + 0.5 + dir[0] * 0.7, y + 0.5 + dir[1] * 0.7, z + 0.5 + dir[2] * 0.7], v: [dir[0] * 26, dir[1] * 26 + 2, dir[2] * 26], life: 8, owner: 'dispenser', damage: 4 });
+        this.audio.shoot('arrow'); take(); return;
+      }
+      if (s.item === CK.tnt && front === B.Air) { w.setBlock(fx, fy, fz, CK.tnt); this.redstone.prime(fx, fy, fz); take(); return; }
+      if (s.item === I.FlintAndSteel && front === B.Air) { this.ignite(fx, fy, fz); s.wear = (s.wear || 0) + 1; if (s.wear >= 64) d.slots[i] = null; return; }
+      if ((s.item === I.WaterBucket || s.item === I.LavaBucket) && front >= 0 && (BLOCKS[front].flags & F.Replaceable)) {
+        w.setBlock(fx, fy, fz, s.item === I.WaterBucket ? B.Water : B.Lava); d.slots[i] = { item: I.Bucket, count: 1 }; return;
+      }
+      if (s.item === I.Bucket && (front === B.Water || front === B.Lava)) {
+        w.setBlock(fx, fy, fz, B.Air); take(); if (!this.insertOne(d, { item: front === B.Water ? I.WaterBucket : I.LavaBucket })) this.spawnItem(front === B.Water ? I.WaterBucket : I.LavaBucket, 1, [fx + 0.5, fy + 0.5, fz + 0.5], [0, 1, 0]);
+        return;
+      }
+    } else if (this.insertInto(fx, fy, fz, s, st)) { take(); return; }     // droppers feed containers
+    this.spawnItem(s.item, 1, [x + 0.5 + dir[0] * 0.7, y + 0.35 + dir[1] * 0.7, z + 0.5 + dir[2] * 0.7], [dir[0] * 5 + (Math.random() - 0.5), dir[1] * 5 + 1.5, dir[2] * 5 + (Math.random() - 0.5)], s.wear, 0.4);
+    take();
+    this.audio.click();
   }
 
   /** A hoe turns grass and dirt into farmland. */
@@ -1062,6 +1289,9 @@ export class Game {
     if (hit.block === CK.smoker) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Smoker' }); return true; }
     if (hit.block === CK.blast_furnace) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Blast Furnace' }); return true; }
     if (hit.block === CK.chest || hit.block === CK.barrel) { this.openStation({ kind: 'chest', pos: hit.hit, name: hit.block === CK.chest ? 'Chest' : 'Barrel' }); this.audio.place(hit.block); return true; }
+    const cf = famOf(hit.block);
+    if (cf && (cf.kind === K.Dispenser || cf.kind === K.Hopper)) { this.openStation({ kind: 'chest', pos: hit.hit, name: cf.name, size: cf.kind === K.Hopper ? 5 : 9 }); return true; }
+    if (cf && cf.kind === K.Comparator) { this.world.setBlock(hx, hy, hz, cf.first + ((hit.block - cf.first) ^ 4)); this.audio.click(); return true; }
     if (hit.block === CK.note_block) { this.audio.click(); this.spawnEmbers([hx + 0.5, hy + 1.2, hz + 0.5], 3, [0.3, 1, 0.4]); return true; }
     if (!fam) return false;
     const st0 = BLOCKS[hit.block].model.state;
@@ -1115,6 +1345,10 @@ export class Game {
         return b >= 0 && (BLOCKS[b].flags & F.Replaceable) && !isLiquid(b) && fl > 0 && (BLOCKS[fl].flags & F.Solid) ? f * 2 : -1;
       }
       case K.Crop: return w.getBlock(pos[0], pos[1] - 1, pos[2]) === FAM.farmland.first ? 0 : -1;
+      case K.Comparator: return f;
+      case K.Observer: { const p = this.player.pitch; return p < -0.85 ? 5 : p > 0.85 ? 4 : f; }          // watches where the player looks
+      case K.Dispenser: { const p = this.player.pitch; return p < -0.85 ? 4 : p > 0.85 ? 5 : opposite(f); }  // faces the player
+      case K.Hopper: return hit.face === 2 || hit.face === 3 ? 0 : 1 + opposite(facingFromFace(hit.face));
       default: return 0;
     }
   }
@@ -1175,6 +1409,7 @@ export class Game {
     if (fam && (fam.kind === K.Door || fam.kind === K.Tall)) w.setBlock(x, y + 1, z, id + 1);
     if (fam && fam.kind === K.Bed) { const n = [[1, 0], [-1, 0], [0, 1], [0, -1]][(id - fam.first) >> 1]; w.setBlock(x + n[0], y, z + n[1], id + 1); }
     if (fam && fam.kind === K.Crop) this.meta.crops = { ...(this.meta.crops || {}), [this.bkey(x, y, z)]: this.meta.clock || 0 };
+    if (fam && (fam.kind === K.Hopper || fam.kind === K.Dispenser)) this.blockData([x, y, z], 'chest', fam.kind === K.Hopper ? 5 : 9);
     this.redstone.track(x, y, z);
     this.audio.place(block);
     this.swing = 1;
@@ -1241,6 +1476,7 @@ export class Game {
     // lava burns, and keeps burning a while after
     const inLava = isLava(feet) || isLava(head);
     if (inLava) this.burning = 3.5;
+    if (feet === CK.fire || feet === CK.soul_fire || head === CK.fire) this.burning = Math.max(this.burning || 0, 2.5);
     else if (isWater(feet) || isWater(head)) this.burning = 0;
     this.hurtTimer = (this.hurtTimer || 0) - dt;
     if (this.hurtTimer <= 0) {
@@ -1332,6 +1568,15 @@ export class Game {
     if (def.id === I.FlintAndSteel) {
       if (!hit) return;
       if (hit.block === CK.tnt) { this.redstone.prime(...hit.hit); this.swing = 1; if (!this.creative) inv.wearHeld(); return; }
+      if (hit.face === 2 && this.world.getBlock(...hit.prev) === B.Air) {
+        const [px, py, pz] = hit.prev;
+        if (!(this.dim !== Dim.End && this.lightPortal(px, py, pz))) {
+          if (this.ignite(px, py, pz)) { this.swing = 1; if (!this.creative) inv.wearHeld(); this.audio.place(B.Netherrack); }
+          return;
+        }
+        this.audio.place(B.Obsidian); if (!this.creative) inv.wearHeld(); this.emit('toast', 'The portal hums');
+        return;
+      }
       const [x, y, z] = hit.prev;
       this.swing = 1;
       if (this.dim !== Dim.End && this.lightPortal(x, y, z)) {
@@ -1341,6 +1586,8 @@ export class Game {
       } else this.spawnEmbers([x + 0.5, y + 0.2, z + 0.5], 6);
       return;
     }
+    if (def.id === I.Bucket || def.id === I.WaterBucket || def.id === I.LavaBucket) { this.useBucket(def); return; }
+    if (def.id === I.Bow) return;       // drawn while the button is held (interact)
     if (def.id === I.EyeOfEnder) {
       if (hit && hit.block === B.EndPortalFrame) {
         const [x, y, z] = hit.hit;
@@ -1597,15 +1844,17 @@ export class Game {
     const w = this.world, e = this.player.eye(), list = this.particles.leaves || (this.particles.leaves = []);
     this.leafTimer = (this.leafTimer || 0) - dt;
     if (this.leafTimer > 0 || list.length > 60) return;
-    this.leafTimer = 0.06;
+    const windy = this.weather && this.weather.params ? (this.weather.params.wind || 0) * 5 : 0;
+    this.leafTimer = 0.06 / (1 + windy * 1.5);
     for (let tries = 0; tries < 4; tries++) {
       const x = Math.floor(e[0] + (Math.random() - 0.5) * 28), z = Math.floor(e[2] + (Math.random() - 0.5) * 28);
       const y = Math.floor(e[1] + (Math.random() - 0.3) * 16);
       const b = w.getBlock(x, y, z);
-      if (b < B.OakLeaves || b > B.JungleLeaves || w.getBlock(x, y - 1, z) !== B.Air) continue;
+      const catLeaf = b > 0 && CAT[b] && CAT[b].cat === 'leaves';
+      if ((!catLeaf && (b < B.OakLeaves || b > B.JungleLeaves)) || w.getBlock(x, y - 1, z) !== B.Air) continue;
       const clim = w.climateAt(x, z);
       const base = this.layerColor(BLOCKS[b].side), t = clim ? clim.temp : 0.5;
-      const tint = b === B.BirchLeaves ? [1.1, 1.08, 0.7] : b === B.SpruceLeaves ? [0.8, 0.9, 0.85] : [0.85 + t * 0.3, 1, 0.75];
+      const tint = catLeaf ? (CAT[b].tint ? [0.75, 0.95, 0.6] : [1, 1, 1]) : b === B.BirchLeaves ? [1.1, 1.08, 0.7] : b === B.SpruceLeaves ? [0.8, 0.9, 0.85] : [0.85 + t * 0.3, 1, 0.75];
       list.push({ p: [x + Math.random(), y - 0.05, z + Math.random()], v: [0, -0.6, 0], life: 9, size: 0.05 + Math.random() * 0.03,
         c: base.map((v, i) => v * tint[i] * 1.2), sky: 1, blk: 0, ph: Math.random() * 6.28, spin: 0.8 + Math.random() * 1.5 });
       break;

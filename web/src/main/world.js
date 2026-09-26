@@ -71,7 +71,7 @@ export class World {
       conn = connections(m.kind, (dx, dz, dy = 0) => {
         const n = this.getBlock(x + dx, y + dy, z + dz);
         return n < 0 ? null : { id: n, opaque: (BLOCKS[n].flags & F.Opaque) !== 0, model: BLOCKS[n].model };
-      });
+      }, m);
       up = this.getBlock(x, y + 1, z) > 0;
     }
     return modelBoxes(m, conn, up, collision);

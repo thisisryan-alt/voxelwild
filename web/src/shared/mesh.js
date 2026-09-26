@@ -344,7 +344,7 @@ export class Mesher {
     const d = BLOCKS[id], m = d.model, region = this.region;
     let conn = 0, up = false;
     if (CONNECTING.has(m.kind)) {
-      conn = connections(m.kind, (dx, dz, dy = 0) => { const n = region[RI(x + dx, y + dy, z + dz)]; return { id: n, opaque: OPAQUE[n], model: BLOCKS[n] && BLOCKS[n].model }; });
+      conn = connections(m.kind, (dx, dz, dy = 0) => { const n = region[RI(x + dx, y + dy, z + dz)]; return { id: n, opaque: OPAQUE[n], model: BLOCKS[n] && BLOCKS[n].model }; }, m);
       up = region[RI(x, y + 1, z)] !== 0;
     }
     const own = this.light(x, y, z), clim = this.clim(x, z);

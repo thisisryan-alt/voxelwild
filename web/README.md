@@ -143,6 +143,15 @@ ingots), cooked food, charcoal, hoes and farmland, wheat that grows from seeds (
 the respawn point and sleep through the night, and leather / gold / iron / diamond armour (Minecraft's defence points,
 worn out by hits). `node test/redstone.mjs` builds test circuits and checks furnaces, crops, beds and armour.
 
+Also: comparators (compare / subtract, read how full a container is), observers (a two-tick pulse when the block they
+watch changes), dispensers (arrows, TNT, fire, buckets; anything else is dropped) and droppers (feed a container in
+front), hoppers (pull from above, collect items, push into what they point at; furnaces take ores from above and fuel
+from the side), fire (flint and steel; burns wood, wool and leaves, spreads, rain puts it out, netherrack burns forever),
+buckets, a bow (hold to draw), beds in all sixteen colours and stairs that form inner and outer corners. Animated
+textures from the pack (fire, sea lanterns, seagrass, prismarine, lit furnaces, redstone) are baked as frames
+(`@frame:k:name`) and played by variant rows; primed TNT flashes; fires, furnaces and redstone give off embers and
+smoke; leaves sway in gusts that roll across the forest and drop drifting leaves. `node test/more.mjs` checks these.
+
 ## Controls
 
 WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·

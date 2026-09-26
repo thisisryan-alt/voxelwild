@@ -693,6 +693,15 @@ def main():
             rgb = np.array([int(c[i:i + 2], 16) for i in (0, 2, 4)], dtype=np.float32) / 255
             a[..., :3] = np.clip(g / max(g.max(), 1e-3) * rgb, 0, 1)
             return a
+        if t.startswith("@frame:"):
+            k, rest = t[7:].split(":", 1)
+            im = p.img("block/" + rest, frame=False)
+            w = im.width
+            return arr(fit(im.crop((0, int(k) * w, w, (int(k) + 1) * w))))
+        if t.startswith("@bright:"):
+            a = texture_expr(p, t[8:]).copy()
+            a[..., :3] = a[..., :3] * 0.35 + 0.65
+            return a
         if t.startswith("@crop:"):
             path, rect = t[6:].rsplit(":", 1)
             x, y, w, h = [int(v) for v in rect.split(",")]
@@ -739,6 +748,8 @@ def main():
     for w in ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak", "bamboo", "crimson", "warped",
               "iron", "copper", "exposed_copper", "weathered_copper", "oxidized_copper"]:
         items[f"fam:{w}_door"] = f"{w}_door"
+    items.update({"Bow": "bow", "Bucket": "bucket", "WaterBucket": "water_bucket", "LavaBucket": "lava_bucket", "fam:comparator": "comparator",
+                  "fam:hopper": "hopper"})
     items.update({"fam:repeater": "repeater", "fam:redstone_torch": "block/redstone_torch", "fam:lever": "block/lever",
                   "fam:ladder": "block/ladder", "fam:rail": "block/rail", "fam:powered_rail": "block/powered_rail",
                   "fam:detector_rail": "block/detector_rail", "fam:activator_rail": "block/activator_rail", "fam:red_bed": "red_bed"})

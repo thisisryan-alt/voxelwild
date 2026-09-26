@@ -18,7 +18,7 @@ export function isRedstone(id) {
   if (id <= 0 || !BLOCKS[id]) return false;
   if (id === C.redstone_block || id === C.redstone_lamp || id === C.lit_redstone_lamp || id === C.tnt || id === C.note_block) return true;
   const m = BLOCKS[id].model;
-  return !!m && [K.Wire, K.RTorch, K.Lever, K.Button, K.Plate, K.Repeater, K.Piston, K.Door, K.Trapdoor, K.Gate].includes(m.kind);
+  return !!m && [K.Wire, K.RTorch, K.Lever, K.Button, K.Plate, K.Repeater, K.Piston, K.Door, K.Trapdoor, K.Gate, K.Comparator, K.Observer, K.Dispenser].includes(m.kind);
 }
 
 export class Redstone {
@@ -30,6 +30,8 @@ export class Redstone {
     this.last = new Map();    // mechanism key -> powered last tick (doors, pistons and TNT react to changes)
     this.tnt = [];            // primed TNT: { x, y, z, t }
     this.tntId = C.tnt;
+    this.compOut = new Map();   // comparator key -> output strength
+    this.seen = new Map();      // observer key -> the block it saw last tick
   }
 
   get list() {
@@ -52,6 +54,8 @@ export class Redstone {
     // primed TNT
     for (const t of this.tnt) {
       t.t -= dt;
+      const flash = Math.floor(t.t * 4) % 2 === 0, cur = this.g.world.getBlock(t.x, t.y, t.z);
+      if ((cur === C.tnt || cur === C.tnt_flash) && (cur === C.tnt_flash) !== flash) this.g.world.setBlock(t.x, t.y, t.z, flash ? C.tnt_flash : C.tnt);
       t.smoke = (t.smoke || 0) - dt;
       if (t.smoke <= 0) { t.smoke = 0.12; this.g.spawnEmbers([t.x + 0.5, t.y + 1.05, t.z + 0.5], 2, [0.8, 0.8, 0.8]); }
     }
@@ -59,7 +63,8 @@ export class Redstone {
     if (boom.length) {
       this.tnt = this.tnt.filter((t) => t.t > 0);
       for (const t of boom) {
-        if (this.g.world.getBlock(t.x, t.y, t.z) === C.tnt) this.g.world.setBlock(t.x, t.y, t.z, B.Air);
+        const cur = this.g.world.getBlock(t.x, t.y, t.z);
+        if (cur === C.tnt || cur === C.tnt_flash) this.g.world.setBlock(t.x, t.y, t.z, B.Air);
         this.g.mobs.explode(t.x + 0.5, t.y + 0.5, t.z + 0.5, 4, null);
       }
     }
@@ -140,6 +145,15 @@ export class Redstone {
             const d = H4[m.state & 3];
             return sx + d[0] === tx && sy === ty && sz + d[1] === tz ? 15 : 0;
           }
+          case K.Comparator: {
+            const d = H4[m.state & 3];
+            return sx + d[0] === tx && sy === ty && sz + d[1] === tz ? this.compOut.get(key(sx, sy, sz)) || 0 : 0;
+          }
+          case K.Observer: {
+            if (m.state < 6) return 0;
+            const d = DIR6[(m.state % 6) ^ 1];       // out of its back
+            return sx + d[0] === tx && sy + d[1] === ty && sz + d[2] === tz ? 15 : 0;
+          }
           default: return 0;
         }
       }
@@ -157,7 +171,7 @@ export class Redstone {
           if ((m.kind === K.Lever || m.kind === K.Button) && m.state >= 6) { const a = attachedTo(nx, ny, nz, m.state % 6); if (a[0] === x && a[1] === y && a[2] === z) { p = true; break; } }
           if (m.kind === K.Plate && m.state === 1 && dy === 1) { p = true; break; }
           if (m.kind === K.RTorch && dy === -1 && m.state === 0) { p = true; break; }
-          if (m.kind === K.Repeater && m.state >= 16 && emits(nx, ny, nz, x, y, z)) { p = true; break; }
+          if ((m.kind === K.Repeater || m.kind === K.Comparator || m.kind === K.Observer) && emits(nx, ny, nz, x, y, z)) { p = true; break; }
         }
       }
       memoStrong.set(k, p);
@@ -174,7 +188,8 @@ export class Redstone {
       for (const [dx, dy, dz] of N6) {
         const nx = x + dx, ny = y + dy, nz = z + dz, id = get(nx, ny, nz);
         if (model(id) && model(id).kind === K.Wire) continue;
-        if (emits(nx, ny, nz, x, y, z) || strong(nx, ny, nz)) { p = 15; break; }
+        p = Math.max(p, emits(nx, ny, nz, x, y, z), strong(nx, ny, nz) ? 15 : 0);
+        if (p >= 15) break;
       }
       if (p) { level.set(k, p); queue.push(k); }
     }
@@ -256,6 +271,34 @@ export class Redstone {
           const delay = ((m.state >> 2) & 3) + 1;
           this.pending.push({ at: this.tickNo + delay, x, y, z, from: id, id: id + (input ? 16 : -16) });
         }
+      } else if (m && m.kind === K.Comparator) {
+        const f = m.state & 3, sub = (m.state >> 2) & 1, on = m.state >= 8;
+        const signal = (sx, sz, side) => {
+          const sid = get(sx, y, sz), sm = model(sid);
+          if (sm && sm.kind === K.Wire) return wireLevel(sx, y, sz);
+          const e = emits(sx, y, sz, x, y, z);
+          if (e) return e;
+          if (sid === C.redstone_block) return 15;
+          if (!side) { const c = this.g.containerSignal(sx, y, sz); if (c != null) return c; if (weak(sx, y, sz)) return 15; }
+          return 0;
+        };
+        const rear = signal(x - H4[f][0], z - H4[f][1], false);
+        const l = (f + 2) & 3, sides = Math.max(signal(x + H4[[2, 3, 1, 0][f]][0], z + H4[[2, 3, 1, 0][f]][1], true), signal(x + H4[[3, 2, 0, 1][f]][0], z + H4[[3, 2, 0, 1][f]][1], true));
+        void l;
+        const out = sub ? Math.max(0, rear - sides) : rear >= sides ? rear : 0;
+        this.compOut.set(k, out);
+        if ((out > 0) !== on) changes.push([x, y, z, id + (on ? -8 : 8)]);
+      } else if (m && m.kind === K.Observer) {
+        const d = DIR6[m.state % 6], seen = get(x + d[0], y + d[1], z + d[2]), before = this.seen.get(k);
+        this.seen.set(k, seen);
+        if (before !== undefined && before !== seen && seen >= 0 && m.state < 6) {
+          changes.push([x, y, z, id + 6]);
+          this.pending.push({ at: this.tickNo + 2, x, y, z, from: id + 6, id });
+        }
+      } else if (m && m.kind === K.Dispenser) {
+        const on = powered(x, y, z), was = this.last.get(k);
+        this.last.set(k, on);
+        if (on && was === false) this.g.dispense(x, y, z, id);
       } else if (id === C.redstone_lamp || id === C.lit_redstone_lamp) {
         const on = powered(x, y, z);
         if (on !== (id === C.lit_redstone_lamp)) changes.push([x, y, z, on ? C.lit_redstone_lamp : C.redstone_lamp]);
@@ -300,7 +343,7 @@ export class Redstone {
     const g = this.g, inside = (p, h) => p[0] > x - h && p[0] < x + 1 + h && p[2] > z - h && p[2] < z + 1 + h && p[1] >= y - 0.01 && p[1] < y + 0.5;
     if (inside(g.player.body.pos, 0.3)) return true;
     for (const m of g.mobs.list) if (!m.dead && inside(m.body.pos, m.def.half || 0.3)) return true;
-    for (const e of g.entities) if (e.pos && inside(e.pos, 0.1)) return true;
+    for (const e of g.entities) if (e.body && inside(e.body.pos, 0.1)) return true;
     return false;
   }
 

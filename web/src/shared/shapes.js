@@ -5,19 +5,20 @@
 
 export const K = { Slab: 1, Stairs: 2, Fence: 3, Gate: 4, Wall: 5, Pane: 6, Door: 7, Trapdoor: 8, Carpet: 9, Plate: 10, Button: 11,
   Ladder: 12, Rail: 13, Lily: 14, Snow: 15, Path: 16, Tall: 17, WallTorch: 18, Wire: 19, RTorch: 20, Lever: 21, Repeater: 22, Piston: 23,
-  Head: 24, Bed: 25, Crop: 26 };
+  Head: 24, Bed: 25, Crop: 26, Comparator: 27, Observer: 28, Dispenser: 29, Hopper: 30 };
 export const KIND_NAMES = { slab: K.Slab, stairs: K.Stairs, fence: K.Fence, gate: K.Gate, wall: K.Wall, pane: K.Pane, door: K.Door,
   trapdoor: K.Trapdoor, carpet: K.Carpet, plate: K.Plate, button: K.Button, ladder: K.Ladder, rail: K.Rail, lily: K.Lily, snow: K.Snow,
   path: K.Path, tall: K.Tall, walltorch: K.WallTorch, wire: K.Wire, rtorch: K.RTorch, lever: K.Lever, repeater: K.Repeater, piston: K.Piston,
-  head: K.Head, bed: K.Bed, crop: K.Crop };
+  head: K.Head, bed: K.Bed, crop: K.Crop, comparator: K.Comparator, observer: K.Observer, dispenser: K.Dispenser, hopper: K.Hopper };
 export const STATES = { [K.Slab]: 3, [K.Stairs]: 8, [K.Fence]: 1, [K.Gate]: 8, [K.Wall]: 1, [K.Pane]: 1, [K.Door]: 16, [K.Trapdoor]: 16,
   [K.Carpet]: 1, [K.Plate]: 2, [K.Button]: 12, [K.Ladder]: 4, [K.Rail]: 2, [K.Lily]: 1, [K.Snow]: 8, [K.Path]: 1, [K.Tall]: 2, [K.WallTorch]: 4,
-  [K.Wire]: 16, [K.RTorch]: 10, [K.Lever]: 12, [K.Repeater]: 32, [K.Piston]: 12, [K.Head]: 12, [K.Bed]: 8, [K.Crop]: 8 };
+  [K.Wire]: 16, [K.RTorch]: 10, [K.Lever]: 12, [K.Repeater]: 32, [K.Piston]: 12, [K.Head]: 12, [K.Bed]: 8, [K.Crop]: 8,
+  [K.Comparator]: 16, [K.Observer]: 12, [K.Dispenser]: 12, [K.Hopper]: 5 };
 /** Kinds the player collides with (the rest can be walked through). */
 export const SOLID_KINDS = new Set([K.Slab, K.Stairs, K.Fence, K.Gate, K.Wall, K.Pane, K.Door, K.Trapdoor, K.Carpet, K.Snow, K.Path, K.Repeater,
-  K.Piston, K.Head, K.Bed]);
+  K.Piston, K.Head, K.Bed, K.Comparator, K.Observer, K.Dispenser, K.Hopper]);
 /** Kinds that link up with their neighbours. */
-export const CONNECTING = new Set([K.Fence, K.Wall, K.Pane, K.Wire]);
+export const CONNECTING = new Set([K.Fence, K.Wall, K.Pane, K.Wire, K.Stairs]);
 /** Six-way facings (pistons): 0 east, 1 west, 2 south, 3 north, 4 up, 5 down; FACE6[f] = the mesher's face index. */
 export const DIR6 = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0]];
 export const FACE6 = [0, 1, 4, 5, 2, 3];
@@ -45,6 +46,7 @@ function turn(b, f) {
   const [ax, az] = P(b[0], b[2]), [bx, bz] = P(b[3], b[5]);
   return [Math.min(ax, bx), b[1], Math.min(az, bz), Math.max(ax, bx), b[4], Math.max(az, bz), ...b.slice(6)];
 }
+const cut = (a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2]), Math.min(a[3], b[3]), Math.min(a[4], b[4]), Math.min(a[5], b[5])];
 const box16 = (a, b, c, d, e, f) => [q(a), q(b), q(c), q(d), q(e), q(f)];
 const FULL = [0, 0, 0, 1, 1, 1];
 
@@ -68,7 +70,12 @@ export function modelBoxes(m, conn = 0, up = false, collision = false) {
     case K.Slab: return [s === 0 ? [0, 0, 0, 1, 0.5, 1] : s === 1 ? [0, 0.5, 0, 1, 1, 1] : FULL];
     case K.Stairs: {
       const f = s >> 1, top = s & 1;
-      return top ? [[0, 0.5, 0, 1, 1, 1], turn([0, 0, 0, 1, 0.5, 0.5], f)] : [[0, 0, 0, 1, 0.5, 1], turn([0, 0.5, 0, 1, 1, 0.5], f)];
+      const half = (g) => turn(top ? [0, 0, 0, 1, 0.5, 0.5] : [0, 0.5, 0, 1, 1, 0.5], g);
+      const slab = top ? [0, 0.5, 0, 1, 1, 1] : [0, 0, 0, 1, 0.5, 1];
+      if (!conn) return [slab, half(f)];
+      const nf = conn & 3, type = conn >> 2;
+      // outer corner: only the quarter both steps share; inner corner: the step plus the quarter that turns the corner
+      return type === 1 ? [slab, cut(half(f), half(nf))] : [slab, half(f), cut(half(nf), half(f ^ 1))];
     }
     case K.Fence: {
       const h = collision ? 1.5 : 1;
@@ -145,6 +152,18 @@ export function modelBoxes(m, conn = 0, up = false, collision = false) {
       return [face6(box16(0, 12, 0, 16, 16, 16), f), face6(box16(6, 0, 6, 10, 12, 10), f)];
     }
     case K.Bed: return [box16(0, 0, 0, 16, 9, 16)];
+    case K.Comparator: {
+      const f = s & 3;
+      if (collision) return [box16(0, 0, 0, 16, 2, 16)];
+      return [box16(0, 0, 0, 16, 2, 16), turn([...box16(4, 2, 11, 6, 7, 13), 1], f), turn([...box16(10, 2, 11, 12, 7, 13), 1], f), turn([...box16(7, 2, 2, 9, 6, 4), 2], f)];
+    }
+    case K.Observer: case K.Dispenser: return [FULL];
+    case K.Hopper: {
+      const out = [box16(0, 10, 0, 16, 16, 16), box16(4, 4, 4, 12, 10, 12)];
+      if (collision) return [box16(0, 10, 0, 16, 16, 16), box16(4, 0, 4, 12, 10, 12)];
+      out.push(s === 0 ? box16(6, 0, 6, 10, 4, 10) : turn(box16(6, 4, 0, 10, 8, 4), s - 1));
+      return out;
+    }
     case K.Crop: return [];
     case K.Ladder: return collision ? [] : [turn(box16(0, 0, 0, 16, 16, 0.8), s)];
     case K.Rail: return collision ? [] : [box16(0, 0, 0, 16, 1, 16)];
@@ -157,9 +176,19 @@ export function modelBoxes(m, conn = 0, up = false, collision = false) {
   return [FULL];
 }
 
-/** Which way a connecting block's neighbour links: mask bit f set when the neighbour on side f joins it. */
-export function connections(kind, nb /* (dx, dz, dy) => { id, model, opaque } */) {
+/** Which way a connecting block's neighbour links: mask bit f set when the neighbour on side f joins it.
+ *  Stairs return their corner instead: 0 straight, (1 << 2 | facing) outer, (2 << 2 | facing) inner (facing of the other step). */
+export function connections(kind, nb /* (dx, dz, dy) => { id, model, opaque } */, self) {
   let m = 0;
+  if (kind === K.Stairs) {
+    const f = self.state >> 1, top = self.state & 1;
+    const stair = (d) => { const n = nb(DIRS[d][0], DIRS[d][1], 0); return n && n.model && n.model.kind === K.Stairs && (n.model.state & 1) === top ? n.model.state >> 1 : -1; };
+    const back = stair(f);
+    if (back >= 0 && (back >> 1) !== (f >> 1)) return (1 << 2) | back;
+    const front = stair(f ^ 1);
+    if (front >= 0 && (front >> 1) !== (f >> 1)) return (2 << 2) | front;
+    return 0;
+  }
   if (kind === K.Wire) {
     const above = nb(0, 0, 1), roof = above && above.opaque;
     for (let f = 0; f < 4; f++) {
@@ -191,7 +220,8 @@ export function wireLinks(n, f) {
   if (!m) return false;
   switch (m.kind) {
     case K.Wire: case K.RTorch: case K.Lever: case K.Button: case K.Plate: return true;
-    case K.Repeater: return ((m.state & 3) >> 1) === (f >> 1);
+    case K.Repeater: case K.Comparator: return ((m.state & 3) >> 1) === (f >> 1);
+    case K.Observer: return true;
     default: return false;
   }
 }

@@ -325,7 +325,11 @@ export class Mobs {
       const inside = n[0] > pp[0] - 0.4 && n[0] < pp[0] + 0.4 && n[2] > pp[2] - 0.4 && n[2] < pp[2] + 0.4 && n[1] > pp[1] && n[1] < pp[1] + 1.9;
       const b = w.getBlock(Math.floor(n[0]), Math.floor(n[1]), Math.floor(n[2]));
       const solid = b < 0 || (BLOCKS[b] && BLOCKS[b].flags & F.Solid);
-      if (inside && !g.creative && g.state === 'playing') {
+      if (s.owner === 'player' || s.owner === 'dispenser') {
+        const hitMob = this.list.find((m) => !m.dead && Math.abs(n[0] - m.body.pos[0]) < (m.def.half || 0.3) + 0.2 && Math.abs(n[2] - m.body.pos[2]) < (m.def.half || 0.3) + 0.2 && n[1] > m.body.pos[1] && n[1] < m.body.pos[1] + m.def.height);
+        if (hitMob) { this.hurt(hitMob, s.damage || 4, s.owner === 'player' ? g.player : null); this.projectiles.splice(i, 1); continue; }
+      }
+      if (inside && !g.creative && g.state === 'playing' && s.owner !== 'player') {
         if (s.kind === 'arrow') g.stats.damage(2 + Math.floor(this.rng() * 3), 'skeleton');
         else if (s.kind === 'fireball') { g.stats.damage(5, 'blaze'); g.burning = 3; }
         else this.explode(n[0], n[1], n[2], 1.6, null);
@@ -333,6 +337,7 @@ export class Mobs {
       }
       if (solid || s.life <= 0) {
         if (s.kind === 'ghastball' && solid) this.explode(n[0], n[1], n[2], 1.6, null);
+        if (s.kind === 'arrow' && s.owner === 'player' && solid && Math.random() < 0.7) g.spawnItem(I.Arrow, 1, s.p, [0, 0.5, 0], 0, 0.3);
         this.projectiles.splice(i, 1); continue;
       }
       s.p = n;
