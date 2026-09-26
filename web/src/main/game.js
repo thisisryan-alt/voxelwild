@@ -8,6 +8,8 @@ import { Inventory, SurvivalStats, Weather, CREATIVE_HOTBAR, HOTBAR, WEATHER_NAM
 import { GameAudio } from './audio.js';
 import { Icons } from './icons.js';
 import { FarTerrain } from './far.js';
+import { Mobs, MOB_TYPES } from './mobs.js';
+import { MobModels } from './mobrender.js';
 import { SaveStore, PackStore } from './save.js';
 import { decodeLarge, fetchBuiltinPack, square } from './respack.js';
 import { readPackZip, convertPack } from './packconv.js';
@@ -58,6 +60,16 @@ export class Game {
     this.renderer = new Renderer(this.canvas);
     this.far = new FarTerrain(this.renderer.gl, this.workerUrl);
     this.renderer.far = this.far;
+    this.mobs = new Mobs(this);
+    // mob models and skins (optional: the world plays without them)
+    this.mobsReady = (async () => {
+      try {
+        const defs = await (await fetch(this.assetBase + 'lbpr/mobs.json')).json();
+        const models = new MobModels(this.renderer.gl);
+        await models.load(defs, (f) => this.loadBitmap('lbpr/' + f));
+        this.renderer.mobModels = models;
+      } catch (e) { console.warn('mobs unavailable:', e && e.message); }
+    })();
     await this.store.open();
     progress && progress('Loading textures', 0.1);
     const load = (name) => this.loadBitmap(name);
@@ -455,6 +467,7 @@ export class Game {
     this.weather = new Weather(meta.seed);
     this.entities = [];
     this.particles = { break: [], rain: [], snow: [] };
+    this.mobs.clear();
     this.mining = null;
     this.creative = meta.mode === 'creative';
     this.player.canFly = this.creative;
@@ -751,6 +764,7 @@ export class Game {
     }
     this.updateEntities(dt);
     this.updateEyes(dt);
+    if (!this.meta.menu) this.mobs.update(dt);
 
     const [jumps, dist] = pl.consumeActivity();
     if (!this.creative) this.stats.tick(dt, dist, pl.sprinting, jumps, pl.headInWater);
@@ -782,9 +796,24 @@ export class Game {
   interact(dt) {
     const pl = this.player, w = this.world, inv = this.inventory;
     const eye = pl.eye(), dir = pl.forward();
-    const hit = raycast(w, eye, dir, REACH, targetable);
-    this.target = hit;
+    let hit = raycast(w, eye, dir, REACH, targetable);
     this.swing = Math.max(0, (this.swing || 0) - dt * 3.2);
+    const mobHit = this.mobs.pick(eye, dir, 3.6);
+    this.attackT = (this.attackT || 0) - dt;
+    if (mobHit && (!hit || mobHit.dist < hit.dist)) {
+      this.target = null;
+      if (this.mouse.leftClicked && this.attackT <= 0) {
+        const def = inv.heldItem;
+        const dmg = def && def.kind === Kind.Tool ? (def.damage || [1, 2, 3, 4, 5][def.tier] + 1) : 1;
+        this.mobs.hurt(mobHit.mob, this.creative ? Math.max(dmg, 4) : dmg, this.player);
+        this.attackT = 0.45; this.swing = 1;
+        this.spawnBreakParticles([mobHit.mob.body.pos[0] - 0.5, mobHit.mob.body.pos[1] + mobHit.mob.def.height * 0.4, mobHit.mob.body.pos[2] - 0.5], B.Stone, 0);
+        if (def && def.kind === Kind.Tool && !this.creative && inv.wearHeld()) this.emit('toast', `${def.name} broke`);
+      }
+      this.mining = null;
+      return;
+    }
+    this.target = hit;
 
     // breaking
     if (this.mouse.left && hit) {
@@ -880,6 +909,7 @@ export class Game {
     this.world = this.makeWorld(dim);
     this.world.setLeaves((this.settings && this.settings.leaves) || 'fluffy');
     this.entities = [];
+    this.mobs.clear();
     this.particles = { break: [], rain: [], snow: [], motes: [] };
     this.mining = null;
     this.portalTime = 0; this.portalLock = true;
@@ -1464,6 +1494,7 @@ export class Game {
     const wp = this.weather.params;
     const inv = this.inventory;
     const entities = [], sprites = [];
+    for (const m of this.mobs.list) m.light = this.lightAt(m.body.pos[0], m.body.pos[1] + m.def.height * 0.6, m.body.pos[2]);
     for (const e of this.entities) {
       const L = this.lightAt(e.body.pos[0], e.body.pos[1] + 0.3, e.body.pos[2]);
       const def = ITEMS[e.item];
@@ -1500,7 +1531,7 @@ export class Game {
       viewDistance: this.world.viewDistance, camSky: this.camSky, underwater: pl.headInWater || inLava, underwaterColor: inLava ? [0.9, 0.25, 0.02] : null,
       selection: this.target && this.state === 'playing' ? this.target.hit : null,
       crack: this.mining && this.mining.progress > 0 ? { pos: this.mining.pos, progress: Math.min(1, this.mining.progress) } : null,
-      entities,
+      entities, mobs: this.mobs.list,
       sprites, particles: this.packParticles(), hand, damage: this.damageFlash * 0.6, flash: this.flash, props: this.world.props,
     };
     this.renderer.render(f);

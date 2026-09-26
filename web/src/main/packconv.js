@@ -34,8 +34,10 @@ const LAYER_BLOCK = {
 };
 export const PACK_ITEMS = { Stick: 'stick', Coal: 'coal', IronChunk: 'raw_iron', GoldChunk: 'raw_gold', Diamond: 'diamond', Apple: 'apple',
   Berries: 'sweet_berries', Flint: 'flint', FlintAndSteel: 'flint_and_steel', NetherQuartz: 'quartz', GlowstoneDust: 'glowstone_dust',
-  EyeOfEnder: 'ender_eye', RawCopper: 'raw_copper', Emerald: 'emerald', LapisLazuli: 'lapis_lazuli', Redstone: 'redstone' };
-for (const t of ['wooden', 'stone', 'iron', 'diamond']) for (const k of ['pickaxe', 'axe', 'shovel']) PACK_ITEMS[t[0].toUpperCase() + t.slice(1) + k[0].toUpperCase() + k.slice(1)] = `${t}_${k}`;
+  EyeOfEnder: 'ender_eye', RawCopper: 'raw_copper', Emerald: 'emerald', LapisLazuli: 'lapis_lazuli', Redstone: 'redstone', Beef: 'beef',
+  Porkchop: 'porkchop', Mutton: 'mutton', RawChicken: 'chicken', Feather: 'feather', Leather: 'leather', RottenFlesh: 'rotten_flesh', Bone: 'bone',
+  Arrow: 'arrow', Gunpowder: 'gunpowder', String: 'string', GoldNugget: 'gold_nugget', BlazeRod: 'blaze_rod', GhastTear: 'ghast_tear' };
+for (const t of ['wooden', 'stone', 'iron', 'diamond']) for (const k of ['pickaxe', 'axe', 'shovel', 'sword']) PACK_ITEMS[t[0].toUpperCase() + t.slice(1) + k[0].toUpperCase() + k.slice(1)] = `${t}_${k}`;
 // sound events the game plays, and where vanilla keeps them
 const SOUND_EVENTS = {
   grassStep: ['block.grass.step', ['step/grass1', 'step/grass2', 'step/grass3', 'step/grass4']],

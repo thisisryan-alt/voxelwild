@@ -240,9 +240,11 @@ export const I = {
   WoodenShovel: 278, StoneShovel: 279, IronShovel: 280, DiamondShovel: 281,
   Flint: 282, FlintAndSteel: 283, NetherQuartz: 284, GlowstoneDust: 285, EyeOfEnder: 286,
   RawCopper: 287, Emerald: 288, LapisLazuli: 289, Redstone: 290,
+  Beef: 291, Porkchop: 292, Mutton: 293, RawChicken: 294, Feather: 295, Leather: 296, RottenFlesh: 297, Bone: 298, Arrow: 299,
+  Gunpowder: 300, String: 301, GoldNugget: 302, BlazeRod: 303, GhastTear: 304, WoodenSword: 305, StoneSword: 306, IronSword: 307, DiamondSword: 308,
 };
 export const Kind = { Block: 0, Material: 1, Tool: 2, Food: 3, Use: 4 };   // Use: right-click items (flint and steel, eye of ender)
-export const ToolType = { None: 0, Pickaxe: 1, Axe: 2, Shovel: 3 };
+export const ToolType = { None: 0, Pickaxe: 1, Axe: 2, Shovel: 3, Sword: 4 };
 export const Tier = { Hand: 0, Wood: 1, Stone: 2, Iron: 3, Diamond: 4 };
 
 export const ITEMS = {};
@@ -259,6 +261,10 @@ const mat = (id, name) => (ITEMS[id] = { id, name, kind: Kind.Material, stack: 6
 const food = (id, name, f, sat) => (ITEMS[id] = { id, name, kind: Kind.Food, stack: 64, food: f, sat });
 mat(I.Stick, 'Stick'); mat(I.Coal, 'Coal'); mat(I.IronChunk, 'Iron Chunk'); mat(I.GoldChunk, 'Gold Chunk'); mat(I.Diamond, 'Diamond');
 food(I.Apple, 'Apple', 4, 2.4); food(I.Berries, 'Wild Berries', 2, 0.4);
+for (const [k, n] of [['Feather', 'Feather'], ['Leather', 'Leather'], ['Bone', 'Bone'], ['Arrow', 'Arrow'], ['Gunpowder', 'Gunpowder'], ['String', 'String'],
+  ['GoldNugget', 'Gold Nugget'], ['BlazeRod', 'Blaze Rod'], ['GhastTear', 'Ghast Tear']]) mat(I[k], n);
+food(I.Beef, 'Raw Beef', 3, 1.8); food(I.Porkchop, 'Raw Porkchop', 3, 1.8); food(I.Mutton, 'Raw Mutton', 2, 1.2); food(I.RawChicken, 'Raw Chicken', 2, 1.2);
+food(I.RottenFlesh, 'Rotten Flesh', 4, 0.8);
 mat(I.RawCopper, 'Raw Copper'); mat(I.Emerald, 'Emerald'); mat(I.LapisLazuli, 'Lapis Lazuli'); mat(I.Redstone, 'Redstone Dust');
 mat(I.Flint, 'Flint'); mat(I.NetherQuartz, 'Nether Quartz'); mat(I.GlowstoneDust, 'Glowstone Dust');
 ITEMS[I.FlintAndSteel] = { id: I.FlintAndSteel, name: 'Flint and Steel', kind: Kind.Use, stack: 1, durability: 64 };
@@ -268,6 +274,7 @@ tiers.forEach(([prefix, tier, dur], t) => {
   ITEMS[I.WoodenPickaxe + t] = { id: I.WoodenPickaxe + t, name: `${prefix} Pickaxe`, kind: Kind.Tool, stack: 1, tool: ToolType.Pickaxe, tier, durability: dur };
   ITEMS[I.WoodenAxe + t] = { id: I.WoodenAxe + t, name: `${prefix} Axe`, kind: Kind.Tool, stack: 1, tool: ToolType.Axe, tier, durability: dur };
   ITEMS[I.WoodenShovel + t] = { id: I.WoodenShovel + t, name: `${prefix} Shovel`, kind: Kind.Tool, stack: 1, tool: ToolType.Shovel, tier, durability: dur };
+  ITEMS[I.WoodenSword + t] = { id: I.WoodenSword + t, name: `${prefix} Sword`, kind: Kind.Tool, stack: 1, tool: ToolType.Sword, tier, durability: dur, damage: 4 + t };
 });
 export const itemName = (id) => (ITEMS[id] ? ITEMS[id].name : `Item ${id}`);
 
@@ -419,4 +426,5 @@ toolMats.forEach((m, t) => {
   recipe(I.WoodenPickaxe + t, 1, [[m, 3], [I.Stick, 2]]);
   recipe(I.WoodenAxe + t, 1, [[m, 3], [I.Stick, 2]]);
   recipe(I.WoodenShovel + t, 1, [[m, 1], [I.Stick, 2]]);
+  recipe(I.WoodenSword + t, 1, [[m, 2], [I.Stick, 1]]);
 });

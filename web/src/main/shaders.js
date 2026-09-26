@@ -1100,3 +1100,51 @@ void main() {
   outColor.rgb = mix(outColor.rgb, skyc, smoothstep(uFarEdge.x, uFarEdge.y, dist));
 }
 `;
+
+// ------------------------------------------------------------------ mobs (Bedrock models, bone matrices)
+export const MOB_VS = /* glsl */ `
+layout(location=0) in vec3 aPos;      // model pixels
+layout(location=1) in vec3 aNrm;
+layout(location=2) in vec2 aUV;
+layout(location=3) in float aBone;
+uniform mat4 uViewProj;
+uniform mat4 uModel;
+uniform mat4 uBones[16];
+out vec3 vPos;
+out vec3 vNrm;
+out vec2 vUV;
+void main() {
+  mat4 B = uBones[int(aBone + 0.5)];
+  vec4 p = uModel * B * vec4(aPos, 1.0);
+  vPos = p.xyz;
+  vNrm = normalize(mat3(uModel) * mat3(B) * aNrm);
+  vUV = aUV;
+  gl_Position = uViewProj * p;
+}
+`;
+export const MOB_FS = /* glsl */ `
+uniform sampler2D uSkin;
+uniform vec2 uMobLight;    // sky, block light at the mob
+uniform vec4 uMobTint;     // rgb multiply (hurt: red), a = white flash (creeper fuse)
+uniform float uMobGlow;
+in vec3 vPos;
+in vec3 vNrm;
+in vec2 vUV;
+out vec4 outColor;
+void main() {
+  vec4 t = texture(uSkin, vUV);
+  if (t.a < 0.5) discard;
+  vec3 albedo = pow(t.rgb, vec3(2.2)) * uMobTint.rgb;
+  albedo = mix(albedo, vec3(1.0), uMobTint.a);
+  vec3 n = normalize(vNrm);
+  if (!gl_FrontFacing) n = -n;
+  vec3 col = shade(albedo, n, 0.75, 0.0, 1.0, 0.5, albedo * uMobGlow, 0.0, vPos, uMobLight.x, uMobLight.y, 1.0, uSkyLut);
+  outColor = vec4(applyFog(col, vPos), 1.0);
+}
+`;
+export const MOB_SHADOW_FS = /* glsl */ `
+uniform sampler2D uSkin;
+in vec2 vUV;
+out vec4 outColor;
+void main() { if (texture(uSkin, vUV).a < 0.5) discard; outColor = vec4(1); }
+`;

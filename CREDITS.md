@@ -65,3 +65,10 @@ Licence.txt): the textures may be used any way with credit and a link to the Cur
 made from them. Its sounds come from freesfx.co.uk and orangefreesounds.com, edited by 1LotS.
 Baked by `web/tools/build_lbpr.py` into `web/assets/lbpr/` (block textures with generated normal, height, AO and
 roughness maps, item icons, destroy stages, the full moon, rain, water, grass-step, stone-break and pop sounds).
+
+## Mob models (browser build)
+
+The mobs' geometry (bones, cubes, texture coordinates) comes from Mojang's Bedrock entity models in
+[Mojang/bedrock-samples](https://github.com/Mojang/bedrock-samples) (`resource_pack/models/entity`), copied to
+`web/tools/geo/` and condensed by `web/tools/build_mobs.py`. Their skins are LB Photo Realism Reload!'s entity
+textures (see above).

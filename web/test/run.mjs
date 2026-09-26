@@ -342,6 +342,7 @@ await step('props: placed, lit, removed with their support', async () => {
 });
 
 await step('lava meets water: obsidian and cobblestone', async () => {
+  await G(() => { const g = window.voxelwild.game; g.settings.mobs = false; g.mobs.clear(); });   // travel tests: no random monsters
   const at = await G(() => {
     const g = window.voxelwild.game, w = g.world, p = g.player.body.pos.map(Math.floor);
     const x = p[0] + 4, y = p[1] + 6, z = p[2];
@@ -352,9 +353,9 @@ await step('lava meets water: obsidian and cobblestone', async () => {
     window.__lavaAt = [x, y, z];
     return [x, y, z];
   });
-  await waitFor(() => { const w = window.voxelwild.game.world, at = window.__lavaAt; const b = w.getBlock(at[0], at[1], at[2]); return b === 53 || b === 9; }, 20000, 'lava to set');
-  const b = await G((at) => window.voxelwild.game.world.getBlock(at[0], at[1], at[2]), at);
-  return { set: b === 53 ? 'obsidian' : 'cobblestone' };
+  await waitFor(() => { const w = window.voxelwild.game.world, at = window.__lavaAt; return [0, 1].some((d) => { const b = w.getBlock(at[0] + d, at[1], at[2]); return b === 53 || b === 9; }); }, 20000, 'lava to set');   // the source sets, or the lava's edge if it flowed first
+  const b = await G((at) => [0, 1].map((d) => window.voxelwild.game.world.getBlock(at[0] + d, at[1], at[2])), at);
+  return { set: b.includes(53) ? 'obsidian' : 'cobblestone' };
 });
 
 await step('nether portal: light, travel, come back', async () => {
@@ -413,6 +414,43 @@ await step('eyes of ender open the end portal; the End and back', async () => {
   await G(() => { const g = window.voxelwild.game, w = g.world; let y = 120; while (y > 0 && w.getBlock(1, y, 1) !== 84) y--; g.player.flying = false; g.portalLock = false; g.player.teleport([1.5, y + 0.2, 1.5]); });
   await waitFor(() => window.voxelwild.game.dim === 0 && window.voxelwild.game.state === 'playing', 90000, 'home from the End');
   return { end: end.pos, home: await G(() => window.voxelwild.game.player.body.pos.map((v) => +v.toFixed(1))) };
+});
+
+await step('mobs: a cow drops beef, a creeper blows up', async () => {
+  await waitFor(() => !!window.voxelwild.game.renderer.mobModels, 30000, 'mob models');
+  await G(() => { window.voxelwild.game.settings.mobs = true; });
+  const r = await G(() => {
+    const g = window.voxelwild.game, w = g.world, p = g.player.body.pos.map(Math.floor);
+    g.setMode(false); g.player.flying = false; g.stats.health = 20;
+    window.__dmg = []; const d0 = g.stats.damage.bind(g.stats); g.stats.damage = (a, c) => { window.__dmg.push([a, c]); return d0(a, c); };
+    const y0 = p[1] + 30;
+    for (let dx = -8; dx <= 8; dx++) for (let dz = -8; dz <= 8; dz++) { w.setBlock(p[0] + dx, y0 - 1, p[2] + dz, 1); for (let dy = 0; dy < 5; dy++) w.setBlock(p[0] + dx, y0 + dy, p[2] + dz, 0); }
+    g.player.teleport([p[0] + 0.5, y0, p[2] + 0.5]);
+    g.mobs.clear();
+    const cow = g.mobs.spawnAt('cow', [p[0] + 3.5, y0, p[2] + 0.5]);
+    for (let k = 0; k < 10 && !cow.dead; k++) g.mobs.hurt(cow, 4, g.player);
+    const beef = g.entities.filter((e) => e.item === 291).reduce((a, e) => a + e.count, 0);
+    const creeper = g.mobs.spawnAt('creeper', [p[0] + 2.5, y0, p[2] + 0.5]);
+    window.__boom = { y0, x: p[0], z: p[2] };
+    return { cowDead: !!cow.dead, beef };
+  });
+  if (!r.cowDead || r.beef < 1) throw new Error('cow: ' + JSON.stringify(r));
+  await waitFor(() => window.voxelwild.game.stats.health < 20, 15000, 'the creeper to explode');
+  const after = await G(() => { const g = window.voxelwild.game, b = window.__boom; let holes = 0; for (let dx = -3; dx <= 5; dx++) for (let dz = -3; dz <= 3; dz++) if (g.world.getBlock(b.x + dx, b.y0 - 1, b.z + dz) === 0) holes++; return { health: g.stats.health, holes, mobs: g.mobs.list.filter((m) => !m.dead).map((m) => m.type), dmg: window.__dmg }; });
+  if (after.holes < 3) throw new Error('no crater: ' + JSON.stringify(after));
+  // a creeper point-blank can kill, as in Minecraft: come back if it did
+  if (await G(() => window.voxelwild.game.state === 'dead')) {
+    await G(() => window.voxelwild.game.respawn());
+    await waitFor(() => window.voxelwild.game.state === 'playing', 60000, 'respawn');
+  }
+  await G(() => { const g = window.voxelwild.game; g.stats.health = 20; g.setMode(true); g.player.flying = true; });
+  return { ...r, ...after, dmg: undefined };
+});
+
+await step('animals spawn on grass by day', async () => {
+  await G(() => { const g = window.voxelwild.game; g.mobs.clear(); g.tod.hour = 12; const p = g.player.body.pos; g.player.teleport([p[0], p[1] - 30, p[2]]); });
+  await waitFor(() => window.voxelwild.game.mobs.list.some((m) => m.def.kind === 'passive'), 60000, 'an animal');
+  return { mobs: await G(() => window.voxelwild.game.mobs.list.map((m) => m.type)) };
 });
 
 await step('save and reload', async () => {

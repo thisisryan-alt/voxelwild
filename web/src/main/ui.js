@@ -10,7 +10,7 @@ const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, vol
   shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr',
   farDistance: 2000, dynamicRes: true, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
   rayStrength: 1, clouds: true, ao: 1, dayCycle: 'normal', fixedHour: 12, dayLength: 20, weatherMode: 'dynamic', brightness: 1,
-  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true };
+  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true };
 const pct = (x) => `${Math.round(x * 100)}%`;
 // every option: tab, key, label and either a range (min/max/step/fmt) or a choice list (values + labels) or a toggle
 const OPTIONS = [
@@ -38,6 +38,8 @@ const OPTIONS = [
   { tab: 'Sky & Time', key: 'fixedHour', label: 'Fixed Hour', min: 0, max: 23.75, step: 0.25, fmt: (x) => `${String(Math.floor(x)).padStart(2, '0')}:${String(Math.round((x % 1) * 60)).padStart(2, '0')}` },
   { tab: 'Sky & Time', key: 'dayLength', label: 'Day Length', min: 5, max: 60, step: 5, fmt: (x) => `${x} min` },
   { tab: 'Sky & Time', key: 'weatherMode', label: 'Weather', values: ['dynamic', 'clear', 'cloudy', 'rain', 'storm', 'fog'], labels: ['Changing', 'Always clear', 'Cloudy', 'Rain', 'Storm', 'Fog'] },
+  { tab: 'Sky & Time', key: 'difficulty', label: 'Difficulty', values: ['peaceful', 'normal'], labels: ['Peaceful', 'Normal'] },
+  { tab: 'Sky & Time', key: 'mobs', label: 'Animals and Monsters' },
   { tab: 'Sky & Time', key: 'nightBrightness', label: 'Night Brightness', min: 0.4, max: 3, step: 0.1, fmt: pct },
   { tab: 'Sky & Time', key: 'saturation', label: 'Colour', min: 0, max: 1.6, step: 0.05, fmt: pct },
   { tab: 'Sky & Time', key: 'fog', label: 'Haze', min: 0, max: 2.5, step: 0.1, fmt: pct },
@@ -51,7 +53,9 @@ const TABS = ['Video', 'Quality', 'Sky & Time', 'Audio', 'Controls', 'Textures']
 const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'KeyE', 'KeyQ', 'KeyF',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F3', 'Tab', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9']);
 const CAUSES = { fall: 'You hit the ground too hard.', drowning: 'You ran out of air.', starvation: 'You starved.', void: 'You fell out of the world.',
-  lava: 'You tried to swim in lava.', magma: 'You discovered the floor was lava.' };
+  lava: 'You tried to swim in lava.', magma: 'You discovered the floor was lava.', explosion: 'You blew up.',
+  husk: 'You were slain by a Husk.', skeleton: 'You were shot by a Skeleton.', creeper: 'You were blown up by a Creeper.', spider: 'You were slain by a Spider.',
+  wolf: 'You were slain by a Wolf.', zombified_piglin: 'You were slain by a Zombified Piglin.', blaze: 'You were burned by a Blaze.', ghast: 'You were fireballed by a Ghast.' };
 
 function svgHeart(fill) {
   const f = fill === 2 ? 'var(--heart)' : fill === 1 ? 'url(#half)' : 'rgba(0,0,0,0.45)';

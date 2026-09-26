@@ -357,6 +357,14 @@ export class GameAudio {
   place(block) { const s = surfaceFor(block), k = this.nextVariant() % 3; this.play(this.get(`plc${s}_${k}`, () => SYNTH.place(s, k)), 0.6); }
   splash() { const k = this.nextVariant() % 3; this.play(this.get(`spl${k}`, () => SYNTH.splash(k)), 0.6); }
   hurt() { const k = this.nextVariant() % 3; this.play(this.get(`hurt${k}`, () => SYNTH.hurt(k)), 0.8); }
+  /** A short grunt or squeal, pitched per mob. */
+  mobHurt(type) {
+    const pitch = { chicken: 1.9, pig: 1.25, sheep: 1.4, cow: 0.75, wolf: 1.3, spider: 1.1, ghast: 1.6, blaze: 0.9, creeper: 1.0 }[type] || 0.85;
+    const k = this.nextVariant() % 3;
+    this.play(this.get(`hurt${k}`, () => SYNTH.hurt(k)), 0.45, pitch * (0.9 + Math.random() * 0.2));
+  }
+  shoot(kind) { const k = this.nextVariant() % 3; this.play(this.get(`hit${2}_${k}`, () => SYNTH.hit(2, k)), kind === 'arrow' ? 0.25 : 0.5, kind === 'arrow' ? 1.8 : 0.6); }
+  explosion() { const k = this.nextVariant() % 3; this.play(this.get(`thunder1_${k}`, () => SYNTH.thunder(k, true)), 1, 1.6); }
   pop() { const rec = this.sample('pop'); this.play(rec || this.get('pop', SYNTH.pop), rec ? 0.3 : 0.35, 0.9 + Math.random() * 0.3); }
   click() { this.play(this.get('click', SYNTH.click), 0.4); }
   eat() { const k = this.nextVariant() % 2; this.play(this.get(`eat${k}`, () => SYNTH.eat(k)), 0.6); }

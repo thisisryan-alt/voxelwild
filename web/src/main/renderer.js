@@ -44,6 +44,8 @@ export class Renderer {
       cutout: compile(gl, C + S.TERRAIN_VS, C + L + S.TERRAIN_FS, 'foliage', '#define CUTOUT 1'),
       glow: compile(gl, C + S.TERRAIN_VS, C + L + S.TERRAIN_FS, 'portal', '#define TRANSLUCENT 1'),
       far: compile(gl, C + S.FAR_VS, C + L + S.FAR_FS, 'far'),
+      mob: compile(gl, C + S.MOB_VS, C + L + S.MOB_FS, 'mob'),
+      mobShadow: compile(gl, C + S.MOB_VS, C + S.MOB_SHADOW_FS, 'mob-shadow'),
       shadow: compile(gl, C + S.SHADOW_VS, C + S.SHADOW_FS, 'shadow'),
       shadowCut: compile(gl, C + S.SHADOW_VS, C + S.SHADOW_FS, 'shadow-cutout', '#define CUTOUT 1'),
       water: compile(gl, C + S.WATER_VS, C + L + S.WATER_FS, 'water'),
@@ -589,6 +591,38 @@ export class Renderer {
     if (extra) setUniforms(gl, prog, extra);
   }
 
+  /** Mobs: one draw per model layer, bone matrices from the pose. */
+  drawMobs(mobs, f, prog, shadowVP) {
+    const gl = this.gl, M = this.mobModels;
+    gl.disable(gl.CULL_FACE);
+    this.use(prog, shadowVP ? { uViewProj: shadowVP } : null);
+    const u = prog.u;
+    gl.activeTexture(gl.TEXTURE0 + 22);
+    if (u.uSkin) gl.uniform1i(u.uSkin.loc, 22);
+    for (const m of mobs) {
+      const type = M.types[m.type];
+      if (!type) continue;
+      if (!shadowVP) {
+        const L = m.light || { sky: 1, block: 0 };
+        if (u.uMobLight) gl.uniform2f(u.uMobLight.loc, L.sky, L.block);
+        const hurt = m.hurtT > 0 || m.dead ? 1 : 0;
+        const flash = m.fuse > 0 ? (Math.sin(m.fuse * 18) * 0.5 + 0.5) * Math.min(1, m.fuse) * 0.8 : 0;
+        if (u.uMobTint) gl.uniform4f(u.uMobTint.loc, 1, hurt ? 0.45 : 1, hurt ? 0.45 : 1, flash);
+        if (u.uMobGlow) gl.uniform1f(u.uMobGlow.loc, m.def.glow || 0);
+      }
+      gl.uniformMatrix4fv(u.uModel.loc, false, M.model(m, type.scale));
+      type.layers.forEach((layer, k) => {
+        if (k > 0 && m.type === 'sheep' && !m.woolly) return;
+        gl.uniformMatrix4fv(u.uBones.loc, false, M.pose(m, layer, f.time));
+        gl.bindTexture(gl.TEXTURE_2D, layer.tex);
+        gl.bindVertexArray(layer.vao);
+        gl.drawArrays(gl.TRIANGLES, 0, layer.count);
+      });
+    }
+    gl.bindVertexArray(null);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+
   /** The far terrain levels (main/far.js) with a projection reaching out to the far distance. */
   drawFar(f) {
     const gl = this.gl, far = this.far, dist = this.settings.farDistance;
@@ -755,6 +789,7 @@ export class Renderer {
       this.bindTex(15, gl.TEXTURE_2D_ARRAY, this.propBakeM);
       this.stats.props = this.drawProps(this.gatherProps(f.props, f.camPos, this.planes, false, far), false);
     }
+    if (f.mobs && f.mobs.length && this.mobModels) this.drawMobs(f.mobs, f, this.progs.mob);
     // entities (dropped blocks) with the foliage program (handles rotation + cutout)
     if (f.entities && f.entities.length) this.drawEntities(f.entities);
     if (f.sprites && f.sprites.length) this.drawSprites(f.sprites, f);
@@ -871,6 +906,10 @@ export class Renderer {
         const prog = pass === 0 ? this.progs.shadow : this.progs.shadowCut;
         this.use(prog, { uViewProj: vp });
         const um = prog.u.uModel.loc, uo = prog.u.uTexOrigin ? prog.u.uTexOrigin.loc : null;
+        if (pass === 1 && f.mobs && f.mobs.length && this.mobModels) {
+          this.drawMobs(f.mobs.filter((m) => Math.hypot(m.body.pos[0] - cp[0], m.body.pos[2] - cp[2]) < r), f, this.progs.mobShadow, vp);
+          this.use(prog, { uViewProj: vp });
+        }
         for (const s of this.sections) {
           const g = s.gl, n = pass === 0 ? g.n0 : g.n1;
           if (!n) continue;

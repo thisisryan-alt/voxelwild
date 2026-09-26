@@ -697,7 +697,10 @@ def main():
     items = {"Stick": "stick", "Coal": "coal", "IronChunk": "raw_iron", "GoldChunk": "raw_gold", "Diamond": "diamond",
              "Apple": "apple", "Berries": "sweet_berries", "Flint": "flint", "FlintAndSteel": "flint_and_steel", "NetherQuartz": "quartz",
              "GlowstoneDust": "glowstone_dust", "EyeOfEnder": "ender_eye", "RawCopper": "raw_copper", "Emerald": "emerald",
-             "LapisLazuli": "lapis_lazuli", "Redstone": "redstone"}
+             "LapisLazuli": "lapis_lazuli", "Redstone": "redstone", "Beef": "beef", "Porkchop": "porkchop", "Mutton": "mutton",
+             "RawChicken": "chicken", "Feather": "feather", "Leather": "leather", "RottenFlesh": "rotten_flesh", "Bone": "bone", "Arrow": "arrow",
+             "Gunpowder": "gunpowder", "String": "string", "GoldNugget": "gold_nugget", "BlazeRod": "blaze_rod", "GhastTear": "ghast_tear",
+             "WoodenSword": "wooden_sword", "StoneSword": "stone_sword", "IronSword": "iron_sword", "DiamondSword": "diamond_sword"}
     for tier in ("wooden", "stone", "iron", "diamond"):
         for tool in ("pickaxe", "axe", "shovel"):
             items[f"{tier.capitalize()}{tool.capitalize()}"] = f"{tier}_{tool}"

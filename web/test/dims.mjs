@@ -67,6 +67,31 @@ if (!only || only === 'portal') {
   await shot('overworld-portal', -1.57, -0.05);
 }
 
+if (only === 'mobs') {
+  // one of every mob in a row on a stone floor, frozen in place
+  await page.waitForFunction(() => !!window.voxelwild.game.renderer.mobModels, { timeout: 30000 });
+  await G(() => {
+    const g = window.voxelwild.game, w = g.world, p = g.player.body.pos.map(Math.floor);
+    const types = ['cow', 'pig', 'sheep', 'chicken', 'wolf', 'husk', 'skeleton', 'creeper', 'spider', 'zombified_piglin', 'blaze', 'ghast'];
+    const y0 = p[1] + 40;
+    for (let dx = -2; dx < 52; dx++) for (let dz = -3; dz < 8; dz++) { w.setBlock(p[0] + dx, y0 - 1, p[2] + dz, 1); for (let dy = 0; dy < 8; dy++) w.setBlock(p[0] + dx, y0 + dy, p[2] + dz, 0); }
+    g.settings.mobs = false; g.mobs.clear();
+    types.forEach((t, k) => { const m = g.mobs.spawnAt(t, [p[0] + 1 + k * 3 + (t === 'ghast' ? 9 : 0), y0 + (t === 'ghast' ? 1.5 : 0), p[2] + 0.5]); m.yaw = 0; m.think = null; });
+    g.mobs.think = () => {};
+    g.player.flying = true; g.player.teleport([p[0] + 17, y0 + 4, p[2] - 14]);
+  });
+  await new Promise((r) => setTimeout(r, 4000));
+  await shot('mobs-a', Math.PI, -0.15);
+  // close-ups: each mob seen three-quarter from the front
+  const list = await G(() => window.voxelwild.game.mobs.list.map((m) => [m.type, ...m.body.pos]));
+  for (const [type, x, y, z] of list) {
+    const d = type === 'ghast' ? 9 : type === 'spider' ? 3.2 : 2.8;
+    await G((x, y, z, d) => { const g = window.voxelwild.game; g.player.teleport([x - d * 0.55, y + (d > 5 ? 1 : -0.3), z - d * 0.85]); }, x, y, z, d);
+    await new Promise((r) => setTimeout(r, 700));
+    await shot('mob-' + type, Math.atan2(d * 0.55, d * 0.85) + Math.PI, -0.12);
+  }
+}
+
 if (only === 'catalog') {
   // every catalog block on a floor, 24 to a row
   const placed = await G(() => {

@@ -27,9 +27,13 @@ Unity project; the renderer and UI are rebuilt for the browser.
 ```sh
 npm install
 npm run build            # dist/index.html + dist/assets/
-npm test                 # 26-step gameplay test in Chrome (CSP=1 adds an artifact-like Content-Security-Policy)
+npm test                 # 28-step gameplay test in Chrome (CSP=1 adds an artifact-like Content-Security-Policy)
 node test/shots.mjs      # screenshots into test/out/
-node test/dims.mjs       # the Nether's biomes and a fortress, the End, a stronghold (screenshots)
+node test/dims.mjs       # the Nether's biomes and a fortress, the End, a stronghold; `catalog`, `mobs` (screenshots)
+node test/pack-import.mjs "<pack.zip>"   # imports a resource pack like a player, reports what it used, screenshots
+node test/ui-shots.mjs   # the options screen, tab by tab
+python tools/make_catalog.py "<LBPR zip>"   # the block catalog (src/shared/catalog.json)
+python tools/build_mobs.py "<LBPR zip>"     # mob models (tools/geo) and skins
 blender -b -P web/tools/export_props.py   # re-export props after changing the Blender assets
 python tools/build_lbpr.py "<path>/LBPR Reload! v.6.6 for mc1.21.8.zip"   # re-bake the default textures
 ```
@@ -89,6 +93,23 @@ overworld sends you back to your spawn. Every dimension keeps its own edits in t
 
 Not like Minecraft (yet): no mobs (so no blazes, endermen, piglins or dragon: eyes are crafted from Nether
 materials and the exit portal is open from the start), no fire blocks, no buckets, no bastions or end ships.
+
+## Blocks, mobs, packs, sky
+
+- **Block catalog**: 365 of Minecraft's full blocks, plants and glass on top of the game's own (stones and deepslate,
+  ores, metals, copper, 16 colours of wool / concrete / terracotta / glazed terracotta / stained glass, every wood,
+  flowers, crops, corals, froglights, workstations). Colour from LBPR, normal and material maps generated at load.
+  World generation places deepslate below y 0, stone pockets, the extra ores, acacia / dark oak / cherry trees,
+  flower fields, ferns, berries, mushrooms, pumpkins and sugar cane. Slabs, stairs, doors, fences and other
+  non-cube shapes are not in yet.
+- **Mobs**: cow, pig, sheep, chicken, wolf, husk, skeleton, creeper, spider, zombified piglin, blaze and ghast, with
+  Mojang's Bedrock models (github.com/Mojang/bedrock-samples) and LBPR's skins; walking, head-tracking, attacking,
+  arrows, fireballs, creeper explosions, drops, swords. No enderman or zombie (the pack has no skins for them).
+- **Resource packs** import like in Minecraft with OptiFine: blockstate random variants, CTM repeat / random / height
+  bands, animations, biome tints, grass side overlay, items, destroy stages, moon, sounds, and generated relief for
+  packs without PBR maps (`src/main/packconv.js`).
+- **Far terrain** out to 2 km, **fluffy leaves**, a moonlit **night** with god rays and the Milky Way, and options for
+  always-day / always-night / a fixed hour, weather lock, and a tabbed options screen.
 
 ## Controls
 
