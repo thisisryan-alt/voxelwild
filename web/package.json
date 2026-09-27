@@ -1,0 +1,15 @@
+{
+  "name": "voxelwild-web",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Browser build of Voxelwild (WebGL2 + Web Workers), published as a Claude artifact",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node test/run.mjs",
+    "test:packs": "node test/packs.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10",
+    "puppeteer-core": "24.22.0"
+  }
+}

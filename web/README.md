@@ -1,0 +1,306 @@
+# Voxelwild — browser build
+
+A hand-written WebGL2 port of the Unity game, so it plays inside a web page (published as a Claude artifact).
+It uses the same world generation, blocks, textures, props, mining/crafting rules and survival model as the
+Unity project; the renderer and UI are rebuilt for the browser.
+
+## Layout
+
+| Path | What it is |
+| --- | --- |
+| `src/shared/` | Code that runs in both the page and the workers: constants, noise, terrain/biomes, column generation, trees, props placement, lighting + meshing, block/item/recipe tables |
+| `src/worker.js` | World worker: generate → decorate (trees, props, heightmap) → light + mesh |
+| `src/main/world.js` | Streaming, block storage, edits with relighting, water simulation, cave culling |
+| `src/main/renderer.js`, `shaders.js`, `sky.js` | HDR renderer: sky model, PBR terrain, shadows, water, props, particles, post |
+| `src/main/game.js`, `player.js`, `gameplay.js` | Session, player physics, interaction, items, survival, weather |
+| `src/main/ui.js`, `src/index.html` | Screens, HUD, inventory/crafting, input (pointer lock, touch) |
+| `src/main/audio.js` | Synthesised sound (port of `SoundSynth`), plus recorded clips and loops from the texture set |
+| `tools/build_textures.py` | Packs `SourceArt` block textures into `assets/*.webp` strips (the "Voxelwild Original" texture set) |
+| `tools/build_lbpr.py` | Bakes the LB Photo Realism Reload! resource pack into `assets/lbpr/` (the default texture set) |
+| `tools/export_props.py` | Blender (headless) export of the prop FBX files to `assets/props.bin/json` + bake strips |
+| `tools/build.mjs` | Bundles everything into `dist/` (one HTML page + assets) |
+| `test/run.mjs` | End-to-end test in real Chrome with the GPU |
+| `test/shots.mjs` | Fixed viewpoints, biomes, caves and props for visual checks |
+
+## Commands
+
+```sh
+npm install
+npm run build            # dist/index.html + dist/assets/
+npm test                 # 28-step gameplay test in Chrome (CSP=1 adds an artifact-like Content-Security-Policy)
+node test/shots.mjs      # screenshots into test/out/
+node test/dims.mjs       # the Nether's biomes and a fortress, the End, a stronghold; `catalog`, `mobs` (screenshots)
+node test/pack-import.mjs "<pack.zip>"   # imports a resource pack like a player, reports what it used, screenshots
+node test/ui-shots.mjs   # the options screen, tab by tab
+python tools/make_catalog.py "<LBPR zip>"   # the block catalog (src/shared/catalog.json)
+python tools/build_mobs.py "<LBPR zip>"     # mob models (tools/geo) and skins
+blender -b -P web/tools/export_props.py   # re-export props after changing the Blender assets
+python tools/build_lbpr.py "<path>/LBPR Reload! v.6.6 for mc1.21.8.zip"   # re-bake the default textures
+```
+
+## Resource packs
+
+Options ▸ Resource Packs lays two built-in packs, or any Minecraft Java resource pack ZIP (LabPBR normals, height
+and specular are used; it stays in the browser), over the texture set chosen under Options ▸ Textures; blocks a
+pack lacks keep that set's texture. "Default" removes the pack.
+
+| Pack | What it is | Licence |
+| --- | --- | --- |
+| Voxelwild Photoreal | Poly Haven photo scans at 512×512 with normal, AO, height (parallax) and roughness; ores composed from the stone scan | CC0 |
+| Soothing 32 | Zughy's pixel-art pack, the top-rated pack on ContentDB, upscaled with hard edges | CC BY-SA 4.0 |
+
+`python web/tools/build_packs.py` downloads the sources and rebuilds `assets/pack_*.webp` and `assets/packs.json`;
+`node test/packs.mjs` switches through every pack in Chrome, screenshots each and checks the choice survives a
+reload. Famous commercial packs (Faithful, Patrix, Stratum, ...) can't be shipped with the game, but players who
+own them can load them with *Load resource pack…*.
+
+## Textures: LB Photo Realism Reload!
+
+The default block textures, item icons, mining cracks, moon and several sounds come from
+[LB Photo Realism Reload!](https://www.curseforge.com/minecraft/texture-packs/lb-photo-realism-reload) v6.6
+by **1LotS** (based on LB Photo Realism and GKrond's version of LBPR; sounds from freesfx.co.uk and
+orangefreesounds.com). Its licence allows any use with credit and a link to the CurseForge page, and no money
+made from it; the game shows the credit under Options > Textures. "Voxelwild Original" switches back to the
+game's own photographic materials, and players can still load their own Java resource pack on top.
+
+LBPR is a 128px colour-only pack built around Minecraft's model system, so `build_lbpr.py` translates:
+
+| In the pack | In the game |
+| --- | --- |
+| Weighted random models per block (blockstates) | Variant table: 32 weighted slots per layer, picked per block by a hash in the shader, with random quarter turns on top faces and mirroring |
+| OptiFine CTM `method=repeat` (stone 4x4, gravel 4x4, sand 5x5) | Repeat mode: one tile per layer, chosen by block position, so a big seamless picture spans several blocks |
+| Grey textures Minecraft tints (grass, foliage, spruce) | Minecraft's default biome colour baked in; the game's biome tint varies it |
+| Grass/snow side overlay with alpha | Side-overlay rows: the fringe drawn over the dirt side like Minecraft |
+| Sprite leaves for extra model planes | Several wrapped copies layered into a denser, still tileable cube face |
+| Multi-part flower models (stems, leaves, blossoms) | Composed into one cross-plant sprite |
+| No normal/height/specular maps | Height from the colour (detail + broad high-pass), normals, cavity AO and roughness generated; gentle POM |
+
+Not carried over: OptiFine connected glass, random mob skins, custom entity models, animated water/lava
+(the game's water shader stays), the pack's sky/cloud pictures (the game's sky is physically based) and the
+swamp ambience (10 MB).
+
+## The Nether and the End
+
+| | How | What's there |
+| --- | --- | --- |
+| **Obsidian** | Lava meets water: a lava source sets to obsidian, flowing lava to cobblestone. Lava lakes fill caves below y -54, and obsidian already lines them where aquifers rest on them. Mine it with a diamond pickaxe. | |
+| **The Nether** | Build an obsidian frame (2x3 to 21x21 inside), light it with **Flint and Steel** (iron + flint; flint drops from gravel), stand in it for 4 s. Distances are 1:8; the other end is found (portals are remembered) or built. | y 0-127 between bedrock, caverns over a lava sea at y 31: nether wastes, crimson and warped forests (huge fungi, vines, roots), soul sand valleys (basalt pillars), basalt deltas (columns, magma, lava pools). Glowstone, quartz and gold ores, lava falls, nether brick fortresses. Biome fog, spores and ash. |
+| **Strongholds** | Three, 450-800 blocks from the origin, buried around y -24..6. Throw an **Eye of Ender** (2 nether quartz + glowstone dust) and it flies toward the nearest. | Stone-brick portal room with twelve end portal frames over a lava pit, corridors out to the sides. |
+| **The End** | Put eyes into all twelve frames; the portal opens (a starfield). | Main island ringed by ten obsidian pillars, an open exit portal home in the middle (no dragon), an end gateway at its edge to the outer islands beyond 1000 blocks (chorus plants, purpur towers). |
+
+Lava burns (and keeps you burning a few seconds), magma hurts unless you sneak, soul sand slows you. Dying outside the
+overworld sends you back to your spawn. Every dimension keeps its own edits in the save.
+
+Not like Minecraft (yet): no mobs (so no blazes, endermen, piglins or dragon: eyes are crafted from Nether
+materials and the exit portal is open from the start), no fire blocks, no buckets, no bastions or end ships.
+
+## Blocks, mobs, packs, sky
+
+- **Block catalog**: 365 of Minecraft's full blocks, plants and glass on top of the game's own (stones and deepslate,
+  ores, metals, copper, 16 colours of wool / concrete / terracotta / glazed terracotta / stained glass, every wood,
+  flowers, crops, corals, froglights, workstations). Colour from LBPR, normal and material maps generated at load.
+  World generation places deepslate below y 0, stone pockets, the extra ores, acacia / dark oak / cherry trees,
+  flower fields, ferns, berries, mushrooms, pumpkins and sugar cane. Slabs, stairs, doors, fences and other
+  non-cube shapes are not in yet.
+- **Mobs**: cow, pig, sheep, chicken, wolf, husk, skeleton, creeper, spider, zombified piglin, blaze and ghast, with
+  Mojang's Bedrock models (github.com/Mojang/bedrock-samples) and LBPR's skins; walking, head-tracking, attacking,
+  arrows, fireballs, creeper explosions, drops, swords. No enderman or zombie (the pack has no skins for them).
+- **Resource packs** import like in Minecraft with OptiFine: blockstate random variants, CTM repeat / random / height
+  bands, animations, biome tints, grass side overlay, items, destroy stages, moon, sounds, and generated relief for
+  packs without PBR maps (`src/main/packconv.js`).
+- **Far terrain** out to 2 km, **fluffy leaves**, a moonlit **night** with god rays and the Milky Way, and options for
+  always-day / always-night / a fixed hour, weather lock, and a tabbed options screen.
+
+## Shaped blocks and graphics
+
+`tools/make_catalog.py` also writes 280 shaped block families into `catalog.json` (`models`): stairs, slabs (double slabs
+when stacked), walls, fences, fence gates, doors, trapdoors, glass panes and iron bars, carpets, pressure plates,
+buttons, ladders, vines, glow lichen, rails, snow layers, dirt paths, farmland, tall flowers, lily pads and wall
+torches. `src/shared/shapes.js` gives each state (facing, half, open) its boxes; `blocks.js` registers one block id per
+state after the catalog (`FAMS`, `FAM`), with mining, drops and recipes from the block each one is cut from. The mesher
+draws the boxes with world-aligned textures; the player collides with them (with a 0.6 block step-up and climbable
+ladders and vines), rays pick them precisely, and right-click opens doors, trapdoors and gates. Texture names
+`@rot90:x` are baked turned a quarter (east-west rails). `node test/shapes.mjs` builds a showcase of every family in
+the sky, screenshots it and checks stairs, slabs, doors and picking.
+
+Rendering: volumetric clouds are ray-marched at quarter resolution (Options > Quality > Cloud Style), ambient
+occlusion is screen-space at half resolution with a depth-aware blur, and the tone-mapped image goes through FXAA and
+contrast-adaptive sharpening. Shadows use 12 rotated Poisson taps; textures use 16x anisotropy and a slight mip bias.
+
+## Redstone and survival
+
+`src/main/redstone.js` runs circuits at 10 ticks a second over the components the player placed (`meta.redstone`, per
+dimension): dust with power 0..15 (one level lost per block, up and down block edges), redstone torches (inverters,
+one-tick delay), levers, buttons (1 s / 1.5 s pulses), pressure plates (player, mobs, items), repeaters (1..4 ticks,
+right-click to change), redstone blocks, lamps, pistons and sticky pistons (push 12 blocks, pull one), TNT (and chain
+reactions) and doors / trapdoors / gates that follow their power. Strong and weak power follow Minecraft's rules.
+
+Blocks with a screen: the crafting table unlocks every recipe (the inventory alone crafts recipes of up to four items),
+furnaces, smokers and blast furnaces smelt with fuel while their chunk is loaded, chests and barrels hold 27 stacks;
+contents live in `meta.blockData` and spill when the block is broken or blown up. Recipes accept ingredient groups
+(`planks`, `logs`, `wool`, `stone`, `coal`). Survival: raw ores smelt into ingots (iron tools, armour, rails need
+ingots), cooked food, charcoal, hoes and farmland, wheat that grows from seeds (grass drops them), bread, beds that set
+the respawn point and sleep through the night, and leather / gold / iron / diamond armour (Minecraft's defence points,
+worn out by hits). `node test/redstone.mjs` builds test circuits and checks furnaces, crops, beds and armour.
+
+Also: comparators (compare / subtract, read how full a container is), observers (a two-tick pulse when the block they
+watch changes), dispensers (arrows, TNT, fire, buckets; anything else is dropped) and droppers (feed a container in
+front), hoppers (pull from above, collect items, push into what they point at; furnaces take ores from above and fuel
+from the side), fire (flint and steel; burns wood, wool and leaves, spreads, rain puts it out, netherrack burns forever),
+buckets, a bow (hold to draw), beds in all sixteen colours and stairs that form inner and outer corners. Animated
+textures from the pack (fire, sea lanterns, seagrass, prismarine, lit furnaces, redstone) are baked as frames
+(`@frame:k:name`) and played by variant rows; primed TNT flashes; fires, furnaces and redstone give off embers and
+smoke; leaves sway in gusts that roll across the forest and drop drifting leaves. `node test/more.mjs` checks these.
+
+Worlds can start in the Nether (by a portal home), the End or as superflat (bedrock, dirt, grass; `flat` in the world
+meta, passed to the generator), from the new-world screen or the title's sandbox buttons; creative players travel
+between dimensions from the pause menu. Resolution: Options > Video > Resolution renders 4K (the default), 1440p,
+1080p, 720p or native device pixels; slow frames are split into physics sub-steps so the game keeps real-time speed.
+The player is lifted out of anything it ends up inside (`VoxelBody.unstick`), small redstone parts are aimed at by
+roomier boxes (`pickBoxes`), and strays, wither skeletons and cave spiders join the mobs. Tests: `node test/ground.mjs`
+(collision stress, respawn into built-up spawn), `test/piston-real.mjs`, `test/dims-start.mjs`.
+
+## Structures and more mobs
+
+Villages are common (a 256-block region grid, 85%, several candidate spots per region, most grassland, forest,
+jungle, swamp, desert, savanna, taiga and snowy biomes): typically 15–20 within a thousand blocks of spawn. A new
+world starts on a village road; the map marks villages, outposts, pyramids, igloos, ruined portals and huts within
+600 blocks.
+
+`src/shared/structures.js` places villages (roads, a well, houses with stair roofs, beds and chests, farms, lamps; styles
+for plains, taiga, savanna, desert and snowy biomes), pillager outposts, desert pyramids (a TNT-trapped treasure pit)
+and wells, igloos, ruined portals, swamp huts, underground dungeons with spawners, and Nether bastions. Every kind has a
+region grid with at most one per region, planned from the seed only, so each column builds its share (like strongholds)
+and the game can use the same plans: villagers, pillagers and piglin brutes keep their structures populated, dungeon
+spawners spawn their monster near the player, and chests found in a structure fill with its loot when first opened.
+Villagers (six professions) trade by right-click. New mobs: villagers, pillagers, vindicators, slimes (they hop and
+split), polar bears, striders (they walk on lava), piglin brutes; their models are written from Minecraft Java's model
+definitions by `tools/make_geo.py` (Java pivots and boxes converted to Bedrock geometry, `tools/geo/custom.json`).
+Ghasts are smaller and rare. Tests: `node test/structures.mjs`, `test/structures2.mjs`.
+
+## Beyond Minecraft
+
+Features Minecraft does not have, picked from the most downloaded mods and from other survival games:
+a minimap with coordinates, biome and season, mobs and waypoints, and a full map on M that remembers explored land
+(Xaero's Minimap, `src/main/minimap.js`); a panel naming the block or mob under the crosshair, the tool it needs,
+a mob's health and a container's contents (Jade); felling whole trees with an axe and mining whole ore veins with a
+pickaxe, sneak for one block (Timber, Veinminer); gravestones that keep everything on death and put it back in place
+(Gravestone mods); waystones, a fast-travel network, one by every village well and craftable (Waystones); backpacks,
+a grappling hook, double doors, Sort buttons, auto-walk on R (Quark, Terraria); Rested by a fire under a roof:
+double healing, half the hunger, quicker mining (Valheim); seasons that turn leaves orange and gold, fade winter
+and change crop growth (Serene Seasons, Vintage Story); a dodge dash on a double-tapped A or D and a summonable boss,
+King Slime, with a health bar (Terraria); tips on loading and pause screens; fuller item tooltips (AppleSkin).
+All can be switched off under Options > Controls and Sky & Time. `node test/extras.mjs`, `test/boss.mjs`,
+`test/seasons.mjs` check them.
+
+## The Skylands and the bosses
+
+A fourth dimension (Dim.Sky = 3, `src/shared/skylands.js`, after the Aether mod): floating islands of grass and calcite
+with glowstone, amethyst, gold and diamond inside, blossom trees (cherry and azalea canopies on birch trunks), cloud
+banks of powder snow far below that break falls, and floating quartz temples. The island density is 3D noise on a
+world-aligned 4-block lattice, so every column can find another's island top. A glowstone frame lit with a water bucket
+opens the portal (both ways, same x and z, a portal home is built on arrival); falling off drops you into the
+overworld's sky. It shares the overworld's sky, time, weather and seasons (`game.openSky()`), saves under `S/`, and
+has moas, sheep and drifting sky whales. New worlds and sandboxes can start there; creative can travel there.
+
+Bosses (all summoned with crafted items, listed under Pause > Bosses, a health bar while near): King Slime,
+the Inferno Spirit (fireball volleys, calls blazes; drops the Flame Blade, which sets mobs alight), the Hollow King
+(charges, raises wither skeletons; drops the Bone Greatsword), the Frost Colossus (ground slam, slowing frost breath;
+drops the Frostbrand, which slows mobs) and the Storm Ghast (ghast volleys and warned lightning strikes; it rises over
+each sky temple once; drops a Cloud in a Bottle, a double jump). Structures have guardians too: the Hollow King in
+each Nether bastion and the Frost Colossus by each igloo (once each), and King Slime now and then in swamps at night. `node test/skylands.mjs`, `test/bosses.mjs`.
+
+## Boss Arena
+
+A mode of nothing but boss fights (title screen > Boss Arena): Boss Rush (King Slime, Frost Colossus, Hollow King,
+Inferno Spirit, Storm Ghast in turn), Endless (the five again and again, +50% health each round) or any one boss.
+It builds a walled stone-brick arena on an unsaved flat world, fixes the time at early afternoon, turns off other
+spawning, and hands out a loadout (iron armour, a diamond sword, a bow and arrows, food, a grappling hook, a Cloud in
+a Bottle). Waves heal and restock the player; a death retries the wave; the end shows the time. `game.startArena`,
+`updateArena`; `node test/arena.mjs`.
+
+## Experience, enchanting, the anvil and pets
+
+- **Experience** (Minecraft's curve, `shared/enchant.js` `xpToNext`): killing mobs (5 for monsters, 1-3 for animals,
+  100 for a boss), mining coal, lapis, redstone, quartz, diamond and emerald ore, and trading. A green bar and level
+  number sit above the hotbar; dying loses half your levels. Saved with the survival stats.
+- **Enchanting table** (4 obsidian, 2 diamonds, 3 lapis): pick a tool, weapon, bow or armour piece and one of three
+  seeded offers (level 5 / 15 / 30 needed, costing 1-3 levels and as much lapis). Sharpness, Fire Aspect, Looting,
+  Knockback, Efficiency, Fortune, Silk Touch, Unbreaking, Protection, Feather Falling, Power, Infinity - all wired
+  into combat, mining speed, drops, wear, damage and the bow. Enchanted items shimmer in slots; tooltips list them;
+  enchantments survive dropping, chests, hoppers and dispensers.
+- **Anvil** (3 iron blocks, 4 iron ingots): repair an item with its material (planks, cobblestone, iron, diamond,
+  leather, gold, string) or merge two of the same item (durability plus a bonus, enchantments combined).
+- **Experience orbs**: kills, ores, fishing and bounties drop glowing green orbs that arc out and home in on the
+  player (`game.giveXp(n, pos)` -> `particles.orbs`, `updateOrbs`, `collectXp`). **Camera effects** (Video >
+  Camera Effects): the field of view widens when sprinting, dashing or flying fast, and the view shakes when hurt.
+- **Combat feel**: critical hits when falling (x1.5, sparks), floating damage numbers (Controls > Damage numbers),
+  an attack-cooldown bar under the crosshair, and a synthesized boss-fight music loop that fades in near a boss
+  (Audio > Boss Music).
+- **Wolves** now also roam forests. Feed one bones to tame it (1 in 3): it follows you (teleporting when left behind,
+  even across dimensions), sits or stands on right-click, heals on meat, and attacks whatever you hit or any monster
+  near you. Tamed wolves are kept in `meta.pets` and come back when you return. `node test/enchant.mjs`,
+  `node test/pets.mjs`.
+- **Fishing** (rod: 3 sticks, 2 string): cast into water; a trail of ripples closes in, the bobber dips with a
+  splash, and a right-click in that second lands raw cod or salmon (smeltable), junk, or treasure (emeralds, a
+  diamond, an enchanted bow or rod), plus experience. Rain makes fish bite sooner. `game.useRod`, `updateFishing`;
+  `node test/fishing.mjs`.
+- **Advancements** (`shared/advancements.js`): 25 survival milestones from Getting Wood to Monarch of Monsters, with a
+  toast when earned and a list with the day reached under pause > Advancements. Kept in `meta.advancements`.
+- **Golden apples** (an apple and 8 gold ingots; enchanted ones only in dungeon and pyramid chests) can be eaten
+  when full and give regeneration, golden absorption hearts and (enchanted) fire resistance. Vindicators may drop a
+  **Totem of Undying**: in the hotbar it saves you from one death. Effects show above the hotbar.
+- **Bounties** (not in Minecraft): every villager posts a job a day (seeded by world and day) on its trade screen:
+  bring goods (wheat, coal, wool, iron...) or hunt monsters (husks, skeletons, spiders, creepers, anything). One at a
+  time, tracked top-left; hunts pay out on the last kill, deliveries at any villager. Emeralds and experience.
+  `node test/bounty.mjs` (also checks golden apples and the totem).
+- **Wolf variants** from the pack: pale wolves in the taiga, snowy wolves in the snowy taiga, woods wolves in
+  forests, each with its own tamed skin.
+- **Fireflies and butterflies** (not in Minecraft): glowing, blinking fireflies near the ground on dry nights in
+  forests, plains, jungles and (most of all) swamps; butterflies in five colours on sunny days. `game.updateFauna`;
+  `node test/fauna.mjs`.
+- **Saplings grow** (they never did): placed saplings are kept in `meta.saplings` and grow after two to five minutes
+  of loaded time into oak, birch (tall), spruce (cone), jungle (big), acacia (flat) and cherry / dark oak / pale oak
+  trees, if there is room. **Bone meal** (a bone makes three) jumps crops 2-4 stages, grows a sapling 45% of the
+  time, and sprouts grass and flowers on grass. `game.growTree`, `updateSaplings`, `useBoneMeal`;
+  `node test/growth.mjs`.
+- **Animal and monster calls** (Audio > Animal and Monster Calls): cows, sheep, pigs, chickens, villagers, wolves,
+  husks and skeletons make synthesized idle sounds now and then (a pulse train through two formant filters per
+  species, `SYNTH.voice`), quieter with distance and panned toward the mob; villagers "hmm" when you open trading.
+  `node test/voices.mjs`.
+- **Potions** (crafted: a glass bottle, glowstone dust and an ingredient): Healing (berries), Swiftness (sugar),
+  Strength (blaze rod), Night Vision (gold nuggets), Fire Resistance (magma), Leaping (slime and feathers), Water
+  Breathing (cod). Drinking leaves the bottle; effects show above the hotbar (`stats.fx`, `applyEffects`,
+  `player.speedMul` / `jumpHeight`, the renderer's `f.nightVision` exposure). Potions also turn up in witch huts,
+  dungeons and pyramids. **Milk** a cow with a bucket; drinking it clears every effect.
+- **Shears** shear sheep (the wool grows back) and keep leaves and grass when breaking them. **Snowballs** (four from a
+  snow block) knock mobs back and hurt blazes; **eggs** (chickens lay them) sometimes hatch; **ender pearls**
+  (fletchers, dungeons, pyramids) teleport you where they land for 5 fall damage. Arrows, fireballs and throwables
+  are now drawn in flight (they were invisible).
+- **Glider** (6 leather or 4 phantom membranes, 4 sticks, 2 string), worn as a chestplate: jump while falling to
+  open it; diving trades height for speed, pulling up bleeds it off; it wears with use and mends with membrane.
+- **Music**: now and then a quiet generative piano piece in one of four scales (Audio > Music).
+- **New mobs** (models written from Minecraft's Java definitions in `tools/make_geo.py`, skins from the pack):
+  foxes and snow foxes (taiga; shy; hunt chickens), schools of cod (oceans) and salmon (rivers), squid and glow squid (swim in oceans, rivers and swamps; dry out
+  on land), pandas and the rare brown panda (jungle), rabbits in four coats by biome (they hop), and phantoms that
+  swoop at players under the night sky from the third night and drop phantom membrane. `part(..., parent=)` lets
+  a bone hang off another. `node test/content.mjs`, `node test/fox.mjs`, `node test/mobs3.mjs`.
+- **New structures** (`shared/structures.js`): mossy jungle temples (two floors, vines, two chests), ruined
+  stone-brick watchtowers with a broken crown and a ladder to the upper floors, and shipwrecks on the sea floor, each
+  with its own loot table (`game.fillLoot`) and minimap marker. `node test/structs3.mjs`.
+- **Compass** (held: the way to spawn and the time), **spyglass** (hold the right button: 5x zoom, slower look, a
+  scope), **crossbow** (hold to wind an arrow in 1.1 s, click to loose a fast flat bolt).
+- **Boats** (5 planks; the Java boat model with the pack's oak boat skin): place on water, right-click to board, look
+  to steer, W / S to row, Shift to get out. They float, coast and crawl on land. `game.placeBoat`, `updateRide`,
+  `mobs.float`.
+- **The Void Phantom** (not in Minecraft): a six-times phantom that descends on players in the End until beaten; it
+  swoops and fires volleys of void fire. It drops **Void Wings**, a glider that is faster (up to 48 m/s), armoured and
+  never wears out. `node test/boat.mjs` covers boats and the boss.
+- The pause menu scrolls when it is taller than the window (`justify-content: safe center`), so its top buttons can
+  always be reached.
+
+## Controls
+
+WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·
+left mouse mine · right mouse place/eat · middle mouse pick block · 1–9 or wheel hotbar · E/Tab inventory ·
+Q drop · F fly (creative) · F3 debug · Esc pause.

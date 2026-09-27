@@ -1,0 +1,2162 @@
+{
+ "vertexBytes": 2015604,
+ "vertexCount": 55989,
+ "indexCount": 110355,
+ "stride": 36,
+ "assets": [
+  {
+   "name": "Cave_Stalactite_00",
+   "kind": "Cave_Stalactite",
+   "variant": 0,
+   "extents": {
+    "radius": 0.2863,
+    "top": 0.098,
+    "bottom": -0.663
+   },
+   "hang": true,
+   "length": 0.661,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Sandstone",
+     "mapping": "triplanar",
+     "tiling": 0.7,
+     "moss": 0.0,
+     "tint": [
+      1.05,
+      1.02,
+      0.97
+     ],
+     "roughness": 0.6,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 0,
+       "count": 1140
+      }
+     ],
+     "triangles": 380
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 1140,
+       "count": 450
+      }
+     ],
+     "triangles": 150
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 1590,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 0
+  },
+  {
+   "name": "Cave_Stalactite_01",
+   "kind": "Cave_Stalactite",
+   "variant": 1,
+   "extents": {
+    "radius": 0.3272,
+    "top": 0.0996,
+    "bottom": -1.2172
+   },
+   "hang": true,
+   "length": 1.21,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Sandstone",
+     "mapping": "triplanar",
+     "tiling": 0.7,
+     "moss": 0.0,
+     "tint": [
+      1.05,
+      1.02,
+      0.97
+     ],
+     "roughness": 0.6,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 1734,
+       "count": 1140
+      }
+     ],
+     "triangles": 380
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 2874,
+       "count": 450
+      }
+     ],
+     "triangles": 150
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 3324,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 1
+  },
+  {
+   "name": "Cave_Stalactite_02",
+   "kind": "Cave_Stalactite",
+   "variant": 2,
+   "extents": {
+    "radius": 0.4417,
+    "top": 0.0972,
+    "bottom": -1.8227
+   },
+   "hang": true,
+   "length": 1.85,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Sandstone",
+     "mapping": "triplanar",
+     "tiling": 0.7,
+     "moss": 0.0,
+     "tint": [
+      1.05,
+      1.02,
+      0.97
+     ],
+     "roughness": 0.6,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 3468,
+       "count": 1140
+      }
+     ],
+     "triangles": 380
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 4608,
+       "count": 450
+      }
+     ],
+     "triangles": 150
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 5058,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 2
+  },
+  {
+   "name": "Cave_Stalactite_03",
+   "kind": "Cave_Stalactite",
+   "variant": 3,
+   "extents": {
+    "radius": 0.5874,
+    "top": 0.0963,
+    "bottom": -3.0108
+   },
+   "hang": true,
+   "length": 3.012,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Sandstone",
+     "mapping": "triplanar",
+     "tiling": 0.7,
+     "moss": 0.0,
+     "tint": [
+      1.05,
+      1.02,
+      0.97
+     ],
+     "roughness": 0.6,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 5202,
+       "count": 1140
+      }
+     ],
+     "triangles": 380
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 6342,
+       "count": 450
+      }
+     ],
+     "triangles": 150
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 6792,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 3
+  },
+  {
+   "name": "Cave_Stalagmite_00",
+   "kind": "Cave_Stalagmite",
+   "variant": 0,
+   "extents": {
+    "radius": 0.4017,
+    "top": 0.4823,
+    "bottom": -0.1025
+   },
+   "hang": false,
+   "length": 0.475,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Sandstone",
+     "mapping": "triplanar",
+     "tiling": 0.7,
+     "moss": 0.0,
+     "tint": [
+      1.05,
+      1.02,
+      0.97
+     ],
+     "roughness": 0.6,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 6936,
+       "count": 1140
+      }
+     ],
+     "triangles": 380
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 8076,
+       "count": 450
+      }
+     ],
+     "triangles": 150
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 8526,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 4
+  },
+  {
+   "name": "Cave_Stalagmite_01",
+   "kind": "Cave_Stalagmite",
+   "variant": 1,
+   "extents": {
+    "radius": 0.4818,
+    "top": 0.85,
+    "bottom": -0.104
+   },
+   "hang": false,
+   "length": 0.85,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Sandstone",
+     "mapping": "triplanar",
+     "tiling": 0.7,
+     "moss": 0.0,
+     "tint": [
+      1.05,
+      1.02,
+      0.97
+     ],
+     "roughness": 0.6,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 8670,
+       "count": 1140
+      }
+     ],
+     "triangles": 380
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 9810,
+       "count": 450
+      }
+     ],
+     "triangles": 150
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 10260,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 5
+  },
+  {
+   "name": "Cave_Stalagmite_02",
+   "kind": "Cave_Stalagmite",
+   "variant": 2,
+   "extents": {
+    "radius": 0.5054,
+    "top": 1.5053,
+    "bottom": -0.0989
+   },
+   "hang": false,
+   "length": 1.507,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Sandstone",
+     "mapping": "triplanar",
+     "tiling": 0.7,
+     "moss": 0.0,
+     "tint": [
+      1.05,
+      1.02,
+      0.97
+     ],
+     "roughness": 0.6,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 10404,
+       "count": 1140
+      }
+     ],
+     "triangles": 380
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 11544,
+       "count": 450
+      }
+     ],
+     "triangles": 150
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 11994,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 6
+  },
+  {
+   "name": "Cave_Stalagmite_03",
+   "kind": "Cave_Stalagmite",
+   "variant": 3,
+   "extents": {
+    "radius": 0.6932,
+    "top": 2.0458,
+    "bottom": -0.1008
+   },
+   "hang": false,
+   "length": 2.04,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Sandstone",
+     "mapping": "triplanar",
+     "tiling": 0.7,
+     "moss": 0.0,
+     "tint": [
+      1.05,
+      1.02,
+      0.97
+     ],
+     "roughness": 0.6,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 12138,
+       "count": 1140
+      }
+     ],
+     "triangles": 380
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 13278,
+       "count": 450
+      }
+     ],
+     "triangles": 150
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 13728,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 7
+  },
+  {
+   "name": "Plant_FlowerClump_00",
+   "kind": "Plant_FlowerClump",
+   "variant": 0,
+   "extents": {
+    "radius": 0.3585,
+    "top": 0.5192,
+    "bottom": -0.02
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Foliage",
+     "layer": null,
+     "mapping": "vertex",
+     "tiling": 0.5,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 0.9,
+     "foliage": true
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 13872,
+       "count": 576
+      }
+     ],
+     "triangles": 192
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 14448,
+       "count": 300
+      }
+     ],
+     "triangles": 100
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Plant_FlowerClump_01",
+   "kind": "Plant_FlowerClump",
+   "variant": 1,
+   "extents": {
+    "radius": 0.4371,
+    "top": 0.5958,
+    "bottom": -0.02
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Foliage",
+     "layer": null,
+     "mapping": "vertex",
+     "tiling": 0.5,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 0.9,
+     "foliage": true
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 14748,
+       "count": 576
+      }
+     ],
+     "triangles": 192
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 15324,
+       "count": 300
+      }
+     ],
+     "triangles": 100
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Plant_GrassClump_00",
+   "kind": "Plant_GrassClump",
+   "variant": 0,
+   "extents": {
+    "radius": 0.4968,
+    "top": 0.6043,
+    "bottom": -0.02
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Foliage",
+     "layer": null,
+     "mapping": "vertex",
+     "tiling": 0.5,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 0.9,
+     "foliage": true
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 15624,
+       "count": 720
+      }
+     ],
+     "triangles": 240
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 16344,
+       "count": 180
+      }
+     ],
+     "triangles": 60
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Plant_GrassClump_01",
+   "kind": "Plant_GrassClump",
+   "variant": 1,
+   "extents": {
+    "radius": 0.407,
+    "top": 0.5771,
+    "bottom": -0.02
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Foliage",
+     "layer": null,
+     "mapping": "vertex",
+     "tiling": 0.5,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 0.9,
+     "foliage": true
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 16524,
+       "count": 720
+      }
+     ],
+     "triangles": 240
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 17244,
+       "count": 180
+      }
+     ],
+     "triangles": 60
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Plant_Mushrooms_00",
+   "kind": "Plant_Mushrooms",
+   "variant": 0,
+   "extents": {
+    "radius": 0.2639,
+    "top": 0.1333,
+    "bottom": -0.03
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Fungus",
+     "layer": null,
+     "mapping": "vertex",
+     "tiling": 0.5,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 0.8,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 17424,
+       "count": 5040
+      }
+     ],
+     "triangles": 1680
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 22464,
+       "count": 3024
+      }
+     ],
+     "triangles": 1008
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 25488,
+       "count": 864
+      }
+     ],
+     "triangles": 288
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Plant_Mushrooms_01",
+   "kind": "Plant_Mushrooms",
+   "variant": 1,
+   "extents": {
+    "radius": 0.0962,
+    "top": 0.1787,
+    "bottom": -0.03
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Fungus",
+     "layer": null,
+     "mapping": "vertex",
+     "tiling": 0.5,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 0.8,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 26352,
+       "count": 720
+      }
+     ],
+     "triangles": 240
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 27072,
+       "count": 432
+      }
+     ],
+     "triangles": 144
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 27504,
+       "count": 288
+      }
+     ],
+     "triangles": 96
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Plant_Mushrooms_02",
+   "kind": "Plant_Mushrooms",
+   "variant": 2,
+   "extents": {
+    "radius": 0.1987,
+    "top": 0.1788,
+    "bottom": -0.03
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Fungus",
+     "layer": null,
+     "mapping": "vertex",
+     "tiling": 0.5,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 0.8,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 27792,
+       "count": 3600
+      }
+     ],
+     "triangles": 1200
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 31392,
+       "count": 2160
+      }
+     ],
+     "triangles": 720
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 33552,
+       "count": 864
+      }
+     ],
+     "triangles": 288
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Rock_Boulder_00",
+   "kind": "Rock_Boulder",
+   "variant": 0,
+   "extents": {
+    "radius": 1.2563,
+    "top": 1.6656,
+    "bottom": -0.327
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.45,
+     "moss": 0.55,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 34416,
+       "count": 4200
+      }
+     ],
+     "triangles": 1400
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 38616,
+       "count": 1560
+      }
+     ],
+     "triangles": 520
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 40176,
+       "count": 480
+      }
+     ],
+     "triangles": 160
+    }
+   ],
+   "bake": 8
+  },
+  {
+   "name": "Rock_Boulder_01",
+   "kind": "Rock_Boulder",
+   "variant": 1,
+   "extents": {
+    "radius": 1.2893,
+    "top": 1.5221,
+    "bottom": -0.2992
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.45,
+     "moss": 0.55,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 40656,
+       "count": 4200
+      }
+     ],
+     "triangles": 1400
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 44856,
+       "count": 1560
+      }
+     ],
+     "triangles": 520
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 46416,
+       "count": 480
+      }
+     ],
+     "triangles": 160
+    }
+   ],
+   "bake": 9
+  },
+  {
+   "name": "Rock_Boulder_02",
+   "kind": "Rock_Boulder",
+   "variant": 2,
+   "extents": {
+    "radius": 1.2048,
+    "top": 1.7302,
+    "bottom": -0.2952
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.45,
+     "moss": 0.55,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 46896,
+       "count": 4200
+      }
+     ],
+     "triangles": 1400
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 51096,
+       "count": 1560
+      }
+     ],
+     "triangles": 520
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 52656,
+       "count": 480
+      }
+     ],
+     "triangles": 160
+    }
+   ],
+   "bake": 10
+  },
+  {
+   "name": "Rock_Boulder_03",
+   "kind": "Rock_Boulder",
+   "variant": 3,
+   "extents": {
+    "radius": 1.2761,
+    "top": 1.6463,
+    "bottom": -0.288
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.45,
+     "moss": 0.55,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 53136,
+       "count": 4200
+      }
+     ],
+     "triangles": 1400
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 57336,
+       "count": 1560
+      }
+     ],
+     "triangles": 520
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 58896,
+       "count": 480
+      }
+     ],
+     "triangles": 160
+    }
+   ],
+   "bake": 11
+  },
+  {
+   "name": "Rock_Pebbles_00",
+   "kind": "Rock_Pebbles",
+   "variant": 0,
+   "extents": {
+    "radius": 0.5769,
+    "top": 0.2053,
+    "bottom": -0.06
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.6,
+     "moss": 0.2,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 59376,
+       "count": 1260
+      }
+     ],
+     "triangles": 420
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 60636,
+       "count": 480
+      }
+     ],
+     "triangles": 160
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 61116,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 12
+  },
+  {
+   "name": "Rock_Pebbles_01",
+   "kind": "Rock_Pebbles",
+   "variant": 1,
+   "extents": {
+    "radius": 0.5823,
+    "top": 0.1789,
+    "bottom": -0.0609
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.6,
+     "moss": 0.2,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 61260,
+       "count": 1260
+      }
+     ],
+     "triangles": 420
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 62520,
+       "count": 480
+      }
+     ],
+     "triangles": 160
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 63000,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 13
+  },
+  {
+   "name": "Rock_Pebbles_02",
+   "kind": "Rock_Pebbles",
+   "variant": 2,
+   "extents": {
+    "radius": 0.5755,
+    "top": 0.212,
+    "bottom": -0.0598
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.6,
+     "moss": 0.2,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 63144,
+       "count": 1254
+      }
+     ],
+     "triangles": 418
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 64398,
+       "count": 480
+      }
+     ],
+     "triangles": 160
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 64878,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 14
+  },
+  {
+   "name": "Rock_Pebbles_03",
+   "kind": "Rock_Pebbles",
+   "variant": 3,
+   "extents": {
+    "radius": 0.5707,
+    "top": 0.1598,
+    "bottom": -0.0616
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.6,
+     "moss": 0.2,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 65022,
+       "count": 1260
+      }
+     ],
+     "triangles": 420
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 66282,
+       "count": 480
+      }
+     ],
+     "triangles": 160
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 66762,
+       "count": 144
+      }
+     ],
+     "triangles": 48
+    }
+   ],
+   "bake": 15
+  },
+  {
+   "name": "Rock_Stone_00",
+   "kind": "Rock_Stone",
+   "variant": 0,
+   "extents": {
+    "radius": 0.4736,
+    "top": 0.5307,
+    "bottom": -0.12
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.45,
+     "moss": 0.45,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 66906,
+       "count": 1680
+      }
+     ],
+     "triangles": 560
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 68586,
+       "count": 600
+      }
+     ],
+     "triangles": 200
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 69186,
+       "count": 180
+      }
+     ],
+     "triangles": 60
+    }
+   ],
+   "bake": 16
+  },
+  {
+   "name": "Rock_Stone_01",
+   "kind": "Rock_Stone",
+   "variant": 1,
+   "extents": {
+    "radius": 0.4677,
+    "top": 0.5466,
+    "bottom": -0.1204
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.45,
+     "moss": 0.45,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 69366,
+       "count": 1680
+      }
+     ],
+     "triangles": 560
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 71046,
+       "count": 600
+      }
+     ],
+     "triangles": 200
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 71646,
+       "count": 180
+      }
+     ],
+     "triangles": 60
+    }
+   ],
+   "bake": 17
+  },
+  {
+   "name": "Rock_Stone_02",
+   "kind": "Rock_Stone",
+   "variant": 2,
+   "extents": {
+    "radius": 0.3978,
+    "top": 0.3648,
+    "bottom": -0.1203
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.45,
+     "moss": 0.45,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 71826,
+       "count": 1680
+      }
+     ],
+     "triangles": 560
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 73506,
+       "count": 600
+      }
+     ],
+     "triangles": 200
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 74106,
+       "count": 180
+      }
+     ],
+     "triangles": 60
+    }
+   ],
+   "bake": 18
+  },
+  {
+   "name": "Rock_Stone_03",
+   "kind": "Rock_Stone",
+   "variant": 3,
+   "extents": {
+    "radius": 0.5591,
+    "top": 0.5078,
+    "bottom": -0.1202
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Rock",
+     "layer": "Stone",
+     "mapping": "triplanar",
+     "tiling": 0.45,
+     "moss": 0.45,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 74286,
+       "count": 1680
+      }
+     ],
+     "triangles": 560
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 75966,
+       "count": 600
+      }
+     ],
+     "triangles": 200
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 76566,
+       "count": 180
+      }
+     ],
+     "triangles": 60
+    }
+   ],
+   "bake": 19
+  },
+  {
+   "name": "Tree_Dead_00",
+   "kind": "Tree_Dead",
+   "variant": 0,
+   "extents": {
+    "radius": 1.4761,
+    "top": 3.3871,
+    "bottom": -0.3141
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Bark",
+     "layer": "OakLog",
+     "mapping": "uv",
+     "tiling": 0.6667,
+     "moss": 0.35,
+     "tint": [
+      0.92,
+      0.9,
+      0.86
+     ],
+     "roughness": 1.1,
+     "foliage": false
+    },
+    {
+     "name": "EndGrain",
+     "layer": "LogTop",
+     "mapping": "uv",
+     "tiling": 1.0,
+     "moss": 0.0,
+     "tint": [
+      0.92,
+      0.9,
+      0.86
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 76746,
+       "count": 3624
+      }
+     ],
+     "triangles": 1208
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 80370,
+       "count": 1944
+      }
+     ],
+     "triangles": 648
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 82314,
+       "count": 660
+      }
+     ],
+     "triangles": 220
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Tree_Dead_01",
+   "kind": "Tree_Dead",
+   "variant": 1,
+   "extents": {
+    "radius": 1.9893,
+    "top": 4.0178,
+    "bottom": -0.3116
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Bark",
+     "layer": "OakLog",
+     "mapping": "uv",
+     "tiling": 0.6667,
+     "moss": 0.35,
+     "tint": [
+      0.92,
+      0.9,
+      0.86
+     ],
+     "roughness": 1.1,
+     "foliage": false
+    },
+    {
+     "name": "EndGrain",
+     "layer": "LogTop",
+     "mapping": "uv",
+     "tiling": 1.0,
+     "moss": 0.0,
+     "tint": [
+      0.92,
+      0.9,
+      0.86
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 82974,
+       "count": 5178
+      }
+     ],
+     "triangles": 1726
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 88152,
+       "count": 1950
+      }
+     ],
+     "triangles": 650
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 90102,
+       "count": 660
+      }
+     ],
+     "triangles": 220
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Tree_Dead_02",
+   "kind": "Tree_Dead",
+   "variant": 2,
+   "extents": {
+    "radius": 2.329,
+    "top": 4.5041,
+    "bottom": -0.3129
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Bark",
+     "layer": "OakLog",
+     "mapping": "uv",
+     "tiling": 0.6667,
+     "moss": 0.35,
+     "tint": [
+      0.92,
+      0.9,
+      0.86
+     ],
+     "roughness": 1.1,
+     "foliage": false
+    },
+    {
+     "name": "EndGrain",
+     "layer": "LogTop",
+     "mapping": "uv",
+     "tiling": 1.0,
+     "moss": 0.0,
+     "tint": [
+      0.92,
+      0.9,
+      0.86
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 90762,
+       "count": 4314
+      }
+     ],
+     "triangles": 1438
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 95076,
+       "count": 1947
+      }
+     ],
+     "triangles": 649
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 97023,
+       "count": 657
+      }
+     ],
+     "triangles": 219
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Tree_FallenLog_00",
+   "kind": "Tree_FallenLog",
+   "variant": 0,
+   "extents": {
+    "radius": 1.6221,
+    "top": 0.5281,
+    "bottom": -0.0707
+   },
+   "hang": false,
+   "length": 3.153,
+   "slots": [
+    {
+     "name": "Bark",
+     "layer": "OakLog",
+     "mapping": "uv",
+     "tiling": 0.6667,
+     "moss": 0.35,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.1,
+     "foliage": false
+    },
+    {
+     "name": "EndGrain",
+     "layer": "LogTop",
+     "mapping": "uv",
+     "tiling": 1.0,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 97680,
+       "count": 1512
+      }
+     ],
+     "triangles": 504
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 99192,
+       "count": 1200
+      }
+     ],
+     "triangles": 400
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 100392,
+       "count": 360
+      }
+     ],
+     "triangles": 120
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Tree_FallenLog_01",
+   "kind": "Tree_FallenLog",
+   "variant": 1,
+   "extents": {
+    "radius": 1.8602,
+    "top": 0.492,
+    "bottom": -0.0765
+   },
+   "hang": false,
+   "length": 3.65,
+   "slots": [
+    {
+     "name": "Bark",
+     "layer": "BirchLog",
+     "mapping": "uv",
+     "tiling": 0.6667,
+     "moss": 0.35,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.1,
+     "foliage": false
+    },
+    {
+     "name": "EndGrain",
+     "layer": "LogTop",
+     "mapping": "uv",
+     "tiling": 1.0,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 100752,
+       "count": 1512
+      }
+     ],
+     "triangles": 504
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 102264,
+       "count": 1200
+      }
+     ],
+     "triangles": 400
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 103464,
+       "count": 360
+      }
+     ],
+     "triangles": 120
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Tree_Stump_00",
+   "kind": "Tree_Stump",
+   "variant": 0,
+   "extents": {
+    "radius": 0.7592,
+    "top": 0.6471,
+    "bottom": -0.25
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Bark",
+     "layer": "OakLog",
+     "mapping": "uv",
+     "tiling": 0.6667,
+     "moss": 0.35,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.1,
+     "foliage": false
+    },
+    {
+     "name": "EndGrain",
+     "layer": "LogTop",
+     "mapping": "uv",
+     "tiling": 1.0,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 103824,
+       "count": 2010
+      }
+     ],
+     "triangles": 670
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 105834,
+       "count": 957
+      }
+     ],
+     "triangles": 319
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 106791,
+       "count": 297
+      }
+     ],
+     "triangles": 99
+    }
+   ],
+   "bake": -1
+  },
+  {
+   "name": "Tree_Stump_01",
+   "kind": "Tree_Stump",
+   "variant": 1,
+   "extents": {
+    "radius": 0.7627,
+    "top": 0.8262,
+    "bottom": -0.25
+   },
+   "hang": false,
+   "length": null,
+   "slots": [
+    {
+     "name": "Bark",
+     "layer": "SpruceLog",
+     "mapping": "uv",
+     "tiling": 0.6667,
+     "moss": 0.35,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.1,
+     "foliage": false
+    },
+    {
+     "name": "EndGrain",
+     "layer": "LogTop",
+     "mapping": "uv",
+     "tiling": 1.0,
+     "moss": 0.0,
+     "tint": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "roughness": 1.0,
+     "foliage": false
+    }
+   ],
+   "lods": [
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 107088,
+       "count": 2010
+      }
+     ],
+     "triangles": 670
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 109098,
+       "count": 957
+      }
+     ],
+     "triangles": 319
+    },
+    {
+     "submeshes": [
+      {
+       "slot": 0,
+       "first": 110055,
+       "count": 300
+      }
+     ],
+     "triangles": 100
+    }
+   ],
+   "bake": -1
+  }
+ ],
+ "bakes": [
+  "Cave_Stalactite_00",
+  "Cave_Stalactite_01",
+  "Cave_Stalactite_02",
+  "Cave_Stalactite_03",
+  "Cave_Stalagmite_00",
+  "Cave_Stalagmite_01",
+  "Cave_Stalagmite_02",
+  "Cave_Stalagmite_03",
+  "Rock_Boulder_00",
+  "Rock_Boulder_01",
+  "Rock_Boulder_02",
+  "Rock_Boulder_03",
+  "Rock_Pebbles_00",
+  "Rock_Pebbles_01",
+  "Rock_Pebbles_02",
+  "Rock_Pebbles_03",
+  "Rock_Stone_00",
+  "Rock_Stone_01",
+  "Rock_Stone_02",
+  "Rock_Stone_03"
+ ]
+}

@@ -69,3 +69,6 @@ tools/dotnet-tests/obj/
 tools/shadercheck/.cache/
 tools/cscheck/bin/
 tools/cscheck/obj/
+
+# resource pack downloads
+web/tools/.pack_cache/
