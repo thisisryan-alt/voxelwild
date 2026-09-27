@@ -2526,6 +2526,7 @@ export class Game {
         snowCover: Math.max(this.weather.snowCover * (clim && clim.temp < 0.25 ? 1 : 0), this.seasonNow()[1] * (clim && clim.temp < 0.75 ? 0.55 : 0)) },
       season: this.dim === Dim.Overworld && !this.meta.menu ? this.seasonNow().slice(0, 2) : [0, 0],
       handLight: this.handLightNow(),
+      skyWorld: this.dim === Dim.Sky,
       viewDistance: this.world.viewDistance, camSky: this.camSky, underwater: pl.headInWater || inLava, underwaterColor: inLava ? [0.9, 0.25, 0.02] : null,
       selection: this.target && this.state === 'playing' ? this.target.hit : null,
       selectionBoxes: this.target && this.state === 'playing' ? this.selectionBoxes(this.target) : null,

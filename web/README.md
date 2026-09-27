@@ -202,7 +202,8 @@ Bosses (all summoned with crafted items, listed under Pause > Bosses, a health b
 the Inferno Spirit (fireball volleys, calls blazes; drops the Flame Blade, which sets mobs alight), the Hollow King
 (charges, raises wither skeletons; drops the Bone Greatsword), the Frost Colossus (ground slam, slowing frost breath;
 drops the Frostbrand, which slows mobs) and the Storm Ghast (ghast volleys and warned lightning strikes; it rises over
-each sky temple once; drops a Cloud in a Bottle, a double jump). `node test/skylands.mjs`, `test/bosses.mjs`.
+each sky temple once; drops a Cloud in a Bottle, a double jump). Structures have guardians too: the Hollow King in
+each Nether bastion and the Frost Colossus by each igloo (once each), and King Slime now and then in swamps at night. `node test/skylands.mjs`, `test/bosses.mjs`.
 
 ## Controls
 

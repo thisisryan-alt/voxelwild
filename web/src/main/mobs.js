@@ -125,6 +125,17 @@ export class Mobs {
       for (let y = y0 - 3; y < y0 + 12; y++) { const f = w.getBlock(x, y - 1, z); if (f > 0 && (BLOCKS[f].flags & F.Solid) && this.standable(x, y, z)) return y; }
       return null;
     };
+    // structure guardians: once per structure (bastions: the Hollow King; igloos: the Frost Colossus)
+    const guards = { bastion: 'hollow_king', igloo: 'frost_colossus' };
+    for (const st of plans) {
+      const type = guards[st.kind], key = `${st.kind}:${st.x},${st.z}`;
+      if (!type || peaceful || (g.meta.guardians || {})[key] || this.list.some((m) => m.def.boss && !m.dead)) continue;
+      if (Math.hypot(st.x - p[0], st.z - p[2]) > (st.kind === 'igloo' ? 12 : 22)) continue;
+      const y = st.kind === 'bastion' ? 35 : (st.gy ?? p[1]) + 1;
+      const m = this.spawnAt(type, [st.x + (st.kind === 'igloo' ? 8.5 : 0.5), y, st.z + 0.5]);
+      g.meta.guardians = { ...(g.meta.guardians || {}), [key]: true };
+      g.emit('toast', `${m.def.name} guards this place!`);
+    }
     for (const s of plans) {
       const d = Math.hypot(s.x - p[0], s.z - p[2]);
       if (s.kind === 'village' && d < 90) {
@@ -203,6 +214,8 @@ export class Mobs {
         if (kind === 'skeleton' && clim && (clim.biome === Biome.SnowyTaiga || clim.biome === Biome.SnowyTundra)) kind = 'stray';
         if (kind === 'spider' && y < 20 && this.rng() < 0.6) kind = 'cave_spider';
         if ((clim && clim.biome === Biome.Swamp && night && this.rng() < 0.5) || (y < 0 && this.rng() < 0.12)) kind = ['slime_big', 'slime_medium', 'slime_small'][Math.floor(this.rng() * 3)];
+        // a rare King Slime in the swamps at night (not in Minecraft)
+        if (clim && clim.biome === Biome.Swamp && night && y >= h && this.rng() < 0.015 && !this.list.some((m) => m.def.boss && !m.dead)) { this.spawnAt('king_slime', [x + 0.5, y + 1, z + 0.5]); g.emit('toast', 'The ground shakes: King Slime is near!'); return; }
         if (kind === 'spider' && !this.standableWide(x, y, z)) continue;
         this.spawnGroup(kind, x, y, z, 1 + (this.rng() < 0.3 ? 1 : 0));
         return;

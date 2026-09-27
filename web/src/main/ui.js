@@ -26,6 +26,7 @@ const TIPS = [
   'Pour water into a glowstone frame to open a portal to the Skylands. Fall off an island and you drop back to the overworld.',
   'Three more bosses: a Blazing Core summons the Inferno Spirit, a Bone Crown the Hollow King, a Storm Tear the Storm Ghast (it also guards the sky temples).',
   'The Frost Colossus (summoned with a Frozen Heart) slams the ground and breathes frost that slows you. Keep your distance, but not too far.',
+  'Bastions are guarded by the Hollow King and igloos by the Frost Colossus, once each. King Slime sometimes roams swamps at night.',
   'Open the pause menu and choose Bosses for the list of bosses and how to find them.',
   'A Cloud in a Bottle, dropped by the Storm Ghast, gives you a second jump in the air.',
   'Seasons turn every three days: leaves go orange and gold in autumn, and crops barely grow in winter.',

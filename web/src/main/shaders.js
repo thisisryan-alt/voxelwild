@@ -594,6 +594,7 @@ uniform vec3 uNight;
 uniform float uCloudGrey;
 uniform float uDim;
 uniform vec3 uDimColor;
+uniform float uSkyWorld;
 in vec2 vUV;
 out vec4 outColor;
 void main() {
@@ -602,9 +603,10 @@ void main() {
   vec3 V = vec3(cos(el) * cos(az), sin(el), cos(el) * sin(az));
   // single scattering alone turns the last few degrees above the horizon khaki (no multiple scattering); look it up
   // a little higher so the horizon stays a pale, hazy blue
-  vec3 Vs = normalize(vec3(V.x, max(V.y, 0.0) * 0.93 + 0.07, V.z));
+  // the Skylands have no ground below: the sky goes on under the horizon (a little paler)
+  vec3 Vs = normalize(vec3(V.x, (uSkyWorld > 0.5 ? abs(V.y) : max(V.y, 0.0)) * 0.93 + 0.07, V.z));
   vec3 c = scattering(Vs, uSunDir, 150.0);
-  if (V.y < 0.0) c *= mix(1.0, 0.6, clamp(-V.y * 3.0, 0.0, 1.0));
+  if (V.y < 0.0) c = uSkyWorld > 0.5 ? mix(c, vec3(dot(c, vec3(0.3, 0.5, 0.2))) * vec3(0.92, 0.97, 1.08), clamp(-V.y * 1.5, 0.0, 0.45)) : c * mix(1.0, 0.6, clamp(-V.y * 3.0, 0.0, 1.0));
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(c, vec3(l), uCloudGrey) * (1.0 - uCloudGrey * 0.3);
   c += uNight * (0.35 + 0.65 * clamp(V.y + 0.1, 0.0, 1.0));

@@ -729,7 +729,7 @@ export class Renderer {
       gl.viewport(0, 0, 128, 64);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
       const nightK = 1;
-      this.use(this.progs.skyLut, { uSunDir: sky.sun, uCloudGrey: wth.cloudCover * 0.55, uDim: f.dim || 0, uDimColor: sky.fogColor,
+      this.use(this.progs.skyLut, { uSkyWorld: f.skyWorld ? 1 : 0, uSunDir: sky.sun, uCloudGrey: wth.cloudCover * 0.55, uDim: f.dim || 0, uDimColor: sky.fogColor,
         uNight: [0.0022 * nightK + sky.illum * 0.004 * Math.max(0, sky.moon[1]), 0.0032 + sky.illum * 0.005 * Math.max(0, sky.moon[1]), 0.0068 + sky.illum * 0.008 * Math.max(0, sky.moon[1])] });
       this.fullscreen();
       gl.bindTexture(gl.TEXTURE_2D, this.skyLut);
