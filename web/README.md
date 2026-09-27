@@ -205,6 +205,15 @@ drops the Frostbrand, which slows mobs) and the Storm Ghast (ghast volleys and w
 each sky temple once; drops a Cloud in a Bottle, a double jump). Structures have guardians too: the Hollow King in
 each Nether bastion and the Frost Colossus by each igloo (once each), and King Slime now and then in swamps at night. `node test/skylands.mjs`, `test/bosses.mjs`.
 
+## Boss Arena
+
+A mode of nothing but boss fights (title screen > Boss Arena): Boss Rush (King Slime, Frost Colossus, Hollow King,
+Inferno Spirit, Storm Ghast in turn), Endless (the five again and again, +50% health each round) or any one boss.
+It builds a walled stone-brick arena on an unsaved flat world, fixes the time at early afternoon, turns off other
+spawning, and hands out a loadout (iron armour, a diamond sword, a bow and arrows, food, a grappling hook, a Cloud in
+a Bottle). Waves heal and restock the player; a death retries the wave; the end shows the time. `game.startArena`,
+`updateArena`; `node test/arena.mjs`.
+
 ## Controls
 
 WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·

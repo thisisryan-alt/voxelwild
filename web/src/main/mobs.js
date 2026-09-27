@@ -176,7 +176,7 @@ export class Mobs {
 
   trySpawn() {
     const g = this.game, w = g.world, p = g.player.body.pos, dim = g.dim;
-    if (g.settings && g.settings.mobs === false) return;
+    if ((g.settings && g.settings.mobs === false) || (g.meta && g.meta.arena)) return;
     const counts = this.counts(), sky = g.skyNow || g.tod.state;
     const night = (sky.daylight ?? 1) < 0.3;
     const peaceful = g.settings && g.settings.difficulty === 'peaceful';

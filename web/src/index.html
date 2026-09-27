@@ -132,6 +132,7 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
 #bossBar i { display: block; height: 100%; background: linear-gradient(#e0305a, #a0102e); }
 #bossList { margin-top: 10px; display: grid; gap: 4px; max-width: 560px; text-align: left; background: rgba(0,0,0,0.55); padding: 8px 12px; border: 2px solid #000; }
 #bossList b { color: #ffe38a; font-weight: normal; } #bossList .done { color: #8f8; } #bossList small { color: #bbb; display: block; }
+#arenaTag { position: absolute; left: 8px; top: calc(28px + env(safe-area-inset-top, 0px)); color: #ffd966; font-size: 15px; text-shadow: var(--px) var(--px) 0 #000; background: rgba(0,0,0,0.35); padding: 3px 8px; }
 #restedTag { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); color: #ffe38a; font-size: 13px; text-shadow: var(--px) var(--px) 0 #000; }
 #bigmapCanvas { width: min(640px, 80vh, 92vw); height: min(640px, 80vh, 92vw); image-rendering: pixelated; border: 3px solid #000; box-shadow: 0 0 0 2px #888; }
 .tip { max-width: 560px; color: #e8e8a0; margin-top: 14px; }
@@ -252,6 +253,7 @@ button.mini { height: auto; padding: 2px 10px; font-size: 13px; margin-left: 10p
     <div id="mapWrap"><canvas id="minimap" width="150" height="150"></canvas><div id="coords"></div></div>
     <div id="lookInfo" hidden><div class="ico"></div><div><b></b><small></small></div></div>
     <div id="restedTag" hidden>Rested</div>
+    <div id="arenaTag" hidden></div>
     <div id="bossBar" hidden><span></span><div><i></i></div></div>
     <div id="debug" hidden></div>
     <div id="fpsTag" hidden></div>
@@ -276,6 +278,7 @@ button.mini { height: auto; padding: 2px 10px; font-size: 13px; margin-left: 10p
       <button id="btnSandbox">Creative Sandbox</button>
       <div class="pair" style="width:100%"><button id="btnSandboxNether">Nether Sandbox</button><button id="btnSandboxEnd">End Sandbox</button><button id="btnSandboxSky">Skylands Sandbox</button></div>
       <button id="btnSandboxFlat">Superflat Sandbox</button>
+      <button id="btnArena">Boss Arena</button>
       <button id="btnSettingsT">Options...</button>
     </div>
     <div class="col" id="worldListWrap" hidden>
@@ -395,6 +398,29 @@ button.mini { height: auto; padding: 2px 10px; font-size: 13px; margin-left: 10p
     <h2 id="bigmapTitle">Map</h2>
     <canvas id="bigmapCanvas" width="640" height="640"></canvas>
     <p class="hint">M or Esc to close · scroll to zoom · white: you · red: monsters · green: villagers · purple: waystones</p>
+  </div>
+
+  <div id="arenaMenu" class="layer dirt" hidden>
+    <h2>Boss Arena</h2>
+    <p class="hint">Nothing but boss fights. You get iron armour, a diamond sword, a bow, food, a grappling hook and a Cloud in a Bottle.
+      Between waves you are healed and restocked; if you fall, you retry the wave.</p>
+    <div class="col" style="margin-top:14px">
+      <button data-arena="rush">Boss Rush · all five bosses in a row</button>
+      <button data-arena="endless">Endless · round after round, each tougher</button>
+      <div class="pair" style="width:100%"><button data-arena="king_slime">King Slime</button><button data-arena="frost_colossus">Frost Colossus</button></div>
+      <div class="pair" style="width:100%"><button data-arena="hollow_king">Hollow King</button><button data-arena="inferno_spirit">Inferno Spirit</button></div>
+      <button data-arena="storm_ghast">Storm Ghast</button>
+      <button id="btnArenaBack">Back</button>
+    </div>
+  </div>
+
+  <div id="arenaWon" class="layer dim" hidden>
+    <h1>Victory!</h1>
+    <p id="arenaWonText"></p>
+    <div class="col" style="margin-top:22px">
+      <button id="btnArenaAgain">Fight Again</button>
+      <button id="btnArenaTitle">Title Screen</button>
+    </div>
   </div>
 
   <div id="death" class="layer" hidden>

@@ -464,6 +464,7 @@ export class Game {
 
   async startWorld(meta, isNew) {
     this.stopWorld();
+    this.arena = null;
     this.meta = meta;
     // saved sections: overworld keys as they were, the Nether's and the End's prefixed N/ and E/
     const all = isNew ? new Map() : await this.store.loadSections(meta.id);
@@ -514,6 +515,10 @@ export class Game {
         this.spawn = [0.5, 70, 0.5];
         this.player.teleport(this.spawn, 0, 0);
         this.arrival = () => { this.arrivePortal(Dim.Nether, 0, 0, null); this.spawn = [...this.player.body.pos]; };
+      } else if (meta.arena) {
+        this.spawn = [0.5, SEA + 1, 0.5];
+        this.player.teleport(this.spawn, 0, 0);
+        this.arrival = () => this.startArena(meta.arena);
       } else if (this.dim === Dim.Sky) {
         this.spawn = [0.5, 150, 0.5];
         this.player.teleport(this.spawn, 0, 0);
@@ -653,6 +658,12 @@ export class Game {
   die(cause) {
     const p = this.player.body.pos;
     // a gravestone keeps everything (not in Minecraft): the items wait where the player fell
+    if (this.meta.arena) {
+      if (this.arena) { this.arena.state = 'lost'; this.arena.deaths++; }
+      this.deathCause = cause; this.state = 'dead'; this.mining = null;
+      this.emit('state', this.state, cause);
+      return;
+    }
     if (this.settings.graves !== false && this.makeGrave()) {
       this.deathCause = cause; this.state = 'dead'; this.mining = null;
       this.emit('state', this.state, cause);
@@ -679,6 +690,7 @@ export class Game {
   respawn() {
     this.stats.reset();
     this.burning = 0;
+    if (this.meta.arena && this.arena) { this.retryWave(); return; }
     if (this.dim !== Dim.Overworld) {
       this.player.flying = false;
       this.travel(Dim.Overworld, this.spawn, this.player.yaw, null);
@@ -840,6 +852,7 @@ export class Game {
       this.interact(dt);
     }
     this.updateEntities(dt);
+    if (this.arena) this.updateArena(dt);
     if (!this.meta.menu) { this.redstone.update(dt); this.updateBlocks(dt); this.updateGrapple(dt); if (!this.creative) this.updateRested(dt); this.updateDash(dt); }
     this.updateEyes(dt);
     if (!this.meta.menu) this.mobs.update(dt);
@@ -1580,6 +1593,105 @@ export class Game {
       if (!frame) { w.setBlock(x + dx, y + dy, z - 1, B.Air); w.setBlock(x + dx, y + dy, z + 1, B.Air); }
     }
     this.meta.portals.push({ dim: this.dim, x, y, z, kind: 'sky' });
+  }
+
+  // ---------------------------------------------------------------- the Boss Arena (a mode of nothing but boss fights)
+
+  /** mode: 'rush' (the five in turn), 'endless' (round after round, each tougher), or a boss type. */
+  startArena(mode) {
+    const order = ['king_slime', 'frost_colossus', 'hollow_king', 'inferno_spirit', 'storm_ghast'];
+    this.arena = { mode, order: mode === 'rush' || mode === 'endless' ? order : [mode], wave: 0, round: 0, state: 'break', timer: 6, start: this.time, fightTime: 0, deaths: 0, best: null };
+    this.buildArena();
+    this.creative = false; this.player.canFly = false; this.player.flying = false;
+    this.tod.running = false; this.tod.hour = 13;          // always early afternoon (this world only)
+    if (this.weather) { this.weather.force(0); this.weather.frozen = true; }
+    this.player.teleport([0.5, SEA + 1, 14.5], 0, 0);
+    this.giveLoadout();
+    this.emit('toast', mode === 'endless' ? 'Endless arena: the bosses keep coming, stronger each round' : mode === 'rush' ? 'Boss Rush: five bosses, one after another' : `Arena: ${MOB_TYPES[mode].name}`);
+  }
+  /** A walled stone-brick arena with lit pillars and a little cover. */
+  buildArena() {
+    const w = this.world, y = SEA, R = 22;
+    const brick = () => { const r = Math.random(); return r < 0.15 ? B.MossyStoneBricks : r < 0.25 ? B.CrackedStoneBricks : B.StoneBricks; };
+    for (let z = -R - 1; z <= R + 1; z++) for (let x = -R - 1; x <= R + 1; x++) {
+      const d = Math.max(Math.abs(x), Math.abs(z));
+      w.setBlock(x, y, z, d > R ? B.StoneBricks : (x + z) % 7 === 0 ? CK.chiseled_stone_bricks || B.StoneBricks : brick());
+      for (let k = 1; k <= 14; k++) w.setBlock(x, y + k, z, B.Air);
+      if (d === R + 1) for (let k = 1; k <= 6; k++) w.setBlock(x, y + k, z, k === 6 && (x + z) % 2 ? B.Air : brick());
+    }
+    // pillars with glowstone crowns, and low cover walls
+    for (const [x, z] of [[-12, -12], [12, -12], [-12, 12], [12, 12], [0, -16], [0, 16], [-16, 0], [16, 0]]) {
+      for (let k = 1; k <= 4; k++) w.setBlock(x, y + k, z, B.StoneBricks);
+      w.setBlock(x, y + 5, z, B.Glowstone);
+    }
+    for (const [x, z, dx, dz] of [[-6, -4, 1, 0], [4, 5, 1, 0], [-8, 6, 0, 1], [8, -7, 0, 1]]) for (let k = 0; k < 3; k++) w.setBlock(x + dx * k, y + 1, z + dz * k, FAM.stone_brick_slab ? FAM.stone_brick_slab.first : B.StoneBricks);
+  }
+  giveLoadout() {
+    const inv = this.inventory;
+    inv.slots.fill(null);
+    const put = (i, item, count = 1) => { if (ITEMS[item]) inv.slots[i] = { item, count }; };
+    put(0, I.DiamondSword); put(1, I.Bow); put(2, I.CookedBeef, 24); put(3, I.GrapplingHook); put(4, B.StoneBricks, 32); put(5, I.Arrow, 64); put(6, I.CookedChicken, 16); put(9, I.Arrow, 64);
+    put(10, I.CloudBottle);
+    inv.armor = [0, 1, 2, 3].map((k) => ({ item: I.LeatherHelmet + 2 * 4 + k, count: 1 }));
+    inv.selected = 0;
+    inv.changed(); this.emit('hud');
+    this.stats.reset();
+  }
+  retryWave() {
+    const a = this.arena;
+    this.mobs.clear();
+    this.giveLoadout();
+    this.player.teleport([0.5, SEA + 1, 14.5], 0, 0);
+    this.player.body.vel = [0, 0, 0];
+    a.state = 'break'; a.timer = 5;
+    this.state = 'playing'; this.emit('state', 'playing'); this.emit('hud');
+    this.emit('toast', `Try again: wave ${a.wave + 1}`);
+  }
+  updateArena(dt) {
+    const a = this.arena;
+    if (this.state !== 'playing' || a.state === 'lost' || a.state === 'won') return;
+    const boss = this.mobs.list.find((m) => m.def.boss && !m.dead);
+    if (a.state === 'break') {
+      a.timer -= dt;
+      const type = a.order[a.wave % a.order.length];
+      if (Math.ceil(a.timer) !== a.shown) { a.shown = Math.ceil(a.timer); if (a.shown <= 3 && a.shown > 0) this.emit('toast', `${MOB_TYPES[type].name} in ${a.shown}…`); }
+      if (a.timer <= 0) {
+        const t = MOB_TYPES[type], mult = 1 + a.round * 0.5;
+        const m = this.mobs.spawnAt(type, [0.5, SEA + 1 + (t.flying ? 8 : 0), -12.5]);
+        m.health = m.maxHealth = t.health * mult;
+        a.state = 'fight'; a.fightStart = this.time;
+        this.flash = Math.max(this.flash, 0.4); this.audio.explosion();
+        this.emit('toast', `Wave ${a.wave + 1}: ${t.name}${a.round ? ` (round ${a.round + 1}, ×${mult} health)` : ''}`);
+      }
+    } else if (a.state === 'fight') {
+      // the wave is won when the boss and everything it brought are gone
+      const minions = this.mobs.list.some((m) => !m.dead && m.def.kind === 'hostile');
+      if (!boss && !minions) {
+        a.wave++;
+        if (a.wave % a.order.length === 0 && a.mode === 'endless') a.round++;
+        const done = a.mode !== 'endless' && a.wave >= a.order.length;
+        this.stats.health = 20; this.stats.hunger = 20; this.stats.saturation = 10;
+        this.inventory.add(I.Arrow, 16); this.inventory.add(I.CookedBeef, 6);
+        this.entities = [];
+        if (done) {
+          a.state = 'won'; a.total = this.time - a.start;
+          this.meta.arenaBest = Math.min(this.meta.arenaBest || Infinity, a.total);
+          this.emit('arenaWon', a);
+        } else { a.state = 'break'; a.timer = 8; this.emit('toast', `Wave cleared! Healed and restocked. Next: ${MOB_TYPES[a.order[a.wave % a.order.length]].name}`); }
+      }
+      // keep the fight inside the arena: a boss that wanders off is brought back
+      if (boss && Math.max(Math.abs(boss.body.pos[0]), Math.abs(boss.body.pos[2])) > 26) { boss.body.pos = [0.5, SEA + 2 + (boss.def.flying ? 8 : 0), 0.5]; boss.body.vel = [0, 0, 0]; }
+      const pl = this.player.body.pos;
+      if (Math.max(Math.abs(pl[0]), Math.abs(pl[2])) > 30) this.player.teleport([0.5, SEA + 1, 14.5]);
+    }
+  }
+  arenaStatus() {
+    const a = this.arena;
+    if (!a) return null;
+    const type = a.order[a.wave % a.order.length], t = this.time - a.start;
+    const clock = `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+    const waves = a.mode === 'endless' ? `Wave ${a.wave + 1}` : `Wave ${Math.min(a.wave + 1, a.order.length)}/${a.order.length}`;
+    return `${waves} · ${a.state === 'won' ? 'cleared' : MOB_TYPES[type].name}${a.round ? ` · round ${a.round + 1}` : ''} · ${clock}${a.deaths ? ` · ${a.deaths} death${a.deaths > 1 ? 's' : ''}` : ''}`;
   }
 
   /** Terraria's dodge: double-tap A or D for a quick sideways dash. */

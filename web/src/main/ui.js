@@ -27,6 +27,7 @@ const TIPS = [
   'Three more bosses: a Blazing Core summons the Inferno Spirit, a Bone Crown the Hollow King, a Storm Tear the Storm Ghast (it also guards the sky temples).',
   'The Frost Colossus (summoned with a Frozen Heart) slams the ground and breathes frost that slows you. Keep your distance, but not too far.',
   'Bastions are guarded by the Hollow King and igloos by the Frost Colossus, once each. King Slime sometimes roams swamps at night.',
+  'Boss Arena on the title screen: fight the bosses one after another, one at a time, or endlessly.',
   'Open the pause menu and choose Bosses for the list of bosses and how to find them.',
   'A Cloud in a Bottle, dropped by the Storm Ghast, gives you a second jump in the air.',
   'Seasons turn every three days: leaves go orange and gold in autumn, and crops barely grow in winter.',
@@ -196,7 +197,7 @@ export class UI {
   // ---------------------------------------------------------------- screens
 
   show(name) {
-    for (const id of ['title', 'newWorld', 'loading', 'pause', 'settings', 'inventory', 'death', 'fatal', 'bigmap']) $(id).hidden = id !== name;
+    for (const id of ['title', 'newWorld', 'loading', 'pause', 'settings', 'inventory', 'death', 'fatal', 'bigmap', 'arenaMenu', 'arenaWon']) $(id).hidden = id !== name;
     if (name === 'loading') $('loadTip').textContent = tip();
     if (name === 'pause') $('pauseTip').textContent = tip();
     $('hud').hidden = !['playing', 'inventory', 'pause', 'death'].includes(name) || !this.game.world || !!(this.game.meta && this.game.meta.menu);
@@ -346,6 +347,18 @@ export class UI {
     const go = (d) => { if (!g.creative || !g.world) return; this.resume(); g.goToDimension(d); };
     $('btnGoOver').onclick = () => go(0); $('btnGoNether').onclick = () => go(1); $('btnGoEnd').onclick = () => go(2); $('btnGoSky').onclick = () => go(3);
     $('btnSandboxSky').onclick = () => sandbox({ startDim: 3 }, 'Skylands sandbox');
+    // the Boss Arena: a flat, unsaved world of nothing but boss fights
+    const arena = (mode) => this.play({ id: `arena${Date.now().toString(36)}`, name: 'Boss Arena', seed: 1234, mode: 'survival', unsaved: true, flat: true, arena: mode, created: Date.now(), lastPlayed: Date.now() }, true);
+    $('btnArena').onclick = () => this.show('arenaMenu');
+    $('btnArenaBack').onclick = () => this.show('title');
+    for (const b of document.querySelectorAll('#arenaMenu [data-arena]')) b.onclick = () => arena(b.dataset.arena);
+    g.on('arenaWon', (a) => {
+      const t = a.total, best = g.meta.arenaBest;
+      $('arenaWonText').textContent = `${a.order.length === 1 ? 'Boss defeated' : 'All bosses defeated'} in ${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}${a.deaths ? ` with ${a.deaths} retr${a.deaths > 1 ? 'ies' : 'y'}` : ' without dying'}.`;
+      g.state = 'paused'; this.unlock(); this.show('arenaWon');
+    });
+    $('btnArenaAgain').onclick = () => arena(g.arena ? g.arena.mode : 'rush');
+    $('btnArenaTitle').onclick = () => this.toTitle();
     $('btnSettingsT').onclick = () => { this.settingsBack = 'title'; this.openSettings(); };
     $('btnSettingsP').onclick = () => { this.settingsBack = 'pause'; this.openSettings(); };
     $('btnSettingsDone').onclick = () => { storeSettings(this.settings); this.show(this.settingsBack); };
@@ -1077,7 +1090,7 @@ export class UI {
     this.hudT = 0.12;
     const p = g.player.body.pos, clim = g.world.climateAt ? g.world.climateAt(Math.floor(p[0]), Math.floor(p[2])) : null;
     const season = g.dim === 0 && s.seasons !== false ? ` · ${g.seasonNow()[3]}` : '';
-    $('coords').textContent = `${Math.floor(p[0])} ${Math.floor(p[1])} ${Math.floor(p[2])}${clim && g.dim === 0 && BIOME_LABEL[clim.biome] ? ' · ' + BIOME_LABEL[clim.biome] : ''}${season}`;
+    $('coords').textContent = `${Math.floor(p[0])} ${Math.floor(p[1])} ${Math.floor(p[2])}${clim && g.dim === 0 && !g.meta.flat && BIOME_LABEL[clim.biome] ? ' · ' + BIOME_LABEL[clim.biome] : ''}${season}`;
     const info = s.lookInfo !== false && this.screen === 'playing' ? g.lookInfo() : null, el = $('lookInfo');
     el.hidden = !info;
     if (info) {
@@ -1090,7 +1103,10 @@ export class UI {
     }
     const boss = g.mobs.list.find((m) => m.def.boss && !m.dead && Math.hypot(m.body.pos[0] - p[0], m.body.pos[2] - p[2]) < 90);
     $('bossBar').hidden = !boss;
-    if (boss) { $('bossBar').querySelector('span').textContent = boss.def.name; $('bossBar').querySelector('i').style.width = `${Math.max(0, boss.health / boss.def.health * 100).toFixed(1)}%`; }
+    if (boss) { $('bossBar').querySelector('span').textContent = boss.def.name; $('bossBar').querySelector('i').style.width = `${Math.max(0, boss.health / (boss.maxHealth || boss.def.health) * 100).toFixed(1)}%`; }
+    const as = g.arena && g.meta && g.meta.arena ? g.arenaStatus() : null;
+    $('arenaTag').hidden = !as;
+    if (as) $('arenaTag').textContent = as;
     $('restedTag').hidden = !(g.rested > 0);
     if (g.rested > 0) $('restedTag').textContent = `Rested · ${Math.ceil(g.rested / 60)} min`;
   }
