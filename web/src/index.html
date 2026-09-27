@@ -130,6 +130,8 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
 #bossBar { position: absolute; left: 50%; top: calc(58px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: min(420px, 70vw); text-align: center; color: #fff; text-shadow: var(--px) var(--px) 0 #000; pointer-events: none; }
 #bossBar div { height: 8px; margin-top: 3px; background: #300; border: 2px solid #000; }
 #bossBar i { display: block; height: 100%; background: linear-gradient(#e0305a, #a0102e); }
+#bossList { margin-top: 10px; display: grid; gap: 4px; max-width: 560px; text-align: left; background: rgba(0,0,0,0.55); padding: 8px 12px; border: 2px solid #000; }
+#bossList b { color: #ffe38a; font-weight: normal; } #bossList .done { color: #8f8; } #bossList small { color: #bbb; display: block; }
 #restedTag { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); color: #ffe38a; font-size: 13px; text-shadow: var(--px) var(--px) 0 #000; }
 #bigmapCanvas { width: min(640px, 80vh, 92vw); height: min(640px, 80vh, 92vw); image-rendering: pixelated; border: 3px solid #000; box-shadow: 0 0 0 2px #888; }
 .tip { max-width: 560px; color: #e8e8a0; margin-top: 14px; }
@@ -272,7 +274,7 @@ button.mini { height: auto; padding: 2px 10px; font-size: 13px; margin-left: 10p
       <button id="btnContinue" hidden>Continue</button>
       <button id="btnNew">Singleplayer</button>
       <button id="btnSandbox">Creative Sandbox</button>
-      <div class="pair" style="width:100%"><button id="btnSandboxNether">Nether Sandbox</button><button id="btnSandboxEnd">End Sandbox</button></div>
+      <div class="pair" style="width:100%"><button id="btnSandboxNether">Nether Sandbox</button><button id="btnSandboxEnd">End Sandbox</button><button id="btnSandboxSky">Skylands Sandbox</button></div>
       <button id="btnSandboxFlat">Superflat Sandbox</button>
       <button id="btnSettingsT">Options...</button>
     </div>
@@ -295,7 +297,7 @@ button.mini { height: auto; padding: 2px 10px; font-size: 13px; margin-left: 10p
         <div class="seg"><button type="button" id="nwSurvival" aria-pressed="true">Survival</button><button type="button" id="nwCreative" aria-pressed="false">Creative</button></div>
         <p class="hint" id="nwModeHint">Health, hunger and breath. Blocks come from mining; tools come from crafting.</p>
         <span class="label">Start In</span>
-        <div class="seg"><button type="button" id="nwDim0" aria-pressed="true">Overworld</button><button type="button" id="nwDim1" aria-pressed="false">Nether</button><button type="button" id="nwDim2" aria-pressed="false">The End</button></div>
+        <div class="seg"><button type="button" id="nwDim0" aria-pressed="true">Overworld</button><button type="button" id="nwDim1" aria-pressed="false">Nether</button><button type="button" id="nwDim2" aria-pressed="false">The End</button><button type="button" id="nwDim3" aria-pressed="false">Skylands</button></div>
         <span class="label">World Type</span>
         <div class="seg"><button type="button" id="nwTypeDefault" aria-pressed="true">Default</button><button type="button" id="nwTypeFlat" aria-pressed="false">Superflat</button></div>
       </div>
@@ -316,8 +318,10 @@ button.mini { height: auto; padding: 2px 10px; font-size: 13px; margin-left: 10p
     <div class="col" style="margin-top:18px">
       <button id="btnResume">Back to Game</button>
       <div class="pair" style="width:100%"><button id="btnSettingsP">Options...</button><button id="btnMode">Switch to Creative</button></div>
-      <div class="pair" id="travelRow" style="width:100%"><button id="btnGoOver">Overworld</button><button id="btnGoNether">Nether</button><button id="btnGoEnd">The End</button></div>
+      <div class="pair" id="travelRow" style="width:100%"><button id="btnGoOver">Overworld</button><button id="btnGoNether">Nether</button><button id="btnGoEnd">The End</button><button id="btnGoSky">Skylands</button></div>
+      <button id="btnBosses">Bosses</button>
       <button id="btnQuit">Save and Quit to Title</button>
+      <div id="bossList" hidden></div>
     </div>
     <p class="hint" id="pauseInfo"></p>
     <p class="hint tip" id="pauseTip"></p>

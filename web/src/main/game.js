@@ -467,9 +467,9 @@ export class Game {
     this.meta = meta;
     // saved sections: overworld keys as they were, the Nether's and the End's prefixed N/ and E/
     const all = isNew ? new Map() : await this.store.loadSections(meta.id);
-    this.dimModified = [new Map(), new Map(), new Map()];
+    this.dimModified = [new Map(), new Map(), new Map(), new Map()];
     for (const [k, v] of all) {
-      const d = k.startsWith('N/') ? 1 : k.startsWith('E/') ? 2 : 0;
+      const d = k.startsWith('N/') ? 1 : k.startsWith('E/') ? 2 : k.startsWith('S/') ? 3 : 0;
       this.dimModified[d].set(d ? k.slice(2) : k, v);
     }
     this.dim = isNew ? meta.startDim || Dim.Overworld : meta.dim || Dim.Overworld;
@@ -489,7 +489,8 @@ export class Game {
     this.player.onLand = (h, water) => {
       if (water) { if (h > 1.5) { this.audio.splash(); this.spawnSplash(Math.min(1, h / 8)); } return; }
       if (h > 0.6) this.audio.step(this.blockUnderFeet(), 0.55);
-      if (!this.creative) this.stats.land(h, water);
+      const under = this.blockUnderFeet();
+      if (!this.creative && under !== CK.powder_snow && under !== CK.slime_block && !(under > 0 && BLOCKS[under].model && BLOCKS[under].model.kind === K.Bed)) this.stats.land(h, water);
     };
     this.player.onStep = () => this.audio.step(this.blockUnderFeet());
     this.stats.onDamage = (a) => { this.damageFlash = Math.min(1, this.damageFlash + 0.5 + a * 0.05); this.audio.hurt(); this.emit('hud'); };
@@ -513,6 +514,10 @@ export class Game {
         this.spawn = [0.5, 70, 0.5];
         this.player.teleport(this.spawn, 0, 0);
         this.arrival = () => { this.arrivePortal(Dim.Nether, 0, 0, null); this.spawn = [...this.player.body.pos]; };
+      } else if (this.dim === Dim.Sky) {
+        this.spawn = [0.5, 150, 0.5];
+        this.player.teleport(this.spawn, 0, 0);
+        this.arrival = () => { this.arriveSky(0, 0, true); this.spawn = [...this.player.body.pos]; };
       } else if (this.dim === Dim.End) {
         this.spawn = [...END_ARRIVAL];
         this.player.teleport(this.spawn, Math.PI / 2, 0);
@@ -542,9 +547,13 @@ export class Game {
     this.emit('inventory');
   }
 
+  /** Dimensions with the overworld's sky, sun, weather and seasons (the overworld and the Skylands). */
+  openSky() { return this.dim === Dim.Overworld || this.dim === Dim.Sky; }
+
   /** Creative: straight to another dimension (a portal home is built on arrival in the Nether). */
   goToDimension(d) {
     if (d === this.dim) { this.emit('toast', 'Already here'); return; }
+    if (d === Dim.Sky || this.dim === Dim.Sky) { this.skyTravel(d); return; }
     if (d === Dim.Nether) { const p = this.player.body.pos, k = this.dim === Dim.Overworld ? 1 / 8 : 1; const tx = Math.floor(p[0] * k), tz = Math.floor(p[2] * k); this.travel(Dim.Nether, [tx + 0.5, 70, tz + 0.5], this.player.yaw, () => this.arrivePortal(Dim.Nether, tx, tz, null)); }
     else if (d === Dim.End) this.travel(Dim.End, END_ARRIVAL, Math.PI / 2, () => this.arriveEnd());
     else this.travel(Dim.Overworld, this.dim === Dim.Nether ? [this.player.body.pos[0] * 8, 100, this.player.body.pos[2] * 8] : this.spawn, this.player.yaw, () => { this.settleOnGround(); });
@@ -633,7 +642,7 @@ export class Game {
       const sections = new Map();
       for (let d = 0; d < 3; d++) {
         const src = d === this.dim ? this.world.editedSections() : this.dimModified[d];
-        for (const [k, v] of src) sections.set((d === 1 ? 'N/' : d === 2 ? 'E/' : '') + k, v);
+        for (const [k, v] of src) sections.set((d === 1 ? 'N/' : d === 2 ? 'E/' : d === 3 ? 'S/' : '') + k, v);
       }
       await this.store.saveWorld(meta, sections);
       this.meta = meta;
@@ -816,7 +825,9 @@ export class Game {
       if (this.keys.has('ArrowRight')) pl.yaw -= lk;
     }
     const before = pl.body.pos[1];
+    pl.doubleJump = this.inventory.count(I.CloudBottle) > 0;
     pl.update(w, dt, inp);
+    if (pl.didDoubleJump) { pl.didDoubleJump = false; for (let k = 0; k < 10; k++) this.spawnEmbers([pl.body.pos[0], pl.body.pos[1], pl.body.pos[2]], 1, [1.4, 1.4, 1.5]); }
     this.updateHazards(dt);
     if (pl.body.pos[1] < MIN_Y - 40) { if (this.creative) pl.teleport([pl.body.pos[0], MAX_Y - 4, pl.body.pos[2]]); else this.stats.damage(1000, 'void'); }
     const wasHead = this.headWet;
@@ -1113,6 +1124,13 @@ export class Game {
     const tgt = BLOCKS[hit.block].flags & F.Replaceable ? hit.hit : hit.prev;
     const cur = w.getBlock(...tgt);
     if (cur < 0 || !(BLOCKS[cur].flags & F.Replaceable)) return;
+    // water poured into a glowstone frame opens a portal to the Skylands
+    if (def.id === I.WaterBucket && FAM.sky_portal && (this.dim === Dim.Overworld || this.dim === Dim.Sky) && cur === B.Air &&
+        this.lightPortal(...tgt, B.Glowstone, FAM.sky_portal.first, FAM.sky_portal.first + 1, 'sky')) {
+      this.audio.splash(); this.emit('toast', 'The portal shimmers with the sky');
+      if (!this.creative) { inv.slots[inv.selected] = { item: I.Bucket, count: 1 }; inv.changed(); }
+      return;
+    }
     if (def.id === I.WaterBucket && this.dim === Dim.Nether) { this.spawnEmbers([tgt[0] + 0.5, tgt[1] + 0.5, tgt[2] + 0.5], 12, [0.9, 0.9, 0.9]); this.emit('toast', 'The water boils away'); }
     else w.setBlock(...tgt, def.id === I.WaterBucket ? B.Water : B.Lava);
     this.audio.splash();
@@ -1173,7 +1191,7 @@ export class Game {
   }
   updateFires(step) {
     const m = this.meta, w = this.world, prefix = `${this.dim || 0}:`;
-    const wet = this.dim === Dim.Overworld && this.weather && this.weather.params && this.weather.params.precip > 0.3;
+    const wet = this.openSky() && this.weather && this.weather.params && this.weather.params.precip > 0.3;
     const list = Object.entries(m.fires || {}).filter(([k]) => k.startsWith(prefix));
     for (const [k, until] of list) {
       const [x, y, z] = k.slice(prefix.length).split(',').map(Number), id = w.getBlock(x, y, z);
@@ -1517,6 +1535,53 @@ export class Game {
     return [autumn, winter, i, ['Spring', 'Summer', 'Autumn', 'Winter'][i]];
   }
 
+  /** Through the Skylands portal (same x and z both ways; a portal home is built where there is none). */
+  skyTravel(to) {
+    const p = this.player.body.pos, tx = Math.floor(p[0]), tz = Math.floor(p[2]);
+    const known = this.meta.portals.find((q) => q.kind === 'sky' && q.dim === to && Math.hypot(q.x - tx, q.z - tz) < 64);
+    if (to === Dim.Sky) this.travel(Dim.Sky, [tx + 0.5, 180, tz + 0.5], this.player.yaw, () => this.arriveSky(tx, tz, false, known));
+    else this.travel(Dim.Overworld, [tx + 0.5, 120, tz + 0.5], this.player.yaw, () => this.arriveSkyHome(tx, tz, known));
+    this.emit('toast', to === Dim.Sky ? 'Entering the Skylands' : 'Returning to the overworld');
+  }
+  /** Arrival in the Skylands: on the nearest island, beside a glowstone portal home (built if needed). */
+  arriveSky(tx, tz, start, known) {
+    const w = this.world;
+    if (known && FAM.sky_portal && w.getBlock(known.x, known.y, known.z) >= FAM.sky_portal.first) { this.player.teleport([known.x + 0.5, known.y, known.z + 2.5]); this.portalLock = true; return; }
+    let spot = null;
+    for (let r = 0; r <= 40 && !spot; r += 4) for (let a = 0; a < 16 && !spot; a++) {
+      const x = Math.floor(tx + Math.cos(a / 16 * Math.PI * 2) * r), z = Math.floor(tz + Math.sin(a / 16 * Math.PI * 2) * r);
+      const h = w.heightmapAt(x, z);
+      if (h != null && h > 40 && w.getBlock(x, h, z) === B.Grass) spot = [x, h + 1, z];
+    }
+    if (!spot) {
+      // no island in reach: a small calcite platform to stand on
+      spot = [tx, 120, tz];
+      for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) if (Math.hypot(dx, dz) < 3.6) w.setBlock(tx + dx, 119, tz + dz, CK.calcite);
+    }
+    this.buildSkyPortal(spot[0], spot[1], spot[2]);
+    this.player.teleport([spot[0] + 0.5, spot[1], spot[2] + 2.5], this.player.yaw, 0);
+    this.portalLock = true;
+    if (start) this.emit('toast', 'Welcome to the Skylands');
+  }
+  arriveSkyHome(tx, tz, known) {
+    const w = this.world;
+    if (known && FAM.sky_portal && w.getBlock(known.x, known.y, known.z) >= FAM.sky_portal.first) { this.player.teleport([known.x + 0.5, known.y, known.z + 2.5]); this.portalLock = true; return; }
+    this.settleOnGround();
+    const p = this.player.body.pos.map(Math.floor);
+    this.buildSkyPortal(p[0], p[1], p[2] - 3);
+    this.portalLock = true;
+  }
+  /** A glowstone frame (4 x 5) with the portal inside, on the ground at (x, y, z). */
+  buildSkyPortal(x, y, z) {
+    const w = this.world;
+    for (let dx = -1; dx <= 2; dx++) for (let dy = -1; dy <= 3; dy++) {
+      const frame = dx === -1 || dx === 2 || dy === -1 || dy === 3;
+      w.setBlock(x + dx, y + dy, z, frame ? B.Glowstone : FAM.sky_portal.first);
+      if (!frame) { w.setBlock(x + dx, y + dy, z - 1, B.Air); w.setBlock(x + dx, y + dy, z + 1, B.Air); }
+    }
+    this.meta.portals.push({ dim: this.dim, x, y, z, kind: 'sky' });
+  }
+
   /** Terraria's dodge: double-tap A or D for a quick sideways dash. */
   updateDash(dt) {
     this.dashCool = Math.max(0, (this.dashCool || 0) - dt);
@@ -1600,13 +1665,13 @@ export class Game {
     if (bag) {
       // a sleeping bag (a Minecraft idea Mojang turned down): rest anywhere, the respawn point stays where it was
       const h = this.tod ? this.tod.hour : 12;
-      if (this.dim !== Dim.Overworld || !(h < 6 || h > 18.5)) { this.emit('toast', 'You can only sleep at night in the overworld'); return; }
+      if (!this.openSky() || !(h < 6 || h > 18.5)) { this.emit('toast', 'You can only sleep at night under the sky'); return; }
       if (this.mobs.list.some((m) => !m.dead && m.def.kind === 'hostile' && Math.hypot(m.body.pos[0] - x, m.body.pos[2] - z) < 8)) { this.emit('toast', 'You may not rest now; there are monsters nearby'); return; }
       this.emit('toast', 'Sleeping…');
       setTimeout(() => { if (this.tod) { if (this.tod.hour > 12) this.tod.day++; this.tod.hour = 6.2; } this.emit('toast', 'Good morning'); }, 1500);
       return;
     }
-    if (this.dim !== Dim.Overworld) { this.emit('toast', 'Beds explode here'); this.mobs.explode(x + 0.5, y + 0.5, z + 0.5, 3, null); return; }
+    if (!this.openSky()) { this.emit('toast', 'Beds explode here'); this.mobs.explode(x + 0.5, y + 0.5, z + 0.5, 3, null); return; }
     this.spawn = [x + 0.5, y + 0.6, z + 0.5];
     this.setWaypoint('bed', 'Bed', pos, '#ff6a6a');
     const h = this.tod ? this.tod.hour : 12, night = h < 6 || h > 18.5;
@@ -1816,6 +1881,15 @@ export class Game {
     const pl = this.player, w = this.world, p = pl.body.pos;
     const bx = Math.floor(p[0]), bz = Math.floor(p[2]);
     const feet = w.getBlock(bx, Math.floor(p[1] + 0.2), bz), head = w.getBlock(bx, Math.floor(p[1] + 1.4), bz);
+    // the Skylands portal: step in and go (both ways)
+    const skyP = FAM.sky_portal ? (b) => b >= FAM.sky_portal.first && b < FAM.sky_portal.first + 2 : () => false;
+    if ((skyP(feet) || skyP(head)) && !this.portalLock) { this.portalLock = true; this.skyTravel(this.dim === Dim.Sky ? Dim.Overworld : Dim.Sky); return; }
+    if (!skyP(feet) && !skyP(head) && !isPortal(feet) && !isPortal(head) && feet !== B.EndPortal) this.portalLock = this.portalLock && this.portalTime > 0;
+    // falling off the Skylands: down into the overworld's sky
+    if (this.dim === Dim.Sky && p[1] < 10) {
+      this.travel(Dim.Overworld, [p[0], 200, p[2]], pl.yaw, () => { this.settleOnGround(); this.emit('toast', 'You tumble out of the Skylands'); });
+      return;
+    }
     const eye = pl.eye();
     this.headInLava = isLava(w.getBlock(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2])));
     // nether portal: stand in it (4 s, 1 s in creative)
@@ -1961,6 +2035,14 @@ export class Game {
     if (def.id === I.Backpack) { this.openBackpack(); return; }
     if (def.id === I.GrapplingHook) { this.fireGrapple(); return; }
     if (def.id === I.SleepingBag) { this.sleep(this.player.body.pos.map(Math.floor), true); return; }
+    if (def.summons) {
+      if (this.mobs.list.some((m) => m.def.boss && !m.dead)) { this.emit('toast', 'A boss is already here'); return; }
+      const p = this.player.body.pos, a = this.player.yaw, t = MOB_TYPES[def.summons];
+      this.mobs.spawnAt(def.summons, [p[0] - Math.sin(a) * 10, p[1] + (t.flying ? 6 : 3), p[2] - Math.cos(a) * 10]);
+      this.emit('toast', `${t.name} has awoken!`); this.audio.explosion(); this.flash = Math.max(this.flash, 0.5);
+      if (!this.creative) inv.consumeHeld();
+      return;
+    }
     if (def.id === I.SlimeCrown) {
       if (this.mobs.list.some((m) => m.def.boss && !m.dead)) { this.emit('toast', 'A boss is already here'); return; }
       const p = this.player.body.pos, a = this.player.yaw;
@@ -2018,7 +2100,7 @@ export class Game {
   }
 
   /** Flood the air inside an obsidian frame (either axis, 2x3 up to 21x21) with portal blocks. */
-  lightPortal(x, y, z) {
+  lightPortal(x, y, z, frame = B.Obsidian, px = B.NetherPortalX, pz = B.NetherPortalZ, kind = 'nether') {
     const w = this.world;
     if (w.getBlock(x, y, z) !== B.Air) return false;
     for (const alongX of [true, false]) {
@@ -2033,8 +2115,8 @@ export class Game {
           const key = `${alongX ? nx : nz},${ny}`;
           if (seen.has(key)) continue;
           const b = w.getBlock(nx, ny, nz);
-          if (b === B.Obsidian) continue;
-          if (b !== B.Air) { ok = false; break; }
+          if (b === frame) continue;
+          if (b !== B.Air && !(frame === B.Glowstone && isWater(b))) { ok = false; break; }
           seen.add(key); q.push([nx, ny, nz]);
         }
       }
@@ -2042,8 +2124,8 @@ export class Game {
       const us = cells.map((c) => (alongX ? c[0] : c[2])), vs = cells.map((c) => c[1]);
       const wdt = Math.max(...us) - Math.min(...us) + 1, hgt = Math.max(...vs) - Math.min(...vs) + 1;
       if (wdt < 2 || hgt < 3 || wdt > 21 || hgt > 21) continue;
-      for (const [cx, cy, cz] of cells) w.setBlock(cx, cy, cz, alongX ? B.NetherPortalX : B.NetherPortalZ);
-      this.meta.portals.push({ dim: this.dim, x: cells[0][0], y: Math.min(...vs), z: cells[0][2] });
+      for (const [cx, cy, cz] of cells) w.setBlock(cx, cy, cz, alongX ? px : pz);
+      this.meta.portals.push({ dim: this.dim, x: cells[0][0], y: Math.min(...vs), z: cells[0][2], kind });
       return true;
     }
     return false;
@@ -2269,7 +2351,7 @@ export class Game {
       if (w.isSolidAt(Math.floor(nx), Math.floor(ny), Math.floor(nz))) { p.v[0] *= 0.3; p.v[2] *= 0.3; p.v[1] = 0; }
       else { p.p[0] = nx; p.p[1] = ny; p.p[2] = nz; }
     }
-    if (this.dim !== Dim.Overworld) { this.updateMotes(dt); this.particles.rain.length = 0; this.particles.snow.length = 0; return; }
+    if (!this.openSky()) { this.updateMotes(dt); this.particles.rain.length = 0; this.particles.snow.length = 0; return; }
     // precipitation around the camera, only where the sky is open
     const wp = this.weather.params, eye = this.player.eye();
     const clim = w.climateAt(Math.floor(eye[0]), Math.floor(eye[2]));
@@ -2339,7 +2421,7 @@ export class Game {
     this.tod.advance(dt);
     const wp = this.weather.params;
     const sunUp = Math.max(0, this.tod.state.sun ? this.tod.state.sun[1] : 0);
-    if (dt > 0 && this.dim === Dim.Overworld && this.weather.step(dt, !!this.cold, Math.min(1, sunUp * 3))) {
+    if (dt > 0 && this.openSky() && this.weather.step(dt, !!this.cold, Math.min(1, sunUp * 3))) {
       this.flash = 1;
       const near = Math.random() < 0.3;
       this.audio.thunder(near, near ? 0.15 : 0.6 + Math.random() * 2.5);
@@ -2350,7 +2432,7 @@ export class Game {
     const ws = wp.wind;
     this.windVec = [Math.cos(a) * ws * 20, Math.sin(a) * ws * 20];
     this.tod.update(this.time, { cloudCover: wp.cloud, sunDim: wp.light });
-    this.skyNow = this.dim === Dim.Overworld ? this.tod.state : this.dimSky(dt);
+    this.skyNow = this.openSky() ? this.tod.state : this.dimSky(dt);
     this.updateParticles(dt);
 
     // light at the camera (exposure / fog darkening underground) - smoothed
@@ -2358,7 +2440,7 @@ export class Game {
     if (this.time - this.lightProbe.at > 0.25) {
       this.lightProbe = { ...this.lightAt(e[0], e[1], e[2]), at: this.time };
     }
-    const target = this.dim === Dim.Overworld ? this.lightProbe.sky : 1;
+    const target = this.openSky() ? this.lightProbe.sky : 1;
     this.camSky += (target - this.camSky) * (1 - Math.exp(-dt * 2));
     if (dt === 0) this.camSky = this.camSky || target;
 
@@ -2384,7 +2466,7 @@ export class Game {
       this.nearWater = { still: Math.min(1, still / 18), flow: Math.min(1, flow / 5), lava: Math.min(1, lava / 14) };
     }
     const nw = this.nearWater || { still: 0, flow: 0, lava: 0 };
-    if (this.dim !== Dim.Overworld) {
+    if (!this.openSky()) {
       this.audio.setAmbience(under ? { underwater: 1 } : this.dim === Dim.Nether
         ? { nether: 0.85, lava: 0.15 + nw.lava * 0.8, water: 0, waterfall: 0 }
         : { end: 0.8, water: 0, waterfall: 0 }, Math.max(dt, 0.016));
@@ -2434,11 +2516,11 @@ export class Game {
           sky: L.sky, blockLight: L.block };
       }
     }
-    const other = this.dim !== Dim.Overworld, sky = this.skyNow || this.tod.state;
+    const other = !this.openSky(), sky = this.skyNow || this.tod.state;
     const inLava = this.headInLava;
     const f = {
       dt, time: this.time, camPos: eye, yaw: pl.yaw, pitch: pl.pitch, sky,
-      dim: this.dim, flat: !!this.meta.flat, dimAmb: sky.dimAmb, dimFog: inLava ? 1.2 : other ? sky.fogDensity : null, portal: Math.min(1, (this.portalTime || 0) / 3),
+      dim: this.dim === Dim.Sky ? 0 : this.dim, flat: !!this.meta.flat || this.dim === Dim.Sky, dimAmb: sky.dimAmb, dimFog: inLava ? 1.2 : other ? sky.fogDensity : null, portal: Math.min(1, (this.portalTime || 0) / 3),
       weather: other ? { cloudCover: 0, windX: 0.2, windZ: 0.1, windStrength: 0.3, gust: 0.2, fog: 0, storm: 0, wetness: 0, snowCover: 0 } : { cloudCover: wp.cloud, windX: this.windVec[0] / 20 || 0, windZ: this.windVec[1] / 20 || 0, windStrength: 0.35 + wp.wind * 5, gust: wp.gust,
         fog: (wp.fog - 1) * 0.02 + (1 - wp.fogDist) * 0.3, storm: Math.max(0, (wp.precip - 0.5) * 2), wetness: this.weather.wetness,
         snowCover: Math.max(this.weather.snowCover * (clim && clim.temp < 0.25 ? 1 : 0), this.seasonNow()[1] * (clim && clim.temp < 0.75 ? 0.55 : 0)) },

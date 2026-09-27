@@ -4,7 +4,7 @@
  "parts": 2,
  "baseLayers": 81,
  "catalog": {
-  "count": 770,
+  "count": 771,
   "parts": 7
  },
  "slots": 32,
@@ -5226,6 +5226,14 @@
   "DiamondChestplate",
   "DiamondLeggings",
   "DiamondBoots",
+  "FlameBlade",
+  "BoneGreatsword",
+  "CloudBottle",
+  "BlazingCore",
+  "BoneCrown",
+  "StormTear",
+  "Frostbrand",
+  "FrozenHeart",
   "Backpack",
   "GrapplingHook",
   "SlimeCrown",

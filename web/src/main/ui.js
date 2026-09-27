@@ -23,6 +23,11 @@ const TIPS = [
   'Hold a torch, glowstone or a lava bucket to light your way through caves.',
   'A sleeping bag (3 wool, 2 leather) lets you sleep through the night anywhere without moving your respawn point.',
   'Craft a Slime Crown (20 slimeballs, 5 gold ingots) and use it to summon King Slime. Bring armour.',
+  'Pour water into a glowstone frame to open a portal to the Skylands. Fall off an island and you drop back to the overworld.',
+  'Three more bosses: a Blazing Core summons the Inferno Spirit, a Bone Crown the Hollow King, a Storm Tear the Storm Ghast (it also guards the sky temples).',
+  'The Frost Colossus (summoned with a Frozen Heart) slams the ground and breathes frost that slows you. Keep your distance, but not too far.',
+  'Open the pause menu and choose Bosses for the list of bosses and how to find them.',
+  'A Cloud in a Bottle, dropped by the Storm Ghast, gives you a second jump in the air.',
   'Seasons turn every three days: leaves go orange and gold in autumn, and crops barely grow in winter.',
   'Sort your inventory or a chest with the Sort button.',
   'Chests in villages, dungeons, pyramids and bastions hold loot the first time you open them.',
@@ -110,7 +115,7 @@ const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft',
 const CAUSES = { fall: 'You hit the ground too hard.', drowning: 'You ran out of air.', starvation: 'You starved.', void: 'You fell out of the world.',
   lava: 'You tried to swim in lava.', magma: 'You discovered the floor was lava.', explosion: 'You blew up.',
   husk: 'You were slain by a Husk.', skeleton: 'You were shot by a Skeleton.', creeper: 'You were blown up by a Creeper.', spider: 'You were slain by a Spider.',
-  wolf: 'You were slain by a Wolf.', zombified_piglin: 'You were slain by a Zombified Piglin.', blaze: 'You were burned by a Blaze.', ghast: 'You were fireballed by a Ghast.', stray: 'You were shot by a Stray.', wither_skeleton: 'You were slain by a Wither Skeleton.', cave_spider: 'You were slain by a Cave Spider.' };
+  wolf: 'You were slain by a Wolf.', zombified_piglin: 'You were slain by a Zombified Piglin.', blaze: 'You were burned by a Blaze.', ghast: 'You were fireballed by a Ghast.', stray: 'You were shot by a Stray.', wither_skeleton: 'You were slain by a Wither Skeleton.', cave_spider: 'You were slain by a Cave Spider.', king_slime: 'You were squashed by King Slime.', inferno_spirit: 'You were burned to ash by the Inferno Spirit.', hollow_king: 'You were slain by the Hollow King.', storm_ghast: 'You were struck down by the Storm Ghast.', frost_colossus: 'You were frozen by the Frost Colossus.', vindicator: 'You were slain by a Vindicator.', pillager: 'You were shot by a Pillager.', piglin_brute: 'You were slain by a Piglin Brute.', polar_bear: 'You were mauled by a Polar Bear.', slime_big: 'You were slain by a Slime.', slime_medium: 'You were slain by a Slime.' };
 
 function svgHeart(fill) {
   const f = fill === 2 ? 'var(--heart)' : fill === 1 ? 'url(#half)' : 'rgba(0,0,0,0.45)';
@@ -171,7 +176,7 @@ export class UI {
     g.on('toast', (t) => this.toast(t));
     g.on('pickup', (item, n) => this.pickup(item, n));
     g.on('loading', (p) => this.loadingProgress(p));
-    g.on('travel', (d) => { this.travelTitle = ['Returning to the overworld', 'Entering the Nether', 'Entering the End'][d]; });
+    g.on('travel', (d) => { this.travelTitle = ['Returning to the overworld', 'Entering the Nether', 'Entering the End', 'Entering the Skylands'][d]; });
     g.on('saved', (manual) => { if (manual) this.toast('Saved'); });
     await this.refreshWorlds();
     requestAnimationFrame((t) => this.loop(t));
@@ -338,7 +343,8 @@ export class UI {
     $('btnSandboxFlat').onclick = () => sandbox({ flat: true }, 'Superflat sandbox');
     // creative: jump straight to another dimension from the pause menu
     const go = (d) => { if (!g.creative || !g.world) return; this.resume(); g.goToDimension(d); };
-    $('btnGoOver').onclick = () => go(0); $('btnGoNether').onclick = () => go(1); $('btnGoEnd').onclick = () => go(2);
+    $('btnGoOver').onclick = () => go(0); $('btnGoNether').onclick = () => go(1); $('btnGoEnd').onclick = () => go(2); $('btnGoSky').onclick = () => go(3);
+    $('btnSandboxSky').onclick = () => sandbox({ startDim: 3 }, 'Skylands sandbox');
     $('btnSettingsT').onclick = () => { this.settingsBack = 'title'; this.openSettings(); };
     $('btnSettingsP').onclick = () => { this.settingsBack = 'pause'; this.openSettings(); };
     $('btnSettingsDone').onclick = () => { storeSettings(this.settings); this.show(this.settingsBack); };
@@ -351,9 +357,9 @@ export class UI {
         : 'Unlimited blocks, instant breaking, no damage. Double-tap Space or press F to fly.';
     };
     let startDim = 0, flat = false;
-    const setDim = (d) => { startDim = d; for (let k = 0; k < 3; k++) $(`nwDim${k}`).setAttribute('aria-pressed', k === d); };
+    const setDim = (d) => { startDim = d; for (let k = 0; k < 4; k++) $(`nwDim${k}`).setAttribute('aria-pressed', k === d); };
     const setFlat = (f) => { flat = f; $('nwTypeDefault').setAttribute('aria-pressed', !f); $('nwTypeFlat').setAttribute('aria-pressed', f); };
-    for (let k = 0; k < 3; k++) $(`nwDim${k}`).onclick = () => setDim(k);
+    for (let k = 0; k < 4; k++) $(`nwDim${k}`).onclick = () => setDim(k);
     $('nwTypeDefault').onclick = () => setFlat(false); $('nwTypeFlat').onclick = () => setFlat(true);
     $('nwSurvival').onclick = () => setMode('survival');
     $('nwCreative').onclick = () => setMode('creative');
@@ -365,6 +371,16 @@ export class UI {
         ...(startDim ? { startDim } : {}), ...(flat ? { flat: true } : {}) }, true);
     };
     $('btnResume').onclick = () => this.resume();
+    $('btnBosses').onclick = () => {
+      const el = $('bossList'), beaten = (g.meta && g.meta.bossesDefeated) || {};
+      const list = [['king_slime', 'King Slime', 'Craft a Slime Crown (20 slimeballs, 5 gold ingots) and use it.'],
+        ['inferno_spirit', 'Inferno Spirit', 'Craft a Blazing Core (4 blaze rods, 4 gold ingots). Drops the Flame Blade.'],
+        ['hollow_king', 'Hollow King', 'Craft a Bone Crown (12 bones, 4 coal, a gold ingot). Drops the Bone Greatsword.'],
+        ['frost_colossus', 'Frost Colossus', 'Craft a Frozen Heart (4 packed ice, a diamond). Drops the Frostbrand.'],
+        ['storm_ghast', 'Storm Ghast', 'Guards the floating temples of the Skylands, or craft a Storm Tear. Drops a Cloud in a Bottle.']];
+      el.innerHTML = list.map(([k, n, how]) => `<div><b>${n}</b> <span class="${beaten[k] ? 'done' : ''}">${beaten[k] ? `defeated ×${beaten[k]}` : 'not yet defeated'}</span><small>${how}</small></div>`).join('');
+      el.hidden = !el.hidden;
+    };
     $('btnMode').onclick = () => { g.setMode(!g.creative); $('btnMode').textContent = g.creative ? 'Switch to survival' : 'Switch to creative'; this.renderStats(); };
     $('btnQuit').onclick = async () => { await g.save(true); this.toTitle(); };
     $('btnRespawn').onclick = () => g.respawn();
@@ -755,7 +771,7 @@ export class UI {
       for (const w of list) {
         const b = document.createElement('button');
         b.className = 'recipe';
-        const dist = (w.dim || 0) === (g.dim || 0) ? `${Math.round(Math.hypot(w.x - here[0], w.z - here[2]))} m away` : ['Overworld', 'Nether', 'The End'][w.dim || 0];
+        const dist = (w.dim || 0) === (g.dim || 0) ? `${Math.round(Math.hypot(w.x - here[0], w.z - here[2]))} m away` : ['Overworld', 'Nether', 'The End', 'Skylands'][w.dim || 0];
         b.innerHTML = `<div class="ico-slot"><div class="ico" style="${g.icons.css(FAM_WAYSTONE(), 32)}"></div></div><div>${w.name}<small><span class="have">${w.x} ${w.y} ${w.z} · ${dist}</span></small></div>`;
         b.onclick = () => { this.closeInventory(); g.travelWaystone(w); };
         rec.appendChild(b);
@@ -1039,7 +1055,7 @@ export class UI {
     this.unlock();
     this.show('bigmap');
     const p = g.player.body.pos;
-    $('bigmapTitle').textContent = `Map · ${['Overworld', 'Nether', 'The End'][g.dim || 0]} · ${Math.floor(p[0])} ${Math.floor(p[1])} ${Math.floor(p[2])}`;
+    $('bigmapTitle').textContent = `Map · ${['Overworld', 'Nether', 'The End', 'Skylands'][g.dim || 0]} · ${Math.floor(p[0])} ${Math.floor(p[1])} ${Math.floor(p[2])}`;
     this.map.drawBig();
     const cv = $('bigmapCanvas');
     if (!cv.bound) {

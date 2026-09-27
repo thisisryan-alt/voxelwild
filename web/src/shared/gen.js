@@ -6,6 +6,7 @@ import { Terrain, Biome, seedOffset } from './terrain.js';
 import { hash4, mulberry32, smoothstep } from './noise.js';
 import { generateNether } from './nether.js';
 import { generateEnd } from './end.js';
+import { generateSkylands } from './skylands.js';
 import { applyStrongholds } from './stronghold.js';
 import { applyStructures } from './structures.js';
 
@@ -24,6 +25,7 @@ export function generateColumn(cx, cz, seed, dim = 0, flat = false) {
   if (flat && dim === 0) return generateFlat();
   if (dim === 1) return generateNether(cx, cz, seed);
   if (dim === 2) return generateEnd(cx, cz, seed);
+  if (dim === 3) return generateSkylands(cx, cz, seed);
   const T = terrainFor(seed), n = T.n;
   const ox = cx * CS, oz = cz * CS;
   const P = CS + 2;

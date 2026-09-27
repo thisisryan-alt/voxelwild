@@ -5,15 +5,15 @@
 
 export const K = { Slab: 1, Stairs: 2, Fence: 3, Gate: 4, Wall: 5, Pane: 6, Door: 7, Trapdoor: 8, Carpet: 9, Plate: 10, Button: 11,
   Ladder: 12, Rail: 13, Lily: 14, Snow: 15, Path: 16, Tall: 17, WallTorch: 18, Wire: 19, RTorch: 20, Lever: 21, Repeater: 22, Piston: 23,
-  Head: 24, Bed: 25, Crop: 26, Comparator: 27, Observer: 28, Dispenser: 29, Hopper: 30, Waystone: 31, Grave: 32 };
+  Head: 24, Bed: 25, Crop: 26, Comparator: 27, Observer: 28, Dispenser: 29, Hopper: 30, Waystone: 31, Grave: 32, SkyPortal: 33 };
 export const KIND_NAMES = { slab: K.Slab, stairs: K.Stairs, fence: K.Fence, gate: K.Gate, wall: K.Wall, pane: K.Pane, door: K.Door,
   trapdoor: K.Trapdoor, carpet: K.Carpet, plate: K.Plate, button: K.Button, ladder: K.Ladder, rail: K.Rail, lily: K.Lily, snow: K.Snow,
   path: K.Path, tall: K.Tall, walltorch: K.WallTorch, wire: K.Wire, rtorch: K.RTorch, lever: K.Lever, repeater: K.Repeater, piston: K.Piston,
-  head: K.Head, bed: K.Bed, crop: K.Crop, comparator: K.Comparator, observer: K.Observer, dispenser: K.Dispenser, hopper: K.Hopper, waystone: K.Waystone, grave: K.Grave };
+  head: K.Head, bed: K.Bed, crop: K.Crop, comparator: K.Comparator, observer: K.Observer, dispenser: K.Dispenser, hopper: K.Hopper, waystone: K.Waystone, grave: K.Grave, skyportal: K.SkyPortal };
 export const STATES = { [K.Slab]: 3, [K.Stairs]: 8, [K.Fence]: 1, [K.Gate]: 8, [K.Wall]: 1, [K.Pane]: 1, [K.Door]: 16, [K.Trapdoor]: 16,
   [K.Carpet]: 1, [K.Plate]: 2, [K.Button]: 12, [K.Ladder]: 4, [K.Rail]: 2, [K.Lily]: 1, [K.Snow]: 8, [K.Path]: 1, [K.Tall]: 2, [K.WallTorch]: 4,
   [K.Wire]: 16, [K.RTorch]: 10, [K.Lever]: 12, [K.Repeater]: 32, [K.Piston]: 12, [K.Head]: 12, [K.Bed]: 8, [K.Crop]: 8,
-  [K.Comparator]: 16, [K.Observer]: 12, [K.Dispenser]: 12, [K.Hopper]: 5, [K.Waystone]: 2, [K.Grave]: 4 };
+  [K.Comparator]: 16, [K.Observer]: 12, [K.Dispenser]: 12, [K.Hopper]: 5, [K.Waystone]: 2, [K.Grave]: 4, [K.SkyPortal]: 2 };
 /** Kinds the player collides with (the rest can be walked through). */
 export const SOLID_KINDS = new Set([K.Slab, K.Stairs, K.Fence, K.Gate, K.Wall, K.Pane, K.Door, K.Trapdoor, K.Carpet, K.Snow, K.Path, K.Repeater,
   K.Piston, K.Head, K.Bed, K.Comparator, K.Observer, K.Dispenser, K.Hopper, K.Waystone, K.Grave]);
@@ -159,6 +159,7 @@ export function modelBoxes(m, conn = 0, up = false, collision = false) {
     }
     case K.Observer: case K.Dispenser: return [FULL];
     case K.Waystone: return s === 0 ? [box16(1, 0, 1, 15, 3, 15), box16(3, 3, 3, 13, 16, 13)] : [box16(3, 0, 3, 13, 12, 13), box16(4, 12, 4, 12, 15, 12)];
+    case K.SkyPortal: return collision ? [] : [s === 0 ? [0, 0, 0.375, 1, 1, 0.625] : [0.375, 0, 0, 0.625, 1, 1]];
     case K.Grave: return [box16(1, 0, 2, 15, 2, 14), turn(box16(3, 2, 6, 13, 14, 9), s)];
     case K.Hopper: {
       const out = [box16(0, 10, 0, 16, 16, 16), box16(4, 4, 4, 12, 10, 12)];

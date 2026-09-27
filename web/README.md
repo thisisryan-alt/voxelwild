@@ -188,6 +188,22 @@ King Slime, with a health bar (Terraria); tips on loading and pause screens; ful
 All can be switched off under Options > Controls and Sky & Time. `node test/extras.mjs`, `test/boss.mjs`,
 `test/seasons.mjs` check them.
 
+## The Skylands and the bosses
+
+A fourth dimension (Dim.Sky = 3, `src/shared/skylands.js`, after the Aether mod): floating islands of grass and calcite
+with glowstone, amethyst, gold and diamond inside, blossom trees (cherry and azalea canopies on birch trunks), cloud
+banks of powder snow far below that break falls, and floating quartz temples. The island density is 3D noise on a
+world-aligned 4-block lattice, so every column can find another's island top. A glowstone frame lit with a water bucket
+opens the portal (both ways, same x and z, a portal home is built on arrival); falling off drops you into the
+overworld's sky. It shares the overworld's sky, time, weather and seasons (`game.openSky()`), saves under `S/`, and
+has moas, sheep and drifting sky whales. New worlds and sandboxes can start there; creative can travel there.
+
+Bosses (all summoned with crafted items, listed under Pause > Bosses, a health bar while near): King Slime,
+the Inferno Spirit (fireball volleys, calls blazes; drops the Flame Blade, which sets mobs alight), the Hollow King
+(charges, raises wither skeletons; drops the Bone Greatsword), the Frost Colossus (ground slam, slowing frost breath;
+drops the Frostbrand, which slows mobs) and the Storm Ghast (ghast volleys and warned lightning strikes; it rises over
+each sky temple once; drops a Cloud in a Bottle, a double jump). `node test/skylands.mjs`, `test/bosses.mjs`.
+
 ## Controls
 
 WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·

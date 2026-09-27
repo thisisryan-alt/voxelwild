@@ -157,7 +157,7 @@ export class MiniMap {
     this.memT -= 0.3;
     if (this.memT <= 0) { this.memT = 1.5; this.remember(); }
     const ctx = this.canvas.getContext('2d', { willReadFrequently: true }), size = this.canvas.width;
-    const p = g.player.body.pos, under = g.dim !== Dim.Overworld || (g.camSky ?? 1) < 0.2;
+    const p = g.player.body.pos, under = (g.dim !== Dim.Overworld && g.dim !== 3) || (g.camSky ?? 1) < 0.2;
     this.paint(ctx, size, 1, Math.floor(p[0]), Math.floor(p[2]), Math.floor(p[1]), under);
     // round mask
     ctx.globalCompositeOperation = 'destination-in';
@@ -170,7 +170,7 @@ export class MiniMap {
   /** The full map (M): 2 blocks a pixel round the player. */
   drawBig() {
     const g = this.g, ctx = this.big.getContext('2d', { willReadFrequently: true }), size = this.big.width;
-    const p = g.player.body.pos, under = g.dim !== Dim.Overworld || (g.camSky ?? 1) < 0.2;
+    const p = g.player.body.pos, under = (g.dim !== Dim.Overworld && g.dim !== 3) || (g.camSky ?? 1) < 0.2;
     const scale = this.bigScale || 2;
     this.paint(ctx, size, scale, Math.floor(p[0]), Math.floor(p[2]), Math.floor(p[1]), under);
     this.markers(ctx, size, scale, Math.floor(p[0]), Math.floor(p[2]), false);

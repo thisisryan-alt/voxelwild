@@ -335,6 +335,8 @@ def model_families(have, keys):
     # ---- not in Minecraft: a waystone (a fast-travel obelisk, two blocks tall) and a gravestone that keeps a death's items
     fam("waystone", "waystone", tex=["lodestone_top", "lodestone_side", "B:StoneBricks"], cat="stone", name="Waystone")
     fam("gravestone", "grave", tex=["mossy_cobblestone", "B:Cobblestone"], cat="stone", noitem=True, name="Gravestone")
+    # the Skylands portal (a glowstone frame lit with water), not in Minecraft
+    fam("sky_portal", "skyportal", tex=["@tint:8fc8ff:nether_portal"], list="glow", cat="glass", noitem=True, name="Skylands Portal", emission=11)
     return out, texinfo
 
 

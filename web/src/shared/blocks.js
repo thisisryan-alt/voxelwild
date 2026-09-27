@@ -27,7 +27,7 @@ export const isLava = (id) => id >= B.Lava && id <= B.LavaFlow7;
 export const isLiquid = (id) => isWater(id) || isLava(id);
 export const isPortal = (id) => id === B.NetherPortalX || id === B.NetherPortalZ;
 /** Dimensions: the overworld, the Nether (y 0..127 between bedrock) and the End (islands over the void). */
-export const Dim = { Overworld: 0, Nether: 1, End: 2 };
+export const Dim = { Overworld: 0, Nether: 1, End: 2, Sky: 3 };   // Sky: the Skylands (not in Minecraft)
 
 // Texture layers (order of SourceArt/Textures/block_layers.json)
 export const LAYER_NAMES = ['Stone', 'Dirt', 'GrassTop', 'Sand', 'Gravel', 'Snow', 'Bedrock', 'Cobblestone', 'Planks', 'Bricks',
@@ -344,7 +344,7 @@ export const I = {
   Gunpowder: 300, String: 301, GoldNugget: 302, BlazeRod: 303, GhastTear: 304, WoodenSword: 305, StoneSword: 306, IronSword: 307, DiamondSword: 308,
   IronIngot: 309, GoldIngot: 310, CopperIngot: 311, CookedBeef: 312, CookedPorkchop: 313, CookedMutton: 314, CookedChicken: 315, Charcoal: 316,
   Bread: 317, Wheat: 318, WheatSeeds: 319, WoodenHoe: 320, StoneHoe: 321, IronHoe: 322, DiamondHoe: 323,
-  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348,
+  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348, FlameBlade: 349, BoneGreatsword: 350, CloudBottle: 351, BlazingCore: 352, BoneCrown: 353, StormTear: 354, Frostbrand: 355, FrozenHeart: 356,
   LeatherHelmet: 324,      // armour: 324 + material * 4 + piece (leather, golden, iron, diamond x helmet, chestplate, leggings, boots)
 };
 export const ARMOR_MATS = ['Leather', 'Golden', 'Iron', 'Diamond'], ARMOR_PIECES = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
@@ -400,6 +400,15 @@ ITEMS[I.Backpack] = { id: I.Backpack, name: 'Backpack', kind: Kind.Use, stack: 1
 ITEMS[I.GrapplingHook] = { id: I.GrapplingHook, name: 'Grappling Hook', kind: Kind.Use, stack: 1, durability: 250 };
 ITEMS[I.SlimeCrown] = { id: I.SlimeCrown, name: 'Slime Crown', kind: Kind.Use, stack: 1 };
 ITEMS[I.SleepingBag] = { id: I.SleepingBag, name: 'Sleeping Bag', kind: Kind.Use, stack: 1 };
+// boss rewards and summons (not in Minecraft)
+ITEMS[I.FlameBlade] = { id: I.FlameBlade, name: 'Flame Blade', kind: Kind.Tool, stack: 1, tool: ToolType.Sword, tier: Tier.Diamond, durability: 2000, damage: 10, fire: true };
+ITEMS[I.BoneGreatsword] = { id: I.BoneGreatsword, name: 'Bone Greatsword', kind: Kind.Tool, stack: 1, tool: ToolType.Sword, tier: Tier.Diamond, durability: 1600, damage: 13, heavy: true };
+mat(I.CloudBottle, 'Cloud in a Bottle');
+ITEMS[I.BlazingCore] = { id: I.BlazingCore, name: 'Blazing Core', kind: Kind.Use, stack: 1, summons: 'inferno_spirit' };
+ITEMS[I.BoneCrown] = { id: I.BoneCrown, name: 'Bone Crown', kind: Kind.Use, stack: 1, summons: 'hollow_king' };
+ITEMS[I.StormTear] = { id: I.StormTear, name: 'Storm Tear', kind: Kind.Use, stack: 1, summons: 'storm_ghast' };
+ITEMS[I.Frostbrand] = { id: I.Frostbrand, name: 'Frostbrand', kind: Kind.Tool, stack: 1, tool: ToolType.Sword, tier: Tier.Diamond, durability: 1800, damage: 11, frost: true };
+ITEMS[I.FrozenHeart] = { id: I.FrozenHeart, name: 'Frozen Heart', kind: Kind.Use, stack: 1, summons: 'frost_colossus' };
 ITEMS[I.Bucket] = { id: I.Bucket, name: 'Bucket', kind: Kind.Use, stack: 16 };
 ITEMS[I.WaterBucket] = { id: I.WaterBucket, name: 'Water Bucket', kind: Kind.Use, stack: 1 };
 ITEMS[I.LavaBucket] = { id: I.LavaBucket, name: 'Lava Bucket', kind: Kind.Use, stack: 1 };
@@ -456,6 +465,7 @@ export function mining(block) {
         if (fam.kind === K.Piston || fam.kind === K.Head) return { hardness: 1.5, tool: ToolType.Pickaxe, required: Tier.Hand };
         if (fam.kind === K.Bed) return { hardness: 0.2, tool: ToolType.None, required: Tier.Hand };
         if (fam.kind === K.Grave) return { hardness: 0.6, tool: ToolType.None, required: Tier.Hand };
+        if (fam.kind === K.SkyPortal) return { hardness: -1, tool: ToolType.None, required: Tier.Hand };
         if (fam.kind === K.Ladder) return { hardness: 0.4, tool: ToolType.Axe, required: Tier.Hand };
         if (fam.kind === K.Snow) return { hardness: 0.1, tool: ToolType.Shovel, required: Tier.Hand };
         if (fam.kind === K.Carpet) return { hardness: 0.1, tool: ToolType.None, required: Tier.Hand };
@@ -598,6 +608,10 @@ recipe(I.Backpack, 1, [[I.Leather, 6], [I.String, 2]]);
 recipe(I.GrapplingHook, 1, [[I.IronIngot, 3], [I.String, 4]]);
 recipe(I.SlimeCrown, 1, [[I.SlimeBall, 20], [I.GoldIngot, 5]]);
 recipe(I.SleepingBag, 1, [['wool', 3], [I.Leather, 2]]);
+recipe(I.BlazingCore, 1, [[I.BlazeRod, 4], [I.GoldIngot, 4]]);
+recipe(I.BoneCrown, 1, [[I.Bone, 12], [I.Coal, 4], [I.GoldIngot, 1]]);
+recipe(I.StormTear, 1, [[I.GhastTear, 2], [I.GlowstoneDust, 6]]);
+if (C.packed_ice) recipe(I.FrozenHeart, 1, [[C.packed_ice, 4], [I.Diamond, 1]]);
 if (FAM.waystone) recipe(FAM.waystone.first, 1, [[B.StoneBricks, 6], [I.GoldIngot, 2]]);
 recipe(I.Bread, 1, [[I.Wheat, 3]]);
 if (C.hay_block) recipe(C.hay_block, 1, [[I.Wheat, 9]]);

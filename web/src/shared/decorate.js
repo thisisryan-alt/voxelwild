@@ -13,6 +13,7 @@ const fdiv = (a, b) => Math.floor(a / b);
 
 /** neighbours: array of 9 surfaces (index (dx+1)+(dz+1)*3), each {height, top, biome}. dim: 0 overworld, 1 nether, 2 end. */
 export function decorateColumn(vox, cx, cz, seed, neighbours, dim = 0) {
+  if (dim === 3) return { heightmap: heightmapOf(vox), props: new Int32Array(0) };   // the Skylands grow their own trees
   if (dim) return decorateOther(vox, cx, cz, seed, neighbours, dim);
   const trees = [];
   const minX = (cx - 1) * CS, minZ = (cz - 1) * CS, maxX = (cx + 2) * CS, maxZ = (cz + 2) * CS;

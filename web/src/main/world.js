@@ -14,7 +14,7 @@ export class World {
     this.flat = flat;                             // superflat overworld
     this.seed = seed >>> 0;
     this.dim = dim;                               // 0 overworld, 1 nether, 2 end
-    this.below = dim === 2 ? B.Air : B.Bedrock;   // what lies under the world: the End's void, bedrock elsewhere
+    this.below = dim === 2 || dim === 3 ? B.Air : B.Bedrock;   // what lies under the world: the End's void, bedrock elsewhere
     this.viewDistance = viewDistance;
     this.onMesh = onMesh;
     this.onUnloadSection = onUnloadSection;

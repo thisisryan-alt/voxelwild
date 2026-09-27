@@ -748,6 +748,8 @@ def main():
     for w in ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak", "bamboo", "crimson", "warped",
               "iron", "copper", "exposed_copper", "weathered_copper", "oxidized_copper"]:
         items[f"fam:{w}_door"] = f"{w}_door"
+    items.update({"FlameBlade": "golden_sword", "BoneGreatsword": "netherite_sword", "CloudBottle": "glass_bottle", "BlazingCore": "fire_charge",
+                  "BoneCrown": "bone_meal", "StormTear": "ghast_tear", "Frostbrand": "amethyst_shard", "FrozenHeart": "heart_of_the_sea"})
     items.update({"Backpack": "bundle", "GrapplingHook": "fishing_rod", "SlimeCrown": "golden_helmet", "SleepingBag": "green_bundle"})
     items.update({"SlimeBall": "slime_ball", "Bow": "bow", "Bucket": "bucket", "WaterBucket": "water_bucket", "LavaBucket": "lava_bucket", "fam:comparator": "comparator",
                   "fam:hopper": "hopper"})

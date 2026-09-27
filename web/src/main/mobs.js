@@ -7,6 +7,7 @@ import { VoxelBody } from './player.js';
 import { B, BLOCKS, F, I, C, ITEMS, Dim, isWater, isLava, isLiquid, mining } from '../shared/blocks.js';
 import { Biome } from '../shared/terrain.js';
 import { structuresIn } from '../shared/structures.js';
+import { skyTemples } from '../shared/skylands.js';
 import { terrainFor } from '../shared/gen.js';
 
 const GRASSY = new Set([Biome.Plains, Biome.Forest, Biome.DenseForest, Biome.Savanna, Biome.Taiga, Biome.SnowyTaiga, Biome.Jungle, Biome.Swamp, Biome.Mountains, Biome.SnowyTundra]);
@@ -36,6 +37,16 @@ export const MOB_TYPES = {
   // a boss (Terraria's King Slime, not in Minecraft): summoned with a Slime Crown
   king_slime: { name: 'King Slime', health: 300, speed: 2.4, half: 2.0, height: 4.0, kind: 'hostile', damage: 8, hop: 2, boss: true,
     drops: [[I.GoldIngot, 5, 10], [I.SlimeBall, 10, 20], [I.Diamond, 1, 3], [I.Emerald, 2, 6]] },
+  inferno_spirit: { name: 'Inferno Spirit', health: 400, speed: 2.6, half: 0.9, height: 5.4, kind: 'hostile', flying: true, ranged: 'fireball', boss: true, bossAI: 'inferno', range: 40, glow: 1,
+    drops: [[I.FlameBlade, 1, 1], [I.BlazeRod, 3, 8], [I.GoldIngot, 4, 8]] },
+  hollow_king: { name: 'Hollow King', health: 450, speed: 3.0, half: 0.8, height: 5.2, kind: 'hostile', damage: 14, boss: true, bossAI: 'hollow', base: 'skeleton', armsForward: true,
+    drops: [[I.BoneGreatsword, 1, 1], [I.Bone, 6, 12], [I.Emerald, 3, 8], [I.Diamond, 1, 3]] },
+  storm_ghast: { name: 'Storm Ghast', health: 500, speed: 1.8, half: 2.5, height: 5.5, kind: 'hostile', flying: true, ranged: 'ghastball', boss: true, bossAI: 'storm', range: 48, hover: 10,
+    drops: [[I.CloudBottle, 1, 1], [I.GhastTear, 2, 5], [I.Diamond, 2, 4]] },
+  frost_colossus: { name: 'Frost Colossus', health: 420, speed: 2.4, half: 2.0, height: 4.2, kind: 'hostile', damage: 12, boss: true, bossAI: 'frost',
+    drops: [[I.Frostbrand, 1, 1], [I.Diamond, 2, 4], [I.Leather, 4, 8]] },
+  sky_whale: { name: 'Sky Whale', health: 40, speed: 1.2, half: 1.7, height: 3.5, kind: 'passive', flying: true, hover: 14, drops: [[I.Leather, 2, 5]] },
+  moa: { name: 'Moa', health: 16, speed: 2.8, half: 0.45, height: 1.8, kind: 'passive', flutter: true, drops: [[I.Feather, 2, 5], [I.RawChicken, 1, 2]] },
   polar_bear: { name: 'Polar Bear', health: 30, speed: 1.7, half: 0.7, height: 1.4, kind: 'neutral', damage: 6, drops: [] },
   strider: { name: 'Strider', health: 20, speed: 1.2, half: 0.45, height: 1.7, kind: 'passive', lavaWalk: true, drops: [[I.String, 0, 3]] },
   piglin_brute: { name: 'Piglin Brute', health: 50, speed: 2.4, half: 0.3, height: 1.95, kind: 'hostile', damage: 9, drops: [[I.GoldIngot, 0, 1]], armsForward: true },
@@ -100,6 +111,14 @@ export class Mobs {
     const peaceful = g.settings && g.settings.difficulty === 'peaceful';
     const T = dim === Dim.Overworld ? (this.T && this.Tseed === g.meta.seed ? this.T : (this.Tseed = g.meta.seed, this.T = terrainFor(g.meta.seed))) : null;
     const plans = structuresIn(g.meta.seed, T, p[0] - 80, p[2] - 80, p[0] + 80, p[2] + 80, dim);
+    if (dim === 3 && !peaceful) for (const t of skyTemples(g.meta.seed, p[0] - 40, p[2] - 40, p[0] + 40, p[2] + 40)) {
+      if ((g.meta.templesCleared || {})[t.key] || this.list.some((m) => m.def.boss && !m.dead)) continue;
+      if (Math.hypot(t.x - p[0], t.z - p[2]) < 14 && Math.abs(p[1] - t.y) < 12) {
+        const m = this.spawnAt('storm_ghast', [t.x + 0.5, t.y + 14, t.z + 0.5]);
+        m.templeKey = t.key;
+        g.emit('toast', 'A Storm Ghast rises over the temple!');
+      }
+    }
     const near = (test, x, z, r) => this.list.filter((m) => !m.dead && test(m) && Math.hypot(m.body.pos[0] - x, m.body.pos[2] - z) < r).length;
     const ground = (x, z, y0) => {
       // the lowest free spot (street level, not a roof)
@@ -187,6 +206,15 @@ export class Mobs {
         if (kind === 'spider' && !this.standableWide(x, y, z)) continue;
         this.spawnGroup(kind, x, y, z, 1 + (this.rng() < 0.3 ? 1 : 0));
         return;
+      }
+      if (dim === 3) {
+        const h = w.heightmapAt(x, z);
+        if (h != null && h > 40 && w.getBlock(x, h, z) === B.Grass && this.standable(x, h + 1, z) && counts.passive < 12) {
+          this.spawnGroup(this.rng() < 0.55 ? 'moa' : 'sheep', x, h + 1, z, 1 + Math.floor(this.rng() * 3));
+          return;
+        }
+        if (this.rng() < 0.08 && this.list.filter((m) => m.type === 'sky_whale').length < 3) { const y = Math.floor(p[1] + 10 + this.rng() * 20); if (this.openAir(x, y, z)) { this.spawnGroup('sky_whale', x, y, z, 1); return; } }
+        continue;
       }
       if (dim === Dim.Nether) {
         if (peaceful) return;
@@ -290,6 +318,12 @@ export class Mobs {
     }
     // lava hurts them too
     if (isLava(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + 0.2), Math.floor(b.pos[2]))) && !['blaze', 'zombified_piglin', 'ghast', 'strider'].includes(m.type)) this.hurt(m, dt * 8, null);
+    if (t.bossAI && hostile) this.bossThink(m, dt, dist, dx, dz, pp);
+    if (m.slowT > 0) { m.slowT -= dt; speed *= 0.4; if (Math.random() < dt * 4) g.spawnEmbers([b.pos[0], b.pos[1] + t.height * 0.6, b.pos[2]], 1, [1.2, 1.5, 2.0]); }
+    if (m.onFire > 0) {
+      m.onFire -= dt; m.fireT = (m.fireT || 0) - dt;
+      if (m.fireT <= 0) { m.fireT = 1; this.hurt(m, 2, null); g.spawnEmbers([b.pos[0], b.pos[1] + t.height * 0.5, b.pos[2]], 6); }
+    }
     if (t.hop) {
       // slimes do not walk: they gather themselves and jump
       m.hopT = (m.hopT ?? 1) - dt;
@@ -336,7 +370,10 @@ export class Mobs {
     if (t.flying) {
       // hover: blazes a few blocks over the ground near their target, ghasts drift high
       const ground = this.groundBelow(b.pos[0], b.pos[1], b.pos[2], 20);
-      const want = m.type === 'ghast' ? ground + 9 : (hostile ? pp[1] + 2 : ground + 2.5);
+      const noGround = ground <= b.pos[1] - 19;
+      let want = t.hover != null ? ground + t.hover : m.type === 'ghast' ? ground + 9 : (hostile ? pp[1] + 2 : ground + 2.5);
+      if (hostile && t.boss) want = pp[1] + (t.bossAI === 'storm' ? 10 : 4);
+      else if (noGround) want = b.pos[1];
       b.vel[1] += ((want - b.pos[1]) * 1.2 - b.vel[1]) * Math.min(1, dt * 2) + Math.sin(m.age * 1.7) * 0.02;
     } else {
       const inLiquid = isLiquid(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + 0.3), Math.floor(b.pos[2])));
@@ -359,6 +396,62 @@ export class Mobs {
     if (b.grounded && m.fallFrom != null) { const h = m.fallFrom - b.pos[1]; if (h > 3.5 && !t.flying) this.hurt(m, h - 3, null); m.fallFrom = null; }
     else if (!b.grounded && b.vel[1] < 0 && m.fallFrom == null) m.fallFrom = b.pos[1];
     if (b.grounded) m.fallFrom = null;
+  }
+
+  /** The bosses' own moves on top of chasing and shooting. */
+  bossThink(m, dt, dist, dx, dz, pp) {
+    const g = this.game, b = m.body, t = m.def, low = m.health < t.health * 0.5;
+    m.skillT = (m.skillT ?? 3) - dt;
+    m.summonT = (m.summonT ?? 10) - dt;
+    if (t.bossAI === 'inferno') {
+      // a spread of fireballs, and blazes called in when it is hurt
+      if (m.skillT <= 0) {
+        m.skillT = low ? 1.6 : 2.4;
+        const n = low ? 5 : 3;
+        for (let k = 0; k < n; k++) {
+          this.shoot(m, pp, 'fireball');
+          const s = this.projectiles[this.projectiles.length - 1], a = (k - (n - 1) / 2) * 0.16, c = Math.cos(a), si = Math.sin(a);
+          s.v = [s.v[0] * c - s.v[2] * si, s.v[1], s.v[0] * si + s.v[2] * c];
+        }
+      }
+      if (low && m.summonT <= 0 && this.list.filter((q) => q.type === 'blaze' && !q.dead).length < 4) { m.summonT = 12; for (let k = 0; k < 2; k++) this.spawnAt('blaze', [b.pos[0] + (k ? 3 : -3), b.pos[1], b.pos[2]]); g.emit('toast', 'The Inferno Spirit calls its blazes!'); }
+    } else if (t.bossAI === 'hollow') {
+      // a charge every few seconds; wither skeletons once it is hurt
+      if (m.skillT <= 0 && dist > 4) {
+        m.skillT = low ? 4 : 6; m.charge = 0.7;
+        const l = Math.hypot(dx, dz) || 1; m.chargeDir = [dx / l, dz / l];
+        g.emit('toast', 'The Hollow King charges!');
+      }
+      if (m.charge > 0) { m.charge -= dt; b.vel[0] = m.chargeDir[0] * 14; b.vel[2] = m.chargeDir[1] * 14; if (m.charge <= 0) b.vel[0] = b.vel[2] = 0; }
+      if (low && m.summonT <= 0 && this.list.filter((q) => q.type === 'wither_skeleton' && !q.dead).length < 4) { m.summonT = 15; for (let k = 0; k < 2; k++) this.spawnAt('wither_skeleton', [b.pos[0] + (k ? 2.5 : -2.5), b.pos[1] + 0.5, b.pos[2]]); g.emit('toast', 'The Hollow King raises the dead!'); }
+    } else if (t.bossAI === 'frost') {
+      // a ground slam that throws the player up, and a freezing breath that slows them
+      const pl = g.player;
+      if (m.skillT <= 0) {
+        m.skillT = low ? 3 : 4.5;
+        if (dist < 9) {
+          g.spawnEmbers([b.pos[0], b.pos[1] + 0.3, b.pos[2]], 30, [1.2, 1.4, 1.8]); g.audio.explosion();
+          if (!g.creative) { g.stats.damage(Math.round(8 * (1 - dist / 12)), 'frost_colossus'); pl.body.vel[1] = Math.max(pl.body.vel[1], 9); }
+        } else if (dist < 16) {
+          for (let k = 1; k < 8; k++) g.spawnEmbers([b.pos[0] + dx * k / 8, b.pos[1] + t.height * 0.6 + (pp[1] - b.pos[1]) * k / 8, b.pos[2] + dz * k / 8], 2, [1.3, 1.6, 2.0]);
+          if (!g.creative) { g.stats.damage(3, 'frost_colossus'); pl.slowT = 3; }
+        }
+      }
+    } else if (t.bossAI === 'storm') {
+      // lightning where the player stands (a warning glow first)
+      if (m.strike) {
+        m.strike.t -= dt;
+        if (Math.random() < 0.5) g.spawnEmbers(m.strike.at, 2, [0.6, 0.8, 2.0]);
+        if (m.strike.t <= 0) {
+          const [x, y, z] = m.strike.at;
+          g.flash = Math.max(g.flash, 1); g.audio.explosion();
+          const pl = g.player.body.pos;
+          if (Math.hypot(pl[0] - x, pl[2] - z) < 2.5 && Math.abs(pl[1] - y) < 4 && !g.creative) g.stats.damage(7, 'storm_ghast');
+          if (g.ignite) g.ignite(Math.floor(x), Math.floor(y), Math.floor(z));
+          m.strike = null;
+        }
+      } else if (m.skillT <= 0) { m.skillT = low ? 2.5 : 4; m.strike = { at: [pp[0], pp[1] + 0.1, pp[2]], t: 1.1 }; }
+    }
   }
 
   groundBelow(x, y, z, max) {
@@ -392,7 +485,15 @@ export class Mobs {
       if (m.def.group) for (const o of this.list) if (o.type === m.type && Math.hypot(o.body.pos[0] - m.body.pos[0], o.body.pos[2] - m.body.pos[2]) < 16) { o.angry = 1; o.provoked = true; }
     }
     g.audio.mobHurt(m.type);
-    if (m.def.boss && m.health > 0) {
+    if (attacker && attacker === g.player && m.health > 0) {
+      const held = g.inventory && g.inventory.heldItem;
+      if (held && held.fire) m.onFire = 4;
+      if (held && held.frost) m.slowT = 4;
+      if (held && held.heavy) { const pp2 = g.player.body.pos, ddx = m.body.pos[0] - pp2[0], ddz = m.body.pos[2] - pp2[2], l2 = Math.hypot(ddx, ddz) || 1; m.body.vel[0] += ddx / l2 * 6; m.body.vel[2] += ddz / l2 * 6; }
+    }
+    if (m.health <= 0 && m.def.boss && g.meta) { g.meta.bossesDefeated = { ...(g.meta.bossesDefeated || {}), [m.type]: ((g.meta.bossesDefeated || {})[m.type] || 0) + 1 }; g.emit('toast', `${m.def.name} defeated!`); }
+    if (m.health <= 0 && m.templeKey && g.meta) { g.meta.templesCleared = { ...(g.meta.templesCleared || {}), [m.templeKey]: true }; g.emit('toast', 'The sky temple is quiet'); }
+    if (m.def.boss && m.health > 0 && m.type === 'king_slime') {
       // the King sheds slimes as it is hurt
       m.shed = (m.shed || 0) + amount;
       while (m.shed >= 25) { m.shed -= 25; const c = this.spawnAt(this.rng() < 0.7 ? 'slime_small' : 'slime_medium', [m.body.pos[0] + (this.rng() - 0.5) * 3, m.body.pos[1] + 2, m.body.pos[2] + (this.rng() - 0.5) * 3]); c.body.vel = [(this.rng() - 0.5) * 8, 6, (this.rng() - 0.5) * 8]; }

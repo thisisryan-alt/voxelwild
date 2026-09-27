@@ -209,10 +209,14 @@ export class Player {
       const grounded = b.probeGround(world);
       // soul sand drags at the feet
       const under = grounded ? world.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] - 0.05), Math.floor(b.pos[2])) : -1;
-      const sp = (input.sprint ? this.sprintSpeed : this.walkSpeed) * (under === B.SoulSand ? 0.45 : 1);
+      if (this.slowT > 0) this.slowT -= dt;       // frozen by the Frost Colossus
+      const sp = (input.sprint ? this.sprintSpeed : this.walkSpeed) * (under === B.SoulSand ? 0.45 : 1) * (this.slowT > 0 ? 0.5 : 1);
       const k = 1 - Math.exp(-(grounded ? this.groundAccel : this.airAccel) * dt);
       v[0] += (wx * sp - v[0]) * k; v[2] += (wz * sp - v[2]) * k;
       if (grounded && input.jump && v[1] <= 0.01) { v[1] = Math.sqrt(2 * this.gravity * this.jumpHeight); this.jumps++; }
+      // a Cloud in a Bottle (not in Minecraft): one more jump in the air
+      if (grounded) this.usedDouble = false;
+      else if (input.jumpPressed && this.doubleJump && !this.usedDouble) { v[1] = Math.sqrt(2 * this.gravity * this.jumpHeight) * 0.95; this.usedDouble = true; this.didDoubleJump = true; this.fallStart = NaN; }
       v[1] = Math.max(v[1] - this.gravity * dt, -60);
       if (this.climbing) {
         if (input.jump || (iz > 0.1 && b.hitWall)) v[1] = 2.4;
