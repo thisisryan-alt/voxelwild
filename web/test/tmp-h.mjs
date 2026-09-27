@@ -25,24 +25,12 @@ await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
 await page.waitForFunction(() => window.voxelwild && (window.voxelwild.game.icons || !document.getElementById('fatal').hidden), { timeout: 30000 });
 const fatal = await page.evaluate(() => document.getElementById('fatal').hidden ? '' : document.getElementById('fatalMsg').textContent); if (fatal) { console.log('FATAL', fatal); process.exit(1); }
 await page.waitForFunction(() => window.voxelwild.game.state === 'menu', { timeout: 60000 }); await new Promise((r) => setTimeout(r, 1200));
-await page.screenshot({ path: join(out, 'shot-title.png') });
-await page.evaluate((seed) => window.voxelwild.ui.play({ id: 'shots', name: 'Shots', seed: +seed, mode: 'creative', created: 0, lastPlayed: 0 }, true), seed);
+await page.evaluate(() => window.voxelwild.ui.play({ id: 'st', name: 'T', seed: 20260925, mode: 'creative', unsaved: true, created: 0, lastPlayed: 0 }, true));
 await page.waitForFunction(() => window.voxelwild.game.state === 'playing', { timeout: 120000 });
-const views = process.argv[4] ? JSON.parse(process.argv[4]) : [
-  { name: 'a-north', dy: 0, yaw: 0, pitch: -0.1 }, { name: 'b-east', dy: 0, yaw: -1.57, pitch: -0.1 }, { name: 'c-south', dy: 0, yaw: 3.14, pitch: -0.1 },
-  { name: 'd-west', dy: 0, yaw: 1.57, pitch: -0.1 }, { name: 'e-high', dy: 40, yaw: 0.6, pitch: -0.45 }, { name: 'f-down', dy: 6, yaw: 0.6, pitch: -1.2 },
-];
-await page.evaluate(async () => {
-  const g = window.voxelwild.game, w = g.world, p = g.player.body.pos.map(Math.floor), Y = 150;
-  for (let x = -6; x < 7; x++) for (let z = -8; z < 3; z++) { w.setBlock(p[0] + x, Y - 1, p[2] + z, 88); for (let y = 0; y < 4; y++) w.setBlock(p[0] + x, Y + y, p[2] + z, 0); }
-  g.settings.mobs = false;
-  g.mobs.clear();
-  ['slime_big', 'polar_bear', 'strider', 'pillager', 'vindicator', 'piglin_brute'].forEach((t, i) => g.mobs.spawnGroup(t, p[0] - 5 + i * 2, Y, p[2] - 4, 1));
-  for (const m of g.mobs.list) { m.yaw = 0; m.angry = 0; m.frozen = true; }
-  g.player.flying = true; g.player.teleport([p[0] + 0.5, Y + 0.5, p[2] + 2], 0, -0.1);
-  g.tod.hour = 12; g.creative = true;
-});
-await new Promise((r) => setTimeout(r, 2500));
-await page.screenshot({ path: join(out, 'mobs-new.png') });
-console.log('render size', await page.evaluate(() => [window.voxelwild.game.renderer.width, window.voxelwild.game.renderer.height, window.voxelwild.game.renderer.dynScale]));
+await new Promise((r) => setTimeout(r, 3000));
+console.log(JSON.stringify(await page.evaluate(() => {
+  const { terrainFor } = window.voxelwild.structures, g = window.voxelwild.game, T = terrainFor(g.meta.seed), p = g.player.body.pos.map(Math.floor), out = [];
+  for (let k = 0; k < 40; k++) { const x = p[0] + ((k * 37) % 60) - 30, z = p[2] + ((k * 53) % 60) - 30; const h = g.world.heightmapAt(x, z), s = T.sample(x, z).height; let top = null; for (let y = 200; y > -60; y--) { const b = g.world.getBlock(x, y, z); if (b > 0 && b !== 8 && !(window.voxelwild.blocks[b].flags & 8)) { top = y; break; } } out.push([+s.toFixed(2), top, h]); }
+  return out;
+})));
 await browser.close(); server.close();

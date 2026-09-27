@@ -105,6 +105,7 @@ await step('mine by hand and collect drop', async () => {
 await step('place a block', async () => {
   const r = await G(async () => {
     const g = window.voxelwild.game;
+    g.mobs.clear();   // a mob in the crosshair would take the click
     // stand beside the hole the mining step dug, on the highest solid block
     const sx = Math.floor(g.spawn[0]) + 3, sz = Math.floor(g.spawn[2]);
     let sy = 150; while (sy > 0 && !g.world.isSolidAt(sx, sy - 1, sz)) sy--;

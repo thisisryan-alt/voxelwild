@@ -7,6 +7,7 @@ import { hash4, mulberry32, smoothstep } from './noise.js';
 import { generateNether } from './nether.js';
 import { generateEnd } from './end.js';
 import { applyStrongholds } from './stronghold.js';
+import { applyStructures } from './structures.js';
 
 export const LAVA_LEVEL = -54;   // caves below this fill with lava (Minecraft's deep lava lakes)
 
@@ -125,6 +126,7 @@ export function generateColumn(cx, cz, seed, dim = 0, flat = false) {
   decorateCaveFloors(vox, sHeight, ox, oz, seed, n);
   placeSurfacePlants(vox, sHeight, sTop, sBiome, ox, oz, seed, n);
   placeSpring(vox, heights, P, sHeight, sBiome, cx, cz, seed);
+  applyStructures(vox, ox, oz, seed, T, sHeight);
   return { voxels: vox, surface: { height: sHeight, top: sTop, biome: sBiome, temp: sTemp, humid: sHumid } };
 }
 

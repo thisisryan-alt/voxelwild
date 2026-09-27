@@ -6,6 +6,8 @@
 import { VoxelBody } from './player.js';
 import { B, BLOCKS, F, I, C, ITEMS, Dim, isWater, isLava, isLiquid, mining } from '../shared/blocks.js';
 import { Biome } from '../shared/terrain.js';
+import { structuresIn } from '../shared/structures.js';
+import { terrainFor } from '../shared/gen.js';
 
 const GRASSY = new Set([Biome.Plains, Biome.Forest, Biome.DenseForest, Biome.Savanna, Biome.Taiga, Biome.SnowyTaiga, Biome.Jungle, Biome.Swamp, Biome.Mountains, Biome.SnowyTundra]);
 
@@ -25,8 +27,20 @@ export const MOB_TYPES = {
   stray: { name: 'Stray', health: 20, speed: 2.3, half: 0.3, height: 1.99, kind: 'hostile', ranged: 'arrow', drops: [[I.Bone, 0, 2], [I.Arrow, 0, 2]], burns: true, base: 'skeleton' },
   wither_skeleton: { name: 'Wither Skeleton', health: 20, speed: 2.4, half: 0.35, height: 2.4, kind: 'hostile', damage: 8, drops: [[I.Coal, 0, 1], [I.Bone, 0, 2]], base: 'skeleton', melee: true },
   cave_spider: { name: 'Cave Spider', health: 12, speed: 3.1, half: 0.35, height: 0.5, kind: 'hostile', damage: 2, drops: [[I.String, 0, 2]], base: 'spider' },
-  ghast: { name: 'Ghast', health: 10, speed: 1.6, half: 2, height: 4, kind: 'hostile', flying: true, ranged: 'ghastball', drops: [[I.GhastTear, 0, 1], [I.Gunpowder, 0, 2]], range: 40 },
+  ghast: { name: 'Ghast', health: 10, speed: 1.6, half: 1, height: 2.2, kind: 'hostile', flying: true, ranged: 'ghastball', drops: [[I.GhastTear, 0, 1], [I.Gunpowder, 0, 2]], range: 32 },
+  pillager: { name: 'Pillager', health: 24, speed: 2.3, half: 0.3, height: 1.95, kind: 'hostile', ranged: 'arrow', drops: [[I.Arrow, 0, 2]], armsForward: true },
+  vindicator: { name: 'Vindicator', health: 24, speed: 2.6, half: 0.3, height: 1.95, kind: 'hostile', damage: 8, drops: [[I.Emerald, 0, 1]], armsForward: true },
+  slime_big: { name: 'Slime', health: 16, speed: 1.9, half: 1.0, height: 2.0, kind: 'hostile', damage: 4, hop: 1, splits: 'slime_medium', drops: [] },
+  slime_medium: { name: 'Slime', health: 4, speed: 1.9, half: 0.5, height: 1.0, kind: 'hostile', damage: 2, hop: 1, splits: 'slime_small', drops: [] },
+  slime_small: { name: 'Slime', health: 1, speed: 1.9, half: 0.26, height: 0.52, kind: 'hostile', damage: 0, hop: 1, drops: [[I.SlimeBall, 0, 2]] },
+  polar_bear: { name: 'Polar Bear', health: 30, speed: 1.7, half: 0.7, height: 1.4, kind: 'neutral', damage: 6, drops: [] },
+  strider: { name: 'Strider', health: 20, speed: 1.2, half: 0.45, height: 1.7, kind: 'passive', lavaWalk: true, drops: [[I.String, 0, 3]] },
+  piglin_brute: { name: 'Piglin Brute', health: 50, speed: 2.4, half: 0.3, height: 1.95, kind: 'hostile', damage: 9, drops: [[I.GoldIngot, 0, 1]], armsForward: true },
 };
+
+// villagers: one type per profession (the skin's overlay), all trading
+export const PROFESSIONS = ['farmer', 'toolsmith', 'butcher', 'shepherd', 'weaponsmith', 'fletcher'];
+for (const p of PROFESSIONS) MOB_TYPES[`villager_${p}`] = { name: 'Villager', health: 20, speed: 1.1, half: 0.3, height: 1.95, kind: 'passive', drops: [], villager: p };
 
 export class Mob {
   constructor(type, pos, rng) {
@@ -64,6 +78,7 @@ export class Mobs {
     const g = this.game, w = g.world;
     if (!w || g.state === 'loading') return;
     if ((this.spawnT -= dt) <= 0) { this.spawnT = 0.7; this.trySpawn(); }
+    if ((this.structT = (this.structT ?? 1) - dt) <= 0) { this.structT = 2.5; this.structureSpawns(); }
     const pp = g.player.body.pos;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const m = this.list[i];
@@ -73,6 +88,51 @@ export class Mobs {
       this.think(m, dt);
     }
     this.updateProjectiles(dt);
+  }
+
+  /** Villages keep their villagers, outposts their pillagers, bastions their brutes; dungeon spawners work. */
+  structureSpawns() {
+    const g = this.game, w = g.world, p = g.player.body.pos, dim = g.dim;
+    if ((g.settings && g.settings.mobs === false) || !g.meta || g.meta.flat) return;
+    const peaceful = g.settings && g.settings.difficulty === 'peaceful';
+    const T = dim === Dim.Overworld ? (this.T && this.Tseed === g.meta.seed ? this.T : (this.Tseed = g.meta.seed, this.T = terrainFor(g.meta.seed))) : null;
+    const plans = structuresIn(g.meta.seed, T, p[0] - 80, p[2] - 80, p[0] + 80, p[2] + 80, dim);
+    const near = (test, x, z, r) => this.list.filter((m) => !m.dead && test(m) && Math.hypot(m.body.pos[0] - x, m.body.pos[2] - z) < r).length;
+    const ground = (x, z, y0) => {
+      // the lowest free spot (street level, not a roof)
+      for (let y = y0 - 3; y < y0 + 12; y++) { const f = w.getBlock(x, y - 1, z); if (f > 0 && (BLOCKS[f].flags & F.Solid) && this.standable(x, y, z)) return y; }
+      return null;
+    };
+    for (const s of plans) {
+      const d = Math.hypot(s.x - p[0], s.z - p[2]);
+      if (s.kind === 'village' && d < 90) {
+        if (near((m) => m.def.villager, s.x, s.z, 56) >= 6) continue;
+        const pc = s.pieces[Math.floor(this.rng() * s.pieces.length)];
+        const x = pc.x + Math.floor(this.rng() * 3) - 1, z = pc.z - 3 + Math.floor(this.rng() * 2), y = ground(x, z, pc.y);
+        if (y == null) continue;
+        const v = this.spawnAt(`villager_${PROFESSIONS[Math.floor(this.rng() * PROFESSIONS.length)]}`, [x + 0.5, y, z + 0.5]);
+        v.home = [s.x, s.z];
+      } else if (s.kind === 'outpost' && !peaceful && d < 70) {
+        if (near((m) => m.type === 'pillager' || m.type === 'vindicator', s.x, s.z, 28) >= 4) continue;
+        const a = this.rng() * Math.PI * 2, x = Math.floor(s.x + Math.cos(a) * 7), z = Math.floor(s.z + Math.sin(a) * 7), y = ground(x, z, s.y + 4);
+        if (y == null) continue;
+        const m = this.spawnAt(this.rng() < 0.7 ? 'pillager' : 'vindicator', [x + 0.5, y, z + 0.5]);
+        m.home = [s.x, s.z];
+      } else if (s.kind === 'bastion' && !peaceful && d < 60) {
+        if (near((m) => m.type === 'piglin_brute', s.x, s.z, 20) >= 3) continue;
+        const x = s.x - 5 + Math.floor(this.rng() * 11), z = s.z - 5 + Math.floor(this.rng() * 11);
+        if (this.standable(x, 35, z)) { const m = this.spawnAt('piglin_brute', [x + 0.5, 35, z + 0.5]); m.home = [s.x, s.z]; }
+      } else if (s.kind === 'dungeon' && !peaceful && Math.hypot(d, s.y + 1 - p[1]) < 16) {
+        // the spawner: a few of its monster at a time while the player is near
+        if (w.getBlock(s.x, s.y + 1, s.z) !== C.spawner) continue;
+        g.spawnEmbers([s.x + 0.5, s.y + 1.5, s.z + 0.5], 8, [1.8, 0.6, 0.2]);
+        if (near((m) => m.type === s.mob, s.x, s.z, 9) >= 4) continue;
+        for (let k = 0; k < 2; k++) {
+          const x = s.x - 3 + Math.floor(this.rng() * 7), z = s.z - 3 + Math.floor(this.rng() * 7);
+          if (this.standable(x, s.y + 1, z)) this.spawnAt(s.mob, [x + 0.5, s.y + 1, z + 0.5]);
+        }
+      }
+    }
   }
 
   counts() {
@@ -96,6 +156,10 @@ export class Mobs {
         const clim = w.climateAt(x, z);
         const top = w.getBlock(x, h, z);
         const open = this.standable(x, h + 1, z) && !isLiquid(top) && (BLOCKS[top].flags & F.Solid);
+        if (open && !night && counts.passive < 12 && clim && (clim.biome === Biome.SnowyTundra || clim.biome === Biome.SnowyPeaks) && (top === B.Snow || top === B.SnowyGrass) && this.rng() < 0.4) {
+          this.spawnGroup('polar_bear', x, h + 1, z, 1 + (this.rng() < 0.3 ? 1 : 0));
+          return;
+        }
         if (open && !night && counts.passive < 12 && top === B.Grass && clim && GRASSY.has(clim.biome)) {
           const kinds = clim.biome === Biome.Taiga || clim.biome === Biome.SnowyTaiga ? ['sheep', 'wolf', 'cow'] : ['cow', 'pig', 'sheep', 'chicken'];
           this.spawnGroup(kinds[Math.floor(this.rng() * kinds.length)], x, h + 1, z, 2 + Math.floor(this.rng() * 3));
@@ -116,6 +180,7 @@ export class Mobs {
         let kind = pick < 0.35 ? 'husk' : pick < 0.62 ? 'skeleton' : pick < 0.82 ? 'creeper' : 'spider';
         if (kind === 'skeleton' && clim && (clim.biome === Biome.SnowyTaiga || clim.biome === Biome.SnowyTundra)) kind = 'stray';
         if (kind === 'spider' && y < 20 && this.rng() < 0.6) kind = 'cave_spider';
+        if ((clim && clim.biome === Biome.Swamp && night && this.rng() < 0.5) || (y < 0 && this.rng() < 0.12)) kind = ['slime_big', 'slime_medium', 'slime_small'][Math.floor(this.rng() * 3)];
         if (kind === 'spider' && !this.standableWide(x, y, z)) continue;
         this.spawnGroup(kind, x, y, z, 1 + (this.rng() < 0.3 ? 1 : 0));
         return;
@@ -132,7 +197,12 @@ export class Mobs {
             this.spawnGroup('zombified_piglin', x, cy, z, 1 + Math.floor(this.rng() * 3));
             return;
           }
-          if (this.rng() < 0.08 && this.openAir(x, cy + 4, z)) { this.spawnGroup('ghast', x, cy + 4, z, 1); return; }
+          // ghasts are rare: a few in the whole Nether around the player
+          if (this.rng() < 0.012 && this.list.filter((m) => m.type === 'ghast' && !m.dead).length < 2 && this.openAir(x, cy + 4, z)) { this.spawnGroup('ghast', x, cy + 4, z, 1); return; }
+          if (this.rng() < 0.05) {
+            // striders on the lava sea
+            for (let ly = 40; ly > 20; ly--) if (isLava(w.getBlock(x, ly, z)) && w.getBlock(x, ly + 1, z) === B.Air && w.getBlock(x, ly + 2, z) === B.Air) { if (counts.passive < 6) this.spawnGroup('strider', x, ly + 1, z, 1 + Math.floor(this.rng() * 2)); return; }
+          }
         }
       }
     }
@@ -205,6 +275,10 @@ export class Mobs {
       }
       m.fuse = Math.max(0, m.fuse - dt * 2);
     }
+    if (m.home && !hostile) {
+      const hx = m.home[0] - b.pos[0], hz = m.home[1] - b.pos[2], hl = Math.hypot(hx, hz);
+      if (hl > 22) { wantX = hx / hl; wantZ = hz / hl; speed = t.speed * 0.6; m.goal = null; }
+    }
     if (speed > 0 && (wantX || wantZ)) m.yaw = lerpAngle(m.yaw, Math.atan2(-wantX, -wantZ), Math.min(1, dt * 6));
     // skeletons burn in daylight under the open sky
     if (t.burns && g.dim === Dim.Overworld && (sky.daylight ?? 0) > 0.6 && !isWater(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + 0.5), Math.floor(b.pos[2])))) {
@@ -212,7 +286,33 @@ export class Mobs {
       if (h != null && b.pos[1] > h) { m.burnT = (m.burnT || 0) - dt; if (m.burnT <= 0) { m.burnT = 1; this.hurt(m, 1, null); g.spawnEmbers([b.pos[0], b.pos[1] + 1, b.pos[2]], 6); } }
     }
     // lava hurts them too
-    if (isLava(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + 0.2), Math.floor(b.pos[2]))) && m.type !== 'blaze' && m.type !== 'zombified_piglin' && m.type !== 'ghast') this.hurt(m, dt * 8, null);
+    if (isLava(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + 0.2), Math.floor(b.pos[2]))) && !['blaze', 'zombified_piglin', 'ghast', 'strider'].includes(m.type)) this.hurt(m, dt * 8, null);
+    if (t.hop) {
+      // slimes do not walk: they gather themselves and jump
+      m.hopT = (m.hopT ?? 1) - dt;
+      if (b.grounded) {
+        b.vel[0] *= 0.6; b.vel[2] *= 0.6;
+        if (m.hopT <= 0 && (wantX || wantZ || hostile)) {
+          m.hopT = hostile ? 0.6 + this.rng() * 0.6 : 1.5 + this.rng() * 2;
+          const l = Math.hypot(wantX, wantZ) || 1, hs = t.speed * (hostile ? 1.6 : 1) * (0.8 + t.height * 0.3);
+          b.vel[0] = wantX / l * hs; b.vel[2] = wantZ / l * hs; b.vel[1] = 6 + t.height * 1.5;
+          m.squish = 1;
+        }
+      }
+      m.squish = Math.max(0, (m.squish || 0) - dt * 3);
+      b.vel[1] = Math.max(b.vel[1] - 30 * dt, -40);
+      b.move(w, [b.vel[0] * dt, b.vel[1] * dt, b.vel[2] * dt]);
+      m.walkSpeed = 0;
+      const wh = dist < 8 ? Math.atan2(-dx, -dz) - m.yaw : 0;
+      m.headYaw = lerpAngle(m.headYaw, clampAngle(wh, 1.0), Math.min(1, dt * 5));
+      return;
+    }
+    if (t.lavaWalk) {
+      // striders stand on lava as on ground
+      const fy = Math.floor(b.pos[1] - 0.02), under = w.getBlock(Math.floor(b.pos[0]), fy, Math.floor(b.pos[2]));
+      if (isLava(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + 0.3), Math.floor(b.pos[2])))) b.vel[1] = Math.max(b.vel[1], 3);
+      else if (isLava(under) && b.vel[1] <= 0 && b.pos[1] - (fy + 1) < 0.2) { b.pos[1] = fy + 1; b.vel[1] = 0; b.grounded = true; }
+    }
     // move
     const accel = 1 - Math.exp(-10 * dt);
     b.vel[0] += (wantX * speed - b.vel[0]) * accel;
@@ -224,7 +324,9 @@ export class Mobs {
       b.vel[1] += ((want - b.pos[1]) * 1.2 - b.vel[1]) * Math.min(1, dt * 2) + Math.sin(m.age * 1.7) * 0.02;
     } else {
       const inLiquid = isLiquid(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + 0.3), Math.floor(b.pos[2])));
-      if (inLiquid) b.vel[1] = Math.min(b.vel[1] + 14 * dt, 2.2); else b.vel[1] = Math.max(b.vel[1] - 30 * dt, -40);
+      const onLava = t.lavaWalk && b.grounded && b.vel[1] === 0 && isLava(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] - 0.02), Math.floor(b.pos[2])));
+      if (onLava) b.vel[1] = 0;
+      else if (inLiquid) b.vel[1] = Math.min(b.vel[1] + 14 * dt, 2.2); else b.vel[1] = Math.max(b.vel[1] - 30 * dt, -40);
       if (b.hitWall && b.grounded && speed > 0) b.vel[1] = 8.5;   // hop up a block
       if (t.flutter && b.vel[1] < -2) b.vel[1] = -2;            // chickens flutter down
     }
@@ -276,6 +378,13 @@ export class Mobs {
     g.audio.mobHurt(m.type);
     if (m.health <= 0) {
       m.dead = 0.001;
+      if (m.def.splits) {
+        const n = 2 + Math.floor(this.rng() * 2);
+        for (let k = 0; k < n; k++) {
+          const c = this.spawnAt(m.def.splits, [m.body.pos[0] + (this.rng() - 0.5) * m.def.half, m.body.pos[1] + 0.2, m.body.pos[2] + (this.rng() - 0.5) * m.def.half]);
+          c.body.vel = [(this.rng() - 0.5) * 4, 4, (this.rng() - 0.5) * 4];
+        }
+      }
       if (attacker || amount >= 1) this.drop(m);
       return true;
     }

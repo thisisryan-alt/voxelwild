@@ -344,7 +344,7 @@ export const I = {
   Gunpowder: 300, String: 301, GoldNugget: 302, BlazeRod: 303, GhastTear: 304, WoodenSword: 305, StoneSword: 306, IronSword: 307, DiamondSword: 308,
   IronIngot: 309, GoldIngot: 310, CopperIngot: 311, CookedBeef: 312, CookedPorkchop: 313, CookedMutton: 314, CookedChicken: 315, Charcoal: 316,
   Bread: 317, Wheat: 318, WheatSeeds: 319, WoodenHoe: 320, StoneHoe: 321, IronHoe: 322, DiamondHoe: 323,
-  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343,
+  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344,
   LeatherHelmet: 324,      // armour: 324 + material * 4 + piece (leather, golden, iron, diamond x helmet, chestplate, leggings, boots)
 };
 export const ARMOR_MATS = ['Leather', 'Golden', 'Iron', 'Diamond'], ARMOR_PIECES = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
@@ -395,6 +395,7 @@ if (FAM.redstone_wire) ITEMS[I.Redstone].places = FAM.redstone_wire.first;
 if (FAM.wheat) ITEMS[I.WheatSeeds].places = FAM.wheat.first;
 ITEMS[I.EyeOfEnder] = { id: I.EyeOfEnder, name: 'Eye of Ender', kind: Kind.Use, stack: 64 };
 ITEMS[I.Bow] = { id: I.Bow, name: 'Bow', kind: Kind.Use, stack: 1, durability: 385 };
+mat(I.SlimeBall, 'Slimeball');
 ITEMS[I.Bucket] = { id: I.Bucket, name: 'Bucket', kind: Kind.Use, stack: 16 };
 ITEMS[I.WaterBucket] = { id: I.WaterBucket, name: 'Water Bucket', kind: Kind.Use, stack: 1 };
 ITEMS[I.LavaBucket] = { id: I.LavaBucket, name: 'Lava Bucket', kind: Kind.Use, stack: 1 };
@@ -597,7 +598,8 @@ if (FAM.lever) recipe(FAM.lever.first, 1, [[I.Stick, 1], ['stone', 1]]);
 if (FAM.repeater) recipe(FAM.repeater.first, 1, [[FAM.redstone_torch.first, 2], [I.Redstone, 1], [B.Stone, 3]]);
 if (C.redstone_lamp) recipe(C.redstone_lamp, 1, [[I.Redstone, 4], [B.Glowstone, 1]]);
 if (FAM.piston) recipe(FAM.piston.first, 1, [['planks', 3], ['stone', 4], [I.IronIngot, 1], [I.Redstone, 1]]);
-if (FAM.sticky_piston && C.slime_block) recipe(FAM.sticky_piston.first, 1, [[FAM.piston.first, 1], [C.slime_block, 1]]);
+if (FAM.sticky_piston) recipe(FAM.sticky_piston.first, 1, [[FAM.piston.first, 1], [I.SlimeBall, 1]]);
+if (C.slime_block) { recipe(C.slime_block, 1, [[I.SlimeBall, 9]]); recipe(I.SlimeBall, 9, [[C.slime_block, 1]]); }
 if (C.tnt) recipe(C.tnt, 1, [[I.Gunpowder, 5], [B.Sand, 4]]);
 if (C.note_block) recipe(C.note_block, 1, [['planks', 8], [I.Redstone, 1]]);
 if (FAM.comparator) recipe(FAM.comparator.first, 1, [[FAM.redstone_torch.first, 3], [I.NetherQuartz, 1], [B.Stone, 3]]);

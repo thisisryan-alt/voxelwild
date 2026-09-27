@@ -2,6 +2,7 @@
 // and warped forests, soul sand valleys, basalt deltas), glowstone hanging from the roof, quartz and gold ores, vines,
 // basalt pillars and nether brick fortresses. Huge fungi are placed by decorate.js (they cross column borders).
 // Everything is a function of world position and seed, so neighbouring columns always agree.
+import { applyStructures } from './structures.js';
 import { CS, CS2, MIN_Y, HEIGHT, colIdx } from './const.js';
 import { B } from './blocks.js';
 import { Biome } from './terrain.js';
@@ -102,6 +103,7 @@ export function generateNether(cx, cz, seed) {
     sHeight[k] = tree; sTop[k] = top; sBiome[k] = biome;
   }
   fortresses(vox, ox, oz, seed);
+  applyStructures(vox, ox, oz, seed, null, null, 1);
   return { voxels: vox, surface: { height: sHeight, top: sTop, biome: sBiome, temp: sTemp, humid: sHumid } };
 }
 

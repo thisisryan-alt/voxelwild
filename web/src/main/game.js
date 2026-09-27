@@ -24,6 +24,7 @@ import { END_ARRIVAL, END_GATEWAY, outerGateway } from '../shared/end.js';
 import { netherClimate, nearestFortress } from '../shared/nether.js';
 import { Simplex } from '../shared/noise.js';
 import { terrainFor } from '../shared/gen.js';
+import { structureAt } from '../shared/structures.js';
 import { Biome, BIOME_NAMES } from '../shared/terrain.js';
 import { VoxelBody } from './player.js';
 import { MIN_Y, MAX_Y, SEA } from '../shared/const.js';
@@ -851,6 +852,13 @@ export class Game {
     this.attackT = (this.attackT || 0) - dt;
     if (mobHit && (!hit || mobHit.dist < hit.dist)) {
       this.target = null;
+      if (this.mouse.rightClicked && mobHit.mob.def.villager && this.state === 'playing') {
+        const v = mobHit.mob;
+        this.openStation({ kind: 'trade', name: `${v.def.villager[0].toUpperCase()}${v.def.villager.slice(1)}`, trades: this.trades(v.def.villager) });
+        this.audio.click();
+        this.mining = null;
+        return;
+      }
       if (this.mouse.leftClicked && this.attackT <= 0) {
         const def = inv.heldItem;
         const dmg = def && def.kind === Kind.Tool ? (def.damage || [1, 2, 3, 4, 5][def.tier] + 1) : 1;
@@ -1178,6 +1186,45 @@ export class Game {
     return false;
   }
   /** Where an item enters a container from direction dir (0..5 six-way, the way the item travels). */
+  /** A chest found in the world: loot for the structure it stands in. */
+  fillLoot(pos) {
+    const [x, y, z] = pos, d = this.blockData(pos, 'chest', 27);
+    const kind = structureAt(this.meta.seed, this.dim === Dim.Overworld ? terrainFor(this.meta.seed) : null, x, y, z, this.dim) || (this.dim === Dim.Nether ? 'bastion' : 'dungeon');
+    let s = (Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791) ^ this.meta.seed) >>> 0;
+    const rnd = () => { s = (Math.imul(s ^ (s >>> 15), 2246822519) + 374761393) >>> 0; return (s >>> 8) / 16777216; };
+    const T = {
+      village: [[I.Bread, 1, 4], [I.Apple, 1, 3], [I.WheatSeeds, 2, 6], [I.Wheat, 2, 8], [I.IronIngot, 1, 3], [I.Emerald, 1, 2], [I.CookedBeef, 1, 3], [B.Torch, 2, 6], [CK.oak_sapling, 1, 2]],
+      dungeon: [[I.Bread, 1, 3], [I.Wheat, 2, 6], [I.IronIngot, 1, 4], [I.GoldIngot, 1, 3], [I.Redstone, 2, 6], [I.String, 1, 5], [I.Gunpowder, 1, 4], [I.Bone, 2, 6], [I.RottenFlesh, 1, 5], [I.Bucket, 1, 1], [I.Diamond, 1, 2], [I.SlimeBall, 1, 3]],
+      pyramid: [[I.Bone, 2, 6], [I.RottenFlesh, 2, 6], [I.GoldIngot, 2, 6], [I.IronIngot, 1, 4], [I.Emerald, 1, 3], [I.Diamond, 1, 3], [I.Gunpowder, 2, 6], [B.Sand, 4, 12]],
+      outpost: [[I.Arrow, 4, 16], [I.IronIngot, 1, 3], [I.String, 1, 4], [I.Wheat, 2, 6], [CK.dark_oak_log, 2, 5], [I.Emerald, 1, 2]],
+      portal: [[I.GoldNugget, 4, 18], [I.GoldIngot, 1, 3], [I.FlintAndSteel, 1, 1], [B.Obsidian, 1, 3], [I.IronIngot, 1, 2], [CK.gold_block, 1, 1]],
+      bastion: [[I.GoldIngot, 3, 9], [CK.gold_block, 1, 2], [I.Diamond, 1, 2], [I.Arrow, 5, 16], [B.Magma, 2, 5], [I.CookedPorkchop, 2, 5], [CK.gilded_blackstone, 1, 4]],
+      igloo: [[I.Apple, 1, 3], [I.Coal, 1, 4], [I.GoldNugget, 1, 3], [I.Emerald, 1, 1], [I.StoneAxe, 1, 1]],
+      hut: [[I.RottenFlesh, 1, 4], [I.Bone, 1, 3], [I.Redstone, 1, 4], [I.GlowstoneDust, 1, 4]],
+    }[kind] || [];
+    const n = 3 + Math.floor(rnd() * 5);
+    for (let k = 0; k < n && T.length; k++) {
+      const [item, lo, hi] = T[Math.floor(rnd() * T.length)];
+      if (!item || !ITEMS[item]) continue;
+      const slot = Math.floor(rnd() * 27);
+      if (!d.slots[slot]) d.slots[slot] = { item, count: Math.min(ITEMS[item].stack, lo + Math.floor(rnd() * (hi - lo + 1))) };
+    }
+  }
+
+  /** A villager's offers, by profession: [[inputs...], output, count]. */
+  trades(prof) {
+    const R = (inputs, out, count) => ({ inputs, out, count, name: itemName(out) });
+    const E = I.Emerald;
+    return {
+      farmer: [R([[I.Wheat, 20]], E, 1), R([[E, 1]], I.Bread, 6), R([[E, 1]], I.Apple, 4), R([[CK.pumpkin || I.Wheat, 6]], E, 1), R([[E, 3]], CK.hay_block || I.Wheat, 1)],
+      toolsmith: [R([[I.Coal, 15]], E, 1), R([[E, 3], [I.Stick, 2]], I.IronPickaxe, 1), R([[E, 2], [I.Stick, 2]], I.IronShovel, 1), R([[E, 3], [I.Stick, 2]], I.IronAxe, 1), R([[E, 12], [I.Stick, 2]], I.DiamondPickaxe, 1)],
+      butcher: [R([[I.RawChicken, 14]], E, 1), R([[I.Porkchop, 7]], E, 1), R([[E, 1]], I.CookedPorkchop, 5), R([[E, 1]], I.CookedChicken, 6), R([[E, 1]], I.CookedBeef, 4)],
+      shepherd: [R([[CK.white_wool, 18]], E, 1), R([[E, 2]], FAM.white_bed ? FAM.white_bed.first : CK.white_wool, 1), R([[E, 1]], CK.red_wool, 2), R([[E, 1]], CK.blue_wool, 2), R([[E, 1]], FAM.white_carpet ? FAM.white_carpet.first : CK.white_wool, 4)],
+      weaponsmith: [R([[I.Coal, 15]], E, 1), R([[I.IronIngot, 4]], E, 1), R([[E, 3], [I.Stick, 1]], I.IronSword, 1), R([[E, 12], [I.Stick, 1]], I.DiamondSword, 1), R([[E, 9]], I.IronChestplate, 1)],
+      fletcher: [R([[I.Stick, 32]], E, 1), R([[I.Flint, 26]], E, 1), R([[E, 1]], I.Arrow, 16), R([[E, 2]], I.Bow, 1), R([[I.String, 14]], E, 1)],
+    }[prof] || [];
+  }
+
   /** Storage of the container block at x, y, z (made on first use), or null. */
   containerAt(x, y, z) {
     const id = this.world.getBlock(x, y, z), f = famOf(id);
@@ -1309,6 +1356,7 @@ export class Game {
     if (hit.block === CK.furnace || hit.block === CK.lit_furnace) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Furnace' }); return true; }
     if (hit.block === CK.smoker) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Smoker' }); return true; }
     if (hit.block === CK.blast_furnace) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Blast Furnace' }); return true; }
+    if ((hit.block === CK.chest || hit.block === CK.barrel) && !(this.meta.blockData && this.meta.blockData[this.bkey(hx, hy, hz)])) this.fillLoot(hit.hit);
     if (hit.block === CK.chest || hit.block === CK.barrel) { this.openStation({ kind: 'chest', pos: hit.hit, name: hit.block === CK.chest ? 'Chest' : 'Barrel' }); this.audio.place(hit.block); return true; }
     const cf = famOf(hit.block);
     if (cf && (cf.kind === K.Dispenser || cf.kind === K.Hopper)) { this.openStation({ kind: 'chest', pos: hit.hit, name: cf.name, size: cf.kind === K.Hopper ? 5 : 9 }); return true; }
@@ -1431,6 +1479,7 @@ export class Game {
     if (fam && fam.kind === K.Bed) { const n = [[1, 0], [-1, 0], [0, 1], [0, -1]][(id - fam.first) >> 1]; w.setBlock(x + n[0], y, z + n[1], id + 1); }
     if (fam && fam.kind === K.Crop) this.meta.crops = { ...(this.meta.crops || {}), [this.bkey(x, y, z)]: this.meta.clock || 0 };
     if (fam && (fam.kind === K.Hopper || fam.kind === K.Dispenser)) this.blockData([x, y, z], 'chest', fam.kind === K.Hopper ? 5 : 9);
+    if (id === CK.chest || id === CK.barrel) this.blockData([x, y, z], 'chest', 27);      // placed chests start empty (found ones hold loot)
     this.redstone.track(x, y, z);
     this.audio.place(block);
     this.swing = 1;

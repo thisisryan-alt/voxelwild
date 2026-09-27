@@ -25,24 +25,32 @@ await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
 await page.waitForFunction(() => window.voxelwild && (window.voxelwild.game.icons || !document.getElementById('fatal').hidden), { timeout: 30000 });
 const fatal = await page.evaluate(() => document.getElementById('fatal').hidden ? '' : document.getElementById('fatalMsg').textContent); if (fatal) { console.log('FATAL', fatal); process.exit(1); }
 await page.waitForFunction(() => window.voxelwild.game.state === 'menu', { timeout: 60000 }); await new Promise((r) => setTimeout(r, 1200));
-await page.screenshot({ path: join(out, 'shot-title.png') });
-await page.evaluate((seed) => window.voxelwild.ui.play({ id: 'shots', name: 'Shots', seed: +seed, mode: 'creative', created: 0, lastPlayed: 0 }, true), seed);
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+await page.evaluate(() => window.voxelwild.ui.play({ id: 'st', name: 'T', seed: 20260925, mode: 'creative', unsaved: true, created: 0, lastPlayed: 0 }, true));
 await page.waitForFunction(() => window.voxelwild.game.state === 'playing', { timeout: 120000 });
-const views = process.argv[4] ? JSON.parse(process.argv[4]) : [
-  { name: 'a-north', dy: 0, yaw: 0, pitch: -0.1 }, { name: 'b-east', dy: 0, yaw: -1.57, pitch: -0.1 }, { name: 'c-south', dy: 0, yaw: 3.14, pitch: -0.1 },
-  { name: 'd-west', dy: 0, yaw: 1.57, pitch: -0.1 }, { name: 'e-high', dy: 40, yaw: 0.6, pitch: -0.45 }, { name: 'f-down', dy: 6, yaw: 0.6, pitch: -1.2 },
-];
-await page.evaluate(async () => {
-  const g = window.voxelwild.game, w = g.world, p = g.player.body.pos.map(Math.floor), Y = 150;
-  for (let x = -6; x < 7; x++) for (let z = -8; z < 3; z++) { w.setBlock(p[0] + x, Y - 1, p[2] + z, 88); for (let y = 0; y < 4; y++) w.setBlock(p[0] + x, Y + y, p[2] + z, 0); }
-  g.settings.mobs = false;
-  g.mobs.clear();
-  ['slime_big', 'polar_bear', 'strider', 'pillager', 'vindicator', 'piglin_brute'].forEach((t, i) => g.mobs.spawnGroup(t, p[0] - 5 + i * 2, Y, p[2] - 4, 1));
-  for (const m of g.mobs.list) { m.yaw = 0; m.angry = 0; m.frozen = true; }
-  g.player.flying = true; g.player.teleport([p[0] + 0.5, Y + 0.5, p[2] + 2], 0, -0.1);
-  g.tod.hour = 12; g.creative = true;
+// the nearest structure of each kind
+const found = await page.evaluate(() => {
+  const { structuresIn, terrainFor } = window.voxelwild.structures, g = window.voxelwild.game, T = terrainFor(g.meta.seed);
+  const best = {};
+  for (let r = 0; r < 3000; r += 400) {
+    for (const s of structuresIn(g.meta.seed, T, -r - 400, -r - 400, r + 400, r + 400)) {
+      const d = Math.hypot(s.x, s.z);
+      if (!best[s.kind] || d < best[s.kind].d) best[s.kind] = { d, x: s.x, y: s.y, z: s.z, kind: s.kind, n: s.pieces ? s.pieces.length : 0, style: s.style };
+    }
+  }
+  return best;
 });
-await new Promise((r) => setTimeout(r, 2500));
-await page.screenshot({ path: join(out, 'mobs-new.png') });
-console.log('render size', await page.evaluate(() => [window.voxelwild.game.renderer.width, window.voxelwild.game.renderer.height, window.voxelwild.game.renderer.dynScale]));
+console.log(JSON.stringify(found));
+const views = { village: [0, 22, 26, -0.55], outpost: [0, 40, 28, -0.6], pyramid: [0, 28, 30, -0.45], well: [0, 12, 8, -0.7], igloo: [0, 10, 9, -0.6], portal: [0, 10, 11, -0.4], hut: [0, 10, 12, -0.4], dungeon: [0, 3, 0, -0.9] };
+const only = process.env.ONLY ? process.env.ONLY.split(',') : Object.keys(views);
+for (const k of only) {
+  const s = found[k]; if (!s) { console.log('none', k); continue; }
+  const v = views[k];
+  const y = k === 'dungeon' ? s.y + 3 : k === 'pyramid' ? s.y + 14 : k === 'outpost' ? s.y + 4 : s.y;
+  await page.evaluate((s, v, y) => { const g = window.voxelwild.game; g.player.flying = true; g.player.teleport([s.x + 0.5 + v[0], y + v[1], s.z + 0.5 + v[2]], 0, v[3]); }, s, v, y);
+  await wait(9000);
+  await page.screenshot({ path: join(out, `struct-${k}.png`) });
+}
+console.log('mobs', await page.evaluate(() => window.voxelwild.game.mobs.list.map((m) => m.type).join(',')));
+console.log('errors', await page.evaluate(() => window.voxelwild.game.errors || 0));
 await browser.close(); server.close();

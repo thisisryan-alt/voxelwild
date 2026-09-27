@@ -682,11 +682,26 @@ export class UI {
       el.title = inv.slots[+el.dataset.slot] ? itemName(inv.slots[+el.dataset.slot].item) : '';
     }
     // a chest or furnace, crafting (survival, or at a table), or the palette (creative)
-    const st = g.station, box = st && (st.kind === 'chest' || st.kind === 'furnace'), crafting = !box && (!g.creative || (st && st.kind === 'table'));
-    $('sideTitle').textContent = box ? st.name : crafting ? (st && st.kind === 'table' ? 'Crafting Table' : 'Crafting') : 'All blocks and items';
+    const st = g.station, trade = st && st.kind === 'trade', box = st && (st.kind === 'chest' || st.kind === 'furnace'), crafting = !box && !trade && (!g.creative || (st && st.kind === 'table'));
+    $('sideTitle').textContent = trade ? `${st.name} · Trades` : box ? st.name : crafting ? (st && st.kind === 'table' ? 'Crafting Table' : 'Crafting') : 'All blocks and items';
     $('station').hidden = !box;
-    $('recipes').hidden = !crafting; $('recipeSearch').hidden = !crafting;
+    $('recipes').hidden = !crafting && !trade; $('recipeSearch').hidden = !crafting;
     $('palette').hidden = !(g.creative && !st); $('paletteSearch').hidden = !(g.creative && !st);
+    if (trade) {
+      $('sideTip').textContent = 'Click an offer to trade. Emeralds come from trading and from chests.';
+      const rec = $('recipes');
+      rec.innerHTML = '';
+      for (const r of st.trades) {
+        const ok = canCraft(inv, r), b = document.createElement('button');
+        b.className = 'recipe'; b.disabled = !ok;
+        const ins = r.inputs.map(([item, n]) => `<span class="${inv.count(item) >= n ? 'have' : 'miss'}">${n}× ${itemName(item)}</span>`).join('');
+        b.innerHTML = `<div class="ico-slot"><div class="ico" style="${g.icons.css(r.out, 32)}"></div></div><div>${r.count > 1 ? r.count + '× ' : ''}${r.name}<small>${ins}</small></div>`;
+        b.onclick = () => { if (craft(inv, r)) { g.audio.click(); this.game.emit('toast', `Traded for ${r.count}× ${r.name}`); } };
+        rec.appendChild(b);
+      }
+      this.updateCursor();
+      return;
+    }
     $('sideTip').textContent = box ? 'Shift-click moves stacks between your inventory and the ' + (st.kind === 'furnace' ? 'furnace (ores and food go in, fuel below).' : st.name.toLowerCase() + '.')
       : crafting ? (st ? 'Shift-click a recipe to craft as many as you can.' : 'Small recipes only. Use a crafting table for the rest. Shift-click crafts as many as you can.')
         : 'Click to take a full stack. Drop items back here to delete them.';

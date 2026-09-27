@@ -748,7 +748,7 @@ def main():
     for w in ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak", "bamboo", "crimson", "warped",
               "iron", "copper", "exposed_copper", "weathered_copper", "oxidized_copper"]:
         items[f"fam:{w}_door"] = f"{w}_door"
-    items.update({"Bow": "bow", "Bucket": "bucket", "WaterBucket": "water_bucket", "LavaBucket": "lava_bucket", "fam:comparator": "comparator",
+    items.update({"SlimeBall": "slime_ball", "Bow": "bow", "Bucket": "bucket", "WaterBucket": "water_bucket", "LavaBucket": "lava_bucket", "fam:comparator": "comparator",
                   "fam:hopper": "hopper"})
     items.update({"fam:repeater": "repeater", "fam:redstone_torch": "block/redstone_torch", "fam:lever": "block/lever",
                   "fam:ladder": "block/ladder", "fam:rail": "block/rail", "fam:powered_rail": "block/powered_rail",

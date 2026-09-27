@@ -160,6 +160,19 @@ The player is lifted out of anything it ends up inside (`VoxelBody.unstick`), sm
 roomier boxes (`pickBoxes`), and strays, wither skeletons and cave spiders join the mobs. Tests: `node test/ground.mjs`
 (collision stress, respawn into built-up spawn), `test/piston-real.mjs`, `test/dims-start.mjs`.
 
+## Structures and more mobs
+
+`src/shared/structures.js` places villages (roads, a well, houses with stair roofs, beds and chests, farms, lamps; styles
+for plains, taiga, savanna, desert and snowy biomes), pillager outposts, desert pyramids (a TNT-trapped treasure pit)
+and wells, igloos, ruined portals, swamp huts, underground dungeons with spawners, and Nether bastions. Every kind has a
+region grid with at most one per region, planned from the seed only, so each column builds its share (like strongholds)
+and the game can use the same plans: villagers, pillagers and piglin brutes keep their structures populated, dungeon
+spawners spawn their monster near the player, and chests found in a structure fill with its loot when first opened.
+Villagers (six professions) trade by right-click. New mobs: villagers, pillagers, vindicators, slimes (they hop and
+split), polar bears, striders (they walk on lava), piglin brutes; their models are written from Minecraft Java's model
+definitions by `tools/make_geo.py` (Java pivots and boxes converted to Bedrock geometry, `tools/geo/custom.json`).
+Ghasts are smaller and rare. Tests: `node test/structures.mjs`, `test/structures2.mjs`.
+
 ## Controls
 
 WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·
