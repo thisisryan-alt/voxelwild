@@ -1383,12 +1383,12 @@ export class Game {
     const R = (inputs, out, count) => ({ inputs, out, count, name: itemName(out) });
     const E = I.Emerald;
     return {
-      farmer: [R([[I.Wheat, 20]], E, 1), R([[E, 1]], I.Bread, 6), R([[E, 1]], I.Apple, 4), R([[CK.pumpkin || I.Wheat, 6]], E, 1), R([[E, 3]], CK.hay_block || I.Wheat, 1)],
+      farmer: [R([[I.Wheat, 20]], E, 1), R([[E, 1]], I.Bread, 6), R([[E, 1]], I.Apple, 4), R([[CK.pumpkin || I.Wheat, 6]], E, 1), R([[E, 3]], CK.hay_block || I.Wheat, 1), R([[E, 1]], I.BoneMeal, 6), R([[E, 8]], I.GoldenApple, 1)],
       toolsmith: [R([[I.Coal, 15]], E, 1), R([[E, 3], [I.Stick, 2]], I.IronPickaxe, 1), R([[E, 2], [I.Stick, 2]], I.IronShovel, 1), R([[E, 3], [I.Stick, 2]], I.IronAxe, 1), R([[E, 12], [I.Stick, 2]], I.DiamondPickaxe, 1)],
-      butcher: [R([[I.RawChicken, 14]], E, 1), R([[I.Porkchop, 7]], E, 1), R([[E, 1]], I.CookedPorkchop, 5), R([[E, 1]], I.CookedChicken, 6), R([[E, 1]], I.CookedBeef, 4)],
+      butcher: [R([[I.RawChicken, 14]], E, 1), R([[I.Porkchop, 7]], E, 1), R([[E, 1]], I.CookedPorkchop, 5), R([[E, 1]], I.CookedChicken, 6), R([[E, 1]], I.CookedBeef, 4), R([[I.Cod, 12]], E, 1), R([[I.Salmon, 10]], E, 1)],
       shepherd: [R([[CK.white_wool, 18]], E, 1), R([[E, 2]], FAM.white_bed ? FAM.white_bed.first : CK.white_wool, 1), R([[E, 1]], CK.red_wool, 2), R([[E, 1]], CK.blue_wool, 2), R([[E, 1]], FAM.white_carpet ? FAM.white_carpet.first : CK.white_wool, 4)],
       weaponsmith: [R([[I.Coal, 15]], E, 1), R([[I.IronIngot, 4]], E, 1), R([[E, 3], [I.Stick, 1]], I.IronSword, 1), R([[E, 12], [I.Stick, 1]], I.DiamondSword, 1), R([[E, 9]], I.IronChestplate, 1)],
-      fletcher: [R([[I.Stick, 32]], E, 1), R([[I.Flint, 26]], E, 1), R([[E, 1]], I.Arrow, 16), R([[E, 2]], I.Bow, 1), R([[I.String, 14]], E, 1)],
+      fletcher: [R([[I.Stick, 32]], E, 1), R([[I.Flint, 26]], E, 1), R([[E, 1]], I.Arrow, 16), R([[E, 2]], I.Bow, 1), R([[I.String, 14]], E, 1), R([[E, 3]], I.FishingRod, 1)],
     }[prof] || [];
   }
 
