@@ -751,7 +751,9 @@ def main():
     items.update({"FlameBlade": "golden_sword", "BoneGreatsword": "netherite_sword", "CloudBottle": "glass_bottle", "BlazingCore": "fire_charge",
                   "BoneCrown": "bone_meal", "StormTear": "ghast_tear", "Frostbrand": "amethyst_shard", "FrozenHeart": "heart_of_the_sea",
                   "FishingRod": "fishing_rod", "Cod": "cod", "Salmon": "salmon", "CookedCod": "cooked_cod", "CookedSalmon": "cooked_salmon",
-                  "GoldenApple": "golden_apple", "EnchantedGoldenApple": "golden_apple", "Totem": "totem_head", "BoneMeal": "bone_meal"})
+                  "GoldenApple": "golden_apple", "EnchantedGoldenApple": "golden_apple", "Totem": "totem_head", "BoneMeal": "bone_meal",
+                  "GlassBottle": "glass_bottle", "Sugar": "sugar", "MilkBucket": "milk_bucket", "Shears": "shears", "Snowball": "snowball",
+                  "Egg": "egg", "EnderPearl": "ender_pearl", "Glider": "elytra", "PhantomMembrane": "phantom_membrane"})
     items.update({"Backpack": "bundle", "GrapplingHook": "lead", "SlimeCrown": "golden_helmet", "SleepingBag": "green_bundle"})
     items.update({"SlimeBall": "slime_ball", "Bow": "bow", "Bucket": "bucket", "WaterBucket": "water_bucket", "LavaBucket": "lava_bucket", "fam:comparator": "comparator",
                   "fam:hopper": "hopper"})
@@ -764,6 +766,17 @@ def main():
             good[key] = p.img(name if name.startswith("block/") else "item/" + name)
         except Exception:
             print("no item texture", name)
+    potions = {"PotionHealing": "f82423", "PotionSwiftness": "7cafc6", "PotionStrength": "932423", "PotionNightVision": "1f1fa1", "PotionFireResistance": "e49a3a", "PotionLeaping": "22ff4c", "PotionWaterBreathing": "2e5299"}
+    try:
+        bottle, liquid = p.img("item/potion").convert("RGBA"), p.img("item/potion_overlay").convert("RGBA")
+        for key, hexc in potions.items():
+            a = np.asarray(liquid, dtype=np.float32).copy()
+            a[..., :3] *= np.array([int(hexc[i:i + 2], 16) for i in (0, 2, 4)], dtype=np.float32) / 255
+            im = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGBA")
+            im.alpha_composite(bottle.resize(im.size))
+            good[key] = im
+    except Exception as e:
+        print("no potion art", e)
     for key in list(good):
         if key.startswith("Leather") and key != "Leather":        # undyed leather armour is brown
             a = np.asarray(good[key].convert("RGBA"), dtype=np.float32)

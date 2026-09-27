@@ -26,6 +26,19 @@ export const MOB_TYPES = {
   wolf_woods: { name: 'Woods Wolf', health: 8, speed: 2.4, half: 0.3, height: 0.85, kind: 'neutral', damage: 4, drops: [], base: 'wolf', tameAs: 'wolf_woods_tame' },
   wolf_snowy_tame: { name: 'Tamed Wolf', health: 20, speed: 2.6, half: 0.3, height: 0.85, kind: 'pet', damage: 4, drops: [], base: 'wolf' },
   wolf_woods_tame: { name: 'Tamed Wolf', health: 20, speed: 2.6, half: 0.3, height: 0.85, kind: 'pet', damage: 4, drops: [], base: 'wolf' },
+  // water life, jungle pandas, hopping rabbits and the phantoms of sleepless nights
+  squid: { name: 'Squid', health: 10, speed: 1.4, half: 0.4, height: 1.2, kind: 'water', drops: [], swims: true },
+  glow_squid: { name: 'Glow Squid', health: 10, speed: 1.4, half: 0.4, height: 1.2, kind: 'water', drops: [[I.GlowstoneDust, 0, 2]], swims: true, glow: 1, base: 'squid' },
+  panda: { name: 'Panda', health: 20, speed: 1.0, half: 0.65, height: 1.25, kind: 'passive', drops: [[I.Stick, 0, 2]] },
+  brown_panda: { name: 'Brown Panda', health: 20, speed: 1.0, half: 0.65, height: 1.25, kind: 'passive', drops: [[I.Stick, 0, 2]], base: 'panda' },
+  rabbit_brown: { name: 'Rabbit', health: 3, speed: 2.4, half: 0.2, height: 0.5, kind: 'passive', drops: [[I.Leather, 0, 1]], hop: true, base: 'rabbit' },
+  rabbit_white: { name: 'Rabbit', health: 3, speed: 2.4, half: 0.2, height: 0.5, kind: 'passive', drops: [[I.Leather, 0, 1]], hop: true, base: 'rabbit' },
+  rabbit_gold: { name: 'Rabbit', health: 3, speed: 2.4, half: 0.2, height: 0.5, kind: 'passive', drops: [[I.Leather, 0, 1]], hop: true, base: 'rabbit' },
+  rabbit_salt: { name: 'Rabbit', health: 3, speed: 2.4, half: 0.2, height: 0.5, kind: 'passive', drops: [[I.Leather, 0, 1]], hop: true, base: 'rabbit' },
+  phantom: { name: 'Phantom', health: 20, speed: 5, half: 0.45, height: 0.5, kind: 'hostile', damage: 3, flying: true, burns: true, drops: [[I.PhantomMembrane, 0, 1]], range: 40 },
+  // foxes keep their distance from the player and hunt chickens
+  fox: { name: 'Fox', health: 10, speed: 2.8, half: 0.3, height: 0.7, kind: 'passive', drops: [], hunts: 'chicken', shy: true },
+  snow_fox: { name: 'Snow Fox', health: 10, speed: 2.8, half: 0.3, height: 0.7, kind: 'passive', drops: [], hunts: 'chicken', shy: true, base: 'fox' },
   wolf_tame: { name: 'Tamed Wolf', health: 20, speed: 2.6, half: 0.3, height: 0.85, kind: 'pet', damage: 4, drops: [], base: 'wolf' },
   husk: { name: 'Husk', health: 20, speed: 2.3, half: 0.3, height: 1.95, kind: 'hostile', damage: 3, drops: [[I.RottenFlesh, 0, 2]] },
   skeleton: { name: 'Skeleton', health: 20, speed: 2.3, half: 0.3, height: 1.99, kind: 'hostile', ranged: 'arrow', drops: [[I.Bone, 0, 2], [I.Arrow, 0, 2]], burns: true },
@@ -129,10 +142,69 @@ export class Mobs {
     }
   }
 
+  /** Squids: drift toward a goal inside the water, tentacles pulsing; out of water they flop and dry out. */
+  swim(m, dt) {
+    const w = this.game.world, b = m.body, wet = (x, y, z) => isWater(w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)));
+    if (!wet(b.pos[0], b.pos[1] + 0.5, b.pos[2])) {
+      m.dryT = (m.dryT || 0) + dt;
+      if (m.dryT > 1) { m.dryT = 0; this.hurt(m, 1, null); }
+      return false;
+    }
+    m.dryT = 0;
+    m.goalT = (m.goalT || 0) - dt;
+    if (m.goalT <= 0 || !m.sgoal || !wet(...m.sgoal)) {
+      m.goalT = 3 + this.rng() * 5;
+      const gl = [b.pos[0] + (this.rng() - 0.5) * 12, b.pos[1] + (this.rng() - 0.5) * 5, b.pos[2] + (this.rng() - 0.5) * 12];
+      m.sgoal = wet(...gl) && wet(gl[0], gl[1] + 1, gl[2]) ? gl : null;
+    }
+    const want = [0, -0.05, 0];
+    if (m.flee > 0) { m.flee -= dt; const pp = this.game.player.body.pos, fx = b.pos[0] - pp[0], fz = b.pos[2] - pp[2], l = Math.hypot(fx, fz) || 1; want[0] = fx / l * 4; want[2] = fz / l * 4; }
+    else if (m.sgoal) { const gx = m.sgoal[0] - b.pos[0], gy = m.sgoal[1] - b.pos[1], gz = m.sgoal[2] - b.pos[2], l = Math.hypot(gx, gy, gz) || 1; const s = m.def.speed * (0.6 + 0.4 * Math.max(0, Math.sin(m.age * 2.5))); want[0] = gx / l * s; want[1] = gy / l * s; want[2] = gz / l * s; if (l > 0.3) m.yaw = lerpAngle(m.yaw, Math.atan2(-gx, -gz), Math.min(1, dt * 2)); }
+    const k = Math.min(1, dt * 2);
+    for (let i = 0; i < 3; i++) b.vel[i] += (want[i] - b.vel[i]) * k;
+    if (!wet(b.pos[0], b.pos[1] + 1.3, b.pos[2]) && b.vel[1] > 0) b.vel[1] = 0;   // stay under the surface
+    b.move(w, [b.vel[0] * dt, b.vel[1] * dt, b.vel[2] * dt]);
+    m.walkSpeed = 0; m.hurtT = Math.max(0, m.hurtT);
+    return true;
+  }
+
+  /** Where a thrown snowball, egg or pearl comes down. */
+  landThrown(s, at) {
+    const g = this.game;
+    if (s.kind === 'snowball') g.spawnEmbers(at, 8, [1.4, 1.4, 1.5]);
+    else if (s.kind === 'egg') {
+      g.spawnEmbers(at, 6, [1.3, 1.2, 0.9]);
+      if (Math.random() < 0.125) { const c = this.spawnAt('chicken', [at[0], at[1] + 0.2, at[2]]); c.body.vel = [0, 3, 0]; }
+    } else if (s.kind === 'pearl') {
+      // step back out of whatever it hit, then teleport there (and take 5 fall damage)
+      const l = Math.hypot(...s.v) || 1, to = [at[0] - s.v[0] / l * 0.6, at[1] - s.v[1] / l * 0.6, at[2] - s.v[2] / l * 0.6];
+      g.spawnEmbers(g.player.eye(), 20, [0.8, 0.3, 1.4]);
+      g.player.teleport([to[0], Math.floor(to[1]) + 0.01, to[2]], g.player.yaw, g.player.pitch);
+      g.player.body.vel = [0, 0, 0];
+      if (g.player.body.unstick) g.player.body.unstick(g.world);
+      g.spawnEmbers([to[0], to[1] + 1, to[2]], 20, [0.8, 0.3, 1.4]);
+      if (!g.creative) g.stats.damage(5, 'fall');
+      g.advance('pearl');
+    }
+  }
+
   /** Right-click on a mob: tame a wolf with a bone, feed or sit a tamed one. Returns true when it did something. */
   interactMob(m) {
     const g = this.game, inv = g.inventory, held = inv.held, p = m.body.pos;
     if (m.dead) return false;
+    // milk a cow with an empty bucket; shear a sheep
+    if ((m.def.base || m.type) === 'cow' && held && held.item === I.Bucket) {
+      if (held.count > 1) { held.count--; if (inv.add(I.MilkBucket, 1)) g.spawnItem(I.MilkBucket, 1, p, [0, 2, 0]); } else inv.slots[inv.selected] = { item: I.MilkBucket, count: 1 };
+      inv.changed(); g.audio.splash();
+      return true;
+    }
+    if (m.type === 'sheep' && held && ITEMS[held.item] && ITEMS[held.item].shears && m.woolly) {
+      m.woolly = false; m.woolT = 90 + this.rng() * 90;
+      g.spawnItem(C.white_wool || B.Snow, 1 + Math.floor(this.rng() * 3), [p[0], p[1] + 1, p[2]], [(this.rng() - 0.5) * 2, 3, (this.rng() - 0.5) * 2]);
+      if (!g.creative) inv.wearHeld();
+      g.audio.place(C.white_wool || B.Snow);
+      return true;
+    }
     if (m.def.tameAs && held && held.item === I.Bone) {
       if (!g.creative) inv.consumeHeld();
       if (g.creative || this.rng() < 0.34) {
@@ -226,7 +298,7 @@ export class Mobs {
   }
 
   counts() {
-    const c = { passive: 0, hostile: 0, neutral: 0 };
+    const c = { passive: 0, hostile: 0, neutral: 0, water: 0, pet: 0 };
     for (const m of this.list) c[m.def.kind]++;
     return c;
   }
@@ -246,12 +318,27 @@ export class Mobs {
         const clim = w.climateAt(x, z);
         const top = w.getBlock(x, h, z);
         const open = this.standable(x, h + 1, z) && !isLiquid(top) && (BLOCKS[top].flags & F.Solid);
+        if (isWater(top) && counts.water < 6 && clim && (clim.biome === Biome.Ocean || clim.biome === Biome.River || clim.biome === Biome.Swamp) && isWater(w.getBlock(x, h - 3, z)) && this.rng() < 0.3) {
+          this.spawnAt(night && this.rng() < 0.4 ? 'glow_squid' : 'squid', [x + 0.5, h - 2.5, z + 0.5]);
+          return;
+        }
+        if (open && counts.passive < 12 && clim && this.rng() < 0.18) {
+          const b = clim.biome;
+          const rab = b === Biome.Desert ? (this.rng() < 0.5 ? 'rabbit_gold' : 'rabbit_salt') : b === Biome.SnowyTundra || b === Biome.SnowyTaiga ? 'rabbit_white' : b === Biome.Plains || b === Biome.Forest || b === Biome.Taiga || b === Biome.Savanna ? 'rabbit_brown' : null;
+          if (rab && !night) { this.spawnGroup(rab, x, h + 1, z, 2 + Math.floor(this.rng() * 2)); return; }
+          if (b === Biome.Jungle && top === B.Grass && !night) { this.spawnGroup(this.rng() < 0.08 ? 'brown_panda' : 'panda', x, h + 1, z, 1 + (this.rng() < 0.4 ? 1 : 0)); return; }
+        }
+        // phantoms hunt players out under the night sky from the third night on
+        if (night && !peaceful && (g.tod ? g.tod.day : 0) >= 2 && p[1] >= (w.heightmapAt(Math.floor(p[0]), Math.floor(p[2])) ?? 999) - 1 && this.rng() < 0.04 && this.list.filter((m) => m.type === 'phantom').length < 3) {
+          const py = Math.floor(p[1] + 18 + this.rng() * 8);
+          if (this.openAir(x, py, z)) { this.spawnGroup('phantom', x, py, z, 1 + (this.rng() < 0.4 ? 1 : 0)); return; }
+        }
         if (open && !night && counts.passive < 12 && clim && (clim.biome === Biome.SnowyTundra || clim.biome === Biome.SnowyPeaks) && (top === B.Snow || top === B.SnowyGrass) && this.rng() < 0.4) {
           this.spawnGroup('polar_bear', x, h + 1, z, 1 + (this.rng() < 0.3 ? 1 : 0));
           return;
         }
         if (open && !night && counts.passive < 12 && clim && (top === B.Grass || (top === B.SnowyGrass && clim.biome === Biome.SnowyTaiga)) && GRASSY.has(clim.biome)) {
-          const kinds = clim.biome === Biome.Taiga ? ['sheep', 'wolf', 'cow'] : clim.biome === Biome.SnowyTaiga ? ['sheep', 'wolf_snowy', 'cow'] : clim.biome === Biome.Forest || clim.biome === Biome.DenseForest ? ['cow', 'pig', 'sheep', 'chicken', 'wolf_woods'] : ['cow', 'pig', 'sheep', 'chicken'];
+          const kinds = clim.biome === Biome.Taiga ? ['sheep', 'wolf', 'cow', 'fox', 'fox'] : clim.biome === Biome.SnowyTaiga ? ['sheep', 'wolf_snowy', 'cow', 'snow_fox', 'snow_fox'] : clim.biome === Biome.Forest || clim.biome === Biome.DenseForest ? ['cow', 'pig', 'sheep', 'chicken', 'wolf_woods'] : ['cow', 'pig', 'sheep', 'chicken'];
           this.spawnGroup(kinds[Math.floor(this.rng() * kinds.length)], x, h + 1, z, 2 + Math.floor(this.rng() * 3));
           return;
         }
@@ -332,12 +419,18 @@ export class Mobs {
     if (m.dead) { m.dead += dt; b.vel[0] *= 0.9; b.vel[2] *= 0.9; b.vel[1] -= 20 * dt; b.move(w, [b.vel[0] * dt, b.vel[1] * dt, b.vel[2] * dt]); return; }
     const pl = g.player, pp = pl.body.pos;
     const dx = pp[0] - b.pos[0], dz = pp[2] - b.pos[2], dy = pp[1] - b.pos[1], dist = Math.hypot(dx, dy, dz);
+    if (t.swims && this.swim(m, dt)) return;
     const sky = g.skyNow || g.tod.state;
     const targetable = g.state === 'playing' && !g.creative;
     let hostile = m.angry > 0 && targetable;
     if (t.dayNeutral && (sky.daylight ?? 0) > 0.5 && !m.provoked) hostile = false;
     const sees = hostile && dist < (t.range || 20) && this.lineOfSight(b.pos[0], b.pos[1] + t.height * 0.85, b.pos[2], pp[0], pp[1] + 1.5, pp[2]);
     let wantX = 0, wantZ = 0, speed = 0;
+    if (t.shy && dist < 5 && targetable && !(pl.sneaking || g.keys.has('ShiftLeft'))) m.flee = Math.max(m.flee, 1.5);
+    if (t.hunts && !(m.flee > 0)) {
+      const near = (o) => o && !o.dead && Math.hypot(o.body.pos[0] - b.pos[0], o.body.pos[2] - b.pos[2]) < 12;
+      if (!near(m.prey)) m.prey = this.list.find((o) => o.type === t.hunts && near(o)) || null;
+    }
     if (m.pet) {
       // a tamed wolf: follows, sits when told, and goes for whatever the player fights or whatever comes close
       const r = m.pet;
@@ -361,6 +454,12 @@ export class Mobs {
         if (dist > 26 && g.state === 'playing') { b.pos = [pp[0] + (this.rng() - 0.5) * 2, pp[1] + 0.3, pp[2] + (this.rng() - 0.5) * 2]; b.vel = [0, 0, 0]; }
         else if (l > 3.5) { wantX = dx / l; wantZ = dz / l; speed = t.speed * (l > 8 ? 1.5 : 1); }
       }
+    } else if (m.prey && !(m.flee > 0)) {
+      // stalk and pounce
+      const o = m.prey.body.pos, tx = o[0] - b.pos[0], tz = o[2] - b.pos[2], tl = Math.hypot(tx, tz) || 1;
+      wantX = tx / tl; wantZ = tz / tl; speed = t.speed * 1.15; m.attackT -= dt;
+      if (tl < 3 && b.grounded && m.attackT <= 0.5 && m.attackT > 0.45) b.vel[1] = 6;
+      if (tl < 1.1 && m.attackT <= 0) { m.attackT = 1.2; m.swing = 1; this.hurt(m.prey, 3, null); }
     } else if (m.flee > 0) {
       m.flee -= dt;
       const l = Math.hypot(dx, dz) || 1;
@@ -422,6 +521,9 @@ export class Mobs {
         g.audio.mobVoice(voice, dist, Math.max(-0.8, Math.min(0.8, -(dx * rx + dz * rz) / l)));
       }
     }
+    // chickens lay eggs; shorn sheep grow their wool back
+    if (m.type === 'chicken' && dist < 48) { m.eggT = (m.eggT ?? 60 + this.rng() * 120) - dt; if (m.eggT <= 0) { m.eggT = 120 + this.rng() * 180; g.spawnItem(I.Egg, 1, [b.pos[0], b.pos[1] + 0.3, b.pos[2]], [0, 1, 0]); g.audio.pop(); } }
+    if (m.type === 'sheep' && !m.woolly && (m.woolT = (m.woolT || 0) - dt) <= 0) m.woolly = true;
     if (m.slowT > 0) { m.slowT -= dt; speed *= 0.4; if (Math.random() < dt * 4) g.spawnEmbers([b.pos[0], b.pos[1] + t.height * 0.6, b.pos[2]], 1, [1.2, 1.5, 2.0]); }
     if (m.onFire > 0) {
       m.onFire -= dt; m.fireT = (m.fireT || 0) - dt;
@@ -666,7 +768,7 @@ export class Mobs {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const s = this.projectiles[i];
       s.life -= dt;
-      if (s.kind === 'arrow') s.v[1] -= 20 * dt;
+      if (s.kind === 'arrow' || s.thrown) s.v[1] -= (s.thrown ? 16 : 20) * dt;
       const n = [s.p[0] + s.v[0] * dt, s.p[1] + s.v[1] * dt, s.p[2] + s.v[2] * dt];
       if (s.kind !== 'arrow' && g.particles) g.spawnEmbers(s.p, 1, s.kind === 'ghastball' ? [1.8, 0.7, 0.2] : [1.8, 0.8, 0.15]);
       // the player
@@ -675,7 +777,13 @@ export class Mobs {
       const solid = b < 0 || (BLOCKS[b] && BLOCKS[b].flags & F.Solid);
       if (s.owner === 'player' || s.owner === 'dispenser') {
         const hitMob = this.list.find((m) => !m.dead && Math.abs(n[0] - m.body.pos[0]) < (m.def.half || 0.3) + 0.2 && Math.abs(n[2] - m.body.pos[2]) < (m.def.half || 0.3) + 0.2 && n[1] > m.body.pos[1] && n[1] < m.body.pos[1] + m.def.height);
-        if (hitMob) { this.hurt(hitMob, s.damage || 4, s.owner === 'player' ? g.player : null); this.projectiles.splice(i, 1); continue; }
+        if (hitMob) {
+          const dmg = s.thrown ? (s.kind === 'snowball' && (hitMob.def.base || hitMob.type) === 'blaze' ? 3 : 0) : (s.damage ?? 4);
+          if (dmg > 0 || !s.thrown) this.hurt(hitMob, dmg, s.owner === 'player' ? g.player : null);
+          else { const l = Math.hypot(s.v[0], s.v[2]) || 1; hitMob.body.vel[0] += s.v[0] / l * 3; hitMob.body.vel[2] += s.v[2] / l * 3; hitMob.body.vel[1] = Math.max(hitMob.body.vel[1], 3); }
+          if (s.thrown) this.landThrown(s, s.p);
+          this.projectiles.splice(i, 1); continue;
+        }
       }
       if (inside && !g.creative && g.state === 'playing' && s.owner !== 'player') {
         if (s.kind === 'arrow') g.stats.damage(2 + Math.floor(this.rng() * 3), 'skeleton');
@@ -683,6 +791,7 @@ export class Mobs {
         else this.explode(n[0], n[1], n[2], 1.6, null);
         this.projectiles.splice(i, 1); continue;
       }
+      if (s.thrown && (solid || s.life <= 0)) { this.landThrown(s, s.p); this.projectiles.splice(i, 1); continue; }
       if (solid || s.life <= 0) {
         if (s.kind === 'ghastball' && solid) this.explode(n[0], n[1], n[2], 1.6, null);
         if (s.kind === 'arrow' && s.owner === 'player' && solid && Math.random() < 0.7) g.spawnItem(I.Arrow, 1, s.p, [0, 0.5, 0], 0, 0.3);

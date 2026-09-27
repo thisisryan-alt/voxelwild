@@ -5243,6 +5243,15 @@
   "EnchantedGoldenApple",
   "Totem",
   "BoneMeal",
+  "GlassBottle",
+  "Sugar",
+  "MilkBucket",
+  "Shears",
+  "Snowball",
+  "Egg",
+  "EnderPearl",
+  "Glider",
+  "PhantomMembrane",
   "Backpack",
   "GrapplingHook",
   "SlimeCrown",
@@ -5258,7 +5267,14 @@
   "fam:rail",
   "fam:powered_rail",
   "fam:detector_rail",
-  "fam:activator_rail"
+  "fam:activator_rail",
+  "PotionHealing",
+  "PotionSwiftness",
+  "PotionStrength",
+  "PotionNightVision",
+  "PotionFireResistance",
+  "PotionLeaping",
+  "PotionWaterBreathing"
  ],
  "sounds": {
   "rain": [

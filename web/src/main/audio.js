@@ -117,6 +117,16 @@ const SYNTH = {
     }
     fadeOut(o, 0.02); return normalize(o, 0.6);
   },
+  piano: () => {
+    // middle C: decaying partials, slightly stretched, with a soft hammer
+    const n = Math.floor(3 * SR), o = new Float32Array(n), f = 261.63, rng = new Rng(88);
+    for (let i = 0; i < n; i++) {
+      const t = i / SR; let v = 0;
+      for (let k = 1; k <= 7; k++) v += Math.sin(TAU * f * k * (1 + 0.0004 * k * k) * t) * Math.exp(-t * (0.9 + k * 0.7)) / Math.pow(k, 1.4);
+      o[i] = v * Math.min(t / 0.004, 1) + (t < 0.01 ? rng.signed() * 0.15 * (1 - t / 0.01) : 0);
+    }
+    fadeOut(o, 0.2); return normalize(o, 0.7);
+  },
   orb: () => {
     // a small bright chime, like picking up experience
     const n = Math.floor(0.25 * SR), o = new Float32Array(n);
@@ -472,6 +482,35 @@ export class GameAudio {
       this.bossSrc.stop(t + 3.1); this.bossSrc = null;
     }
   }
+  /** Quiet generative piano pieces now and then (Minecraft-style), a few minutes apart. */
+  music(dt, on) {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    this.musicT = (this.musicT ?? 45) - dt;
+    if (!on || this.musicT > 0) return;
+    this.musicT = 200 + Math.random() * 220;
+    this.playPiece();
+  }
+  playPiece() {
+    const ctx = this.ctx, rnd = Math.random, piano = this.get('piano', SYNTH.piano);
+    if (!this.musicGain) { this.musicGain = ctx.createGain(); this.musicGain.gain.value = 0.3; this.musicGain.connect(this.master); }
+    const scales = [[0, 2, 4, 7, 9], [0, 3, 5, 7, 10], [0, 2, 4, 5, 7, 9, 11], [0, 2, 3, 5, 7, 8, 10]];
+    const sc = scales[Math.floor(rnd() * scales.length)], root = [53, 55, 57, 60, 62][Math.floor(rnd() * 5)], beat = 0.55 + rnd() * 0.45;
+    const note = (midi, at, vol) => {
+      const src = ctx.createBufferSource(), g = ctx.createGain();
+      src.buffer = piano; src.playbackRate.value = Math.pow(2, (midi - 60) / 12);
+      g.gain.value = vol; src.connect(g); g.connect(this.musicGain); src.start(at);
+    };
+    let t = ctx.currentTime + 0.5, deg = Math.floor(rnd() * sc.length);
+    const count = 36 + Math.floor(rnd() * 30);
+    for (let i = 0; i < count; i++) {
+      deg = Math.max(0, Math.min(sc.length * 2 - 1, deg + Math.round((rnd() - 0.5) * 4)));
+      const midi = root + sc[deg % sc.length] + 12 * Math.floor(deg / sc.length);
+      note(midi, t, 0.12 + rnd() * 0.08);
+      if (i % 4 === 0) note(root - 12 + sc[(deg + 2) % sc.length], t, 0.08);          // a low note every bar
+      t += beat * [1, 1, 2, 0.5, 1.5, 1][Math.floor(rnd() * 6)] + (rnd() < 0.1 ? beat * 2 : 0);
+    }
+  }
+
   /** A mob's idle call, quieter with distance and panned toward it. */
   mobVoice(kind, dist, pan) {
     const k = this.nextVariant() % 3;

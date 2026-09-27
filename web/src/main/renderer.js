@@ -1098,7 +1098,7 @@ export class Renderer {
       pass(this.aoFbo, P.aoBlur, { uAOIn: 10, uDepth: 11, uDir: [0, 1 / this.aoTex.h], uInvProj: invProj }, [this.aoTex2, this.raysDepth]);
     }
     const underground = 1 - f.camSky;
-    const nightK = 1 + ((this.settings.nightBrightness ?? 1) - 1) * (sky.night || 0);
+    const nightK = (1 + ((this.settings.nightBrightness ?? 1) - 1) * (sky.night || 0)) * (f.nightVision ? 1 + 2.5 * Math.max(sky.night || 0, underground) : 1);
     const exposure = sky.exposure * (1 + underground * 1.6) * (f.underwater ? 1.3 : 1) * (this.settings.brightness ?? 1) * nightK;
     const aa = this.settings.aa ?? true, sharpen = this.settings.sharpen ?? 0.6;
     const post2 = aa || sharpen > 0;

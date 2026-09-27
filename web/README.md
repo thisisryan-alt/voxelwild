@@ -268,6 +268,23 @@ a Bottle). Waves heal and restock the player; a death retries the wave; the end 
   husks and skeletons make synthesized idle sounds now and then (a pulse train through two formant filters per
   species, `SYNTH.voice`), quieter with distance and panned toward the mob; villagers "hmm" when you open trading.
   `node test/voices.mjs`.
+- **Potions** (crafted: a glass bottle, glowstone dust and an ingredient): Healing (berries), Swiftness (sugar),
+  Strength (blaze rod), Night Vision (gold nuggets), Fire Resistance (magma), Leaping (slime and feathers), Water
+  Breathing (cod). Drinking leaves the bottle; effects show above the hotbar (`stats.fx`, `applyEffects`,
+  `player.speedMul` / `jumpHeight`, the renderer's `f.nightVision` exposure). Potions also turn up in witch huts,
+  dungeons and pyramids. **Milk** a cow with a bucket; drinking it clears every effect.
+- **Shears** shear sheep (the wool grows back) and keep leaves and grass when breaking them. **Snowballs** (four from a
+  snow block) knock mobs back and hurt blazes; **eggs** (chickens lay them) sometimes hatch; **ender pearls**
+  (fletchers, dungeons, pyramids) teleport you where they land for 5 fall damage. Arrows, fireballs and throwables
+  are now drawn in flight (they were invisible).
+- **Glider** (6 leather or 4 phantom membranes, 4 sticks, 2 string), worn as a chestplate: jump while falling to
+  open it; diving trades height for speed, pulling up bleeds it off; it wears with use and mends with membrane.
+- **Music**: now and then a quiet generative piano piece in one of four scales (Audio > Music).
+- **New mobs** (models written from Minecraft's Java definitions in `tools/make_geo.py`, skins from the pack):
+  foxes and snow foxes (taiga; shy; hunt chickens), squid and glow squid (swim in oceans, rivers and swamps; dry out
+  on land), pandas and the rare brown panda (jungle), rabbits in four coats by biome (they hop), and phantoms that
+  swoop at players under the night sky from the third night and drop phantom membrane. `part(..., parent=)` lets
+  a bone hang off another. `node test/content.mjs`, `node test/fox.mjs`, `node test/mobs3.mjs`.
 - The pause menu scrolls when it is taller than the window (`justify-content: safe center`), so its top buttons can
   always be reached.
 

@@ -103,10 +103,15 @@ export class SurvivalStats {
   constructor() { this.reset(); this.onDamage = null; this.onDeath = null; this.level = 0; this.xp = 0; }
   /** Effects from golden apples and the totem: regen [seconds, level], absorb (extra health), fireRes (seconds). */
   applyEffects(e) {
-    if (e.regen) { this.fx.regen = Math.max(this.fx.regen, e.regen[0]); this.fx.regenLvl = Math.max(this.fx.regenLvl, e.regen[1]); }
-    if (e.absorb) this.absorb = Math.max(this.absorb, e.absorb);
-    if (e.fireRes) this.fx.fireRes = Math.max(this.fx.fireRes, e.fireRes);
+    for (const [k, v] of Object.entries(e)) {
+      if (k === 'regen') { this.fx.regen = Math.max(this.fx.regen, v[0]); this.fx.regenLvl = Math.max(this.fx.regenLvl, v[1]); }
+      else if (k === 'absorb') this.absorb = Math.max(this.absorb, v);
+      else if (k === 'heal') this.health = Math.min(MAX_HEALTH, this.health + v);
+      else this.fx[k] = Math.max(this.fx[k] || 0, v);        // seconds: fireRes, speed, strength, night, jump, water
+    }
   }
+  /** Milk: every effect ends. */
+  clearEffects() { this.fx = { regen: 0, regenLvl: 0, fireRes: 0 }; this.absorb = 0; }
   /** Experience points; returns the levels gained. */
   addXp(n) {
     const before = this.level;
@@ -148,14 +153,14 @@ export class SurvivalStats {
   tick(dt, moved, sprinting, jumps, headUnder) {
     if (this.dead) return;
     const fx = this.fx;
-    if (fx.fireRes > 0) fx.fireRes = Math.max(0, fx.fireRes - dt);
+    for (const k of ['fireRes', 'speed', 'strength', 'night', 'jump', 'water']) if (fx[k] > 0) fx[k] = Math.max(0, fx[k] - dt);
     if (fx.regen > 0) {
       fx.regen = Math.max(0, fx.regen - dt); if (!fx.regen) fx.regenLvl = 0;
       this.fxT += dt * (fx.regenLvl >= 2 ? 2 : 1);
       while (this.fxT >= 1.25) { this.fxT -= 1.25; this.health = Math.min(MAX_HEALTH, this.health + 1); }
     }
     this.addExhaustion(moved * (sprinting ? 0.1 : 0.01) + jumps * (sprinting ? 0.2 : 0.05) + dt * 0.005);
-    if (headUnder) {
+    if (headUnder && !(this.fx.water > 0)) {
       this.air = Math.max(0, this.air - dt);
       if (this.air <= 0) { this.drown += dt; while (this.drown >= 1) { this.drown -= 1; this.damage(2, 'drowning'); } }
     } else { this.air = Math.min(MAX_AIR, this.air + dt * 5); this.drown = 0; }

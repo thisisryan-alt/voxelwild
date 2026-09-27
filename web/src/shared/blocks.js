@@ -345,7 +345,7 @@ export const I = {
   Gunpowder: 300, String: 301, GoldNugget: 302, BlazeRod: 303, GhastTear: 304, WoodenSword: 305, StoneSword: 306, IronSword: 307, DiamondSword: 308,
   IronIngot: 309, GoldIngot: 310, CopperIngot: 311, CookedBeef: 312, CookedPorkchop: 313, CookedMutton: 314, CookedChicken: 315, Charcoal: 316,
   Bread: 317, Wheat: 318, WheatSeeds: 319, WoodenHoe: 320, StoneHoe: 321, IronHoe: 322, DiamondHoe: 323,
-  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348, FlameBlade: 349, BoneGreatsword: 350, CloudBottle: 351, BlazingCore: 352, BoneCrown: 353, StormTear: 354, Frostbrand: 355, FrozenHeart: 356, FishingRod: 357, Cod: 358, Salmon: 359, CookedCod: 360, CookedSalmon: 361, GoldenApple: 362, EnchantedGoldenApple: 363, Totem: 364, BoneMeal: 365,
+  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348, FlameBlade: 349, BoneGreatsword: 350, CloudBottle: 351, BlazingCore: 352, BoneCrown: 353, StormTear: 354, Frostbrand: 355, FrozenHeart: 356, FishingRod: 357, Cod: 358, Salmon: 359, CookedCod: 360, CookedSalmon: 361, GoldenApple: 362, EnchantedGoldenApple: 363, Totem: 364, BoneMeal: 365, GlassBottle: 366, PotionHealing: 367, PotionSwiftness: 368, PotionStrength: 369, PotionNightVision: 370, PotionFireResistance: 371, PotionLeaping: 372, PotionWaterBreathing: 373, Sugar: 374, MilkBucket: 375, Shears: 376, Snowball: 377, Egg: 378, EnderPearl: 379, Glider: 380, PhantomMembrane: 381,
   LeatherHelmet: 324,      // armour: 324 + material * 4 + piece (leather, golden, iron, diamond x helmet, chestplate, leggings, boots)
 };
 export const ARMOR_MATS = ['Leather', 'Golden', 'Iron', 'Diamond'], ARMOR_PIECES = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
@@ -415,6 +415,18 @@ ITEMS[I.GoldenApple] = { id: I.GoldenApple, name: 'Golden Apple', kind: Kind.Foo
 ITEMS[I.EnchantedGoldenApple] = { id: I.EnchantedGoldenApple, name: 'Enchanted Golden Apple', kind: Kind.Food, stack: 64, food: 4, sat: 9.6, always: true, glint: true, effects: { regen: [20, 2], absorb: 16, fireRes: 300 } };
 ITEMS[I.Totem] = { id: I.Totem, name: 'Totem of Undying', kind: Kind.Material, stack: 1, glint: true };
 ITEMS[I.BoneMeal] = { id: I.BoneMeal, name: 'Bone Meal', kind: Kind.Use, stack: 64 };
+// potions: drunk like food (even when full), leave the bottle behind
+mat(I.GlassBottle, 'Glass Bottle'); mat(I.Sugar, 'Sugar'); mat(I.PhantomMembrane, 'Phantom Membrane');
+const potion = (id, name, effects) => { ITEMS[id] = { id, name: `Potion of ${name}`, kind: Kind.Food, stack: 1, food: 0, sat: 0, always: true, drink: true, returns: I.GlassBottle, effects }; };
+potion(I.PotionHealing, 'Healing', { heal: 8 }); potion(I.PotionSwiftness, 'Swiftness', { speed: 180 }); potion(I.PotionStrength, 'Strength', { strength: 180 });
+potion(I.PotionNightVision, 'Night Vision', { night: 180 }); potion(I.PotionFireResistance, 'Fire Resistance', { fireRes: 180 });
+potion(I.PotionLeaping, 'Leaping', { jump: 180 }); potion(I.PotionWaterBreathing, 'Water Breathing', { water: 180 });
+ITEMS[I.MilkBucket] = { id: I.MilkBucket, name: 'Milk Bucket', kind: Kind.Food, stack: 1, food: 0, sat: 0, always: true, drink: true, returns: I.Bucket, milk: true };
+ITEMS[I.Shears] = { id: I.Shears, name: 'Shears', kind: Kind.Tool, stack: 1, tool: ToolType.None, tier: Tier.Iron, durability: 238, damage: 1, shears: true };
+ITEMS[I.Snowball] = { id: I.Snowball, name: 'Snowball', kind: Kind.Use, stack: 16, throws: 'snowball' };
+ITEMS[I.Egg] = { id: I.Egg, name: 'Egg', kind: Kind.Use, stack: 16, throws: 'egg' };
+ITEMS[I.EnderPearl] = { id: I.EnderPearl, name: 'Ender Pearl', kind: Kind.Use, stack: 16, throws: 'pearl' };
+ITEMS[I.Glider] = { id: I.Glider, name: 'Glider', kind: Kind.Armor, stack: 1, slot: 1, points: 0, durability: 432, glider: true };
 ITEMS[I.FishingRod] = { id: I.FishingRod, name: 'Fishing Rod', kind: Kind.Use, stack: 1, durability: 64 };
 food(I.Cod, 'Raw Cod', 2, 0.4); food(I.Salmon, 'Raw Salmon', 2, 0.4); food(I.CookedCod, 'Cooked Cod', 5, 6); food(I.CookedSalmon, 'Cooked Salmon', 6, 9.6);
 ITEMS[I.Bucket] = { id: I.Bucket, name: 'Bucket', kind: Kind.Use, stack: 16 };
@@ -534,6 +546,7 @@ export function drops(block, held, rnd) {
     case B.GoldOre: return [[I.GoldChunk, 1]];
     case B.DiamondOre: return [[I.Diamond, 1]];
     case B.Ice: return [];
+    case B.Snow: return [[I.Snowball, 4]];
     case B.Gravel: return rnd < 0.1 ? [[I.Flint, 1]] : [[B.Gravel, 1]];
     case B.NetherQuartzOre: return [[I.NetherQuartz, 1 + (rnd < 0.2 ? 1 : 0)]];
     case B.NetherGoldOre: return [[I.GoldChunk, 1]];
@@ -623,6 +636,18 @@ if (C.packed_ice) recipe(I.FrozenHeart, 1, [[C.packed_ice, 4], [I.Diamond, 1]]);
 recipe(I.FishingRod, 1, [[I.Stick, 3], [I.String, 2]]);
 recipe(I.GoldenApple, 1, [[I.Apple, 1], [I.GoldIngot, 8]]);
 recipe(I.BoneMeal, 3, [[I.Bone, 1]]);
+if (C.glass) recipe(I.GlassBottle, 3, [[C.glass, 3]]);
+if (C.sugar_cane) recipe(I.Sugar, 1, [[C.sugar_cane, 1]]);
+recipe(I.PotionHealing, 1, [[I.GlassBottle, 1], [I.Berries, 4], [I.GlowstoneDust, 1]]);
+recipe(I.PotionSwiftness, 1, [[I.GlassBottle, 1], [I.Sugar, 2], [I.GlowstoneDust, 1]]);
+recipe(I.PotionStrength, 1, [[I.GlassBottle, 1], [I.BlazeRod, 1], [I.GlowstoneDust, 1]]);
+recipe(I.PotionNightVision, 1, [[I.GlassBottle, 1], [I.GoldNugget, 4], [I.GlowstoneDust, 2]]);
+recipe(I.PotionFireResistance, 1, [[I.GlassBottle, 1], [B.Magma, 1], [I.GlowstoneDust, 1]]);
+recipe(I.PotionLeaping, 1, [[I.GlassBottle, 1], [I.SlimeBall, 1], [I.Feather, 2]]);
+recipe(I.PotionWaterBreathing, 1, [[I.GlassBottle, 1], [I.Cod, 2], [I.GlowstoneDust, 1]]);
+recipe(I.Shears, 1, [[I.IronIngot, 2]]);
+recipe(I.Glider, 1, [[I.Leather, 6], [I.Stick, 4], [I.String, 2]]);
+recipe(I.Glider, 1, [[I.PhantomMembrane, 4], [I.Stick, 4], [I.String, 2]]);
 if (FAM.waystone) recipe(FAM.waystone.first, 1, [[B.StoneBricks, 6], [I.GoldIngot, 2]]);
 if (FAM.enchanting_table) recipe(FAM.enchanting_table.first, 1, [[B.Obsidian, 4], [I.Diamond, 2], [I.LapisLazuli, 3]]);
 if (FAM.anvil && C.iron_block) recipe(FAM.anvil.first, 1, [[C.iron_block, 3], [I.IronIngot, 4]]);

@@ -882,7 +882,9 @@ export class Game {
     }
     this.updateEntities(dt);
     if (this.arena) this.updateArena(dt);
-    if (!this.meta.menu) { this.redstone.update(dt); this.updateBlocks(dt); this.updateGrapple(dt); this.updateFishing(dt); if (!this.creative) this.updateRested(dt); this.updateDash(dt); }
+    if (!this.meta.menu) { this.redstone.update(dt); this.updateBlocks(dt); this.updateGrapple(dt); this.updateFishing(dt); this.updateGlide(dt);
+      { const fx = this.stats.fx || {}; this.player.speedMul = fx.speed > 0 ? 1.35 : 1; this.player.jumpHeight = fx.jump > 0 ? 2.4 : 1.25; }
+      this.audio.music(dt, this.settings.music !== false && this.state === 'playing' && !this.audio.bossSrc); if (!this.creative) this.updateRested(dt); this.updateDash(dt); }
     this.updateEyes(dt);
     if (!this.meta.menu) this.mobs.update(dt);
     if ((this.advT = (this.advT || 0) - dt) <= 0) { this.advT = 1; this.checkAdvancements(); }
@@ -945,7 +947,7 @@ export class Game {
       if (this.mouse.leftClicked && this.attackT <= 0) {
         const def = inv.heldItem;
         const mob = mobHit.mob, sharp = enchLevel(inv.held, 'sharpness');
-        let dmg = (def && def.kind === Kind.Tool ? (def.damage || [1, 2, 3, 4, 5][def.tier] + 1) : 1) + (sharp ? 0.5 * sharp + 0.5 : 0);
+        let dmg = (def && def.kind === Kind.Tool ? (def.damage || [1, 2, 3, 4, 5][def.tier] + 1) : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + (this.stats.fx && this.stats.fx.strength > 0 ? 3 : 0);
         // a critical hit when striking while falling (Minecraft's): half as much again
         const crit = !pl.body.grounded && pl.body.vel[1] < -1 && !pl.flying && !pl.inWater;
         if (crit) { dmg *= 1.5; this.spawnEmbers([mob.body.pos[0], mob.body.pos[1] + mob.def.height * 0.7, mob.body.pos[2]], 12, [1.8, 1.7, 1.2]); }
@@ -1005,7 +1007,12 @@ export class Game {
       if (hit && !sneaking && this.toggle(hit)) { this.useCooldown = 0.3; this.swing = 1; }
       else if (def && def.kind === Kind.Use) this.useItem(def, hit);
       else if (def && def.kind === Kind.Food) {
-        if (!this.creative && (this.stats.hunger < 20 || def.always)) { this.stats.eat(def.food, def.sat); if (def.effects) this.stats.applyEffects(def.effects); inv.consumeHeld(); this.audio.eat(); this.swing = 1; this.emit('hud'); }
+        if (!this.creative && (this.stats.hunger < 20 || def.always)) {
+          this.stats.eat(def.food, def.sat); if (def.effects) this.stats.applyEffects(def.effects); if (def.milk) this.stats.clearEffects();
+          inv.consumeHeld(); if (def.returns && inv.add(def.returns, 1)) this.spawnItem(def.returns, 1, pl.eye(), [0, 1, 0]);
+          if (def.drink && def.effects) this.advance('brew');
+          this.audio.eat(); this.swing = 1; this.emit('hud');
+        }
       } else if (hit && def && def.kind === Kind.Tool && def.tool === ToolType.Hoe) this.till(hit);
       else if (def && def.kind === Kind.Armor) this.wear();
       else if (hit && def && def.places) this.place(hit, def.places);
@@ -1026,6 +1033,7 @@ export class Game {
       const hs = inv.held, fortune = enchLevel(hs, 'fortune'), silk = enchLevel(hs, 'silk_touch');
       let out = drops(block, held, Math.random());
       if (silk && ITEMS[block] && !famOf(block) && canHarvest(block, held) && out.every(([it]) => it !== block)) out = [[block, 1]];
+      else if (ITEMS[held] && ITEMS[held].shears && ITEMS[block] && /Leaves|Vines|Grass|Fern/.test(BLOCKS[block].name || '')) out = [[block, 1]];
       else if (fortune) out = out.map(([it, n]) => [it, it !== block && ITEMS[it] && ITEMS[it].kind === Kind.Material ? n * (1 + Math.max(0, Math.floor(Math.random() * (fortune + 2)) - 1)) : n]);
       for (const [item, n] of out)
         this.spawnItem(item, n, [x + 0.5, y + 0.3, z + 0.5], [(Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2]);
@@ -1305,13 +1313,13 @@ export class Game {
     const rnd = () => { s = (Math.imul(s ^ (s >>> 15), 2246822519) + 374761393) >>> 0; return (s >>> 8) / 16777216; };
     const T = {
       village: [[I.Bread, 1, 4], [I.Apple, 1, 3], [I.WheatSeeds, 2, 6], [I.Wheat, 2, 8], [I.IronIngot, 1, 3], [I.Emerald, 1, 2], [I.CookedBeef, 1, 3], [B.Torch, 2, 6], [CK.oak_sapling, 1, 2]],
-      dungeon: [[I.GoldenApple, 1, 1], [I.EnchantedGoldenApple, 1, 1], [I.Bread, 1, 3], [I.Wheat, 2, 6], [I.IronIngot, 1, 4], [I.GoldIngot, 1, 3], [I.Redstone, 2, 6], [I.String, 1, 5], [I.Gunpowder, 1, 4], [I.Bone, 2, 6], [I.RottenFlesh, 1, 5], [I.Bucket, 1, 1], [I.Diamond, 1, 2], [I.SlimeBall, 1, 3]],
-      pyramid: [[I.GoldenApple, 1, 2], [I.EnchantedGoldenApple, 1, 1], [I.Bone, 2, 6], [I.RottenFlesh, 2, 6], [I.GoldIngot, 2, 6], [I.IronIngot, 1, 4], [I.Emerald, 1, 3], [I.Diamond, 1, 3], [I.Gunpowder, 2, 6], [B.Sand, 4, 12]],
+      dungeon: [[I.EnderPearl, 1, 2], [I.PotionHealing, 1, 1], [I.PotionStrength, 1, 1], [I.GoldenApple, 1, 1], [I.EnchantedGoldenApple, 1, 1], [I.Bread, 1, 3], [I.Wheat, 2, 6], [I.IronIngot, 1, 4], [I.GoldIngot, 1, 3], [I.Redstone, 2, 6], [I.String, 1, 5], [I.Gunpowder, 1, 4], [I.Bone, 2, 6], [I.RottenFlesh, 1, 5], [I.Bucket, 1, 1], [I.Diamond, 1, 2], [I.SlimeBall, 1, 3]],
+      pyramid: [[I.EnderPearl, 1, 2], [I.PotionFireResistance, 1, 1], [I.GoldenApple, 1, 2], [I.EnchantedGoldenApple, 1, 1], [I.Bone, 2, 6], [I.RottenFlesh, 2, 6], [I.GoldIngot, 2, 6], [I.IronIngot, 1, 4], [I.Emerald, 1, 3], [I.Diamond, 1, 3], [I.Gunpowder, 2, 6], [B.Sand, 4, 12]],
       outpost: [[I.Arrow, 4, 16], [I.IronIngot, 1, 3], [I.String, 1, 4], [I.Wheat, 2, 6], [CK.dark_oak_log, 2, 5], [I.Emerald, 1, 2]],
       portal: [[I.GoldNugget, 4, 18], [I.GoldIngot, 1, 3], [I.FlintAndSteel, 1, 1], [B.Obsidian, 1, 3], [I.IronIngot, 1, 2], [CK.gold_block, 1, 1]],
       bastion: [[I.GoldenApple, 1, 2], [I.GoldIngot, 3, 9], [CK.gold_block, 1, 2], [I.Diamond, 1, 2], [I.Arrow, 5, 16], [B.Magma, 2, 5], [I.CookedPorkchop, 2, 5], [CK.gilded_blackstone, 1, 4]],
       igloo: [[I.Apple, 1, 3], [I.Coal, 1, 4], [I.GoldNugget, 1, 3], [I.Emerald, 1, 1], [I.StoneAxe, 1, 1]],
-      hut: [[I.RottenFlesh, 1, 4], [I.Bone, 1, 3], [I.Redstone, 1, 4], [I.GlowstoneDust, 1, 4]],
+      hut: [[I.PotionHealing, 1, 1], [I.PotionNightVision, 1, 1], [I.PotionLeaping, 1, 1], [I.PotionSwiftness, 1, 1], [I.GlassBottle, 1, 3], [I.Sugar, 1, 4], [I.RottenFlesh, 1, 4], [I.Bone, 1, 3], [I.Redstone, 1, 4], [I.GlowstoneDust, 1, 4]],
     }[kind] || [];
     const n = 3 + Math.floor(rnd() * 5);
     for (let k = 0; k < n && T.length; k++) {
@@ -1383,12 +1391,12 @@ export class Game {
     const R = (inputs, out, count) => ({ inputs, out, count, name: itemName(out) });
     const E = I.Emerald;
     return {
-      farmer: [R([[I.Wheat, 20]], E, 1), R([[E, 1]], I.Bread, 6), R([[E, 1]], I.Apple, 4), R([[CK.pumpkin || I.Wheat, 6]], E, 1), R([[E, 3]], CK.hay_block || I.Wheat, 1), R([[E, 1]], I.BoneMeal, 6), R([[E, 8]], I.GoldenApple, 1)],
+      farmer: [R([[I.Wheat, 20]], E, 1), R([[E, 1]], I.Bread, 6), R([[E, 1]], I.Apple, 4), R([[CK.pumpkin || I.Wheat, 6]], E, 1), R([[E, 3]], CK.hay_block || I.Wheat, 1), R([[E, 1]], I.BoneMeal, 6), R([[E, 8]], I.GoldenApple, 1), R([[E, 1]], I.Sugar, 8)],
       toolsmith: [R([[I.Coal, 15]], E, 1), R([[E, 3], [I.Stick, 2]], I.IronPickaxe, 1), R([[E, 2], [I.Stick, 2]], I.IronShovel, 1), R([[E, 3], [I.Stick, 2]], I.IronAxe, 1), R([[E, 12], [I.Stick, 2]], I.DiamondPickaxe, 1)],
       butcher: [R([[I.RawChicken, 14]], E, 1), R([[I.Porkchop, 7]], E, 1), R([[E, 1]], I.CookedPorkchop, 5), R([[E, 1]], I.CookedChicken, 6), R([[E, 1]], I.CookedBeef, 4), R([[I.Cod, 12]], E, 1), R([[I.Salmon, 10]], E, 1)],
       shepherd: [R([[CK.white_wool, 18]], E, 1), R([[E, 2]], FAM.white_bed ? FAM.white_bed.first : CK.white_wool, 1), R([[E, 1]], CK.red_wool, 2), R([[E, 1]], CK.blue_wool, 2), R([[E, 1]], FAM.white_carpet ? FAM.white_carpet.first : CK.white_wool, 4)],
       weaponsmith: [R([[I.Coal, 15]], E, 1), R([[I.IronIngot, 4]], E, 1), R([[E, 3], [I.Stick, 1]], I.IronSword, 1), R([[E, 12], [I.Stick, 1]], I.DiamondSword, 1), R([[E, 9]], I.IronChestplate, 1)],
-      fletcher: [R([[I.Stick, 32]], E, 1), R([[I.Flint, 26]], E, 1), R([[E, 1]], I.Arrow, 16), R([[E, 2]], I.Bow, 1), R([[I.String, 14]], E, 1), R([[E, 3]], I.FishingRod, 1)],
+      fletcher: [R([[I.Stick, 32]], E, 1), R([[I.Flint, 26]], E, 1), R([[E, 1]], I.Arrow, 16), R([[E, 2]], I.Bow, 1), R([[I.String, 14]], E, 1), R([[E, 3]], I.FishingRod, 1), R([[E, 4]], I.EnderPearl, 1)],
     }[prof] || [];
   }
 
@@ -2400,8 +2408,49 @@ export class Game {
     this.swing = 1; this.audio.place(B.Grass);
   }
 
+  /** Snowballs, eggs and ender pearls are thrown. */
+  throwItem(def) {
+    const pl = this.player, e = pl.eye(), f = pl.forward();
+    if (def.throws === 'pearl' && (this.pearlCool || 0) > this.time) return;
+    this.mobs.projectiles.push({ kind: def.throws, thrown: true, p: [e[0] + f[0] * 0.5, e[1] + f[1] * 0.5 - 0.1, e[2] + f[2] * 0.5], v: [f[0] * 22, f[1] * 22 + 2, f[2] * 22], life: 6, owner: 'player', damage: 0 });
+    if (def.throws === 'pearl') this.pearlCool = this.time + 1;
+    if (!this.creative) this.inventory.consumeHeld();
+    this.audio.shoot('arrow'); this.swing = 1;
+  }
+
+  /** The glider (worn as a chestplate): jump again while falling to spread it; dive to speed up, pull up to slow. */
+  updateGlide(dt) {
+    const pl = this.player, a = this.inventory.armor[1], space = this.keys.has('Space');
+    const pressed = space && !this.lastSpace; this.lastSpace = space;
+    if (!a || a.item !== I.Glider || pl.flying || pl.inWater || pl.body.grounded || this.state !== 'playing') { this.gliding = false; return; }
+    if (!this.gliding) {
+      if (pressed && pl.body.vel[1] < -2) {
+        // opening the wing turns the fall into forward speed
+        const v0 = pl.body.vel, f0 = pl.forward();
+        this.gliding = true; this.glideSpeed = Math.min(30, Math.max(8, Math.hypot(v0[0], v0[2]) + -v0[1] * 0.6));
+        v0[0] = f0[0] * this.glideSpeed; v0[2] = f0[2] * this.glideSpeed; v0[1] = Math.max(v0[1], -4);
+        this.advance('glide');
+      }
+      return;
+    }
+    if (pressed) { this.gliding = false; return; }
+    const f = pl.forward(), v = pl.body.vel;
+    this.glideSpeed = Math.max(4, Math.min(34, this.glideSpeed + (-f[1] * 22 - 2) * dt));
+    v[1] += (pl.gravity || 30) * dt;   // the wing carries the player's weight; lift and drag come from the blend below
+    const want = [f[0] * this.glideSpeed, f[1] * this.glideSpeed - 2, f[2] * this.glideSpeed], k = Math.min(1, dt * 5);
+    for (let i = 0; i < 3; i++) v[i] += (want[i] - v[i]) * k;
+    pl.fallStart = NaN;
+    this.glideWear = (this.glideWear || 0) + dt;
+    if (this.glideWear >= 1 && !this.creative) {
+      this.glideWear = 0; a.wear = (a.wear || 0) + 1;
+      if (a.wear >= ITEMS[a.item].durability) { this.inventory.armor[1] = null; this.gliding = false; this.emit('toast', 'Glider broke'); this.inventory.changed(); }
+    }
+    if (Math.random() < dt * 20) this.particles.break.push({ p: [pl.body.pos[0], pl.body.pos[1] + 0.4, pl.body.pos[2]], v: [-v[0] * 0.05, 0, -v[2] * 0.05], life: 0.5, size: 0.02, c: [1, 1, 1], sky: 1, blk: 0 });
+  }
+
   useItem(def, hit) {
     if (def.id === I.BoneMeal) { this.useBoneMeal(hit); return; }
+    if (def.throws) { this.throwItem(def); return; }
     const inv = this.inventory, w = this.world;
     if (def.id === I.FlintAndSteel) {
       if (!hit) return;
@@ -2731,6 +2780,7 @@ export class Game {
     const d = ITEMS[item];
     if (!d || !d.durability) return null;
     if (item === I.Bow) return I.String;
+    if (item === I.Glider) return I.PhantomMembrane;
     if (d.kind === Kind.Armor) return { Leather: I.Leather, Golden: I.GoldIngot, Iron: I.IronIngot, Diamond: I.Diamond }[d.name.split(' ')[0]] || null;
     if (d.kind === Kind.Tool) return [null, 'planks', B.Cobblestone, I.IronIngot, I.Diamond][d.tier] || null;
     return null;
@@ -3081,6 +3131,14 @@ export class Game {
     const inv = this.inventory;
     const entities = [], sprites = [];
     for (const m of this.mobs.list) m.light = this.lightAt(m.body.pos[0], m.body.pos[1] + m.def.height * 0.6, m.body.pos[2]);
+    // arrows, throwables and fireballs in flight
+    const PICON = { arrow: I.Arrow, snowball: I.Snowball, egg: I.Egg, pearl: I.EnderPearl, fireball: I.BlazingCore, ghastball: I.BlazingCore };
+    for (const s of this.mobs.projectiles) {
+      const it = PICON[s.kind];
+      if (!it || !ITEMS[it]) continue;
+      const L = this.lightAt(s.p[0], s.p[1], s.p[2]);
+      sprites.push({ pos: [...s.p], size: s.kind === 'ghastball' ? 0.5 : s.kind === 'fireball' ? 0.3 : 0.16, rect: this.icons.rect(it), sky: L.sky, block: s.kind.endsWith('ball') && s.kind !== 'snowball' ? Math.max(L.block, 14) : L.block });
+    }
     for (const e of this.entities) {
       const L = this.lightAt(e.body.pos[0], e.body.pos[1] + 0.3, e.body.pos[2]);
       const def = ITEMS[e.item];
@@ -3115,7 +3173,7 @@ export class Game {
     this.shake = Math.max(0, (this.shake || 0) - dt * 2.5);
     const sh = camFx ? this.shake * this.shake * 0.035 : 0;
     const f = {
-      dt, time: this.time, camPos: eye, yaw: pl.yaw + Math.sin(this.time * 47) * sh, pitch: pl.pitch + Math.cos(this.time * 39) * sh, sky, fovMul: this.fovK,
+      dt, time: this.time, camPos: eye, yaw: pl.yaw + Math.sin(this.time * 47) * sh, pitch: pl.pitch + Math.cos(this.time * 39) * sh, sky, fovMul: this.fovK * (this.gliding ? 1 + Math.min(0.15, (this.glideSpeed || 0) / 200) : 1), nightVision: !!(this.stats && this.stats.fx && this.stats.fx.night > 0),
       dim: this.dim === Dim.Sky ? 0 : this.dim, flat: !!this.meta.flat || this.dim === Dim.Sky, dimAmb: sky.dimAmb, dimFog: inLava ? 1.2 : other ? sky.fogDensity : null, portal: Math.min(1, (this.portalTime || 0) / 3),
       weather: other ? { cloudCover: 0, windX: 0.2, windZ: 0.1, windStrength: 0.3, gust: 0.2, fog: 0, storm: 0, wetness: 0, snowCover: 0 } : { cloudCover: wp.cloud, windX: this.windVec[0] / 20 || 0, windZ: this.windVec[1] / 20 || 0, windStrength: 0.35 + wp.wind * 5, gust: wp.gust,
         fog: (wp.fog - 1) * 0.02 + (1 - wp.fogDist) * 0.3, storm: Math.max(0, (wp.precip - 0.5) * 2), wetness: this.weather.wetness,
