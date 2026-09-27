@@ -25,7 +25,7 @@ h2 { font-size: 20px; }
 p { margin: 0; }
 
 /* screens */
-.layer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px 16px; overflow: auto; }
+.layer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 12px; padding: 24px 16px; overflow: auto; }
 .dirt { background: linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)), var(--tex-dirt); background-size: auto, 64px 64px; image-rendering: pixelated; }
 .dim { background: linear-gradient(rgba(16, 16, 16, 0.75), rgba(16, 16, 16, 0.82)); }
 #app:not(.ingame) #settings { background: linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)), var(--tex-dirt); background-size: auto, 64px 64px; }
@@ -114,6 +114,20 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
 #mineBar { position: absolute; left: 50%; top: calc(50% + 16px); width: 40px; height: 6px; transform: translateX(-50%); background: #000; border: var(--px) solid #000; }
 #mineBar i { display: block; height: 100%; width: 0; background: #fff; }
 #bottom { position: absolute; left: 50%; bottom: calc(4px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; max-width: calc(100% - 8px); }
+#xpBar { position: relative; width: 100%; height: 6px; background: rgba(0,0,0,0.65); border: 1px solid #000; margin-top: 2px; }
+#xpBar > i { display: block; height: 100%; width: 0; background: linear-gradient(#c8ff6a, #5cbf1c); }
+#xpBar > span { position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); color: #86ff2a; font-size: 16px; text-shadow: 2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000; }
+#dmgNums { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+#dmgNums b { position: absolute; font-weight: normal; color: #fff; font-size: 20px; text-shadow: 2px 2px 0 #000; transform: translate(-50%, -50%); white-space: nowrap; }
+#dmgNums b.crit { color: #ffd84a; font-size: 26px; }
+#cooldown { position: absolute; left: 50%; top: calc(50% + 16px); width: 22px; height: 4px; transform: translateX(-50%); background: rgba(0,0,0,0.5); }
+#cooldown > i { display: block; height: 100%; background: #fff; }
+.slot .glint { position: absolute; inset: 2px; pointer-events: none; background: linear-gradient(115deg, transparent 35%, rgba(200,130,255,0.55) 48%, transparent 62%); background-size: 300% 100%; animation: glint 2.6s linear infinite; mix-blend-mode: screen; }
+@keyframes glint { from { background-position: 150% 0; } to { background-position: -150% 0; } }
+.recipe .ench { color: #7b3fc4; }
+.magicPick { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.magicPick .slot { cursor: pointer; width: 40px; height: 40px; position: relative; display: flex; align-items: center; justify-content: center; }
+.magicPick .slot.on { outline: 2px solid #fff; }
 #stats { display: flex; justify-content: space-between; align-items: flex-end; width: 100%; gap: 8px; padding: 0 2px; }
 .meter { display: flex; }
 .meter svg { width: 18px; height: 18px; margin-right: -2px; shape-rendering: crispEdges; }
@@ -130,9 +144,17 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
 #bossBar { position: absolute; left: 50%; top: calc(58px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: min(420px, 70vw); text-align: center; color: #fff; text-shadow: var(--px) var(--px) 0 #000; pointer-events: none; }
 #bossBar div { height: 8px; margin-top: 3px; background: #300; border: 2px solid #000; }
 #bossBar i { display: block; height: 100%; background: linear-gradient(#e0305a, #a0102e); }
+#advList { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; max-width: 640px; max-height: 50vh; overflow: auto; text-align: left; background: rgba(0,0,0,0.55); padding: 8px 12px; border: 2px solid #000; }
+#advList > div:first-child { grid-column: 1 / -1; } #advList b { color: #ffe38a; font-weight: normal; } #advList .done { color: #8f8; } #advList small { color: #bbb; display: block; }
+#advToast { position: absolute; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -20px); opacity: 0; pointer-events: none; background: rgba(20, 16, 40, 0.92); border: 2px solid #000; box-shadow: inset 0 0 0 2px #6a4fb0; padding: 6px 14px; color: #fff; text-align: center; transition: opacity 0.35s, transform 0.35s; min-width: 240px; }
+#advToast.show { opacity: 1; transform: translate(-50%, 0); }
+#advToast b { display: block; color: #ffe38a; font-weight: normal; } #advToast small { display: block; color: #bbb; }
 #bossList { margin-top: 10px; display: grid; gap: 4px; max-width: 560px; text-align: left; background: rgba(0,0,0,0.55); padding: 8px 12px; border: 2px solid #000; }
 #bossList b { color: #ffe38a; font-weight: normal; } #bossList .done { color: #8f8; } #bossList small { color: #bbb; display: block; }
 #arenaTag { position: absolute; left: 8px; top: calc(28px + env(safe-area-inset-top, 0px)); color: #ffd966; font-size: 15px; text-shadow: var(--px) var(--px) 0 #000; background: rgba(0,0,0,0.35); padding: 3px 8px; }
+#hearts .absorb { display: flex; filter: sepia(1) saturate(5) hue-rotate(5deg) brightness(1.15); margin-left: 2px; }
+#bountyTag { position: absolute; left: 8px; top: calc(40px + env(safe-area-inset-top, 0px)); color: #b8ff9a; font-size: 14px; text-shadow: var(--px) var(--px) 0 #000; background: rgba(0,0,0,0.35); padding: 2px 8px; }
+#bountyTag::before { content: "Bounty: "; color: #ffe38a; }
 #restedTag { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); color: #ffe38a; font-size: 13px; text-shadow: var(--px) var(--px) 0 #000; }
 #bigmapCanvas { width: min(640px, 80vh, 92vw); height: min(640px, 80vh, 92vw); image-rendering: pixelated; border: 3px solid #000; box-shadow: 0 0 0 2px #888; }
 .tip { max-width: 560px; color: #e8e8a0; margin-top: 14px; }
@@ -258,14 +280,19 @@ button.mini { height: auto; padding: 2px 10px; font-size: 13px; margin-left: 10p
     <div id="debug" hidden></div>
     <div id="fpsTag" hidden></div>
     <div id="toast"></div>
+    <div id="advToast"></div>
+    <div id="bountyTag" hidden></div>
     <div id="pickups"></div>
     <div id="clickHint" hidden>Click to look around</div>
     <div id="bottom">
       <div id="heldName"></div>
       <div id="armorBar" class="meter"></div>
       <div id="stats"><div class="meter" id="hearts"></div><div class="meter" id="air"></div><div class="meter" id="food"></div></div>
+      <div id="xpBar"><i></i><span></span></div>
       <div id="hotbar"></div>
     </div>
+    <div id="dmgNums"></div>
+    <div id="cooldown" hidden><i></i></div>
   </div>
   <div id="touch" hidden></div>
 
@@ -322,9 +349,10 @@ button.mini { height: auto; padding: 2px 10px; font-size: 13px; margin-left: 10p
       <button id="btnResume">Back to Game</button>
       <div class="pair" style="width:100%"><button id="btnSettingsP">Options...</button><button id="btnMode">Switch to Creative</button></div>
       <div class="pair" id="travelRow" style="width:100%"><button id="btnGoOver">Overworld</button><button id="btnGoNether">Nether</button><button id="btnGoEnd">The End</button><button id="btnGoSky">Skylands</button></div>
-      <button id="btnBosses">Bosses</button>
+      <div class="pair" style="width:100%"><button id="btnAdv">Advancements</button><button id="btnBosses">Bosses</button></div>
       <button id="btnQuit">Save and Quit to Title</button>
       <div id="bossList" hidden></div>
+      <div id="advList" class="bossList" hidden></div>
     </div>
     <p class="hint" id="pauseInfo"></p>
     <p class="hint tip" id="pauseTip"></p>

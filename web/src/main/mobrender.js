@@ -79,6 +79,14 @@ export class MobModels {
       const n = named(b);
       // procedural animation
       if (n === 'head') { r[1] += m.headYaw; r[0] += m.headPitch; }
+      let off = null;
+      if (m.sit && (m.def.base || m.type) === 'wolf') {
+        // sitting: rear down, hind legs folded forward under it, tail on the ground
+        if (n === 'leg0' || n === 'leg1') { r[0] += SIT.hind; off = SIT.hindOff; }
+        else if (n === 'body') r[0] += SIT.body;
+        else if (n === 'upperbody') r[0] += SIT.upper;
+        else if (n === 'tail') { r[0] += SIT.tail; off = SIT.tailOff; }
+      }
       else if (/^leg[0-7]$/.test(n)) {
         const k = +n[3];
         if ((m.def.base || m.type) === 'spider') { const ph = (k & 1 ? 1 : -1) * Math.sin(w * 1.3 + (k >> 1)) * 0.4 * ws; r[1] += ph; r[2] += Math.abs(Math.cos(w * 1.3 + (k >> 1))) * 0.2 * ws * (k & 1 ? 1 : -1); }
@@ -102,6 +110,7 @@ export class MobModels {
         const top = ring === 0 ? 26 - Math.cos((2 * j + age) * 0.25) : ring === 1 ? 22 - Math.cos((2 * j + age) * 0.25) : 13 - Math.cos(1.5 * j + age * 0.5);
         M = mm(M, mat4.translation(mat4.create(), Math.cos(base) * rad - 1, top - 24, Math.sin(base) * rad - 1));
       }
+      if (off) M = mm(M, mat4.translation(mat4.create(), off[0], off[1], off[2]));
       M = mm(M, mat4.translation(mat4.create(), p[0], p[1], p[2]));
       M = mm(M, rotZ(r[2])); M = mm(M, rotY(r[1])); M = mm(M, rotX(r[0]));
       M = mm(M, mat4.translation(mat4.create(), -p[0], -p[1], -p[2]));
@@ -137,6 +146,7 @@ export class MobModels {
 }
 
 const mm = (a, b) => mat4.mul(new Float32Array(16), a, b);
+const SIT = { hind: 1.5, body: 0.65, upper: 0.3, tail: 0.9, hindOff: [0, -4.5, -1], tailOff: [0, -5, -1.5] };
 const scaling = (s) => new Float32Array([s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1]);
 function rotX(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]); }
 function rotY(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]); }

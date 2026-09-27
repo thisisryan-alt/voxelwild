@@ -337,6 +337,9 @@ def model_families(have, keys):
     fam("gravestone", "grave", tex=["mossy_cobblestone", "B:Cobblestone"], cat="stone", noitem=True, name="Gravestone")
     # the Skylands portal (a glowstone frame lit with water), not in Minecraft
     fam("sky_portal", "skyportal", tex=["@tint:8fc8ff:nether_portal"], list="glow", cat="glass", noitem=True, name="Skylands Portal", emission=11)
+    # appended last so no earlier family's block ids move
+    fam("enchanting_table", "enchtable", tex=["enchanting_table_top", "enchanting_table_side", "enchanting_table_bottom"], cat="stone", emission=7)
+    fam("anvil", "anvil", tex=["anvil_top", "anvil"], cat="metal")
     return out, texinfo
 
 

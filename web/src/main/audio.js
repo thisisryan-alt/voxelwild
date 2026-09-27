@@ -87,6 +87,65 @@ const SYNTH = {
     for (let i = 0; i < n; i++) { const t = i / SR; lp += aL * (rng.signed() - lp); ph += TAU * (140 - 60 * Math.min(t / 0.2, 1)) / SR; o[i] = (Math.sin(ph) * 0.9 + lp * 0.8) * Math.min(t / 0.003, 1) * Math.exp(-t / 0.06); }
     fadeOut(o, 0.02); return normalize(o, 0.8);
   },
+  orb: () => {
+    // a small bright chime, like picking up experience
+    const n = Math.floor(0.25 * SR), o = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const t = i / SR; o[i] = (Math.sin(TAU * 1760 * t) * 0.6 + Math.sin(TAU * 2637 * t) * 0.3 + Math.sin(TAU * 3520 * t) * 0.1) * Math.min(t / 0.003, 1) * Math.exp(-t / 0.07); }
+    fadeOut(o, 0.02); return normalize(o, 0.4);
+  },
+  levelUp: () => {
+    // a rising three-note arpeggio
+    const n = Math.floor(0.9 * SR), o = new Float32Array(n);
+    [[0, 784], [0.12, 988], [0.24, 1319]].forEach(([at, f]) => { for (let i = Math.floor(at * SR); i < n; i++) { const t = i / SR - at; o[i] += (Math.sin(TAU * f * t) + Math.sin(TAU * f * 2 * t) * 0.3) * Math.min(t / 0.005, 1) * Math.exp(-t / 0.25) * 0.5; } });
+    fadeOut(o, 0.05); return normalize(o, 0.55);
+  },
+  enchant: () => {
+    // a shimmering swell of detuned high partials
+    const n = Math.floor(1.4 * SR), o = new Float32Array(n), fs = [1046, 1318, 1568, 2093, 2637];
+    for (let i = 0; i < n; i++) { const t = i / SR, env = Math.min(t / 0.25, 1) * Math.exp(-Math.max(0, t - 0.25) / 0.35); let v = 0; for (let k = 0; k < fs.length; k++) v += Math.sin(TAU * fs[k] * t * (1 + 0.003 * Math.sin(TAU * (5 + k) * t))) * Math.sin(TAU * (3 + k * 1.7) * t + k) ** 2; o[i] = v * env / fs.length; }
+    fadeOut(o, 0.05); return normalize(o, 0.5);
+  },
+  anvil: () => {
+    // a ringing metal clang
+    const n = Math.floor(0.8 * SR), o = new Float32Array(n), fs = [523, 1187, 1797, 2531, 3302];
+    for (let i = 0; i < n; i++) { const t = i / SR; let v = 0; for (let k = 0; k < fs.length; k++) v += Math.sin(TAU * fs[k] * t) * Math.exp(-t / (0.25 / (1 + k * 0.6))) / (1 + k * 0.5); o[i] = v * Math.min(t / 0.001, 1); }
+    fadeOut(o, 0.05); return normalize(o, 0.6);
+  },
+  bossLoop: () => {
+    // four bars of a driving minor riff at 140 bpm: bass ostinato, kick, clap, hats and a dark pad
+    const beat = 60 / 140, n = Math.floor(16 * beat * SR), o = new Float32Array(n), rng = new Rng(4242), e8 = beat / 2;
+    const riff = [0, 0, 12, 0, 3, 0, 10, 7, 0, 0, 12, 0, 8, 7, 5, 3], chords = [[0, 3, 7], [-4, 0, 3], [-7, -3, 0], [-5, -1, 2]];
+    const hz = (semi, base) => base * Math.pow(2, semi / 12);
+    for (let s = 0; s < 32; s++) {
+      const at = Math.floor(s * e8 * SR), f = hz(riff[s % 16] + (s >= 16 && s % 16 >= 12 ? -2 : 0), 55), len = Math.floor(e8 * SR);
+      let lp = 0; const a = coef(900);
+      for (let i = 0; i < len && at + i < n; i++) {
+        const t = i / SR, ph = f * t;
+        const saw = 2 * (ph - Math.floor(ph + 0.5)) + 0.5 * (2 * (ph * 1.005 - Math.floor(ph * 1.005 + 0.5)));
+        lp += a * (saw - lp);
+        o[at + i] += lp * 0.55 * Math.min(t / 0.004, 1) * Math.exp(-t / 0.18);
+      }
+    }
+    for (let q = 0; q < 16; q++) {
+      const at = Math.floor(q * beat * SR);
+      // kick on every beat
+      let ph = 0;
+      for (let i = 0; i < 0.3 * SR && at + i < n; i++) { const t = i / SR; ph += TAU * (45 + 90 * Math.exp(-t / 0.03)) / SR; o[at + i] += Math.sin(ph) * Math.exp(-t / 0.13) * 0.9; }
+      // a clap on 2 and 4
+      if (q % 2 === 1) { let lp = 0, hp = 0; const aL = coef(2600), aH = coef(700); for (let i = 0; i < 0.22 * SR && at + i < n; i++) { const t = i / SR; lp += aL * (rng.signed() - lp); hp += aH * (lp - hp); o[at + i] += (lp - hp) * Math.exp(-t / 0.06) * 1.2; } }
+      // hats on the off-beats
+      const ah = Math.floor((q + 0.5) * beat * SR); let hp2 = 0; const aH2 = coef(7000);
+      for (let i = 0; i < 0.05 * SR && ah + i < n; i++) { const x = rng.signed(); hp2 += aH2 * (x - hp2); o[ah + i] += (x - hp2) * Math.exp(-i / SR / 0.015) * 0.25; }
+    }
+    for (let bar = 0; bar < 4; bar++) {
+      const at = Math.floor(bar * 4 * beat * SR), len = Math.floor(4 * beat * SR);
+      for (const semi of chords[bar]) {
+        const f = hz(semi, 220);
+        for (let i = 0; i < len && at + i < n; i++) { const t = i / SR; o[at + i] += (Math.sin(TAU * f * t) + Math.sin(TAU * f * 1.004 * t) * 0.7) * 0.06 * Math.min(t / 0.3, 1) * Math.min((len - i) / SR / 0.2, 1) * (0.75 + 0.25 * Math.sin(TAU * 4 * t)); }
+      }
+    }
+    return normalize(o, 0.75);
+  },
   pop: () => {
     const n = Math.floor(0.09 * SR), o = new Float32Array(n); let ph = 0;
     for (let i = 0; i < n; i++) { const t = i / SR; ph += TAU * (650 + 900 * t / 0.09) / SR; o[i] = Math.sin(ph) * Math.min(t / 0.004, 1) * Math.exp(-t / 0.03); }
@@ -367,6 +426,26 @@ export class GameAudio {
   explosion() { const k = this.nextVariant() % 3; this.play(this.get(`thunder1_${k}`, () => SYNTH.thunder(k, true)), 1, 1.6); }
   pop() { const rec = this.sample('pop'); this.play(rec || this.get('pop', SYNTH.pop), rec ? 0.3 : 0.35, 0.9 + Math.random() * 0.3); }
   click() { this.play(this.get('click', SYNTH.click), 0.4); }
+  /** A looping fight track, faded in and out. */
+  bossMusic(on) {
+    if (!this.ctx || this.ctx.state !== 'running' || !on === !this.bossSrc) return;
+    const t = this.ctx.currentTime;
+    if (on) {
+      const src = this.ctx.createBufferSource(), g = this.ctx.createGain();
+      src.buffer = this.get('bossLoop', SYNTH.bossLoop); src.loop = true;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.4, t + 2);
+      src.connect(g); g.connect(this.sfx); src.start();
+      this.bossSrc = src; this.bossGain = g;
+    } else {
+      const g = this.bossGain;
+      g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 3);
+      this.bossSrc.stop(t + 3.1); this.bossSrc = null;
+    }
+  }
+  orb() { this.play(this.get('orb', SYNTH.orb), 0.3, 0.85 + Math.random() * 0.4); }
+  levelUp() { this.play(this.get('levelUp', SYNTH.levelUp), 0.5); }
+  enchant() { this.play(this.get('enchant', SYNTH.enchant), 0.6); }
+  anvil() { this.play(this.get('anvil', SYNTH.anvil), 0.45, 0.9 + Math.random() * 0.2); }
   eat() { const k = this.nextVariant() % 2; this.play(this.get(`eat${k}`, () => SYNTH.eat(k)), 0.6); }
   thunder(near, delay = 0) {
     const k = this.nextVariant() % 3;

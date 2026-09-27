@@ -15,6 +15,8 @@ import { decodeLarge, fetchBuiltinPack, square } from './respack.js';
 import { readPackZip, convertPack } from './packconv.js';
 import { LAYER_TUNING, LAYER_NAMES, I, BASE_LAYERS, CAT } from '../shared/blocks.js';
 import CATALOG from '../shared/catalog.json';
+import { ADVANCEMENTS, ADV_BY_ID } from '../shared/advancements.js';
+import { enchantOffers, enchLevel, enchantKind, enchText, ENCHANTS } from '../shared/enchant.js';
 import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, isLava, isPortal, Dim, breakSeconds, drops, canHarvest, itemName, layerFor, FAMS, FAM, famOf, isLiquid, mining } from '../shared/blocks.js';
 import { K, facingFromYaw, facingFromFace, opposite, DIR6 } from '../shared/shapes.js';
 import { Redstone } from './redstone.js';
@@ -497,10 +499,23 @@ export class Game {
     this.stats.onDamage = (a) => { this.damageFlash = Math.min(1, this.damageFlash + 0.5 + a * 0.05); this.audio.hurt(); this.emit('hud'); };
     this.stats.onDeath = (cause) => this.die(cause);
     this.stats.armor = () => this.inventory.defense;
+    this.stats.onTotem = () => {
+      const inv = this.inventory, i = inv.slots.findIndex((s, k) => k < 9 && s && s.item === I.Totem);
+      if (i < 0 || this.meta.arena) return false;
+      inv.slots[i] = null; inv.changed();
+      this.stats.applyEffects({ regen: [45, 2], absorb: 8, fireRes: 40 });
+      const e = this.player.eye();
+      this.spawnEmbers([e[0], e[1] - 0.5, e[2]], 50, [1.7, 1.5, 0.3]); this.spawnEmbers([e[0], e[1] - 0.5, e[2]], 40, [0.4, 1.7, 0.4]);
+      this.emit('toast', 'The Totem of Undying saves you!'); this.audio.levelUp(); this.burning = 0;
+      this.advance('totem');
+      return true;
+    };
+    this.stats.protect = (cause) => this.inventory.armor.reduce((a, s, i) => a + enchLevel(s, 'protection') + (cause === 'fall' && i === 3 ? enchLevel(s, 'feather_falling') * 3 : 0), 0);
     this.stats.onArmorHit = () => {
       const a = this.inventory.armor;
       for (let i = 0; i < 4; i++) {
         const s = a[i]; if (!s) continue;
+        if (Math.random() > 1 / (1 + enchLevel(s, 'unbreaking'))) continue;
         s.wear = (s.wear || 0) + 1;
         if (s.wear >= ITEMS[s.item].durability) { a[i] = null; this.emit('toast', `${ITEMS[s.item].name} broke`); this.audio.break(B.Planks); }
       }
@@ -669,6 +684,7 @@ export class Game {
 
   die(cause) {
     const p = this.player.body.pos;
+    if (!this.meta.arena) { this.stats.level = Math.floor((this.stats.level || 0) / 2); this.stats.xp = 0; }   // half your levels are lost
     // a gravestone keeps everything (not in Minecraft): the items wait where the player fell
     if (this.meta.arena) {
       if (this.arena) { this.arena.state = 'lost'; this.arena.deaths++; }
@@ -685,11 +701,11 @@ export class Game {
     for (let i = 0; i < this.inventory.slots.length; i++) {
       const s = this.inventory.slots[i];
       if (!s) continue;
-      this.spawnItem(s.item, s.count, [p[0], Math.max(p[1], MIN_Y + 2) + 0.8, p[2]], [(Math.random() - 0.5) * 5, 3 + Math.random() * 2, (Math.random() - 0.5) * 5], s.wear);
+      this.spawnItem(s.item, s.count, [p[0], Math.max(p[1], MIN_Y + 2) + 0.8, p[2]], [(Math.random() - 0.5) * 5, 3 + Math.random() * 2, (Math.random() - 0.5) * 5], s);
       this.inventory.slots[i] = null;
     }
     this.inventory.armor.forEach((s, i) => {
-      if (s) this.spawnItem(s.item, 1, [p[0], Math.max(p[1], MIN_Y + 2) + 0.8, p[2]], [(Math.random() - 0.5) * 5, 3, (Math.random() - 0.5) * 5], s.wear);
+      if (s) this.spawnItem(s.item, 1, [p[0], Math.max(p[1], MIN_Y + 2) + 0.8, p[2]], [(Math.random() - 0.5) * 5, 3, (Math.random() - 0.5) * 5], s);
       this.inventory.armor[i] = null;
     });
     this.inventory.changed();
@@ -866,9 +882,16 @@ export class Game {
     }
     this.updateEntities(dt);
     if (this.arena) this.updateArena(dt);
-    if (!this.meta.menu) { this.redstone.update(dt); this.updateBlocks(dt); this.updateGrapple(dt); if (!this.creative) this.updateRested(dt); this.updateDash(dt); }
+    if (!this.meta.menu) { this.redstone.update(dt); this.updateBlocks(dt); this.updateGrapple(dt); this.updateFishing(dt); if (!this.creative) this.updateRested(dt); this.updateDash(dt); }
     this.updateEyes(dt);
     if (!this.meta.menu) this.mobs.update(dt);
+    if ((this.advT = (this.advT || 0) - dt) <= 0) { this.advT = 1; this.checkAdvancements(); }
+    // boss music while a boss is near
+    if ((this.bossMusicT = (this.bossMusicT || 0) - dt) <= 0) {
+      this.bossMusicT = 0.5;
+      const pp = this.player.body.pos;
+      this.audio.bossMusic(this.settings.bossMusic !== false && !this.meta.menu && this.mobs.list.some((m) => m.def.boss && !m.dead && Math.hypot(m.body.pos[0] - pp[0], m.body.pos[2] - pp[2]) < 64));
+    }
 
     const [jumps, dist] = pl.consumeActivity();
     if (!this.creative) this.stats.tick(dt, dist, pl.sprinting, jumps, pl.headInWater);
@@ -892,7 +915,7 @@ export class Game {
     if (!s) return;
     const n = all ? s.count : 1;
     const f = this.player.forward(), e = this.player.eye();
-    this.spawnItem(s.item, n, [e[0] + f[0] * 0.4, e[1] - 0.3, e[2] + f[2] * 0.4], [f[0] * 5, f[1] * 5 + 1.5, f[2] * 5], s.wear, 1.2);
+    this.spawnItem(s.item, n, [e[0] + f[0] * 0.4, e[1] - 0.3, e[2] + f[2] * 0.4], [f[0] * 5, f[1] * 5 + 1.5, f[2] * 5], s, 1.2);
     s.count -= n;
     if (s.count <= 0) this.inventory.slots[this.inventory.selected] = null;
     this.inventory.changed();
@@ -910,17 +933,22 @@ export class Game {
     this.attackT = (this.attackT || 0) - dt;
     if (mobHit && (!hit || mobHit.dist < hit.dist)) {
       this.target = null;
+      if (this.mouse.rightClicked && this.state === 'playing' && this.mobs.interactMob(mobHit.mob)) { this.swing = 1; this.mining = null; return; }
       if (this.mouse.rightClicked && mobHit.mob.def.villager && this.state === 'playing') {
         const v = mobHit.mob;
-        this.openStation({ kind: 'trade', name: `${v.def.villager[0].toUpperCase()}${v.def.villager.slice(1)}`, trades: this.trades(v.def.villager) });
+        this.openStation({ kind: 'trade', prof: v.def.villager, name: `${v.def.villager[0].toUpperCase()}${v.def.villager.slice(1)}`, trades: this.trades(v.def.villager) });
         this.audio.click();
         this.mining = null;
         return;
       }
       if (this.mouse.leftClicked && this.attackT <= 0) {
         const def = inv.heldItem;
-        const dmg = def && def.kind === Kind.Tool ? (def.damage || [1, 2, 3, 4, 5][def.tier] + 1) : 1;
-        this.mobs.hurt(mobHit.mob, this.creative ? Math.max(dmg, 4) : dmg, this.player);
+        const mob = mobHit.mob, sharp = enchLevel(inv.held, 'sharpness');
+        let dmg = (def && def.kind === Kind.Tool ? (def.damage || [1, 2, 3, 4, 5][def.tier] + 1) : 1) + (sharp ? 0.5 * sharp + 0.5 : 0);
+        // a critical hit when striking while falling (Minecraft's): half as much again
+        const crit = !pl.body.grounded && pl.body.vel[1] < -1 && !pl.flying && !pl.inWater;
+        if (crit) { dmg *= 1.5; this.spawnEmbers([mob.body.pos[0], mob.body.pos[1] + mob.def.height * 0.7, mob.body.pos[2]], 12, [1.8, 1.7, 1.2]); }
+        this.mobs.hurt(mob, this.creative ? Math.max(dmg, 4) : dmg, this.player, crit);
         this.attackT = 0.45; this.swing = 1;
         this.spawnBreakParticles([mobHit.mob.body.pos[0] - 0.5, mobHit.mob.body.pos[1] + mobHit.mob.def.height * 0.4, mobHit.mob.body.pos[2] - 0.5], B.Stone, 0);
         if (def && def.kind === Kind.Tool && !this.creative && inv.wearHeld()) this.emit('toast', `${def.name} broke`);
@@ -935,7 +963,7 @@ export class Game {
       const key = hit.hit.join(',');
       if (!this.mining || this.mining.key !== key || this.mining.block !== hit.block) {
         const held = inv.held ? inv.held.item : 0;
-        this.mining = { key, pos: hit.hit, block: hit.block, progress: 0, time: this.creative ? 0 : breakSeconds(hit.block, held) / (this.rested > 0 ? 1.2 : 1), hitTimer: 0 };
+        this.mining = { key, pos: hit.hit, block: hit.block, progress: 0, time: this.creative ? 0 : breakSeconds(hit.block, held) / (this.rested > 0 ? 1.2 : 1) / (1 + (enchLevel(inv.held, 'efficiency') ? 0.25 * (enchLevel(inv.held, 'efficiency') ** 2 + 1) : 0)), hitTimer: 0 };
       }
       const m = this.mining;
       if (this.creative) {
@@ -961,9 +989,9 @@ export class Game {
         const k = this.bowDraw; this.bowDraw = 0;
         if (k > 0.15) {
           const f = pl.forward(), e = pl.eye();
-          this.mobs.projectiles.push({ kind: 'arrow', p: [e[0] + f[0] * 0.5, e[1] + f[1] * 0.5 - 0.1, e[2] + f[2] * 0.5], v: f.map((x) => x * (10 + 32 * k)), life: 8, owner: 'player', damage: Math.round(2 + 7 * k * k) });
+          this.mobs.projectiles.push({ kind: 'arrow', p: [e[0] + f[0] * 0.5, e[1] + f[1] * 0.5 - 0.1, e[2] + f[2] * 0.5], v: f.map((x) => x * (10 + 32 * k)), life: 8, owner: 'player', damage: Math.round((2 + 7 * k * k) * (1 + 0.25 * enchLevel(inv.held, 'power'))) });
           this.audio.shoot('arrow'); this.swing = 1;
-          if (!this.creative) { inv.remove(I.Arrow, 1); if (inv.wearHeld()) this.emit('toast', 'Bow broke'); }
+          if (!this.creative) { if (!enchLevel(inv.held, 'infinity')) inv.remove(I.Arrow, 1); if (inv.wearHeld()) this.emit('toast', 'Bow broke'); }
         }
       }
     } else this.bowDraw = 0;
@@ -976,7 +1004,7 @@ export class Game {
       if (hit && !sneaking && this.toggle(hit)) { this.useCooldown = 0.3; this.swing = 1; }
       else if (def && def.kind === Kind.Use) this.useItem(def, hit);
       else if (def && def.kind === Kind.Food) {
-        if (!this.creative && this.stats.hunger < 20) { this.stats.eat(def.food, def.sat); inv.consumeHeld(); this.audio.eat(); this.swing = 1; this.emit('hud'); }
+        if (!this.creative && (this.stats.hunger < 20 || def.always)) { this.stats.eat(def.food, def.sat); if (def.effects) this.stats.applyEffects(def.effects); inv.consumeHeld(); this.audio.eat(); this.swing = 1; this.emit('hud'); }
       } else if (hit && def && def.kind === Kind.Tool && def.tool === ToolType.Hoe) this.till(hit);
       else if (def && def.kind === Kind.Armor) this.wear();
       else if (hit && def && def.places) this.place(hit, def.places);
@@ -994,8 +1022,15 @@ export class Game {
     this.audio.break(block);
     this.spawnBreakParticles(pos, block, 26);
     if (survival) {
-      for (const [item, n] of drops(block, held, Math.random()))
+      const hs = inv.held, fortune = enchLevel(hs, 'fortune'), silk = enchLevel(hs, 'silk_touch');
+      let out = drops(block, held, Math.random());
+      if (silk && ITEMS[block] && !famOf(block) && canHarvest(block, held) && out.every(([it]) => it !== block)) out = [[block, 1]];
+      else if (fortune) out = out.map(([it, n]) => [it, it !== block && ITEMS[it] && ITEMS[it].kind === Kind.Material ? n * (1 + Math.max(0, Math.floor(Math.random() * (fortune + 2)) - 1)) : n]);
+      for (const [item, n] of out)
         this.spawnItem(item, n, [x + 0.5, y + 0.3, z + 0.5], [(Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2]);
+      // ores give experience (not when silk-touched)
+      const oreXp = { [I.Coal]: [0, 2], [I.Diamond]: [3, 7], [I.Emerald]: [3, 7], [I.LapisLazuli]: [2, 5], [I.Redstone]: [1, 5], [I.NetherQuartz]: [2, 5] };
+      for (const [it] of out) if (oreXp[it] && it !== block) { const [lo, hi] = oreXp[it]; this.giveXp(lo + Math.floor(Math.random() * (hi - lo + 1)), [x + 0.5, y + 0.5, z + 0.5]); }
       const def = inv.heldItem;
       if (def && def.kind === Kind.Tool && BLOCKS[block] && (BLOCKS[block].flags & F.Breakable)) {
         if (inv.wearHeld()) { this.audio.break(B.Planks); this.emit('toast', `${def.name} broke`); }
@@ -1045,7 +1080,7 @@ export class Game {
   spill(x, y, z) {
     const bd = this.meta.blockData && this.meta.blockData[this.bkey(x, y, z)];
     if (!bd) return;
-    for (const s of bd.slots) if (s) this.spawnItem(s.item, s.count, [x + 0.5, y + 0.5, z + 0.5], [(Math.random() - 0.5) * 3, 3, (Math.random() - 0.5) * 3], s.wear);
+    for (const s of bd.slots) if (s) this.spawnItem(s.item, s.count, [x + 0.5, y + 0.5, z + 0.5], [(Math.random() - 0.5) * 3, 3, (Math.random() - 0.5) * 3], s);
     delete this.meta.blockData[this.bkey(x, y, z)];
     if (this.station && this.station.key === this.bkey(x, y, z)) this.emit('closeStation');
   }
@@ -1256,7 +1291,7 @@ export class Game {
   insertOne(d, s, from = 0, to = d.slots.length) {
     const max = ITEMS[s.item].stack;
     for (let i = from; i < to; i++) { const t = d.slots[i]; if (t && t.item === s.item && t.count < max) { t.count++; return true; } }
-    for (let i = from; i < to; i++) if (!d.slots[i]) { d.slots[i] = { item: s.item, count: 1, wear: s.wear }; return true; }
+    for (let i = from; i < to; i++) if (!d.slots[i]) { d.slots[i] = { item: s.item, count: 1, wear: s.wear, ench: s.ench }; return true; }
     return false;
   }
   /** Where an item enters a container from direction dir (0..5 six-way, the way the item travels). */
@@ -1268,11 +1303,11 @@ export class Game {
     const rnd = () => { s = (Math.imul(s ^ (s >>> 15), 2246822519) + 374761393) >>> 0; return (s >>> 8) / 16777216; };
     const T = {
       village: [[I.Bread, 1, 4], [I.Apple, 1, 3], [I.WheatSeeds, 2, 6], [I.Wheat, 2, 8], [I.IronIngot, 1, 3], [I.Emerald, 1, 2], [I.CookedBeef, 1, 3], [B.Torch, 2, 6], [CK.oak_sapling, 1, 2]],
-      dungeon: [[I.Bread, 1, 3], [I.Wheat, 2, 6], [I.IronIngot, 1, 4], [I.GoldIngot, 1, 3], [I.Redstone, 2, 6], [I.String, 1, 5], [I.Gunpowder, 1, 4], [I.Bone, 2, 6], [I.RottenFlesh, 1, 5], [I.Bucket, 1, 1], [I.Diamond, 1, 2], [I.SlimeBall, 1, 3]],
-      pyramid: [[I.Bone, 2, 6], [I.RottenFlesh, 2, 6], [I.GoldIngot, 2, 6], [I.IronIngot, 1, 4], [I.Emerald, 1, 3], [I.Diamond, 1, 3], [I.Gunpowder, 2, 6], [B.Sand, 4, 12]],
+      dungeon: [[I.GoldenApple, 1, 1], [I.EnchantedGoldenApple, 1, 1], [I.Bread, 1, 3], [I.Wheat, 2, 6], [I.IronIngot, 1, 4], [I.GoldIngot, 1, 3], [I.Redstone, 2, 6], [I.String, 1, 5], [I.Gunpowder, 1, 4], [I.Bone, 2, 6], [I.RottenFlesh, 1, 5], [I.Bucket, 1, 1], [I.Diamond, 1, 2], [I.SlimeBall, 1, 3]],
+      pyramid: [[I.GoldenApple, 1, 2], [I.EnchantedGoldenApple, 1, 1], [I.Bone, 2, 6], [I.RottenFlesh, 2, 6], [I.GoldIngot, 2, 6], [I.IronIngot, 1, 4], [I.Emerald, 1, 3], [I.Diamond, 1, 3], [I.Gunpowder, 2, 6], [B.Sand, 4, 12]],
       outpost: [[I.Arrow, 4, 16], [I.IronIngot, 1, 3], [I.String, 1, 4], [I.Wheat, 2, 6], [CK.dark_oak_log, 2, 5], [I.Emerald, 1, 2]],
       portal: [[I.GoldNugget, 4, 18], [I.GoldIngot, 1, 3], [I.FlintAndSteel, 1, 1], [B.Obsidian, 1, 3], [I.IronIngot, 1, 2], [CK.gold_block, 1, 1]],
-      bastion: [[I.GoldIngot, 3, 9], [CK.gold_block, 1, 2], [I.Diamond, 1, 2], [I.Arrow, 5, 16], [B.Magma, 2, 5], [I.CookedPorkchop, 2, 5], [CK.gilded_blackstone, 1, 4]],
+      bastion: [[I.GoldenApple, 1, 2], [I.GoldIngot, 3, 9], [CK.gold_block, 1, 2], [I.Diamond, 1, 2], [I.Arrow, 5, 16], [B.Magma, 2, 5], [I.CookedPorkchop, 2, 5], [CK.gilded_blackstone, 1, 4]],
       igloo: [[I.Apple, 1, 3], [I.Coal, 1, 4], [I.GoldNugget, 1, 3], [I.Emerald, 1, 1], [I.StoneAxe, 1, 1]],
       hut: [[I.RottenFlesh, 1, 4], [I.Bone, 1, 3], [I.Redstone, 1, 4], [I.GlowstoneDust, 1, 4]],
     }[kind] || [];
@@ -1286,6 +1321,62 @@ export class Game {
   }
 
   /** A villager's offers, by profession: [[inputs...], output, count]. */
+  // ---------------------------------------------------------------- bounties (not in Minecraft)
+
+  /** Today's job from a villager of this profession: bring items, or hunt monsters. Seeded by world and day. */
+  bountyOffer(prof) {
+    const day = this.tod ? this.tod.day : 0;
+    let s = (this.meta.seed ^ Math.imul(day + 1, 2654435761) ^ Math.imul(prof.length * 31 + prof.charCodeAt(0), 40503)) >>> 0;
+    const rnd = () => { s = (Math.imul(s ^ (s >>> 15), 2246822519) + 374761393) >>> 0; return (s >>> 8) / 16777216; };
+    const hunts = [['husk', 'husks', 3, 6], ['skeleton', 'skeletons', 3, 5], ['spider', 'spiders', 3, 5], ['creeper', 'creepers', 2, 4], [null, 'monsters', 6, 10]];
+    const brings = {
+      farmer: [[I.Wheat, 16, 32], [I.Apple, 3, 6], [CK.pumpkin, 4, 8]], toolsmith: [[I.Coal, 12, 24], [I.IronIngot, 4, 8]],
+      butcher: [[I.RawChicken, 4, 8], [I.Beef, 4, 8], [I.Cod, 4, 8]], shepherd: [[CK.white_wool, 8, 16], [I.String, 6, 12]],
+      weaponsmith: [[I.IronIngot, 4, 10], [I.GoldIngot, 3, 6]], fletcher: [[I.Feather, 6, 12], [I.Flint, 6, 12], [I.Stick, 24, 48]],
+    }[prof] || [[I.Bread, 3, 6]];
+    const hunt = prof === 'weaponsmith' || prof === 'fletcher' || rnd() < 0.35;
+    if (hunt) {
+      const [mob, label, lo, hi] = hunts[Math.floor(rnd() * hunts.length)], n = lo + Math.floor(rnd() * (hi - lo + 1));
+      return { id: `${day}:${prof}`, kind: 'hunt', mob, n, text: `Slay ${n} ${label}`, reward: 3 + Math.floor(n * 0.8), xp: 8 + n * 3, got: 0 };
+    }
+    const opts = brings.filter(([it]) => it && ITEMS[it]), [item, lo, hi] = opts[Math.floor(rnd() * opts.length)], n = lo + Math.floor(rnd() * (hi - lo + 1));
+    return { id: `${day}:${prof}`, kind: 'bring', item, n, text: `Bring ${n} ${itemName(item)}`, reward: 2 + Math.ceil(n / 6), xp: 6 + n, got: 0 };
+  }
+
+  acceptBounty(b) {
+    if (this.meta.bounty) return false;
+    if ((this.meta.bountiesDone || []).includes(b.id)) return false;
+    this.meta.bounty = { ...b };
+    this.emit('toast', `Bounty taken: ${b.text}`); this.emit('hud');
+    return true;
+  }
+
+  /** A bring-bounty is handed in at any villager; a hunt pays out as soon as it is done. */
+  finishBounty() {
+    const b = this.meta.bounty;
+    if (!b) return false;
+    if (b.kind === 'bring') { if (this.inventory.count(b.item) < b.n) return false; this.inventory.remove(b.item, b.n); }
+    else if (b.got < b.n) return false;
+    this.meta.bounty = null;
+    this.meta.bountiesDone = [...(this.meta.bountiesDone || []).slice(-40), b.id];
+    this.meta.bountyCount = (this.meta.bountyCount || 0) + 1;
+    if (this.inventory.add(I.Emerald, b.reward)) { const e = this.player.eye(); this.spawnItem(I.Emerald, b.reward, e, [0, 2, 0]); }
+    this.giveXp(b.xp, this.player.eye());
+    this.emit('toast', `Bounty complete! +${b.reward} emeralds`);
+    this.advance('bounty');
+    this.emit('hud');
+    return true;
+  }
+
+  /** Called when the player kills a hostile mob. */
+  bountyKill(m) {
+    const b = this.meta && this.meta.bounty;
+    if (!b || b.kind !== 'hunt' || b.got >= b.n) return;
+    if (b.mob && (m.def.base || m.type) !== b.mob && m.type !== b.mob) return;
+    b.got++;
+    if (b.got >= b.n) this.finishBounty(); else this.emit('hud');
+  }
+
   trades(prof) {
     const R = (inputs, out, count) => ({ inputs, out, count, name: itemName(out) });
     const E = I.Emerald;
@@ -1316,7 +1407,7 @@ export class Game {
   }
   takeOne(d) {
     const range = d.kind === 'furnace' ? [2] : d.slots.map((_, i) => i);
-    for (const i of range) { const t = d.slots[i]; if (t) { t.count--; if (t.count <= 0) d.slots[i] = null; return { item: t.item, count: 1, wear: t.wear }; } }
+    for (const i of range) { const t = d.slots[i]; if (t) { t.count--; if (t.count <= 0) d.slots[i] = null; return { item: t.item, count: 1, wear: t.wear, ench: t.ench }; } }
     return null;
   }
   updateHoppers() {
@@ -1373,7 +1464,7 @@ export class Game {
         return;
       }
     } else if (this.insertInto(fx, fy, fz, s, st)) { take(); return; }     // droppers feed containers
-    this.spawnItem(s.item, 1, [x + 0.5 + dir[0] * 0.7, y + 0.35 + dir[1] * 0.7, z + 0.5 + dir[2] * 0.7], [dir[0] * 5 + (Math.random() - 0.5), dir[1] * 5 + 1.5, dir[2] * 5 + (Math.random() - 0.5)], s.wear, 0.4);
+    this.spawnItem(s.item, 1, [x + 0.5 + dir[0] * 0.7, y + 0.35 + dir[1] * 0.7, z + 0.5 + dir[2] * 0.7], [dir[0] * 5 + (Math.random() - 0.5), dir[1] * 5 + 1.5, dir[2] * 5 + (Math.random() - 0.5)], s, 0.4);
     take();
     this.audio.click();
   }
@@ -1462,8 +1553,8 @@ export class Game {
     const key = this.bkey(...pos), g = this.meta.graves && this.meta.graves[key], inv = this.inventory;
     if (!g) { if (!broken) this.world.setBlock(...pos, B.Air); return; }
     delete this.meta.graves[key];
-    g.slots.forEach((s, i) => { if (!s) return; if (!inv.slots[i]) inv.slots[i] = s; else if (inv.add(s.item, s.count, s)) this.spawnItem(s.item, s.count, [pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5], [0, 2, 0], s.wear); });
-    g.armor.forEach((s, i) => { if (!s) return; if (!inv.armor[i]) inv.armor[i] = s; else if (inv.add(s.item, 1, s)) this.spawnItem(s.item, 1, [pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5], [0, 2, 0], s.wear); });
+    g.slots.forEach((s, i) => { if (!s) return; if (!inv.slots[i]) inv.slots[i] = s; else if (inv.add(s.item, s.count, s)) this.spawnItem(s.item, s.count, [pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5], [0, 2, 0], s); });
+    g.armor.forEach((s, i) => { if (!s) return; if (!inv.armor[i]) inv.armor[i] = s; else if (inv.add(s.item, 1, s)) this.spawnItem(s.item, 1, [pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5], [0, 2, 0], s); });
     inv.changed(); this.emit('hud');
     if (!broken) this.world.setBlock(...pos, B.Air);
     this.spawnEmbers([pos[0] + 0.5, pos[1] + 0.8, pos[2] + 0.5], 20, [0.8, 0.9, 1.4]);
@@ -1506,6 +1597,7 @@ export class Game {
       this.stats.hunger -= 3;
     }
     const to = [ws.x + 0.5, ws.y, ws.z + 1.5];
+    this.advance('waystone');
     if ((ws.dim || 0) !== (this.dim || 0)) this.travel(ws.dim, to, this.player.yaw, () => { this.player.teleport(to); });
     else { this.player.teleport(to, this.player.yaw, 0); this.state = 'loading'; this.needGround = false; this.emit('state', 'loading'); }
     this.audio.place(B.Obsidian);
@@ -1521,6 +1613,92 @@ export class Game {
     m.bags[s.wear] = m.bags[s.wear] || { kind: 'chest', slots: new Array(27).fill(null) };
     this.openStation({ kind: 'chest', name: 'Backpack', bag: s.wear, data: m.bags[s.wear] });
     this.audio.place(B.Planks);
+  }
+
+  // ---------------------------------------------------------------- fishing
+
+  /** Right-click with a rod: cast the bobber, or reel it in (with a catch if something is biting). */
+  useRod() {
+    const pl = this.player;
+    if (this.fishing) { this.reelIn(); return; }
+    const e = pl.eye(), d = pl.forward();
+    this.fishing = { p: [e[0] + d[0] * 0.6, e[1] + d[1] * 0.6 - 0.1, e[2] + d[2] * 0.6], v: [d[0] * 13, d[1] * 13 + 3, d[2] * 13], inWater: false, wait: 0, bite: 0, t: 0 };
+    this.audio.shoot('arrow'); this.swing = 1;
+  }
+
+  reelIn() {
+    const f = this.fishing, pl = this.player;
+    this.fishing = null; this.swing = 1;
+    if (!f) return;
+    if (f.bite > 0) {
+      const r = Math.random(), e = pl.eye();
+      let item, n = 1, extra;
+      if (r < 0.6) item = I.Cod;
+      else if (r < 0.85) item = I.Salmon;
+      else if (r < 0.95) item = [I.String, I.Bone, I.Leather, I.Stick, I.RottenFlesh][Math.floor(Math.random() * 5)];
+      else {
+        // treasure
+        const t = Math.floor(Math.random() * 4);
+        if (t === 0) { item = I.Emerald; n = 1 + Math.floor(Math.random() * 3); }
+        else if (t === 1) item = I.Diamond;
+        else if (t === 2) { item = I.Bow; extra = { wear: Math.floor(Math.random() * 200), ench: { power: 1 + Math.floor(Math.random() * 3), unbreaking: 1 } }; }
+        else { item = I.FishingRod; extra = { wear: 0, ench: { unbreaking: 3 } }; }
+        this.emit('toast', 'Treasure!');
+      }
+      const dx = e[0] - f.p[0], dy = e[1] - f.p[1], dz = e[2] - f.p[2];
+      this.spawnItem(item, n, [f.p[0], f.p[1] + 0.3, f.p[2]], [dx * 1.1, dy * 1.1 + Math.hypot(dx, dz) * 0.35 + 3, dz * 1.1], extra, 0.2);
+      this.giveXp(1 + Math.floor(Math.random() * 6), f.p);
+      if (item === I.Cod || item === I.Salmon) this.advance('fish');
+      this.audio.splash();
+    }
+    if (!this.creative && this.inventory.heldItem && this.inventory.heldItem.id === I.FishingRod && (f.inWater || f.stuck) && this.inventory.wearHeld()) this.emit('toast', 'Fishing rod broke');
+  }
+
+  updateFishing(dt) {
+    const f = this.fishing;
+    if (!f) return;
+    const def = this.inventory.heldItem, w = this.world;
+    if (!def || def.id !== I.FishingRod || this.state === 'dead') { this.fishing = null; return; }
+    f.t += dt;
+    const eye = this.player.eye();
+    if (!f.inWater && !f.stuck) {
+      f.v[1] -= 20 * dt;
+      for (let k = 0; k < 3; k++) f.p[k] += f.v[k] * dt;
+      const here = w.getBlock(Math.floor(f.p[0]), Math.floor(f.p[1]), Math.floor(f.p[2]));
+      if (isWater(here)) {
+        f.inWater = true;
+        let y = Math.floor(f.p[1]);
+        while (isWater(w.getBlock(Math.floor(f.p[0]), y + 1, Math.floor(f.p[2])))) y++;
+        f.surface = y + 1;
+        f.wait = (4 + Math.random() * 14) * (this.weather && this.weather.current >= 2 && this.weather.current <= 4 ? 0.7 : 1);   // they bite more in the rain
+        this.audio.splash();
+        this.spawnEmbers([f.p[0], f.surface, f.p[2]], 6, [0.6, 0.8, 1.2]);
+      } else if (here > 0 && BLOCKS[here] && (BLOCKS[here].flags & F.Solid)) { f.stuck = true; f.v = [0, 0, 0]; }
+      if (f.t > 5 && !f.inWater) { this.fishing = null; return; }
+    } else if (f.inWater) {
+      const want = f.surface - 0.1 + Math.sin(f.t * 3) * 0.03 - (f.bite > 0 ? 0.28 : 0);
+      f.p[1] += (want - f.p[1]) * Math.min(1, dt * 10);
+      if (f.bite > 0) { f.bite -= dt; if (f.bite <= 0) f.wait = 3 + Math.random() * 10; }
+      else {
+        f.wait -= dt;
+        // a fish swims in: a trail of ripples closing on the bobber
+        if (f.wait < 2.5 && f.wait > 0) {
+          const a = f.ang ?? (f.ang = Math.random() * Math.PI * 2), r = f.wait * 1.2;
+          if (Math.random() < dt * 20) this.particles.break.push({ p: [f.p[0] + Math.cos(a) * r, f.surface + 0.02, f.p[2] + Math.sin(a) * r], v: [0, 0.2, 0], life: 0.5, size: 0.05, c: [0.8, 0.9, 1.1], sky: 1, blk: 0.5 });
+        }
+        if (f.wait <= 0) { f.bite = 1.1; f.ang = null; this.audio.splash(); this.spawnEmbers([f.p[0], f.surface, f.p[2]], 10, [0.7, 0.9, 1.3]); }
+      }
+    }
+    if (Math.hypot(f.p[0] - eye[0], f.p[2] - eye[2]) > 36) { this.fishing = null; return; }
+    // the line (sagging a little) and the red and white bobber: motes that live for one frame
+    const life = dt * 1.5 + 0.001;
+    const hand = [eye[0] + Math.cos(this.player.yaw) * 0.35, eye[1] - 0.35, eye[2] - Math.sin(this.player.yaw) * 0.35];
+    for (let k = 1; k < 28; k++) {
+      const s = k / 28, sag = Math.sin(s * Math.PI) * (f.inWater ? 0.6 : 0.15);
+      this.particles.break.push({ p: [hand[0] + (f.p[0] - hand[0]) * s, hand[1] + (f.p[1] + 0.12 - hand[1]) * s - sag, hand[2] + (f.p[2] - hand[2]) * s], v: [0, 0, 0], life, size: 0.012, c: [0.85, 0.85, 0.85], sky: 1, blk: 0.5 });
+    }
+    this.particles.break.push({ p: [f.p[0], f.p[1] + 0.02, f.p[2]], v: [0, 0, 0], life, size: 0.09, c: [1.3, 0.12, 0.1], sky: 1, blk: 0.5 });
+    this.particles.break.push({ p: [f.p[0], f.p[1] + 0.13, f.p[2]], v: [0, 0, 0], life, size: 0.07, c: [1.3, 1.3, 1.3], sky: 1, blk: 0.5 });
   }
 
   /** The grappling hook: fire, catch on a block up to 32 away, get reeled in. */
@@ -1804,6 +1982,7 @@ export class Game {
     const near = this.mobs.list.some((m) => !m.dead && m.def.kind === 'hostile' && Math.hypot(m.body.pos[0] - x, m.body.pos[1] - y, m.body.pos[2] - z) < 8);
     if (near) { this.emit('toast', 'You may not rest now; there are monsters nearby'); return; }
     this.sleeping = 1.6;
+    this.advance('sleep');
     this.emit('toast', 'Sleeping…');
     setTimeout(() => {
       if (this.tod) { if (this.tod.hour > 12) this.tod.day++; this.tod.hour = 6.2; }
@@ -1829,6 +2008,8 @@ export class Game {
     const w = this.world, fam = famOf(hit.block), [hx, hy, hz] = hit.hit;
     // blocks with a screen
     if (hit.block === CK.crafting_table) { this.openStation({ kind: 'table' }); return true; }
+    if (fam && fam === FAM.enchanting_table) { this.openStation({ kind: 'enchant', name: 'Enchanting Table', slot: this.inventory.selected }); this.audio.click(); return true; }
+    if (fam && fam === FAM.anvil) { this.openStation({ kind: 'anvil', name: 'Anvil', slot: this.inventory.selected }); this.audio.place(B.Stone); return true; }
     if (hit.block === CK.furnace || hit.block === CK.lit_furnace) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Furnace' }); return true; }
     if (hit.block === CK.smoker) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Smoker' }); return true; }
     if (hit.block === CK.blast_furnace) { this.openStation({ kind: 'furnace', pos: hit.hit, name: 'Blast Furnace' }); return true; }
@@ -1888,6 +2069,7 @@ export class Game {
       }
       case K.Rail: return f >= 2 ? 0 : 1;
       case K.Repeater: return f;
+      case K.Anvil: return f;
       case K.Lever: return hit.face === 2 ? 4 : hit.face === 3 ? 5 : opposite(facingFromFace(hit.face));
       case K.RTorch: {
         if (hit.face === 2) { const b = w.getBlock(pos[0], pos[1] - 1, pos[2]); return b > 0 && (BLOCKS[b].flags & F.Solid) ? 0 : -1; }
@@ -2159,6 +2341,7 @@ export class Game {
     if (def.id === I.Bow) return;       // drawn while the button is held (interact)
     if (def.id === I.Backpack) { this.openBackpack(); return; }
     if (def.id === I.GrapplingHook) { this.fireGrapple(); return; }
+    if (def.id === I.FishingRod) { this.useRod(); return; }
     if (def.id === I.SleepingBag) { this.sleep(this.player.body.pos.map(Math.floor), true); return; }
     if (def.summons) {
       if (this.mobs.list.some((m) => m.def.boss && !m.dead)) { this.emit('toast', 'A boss is already here'); return; }
@@ -2313,6 +2496,53 @@ export class Game {
   }
 
   /** Floating spores, ash and embers around the camera. */
+  /** Fireflies over forests, plains and swamps on dry nights; butterflies on sunny days (not in Minecraft). */
+  updateFauna(dt) {
+    const list = this.particles.flies || (this.particles.flies = []);
+    const e = this.player.eye(), w = this.world, s = this.skyNow || this.tod.state, q = this.settings.particles ?? 1;
+    const clim = this.dim === Dim.Overworld ? w.climateAt(Math.floor(e[0]), Math.floor(e[2])) : null;
+    const bio = clim ? clim.biome : -1, day = s.daylight ?? 1;
+    const rain = this.weather && this.weather.current >= 2 && this.weather.current <= 4;
+    let want = 0, kind = null;
+    if (clim && !rain && [Biome.Forest, Biome.DenseForest, Biome.Swamp, Biome.Jungle, Biome.Plains, Biome.Taiga].includes(bio)) {
+      if (day < 0.3) { want = bio === Biome.Swamp ? 140 : 80; kind = 'firefly'; }
+      else if (day > 0.6 && bio !== Biome.Taiga && bio !== Biome.Swamp) { want = 16; kind = 'butterfly'; }
+    }
+    want = Math.floor(want * q);
+    // the ground below eye level (not the canopy), with air above it
+    const ground = (x, z) => {
+      const X = Math.floor(x), Z = Math.floor(z);
+      for (let y = Math.floor(e[1]) + 1; y > e[1] - 14; y--) {
+        const b = w.getBlock(X, y, Z);
+        if (b < 0) return null;
+        if (BLOCKS[b].flags & F.Solid || isWater(b)) { const up = w.getBlock(X, y + 1, Z); return up === B.Air || (up > 0 && !(BLOCKS[up].flags & F.Solid) && !isWater(up)) ? y + 1 : null; }
+      }
+      return null;
+    };
+    for (let t = 0; t < 3 && list.length < want; t++) {
+      const x = e[0] + (Math.random() - 0.5) * 30, z = e[2] + (Math.random() - 0.5) * 30, g = ground(x, z);
+      if (g == null) continue;
+      const c = kind === 'firefly' ? [3.2, 4.2, 0.7] : [[1.0, 0.5, 0.08], [0.95, 0.95, 0.9], [0.3, 0.5, 1.1], [1.0, 0.85, 0.15], [0.9, 0.35, 0.8]][Math.floor(Math.random() * 5)];
+      list.push({ kind, p: [x, g + 0.4 + Math.random() * 2, z], home: g + (kind === 'firefly' ? 0.8 + Math.random() * 1.5 : 1 + Math.random()), ph: Math.random() * 6.28, life: 10 + Math.random() * 14, size: 0.04, c, a: 0, dir: Math.random() * 6.28 });
+    }
+    for (let i = list.length - 1; i >= 0; i--) {
+      const f = list[i];
+      f.life -= dt * (f.kind === kind ? 1 : 4); f.ph += dt;   // the wrong kind for the hour fades out quickly
+      if (f.kind === 'firefly') {
+        f.p[0] += Math.sin(f.ph * 0.6 + i) * 0.35 * dt; f.p[2] += Math.cos(f.ph * 0.45 + i) * 0.35 * dt;
+        f.p[1] += (f.home - f.p[1]) * 0.3 * dt + Math.sin(f.ph * 1.3) * 0.15 * dt;
+        f.a = (0.15 + 0.85 * Math.pow(Math.max(0, Math.sin(f.ph * 1.6 + i * 1.7)), 1.5)) * Math.min(1, f.life);   // they blink
+        f.size = 0.06 + 0.06 * f.a;
+      } else {
+        f.dir += (Math.random() - 0.5) * 3 * dt;
+        f.p[0] += Math.cos(f.dir) * 0.9 * dt; f.p[2] += Math.sin(f.dir) * 0.9 * dt;
+        f.p[1] += Math.sin(f.ph * 9) * 0.8 * dt + (f.home - f.p[1]) * 0.5 * dt;
+        f.a = Math.min(1, f.life); f.size = 0.05 + 0.1 * Math.abs(Math.sin(f.ph * 14));   // wings beating
+      }
+      if (f.life <= 0 || Math.abs(f.p[0] - e[0]) > 26 || Math.abs(f.p[2] - e[2]) > 26) list.splice(i, 1);
+    }
+  }
+
   updateMotes(dt) {
     const list = this.particles.motes || (this.particles.motes = []);
     const e = this.player.eye(), w = this.world;
@@ -2338,6 +2568,121 @@ export class Game {
     }
   }
 
+  // ---------------------------------------------------------------- experience, enchanting and the anvil
+
+  /** Awards an advancement once per world (survival only). */
+  advance(id) {
+    const m = this.meta;
+    if (!m || this.creative || m.arena || m.menu || !ADV_BY_ID[id]) return;
+    m.advancements = m.advancements || {};
+    if (m.advancements[id]) return;
+    m.advancements[id] = (this.tod ? this.tod.day : 0) + 1;
+    this.emit('advancement', ADV_BY_ID[id]);
+    this.audio.levelUp();
+  }
+
+  checkAdvancements() {
+    const m = this.meta, inv = this.inventory;
+    if (!m || this.creative || m.arena || m.menu || !inv || this.state !== 'playing') return;
+    const done = m.advancements || {};
+    for (const a of ADVANCEMENTS) {
+      if (done[a.id]) continue;
+      if ((a.have && inv.slots.some((s) => s && a.have(s))) || (a.dim != null && this.dim === a.dim) || (a.level && this.stats.level >= a.level)
+        || (a.armor === 1 && inv.armor.some(Boolean)) || (a.armor === 'diamond' && inv.armor.every((s) => s && ITEMS[s.item].name.startsWith('Diamond')))) this.advance(a.id);
+    }
+    const beaten = m.bossesDefeated || {};
+    if (['king_slime', 'inferno_spirit', 'hollow_king', 'frost_colossus', 'storm_ghast'].every((k) => beaten[k])) this.advance('bosses');
+  }
+
+  giveXp(n, pos) {
+    if (this.creative || !(n > 0) || !this.stats) return;
+    const up = this.stats.addXp(n);
+    if (pos) this.spawnEmbers(pos, Math.min(14, 3 + n), [0.8, 1.8, 0.3]);
+    this.audio.orb();
+    if (up) { this.audio.levelUp(); if (this.stats.level % 5 === 0) this.emit('toast', `Level ${this.stats.level}!`); }
+    this.emit('hud');
+  }
+
+  /** The table's three offers for the item in a slot. */
+  enchantOffersFor(slot) {
+    const s = this.inventory.slots[slot];
+    if (!s || s.ench || !enchantKind(s.item)) return [];
+    if (!this.meta.enchSeed) this.meta.enchSeed = (Math.random() * 2 ** 31) | 0;
+    return enchantOffers(s.item, this.meta.enchSeed);
+  }
+
+  /** Takes offer k for the item in a slot: needs its level, costs 1-3 levels and as much lapis. */
+  enchantSlot(slot, k) {
+    const inv = this.inventory, s = inv.slots[slot], o = this.enchantOffersFor(slot)[k];
+    if (!s || !o || !Object.keys(o.ench).length) return false;
+    if (!this.creative) {
+      if (this.stats.level < o.levels || inv.count(I.LapisLazuli) < o.lapis) return false;
+      this.stats.spendLevels(o.lapis); inv.remove(I.LapisLazuli, o.lapis);
+    }
+    s.ench = { ...o.ench };
+    this.advance('enchant');
+    this.meta.enchSeed = (Math.random() * 2 ** 31) | 0;
+    const e = this.player.eye();
+    this.spawnEmbers([e[0], e[1] - 0.4, e[2]], 30, [1.2, 0.6, 1.9]);
+    this.audio.enchant();
+    this.emit('toast', `${ITEMS[s.item].name}: ${enchText(s.ench)}`);
+    inv.changed(); this.emit('hud');
+    return true;
+  }
+
+  /** What an item is mended with at the anvil. */
+  repairMaterial(item) {
+    const d = ITEMS[item];
+    if (!d || !d.durability) return null;
+    if (item === I.Bow) return I.String;
+    if (d.kind === Kind.Armor) return { Leather: I.Leather, Golden: I.GoldIngot, Iron: I.IronIngot, Diamond: I.Diamond }[d.name.split(' ')[0]] || null;
+    if (d.kind === Kind.Tool) return [null, 'planks', B.Cobblestone, I.IronIngot, I.Diamond][d.tier] || null;
+    return null;
+  }
+
+  /** The anvil's jobs for the item in a slot: mend it with its material, or combine it with a second one. */
+  anvilOptions(slot) {
+    const inv = this.inventory, s = inv.slots[slot], d = s && ITEMS[s.item];
+    if (!d || !d.durability) return [];
+    const out = [], mat = this.repairMaterial(s.item), quarter = Math.ceil(d.durability / 4);
+    if (mat && s.wear > 0) {
+      const units = Math.max(1, Math.min(Math.ceil(s.wear / quarter), this.creative ? 4 : inv.count(mat)));
+      out.push({ kind: 'repair', label: `Repair (+${Math.min(100, units * 25)}%)`, levels: 1 + (s.ench ? 1 : 0), inputs: [[mat, units]], units });
+    }
+    const j = inv.slots.findIndex((o, i) => o && i !== slot && o.item === s.item);
+    if (j >= 0) {
+      const o = inv.slots[j], extra = Object.values(o.ench || {}).reduce((a, v) => a + v, 0);
+      out.push({ kind: 'combine', label: `Combine with a second ${d.name}${o.ench ? ` (${enchText(o.ench)})` : ''}`, levels: 2 + extra, inputs: [], other: j });
+    }
+    return out;
+  }
+
+  anvilUse(slot, k) {
+    const inv = this.inventory, s = inv.slots[slot], o = this.anvilOptions(slot)[k], d = s && ITEMS[s.item];
+    if (!o) return false;
+    if (!this.creative) {
+      if (this.stats.level < o.levels || !o.inputs.every(([it, n]) => inv.count(it) >= n)) return false;
+      this.stats.spendLevels(o.levels);
+      for (const [it, n] of o.inputs) inv.remove(it, n);
+    }
+    if (o.kind === 'repair') s.wear = Math.max(0, s.wear - o.units * Math.ceil(d.durability / 4));
+    else {
+      const t = inv.slots[o.other];
+      s.wear = Math.max(0, d.durability - ((d.durability - (s.wear || 0)) + (d.durability - (t.wear || 0)) + Math.floor(d.durability * 0.12)));
+      const ench = { ...(s.ench || {}) };
+      for (const [key, v] of Object.entries(t.ench || {})) {
+        if (ENCHANTS[key] && ENCHANTS[key].clash && ench[ENCHANTS[key].clash]) continue;
+        ench[key] = ench[key] === v ? Math.min(ENCHANTS[key] ? ENCHANTS[key].max : v, v + 1) : Math.max(ench[key] || 0, v);
+      }
+      if (Object.keys(ench).length) s.ench = ench;
+      inv.slots[o.other] = null;
+    }
+    this.audio.place(B.Stone); this.audio.anvil(); this.advance('anvil');
+    this.emit('toast', `${d.name} ${o.kind === 'repair' ? 'repaired' : 'combined'}`);
+    inv.changed(); this.emit('hud');
+    return true;
+  }
+
   // ---------------------------------------------------------------- item entities
 
   spawnItem(item, count, pos, vel, wear, delay = 0.5) {
@@ -2345,7 +2690,8 @@ export class Game {
     const body = new VoxelBody();
     body.half = 0.125; body.height = 0.25;
     body.pos = [...pos]; body.vel = [...vel];
-    this.entities.push({ item, count, wear, body, age: 0, pickup: delay, rot: Math.random() * 6.28 });
+    const extra = wear && typeof wear === 'object' ? wear : { wear };   // a stack (wear and enchantments) or just its wear
+    this.entities.push({ item, count, wear: extra.wear, ench: extra.ench, body, age: 0, pickup: delay, rot: Math.random() * 6.28 });
   }
 
   updateEntities(dt) {
@@ -2373,7 +2719,7 @@ export class Game {
       const touching = Math.abs(dx) < 1.3 && Math.abs(dz) < 1.3 && b.pos[1] > eye[1] - 0.75 && b.pos[1] < eye[1] + 2.3;
       if (e.pickup <= 0 && this.state !== 'dead') {
         if (touching || d < 1.4) {
-          const left = this.inventory.add(e.item, e.count, { wear: e.wear });
+          const left = this.inventory.add(e.item, e.count, { wear: e.wear, ench: e.ench });
           if (left < e.count) { this.audio.pop(); this.emit('pickup', e.item, e.count - left); }
           e.count = left;
           if (left <= 0) { this.entities.splice(i, 1); continue; }
@@ -2476,7 +2822,8 @@ export class Game {
       if (w.isSolidAt(Math.floor(nx), Math.floor(ny), Math.floor(nz))) { p.v[0] *= 0.3; p.v[2] *= 0.3; p.v[1] = 0; }
       else { p.p[0] = nx; p.p[1] = ny; p.p[2] = nz; }
     }
-    if (!this.openSky()) { this.updateMotes(dt); this.particles.rain.length = 0; this.particles.snow.length = 0; return; }
+    if (!this.openSky()) { this.updateMotes(dt); this.particles.rain.length = 0; this.particles.snow.length = 0; if (this.particles.flies) this.particles.flies.length = 0; return; }
+    this.updateFauna(dt);
     // precipitation around the camera, only where the sky is open
     const wp = this.weather.params, eye = this.player.eye();
     const clim = w.climateAt(Math.floor(eye[0]), Math.floor(eye[2]));
@@ -2509,12 +2856,13 @@ export class Game {
     const s = this.skyNow || this.tod.state;
     const amb = s.ambUp.map((a, i) => a * 0.7 + s.lightColor[i] * 0.35);
     const groups = [];
-    const pack = (list, color, size, stretch, round) => {
+    const pack = (list, color, size, stretch, round, name) => {
       const n = list.length;
       if (!n) return;
-      const data = (this.packBufs = this.packBufs || {})[round ? 'r' : stretch ? 's' : 'b'];
+      const key = name || (round ? 'r' : stretch ? 's' : 'b');
+      const data = (this.packBufs = this.packBufs || {})[key];
       let buf = data && data.length >= n * 8 ? data : new Float32Array(Math.max(n * 8, 1024));
-      this.packBufs[round ? 'r' : stretch ? 's' : 'b'] = buf;
+      this.packBufs[key] = buf;
       for (let i = 0; i < n; i++) {
         const p = list[i], o = i * 8;
         buf[o] = p.p[0]; buf[o + 1] = p.p[1]; buf[o + 2] = p.p[2]; buf[o + 3] = p.size || size;
@@ -2535,7 +2883,9 @@ export class Game {
     const wind = this.windVec || [0, 0];
     pack(this.particles.rain, () => [amb[0] * 0.55, amb[1] * 0.6, amb[2] * 0.7, 0.32], 0.012, [-wind[0] * 0.03 * 3, 0.42, -wind[1] * 0.03 * 3], false);
     pack(this.particles.snow, () => [amb[0] * 0.95, amb[1] * 0.95, amb[2], 0.9], 0.045, null, true);
-    if (this.particles.motes && this.particles.motes.length) pack(this.particles.motes, (p) => [p.c[0], p.c[1], p.c[2], Math.min(1, p.life) * p.a], 0.03, null, true);
+    if (this.particles.motes && this.particles.motes.length) pack(this.particles.motes, (p) => [p.c[0], p.c[1], p.c[2], Math.min(1, p.life) * p.a], 0.03, null, true, 'm');
+    // fireflies glow on their own; butterflies are lit by the sky
+    if (this.particles.flies && this.particles.flies.length) pack(this.particles.flies, (p) => p.kind === 'firefly' ? [p.c[0] * p.a, p.c[1] * p.a, p.c[2] * p.a, p.a] : [p.c[0] * amb[0] * 1.3, p.c[1] * amb[1] * 1.3, p.c[2] * amb[2] * 1.3, p.a], 0.04, null, true, 'f');
     return groups;
   }
 

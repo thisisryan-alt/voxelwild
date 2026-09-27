@@ -219,6 +219,46 @@ spawning, and hands out a loadout (iron armour, a diamond sword, a bow and arrow
 a Bottle). Waves heal and restock the player; a death retries the wave; the end shows the time. `game.startArena`,
 `updateArena`; `node test/arena.mjs`.
 
+## Experience, enchanting, the anvil and pets
+
+- **Experience** (Minecraft's curve, `shared/enchant.js` `xpToNext`): killing mobs (5 for monsters, 1-3 for animals,
+  100 for a boss), mining coal, lapis, redstone, quartz, diamond and emerald ore, and trading. A green bar and level
+  number sit above the hotbar; dying loses half your levels. Saved with the survival stats.
+- **Enchanting table** (4 obsidian, 2 diamonds, 3 lapis): pick a tool, weapon, bow or armour piece and one of three
+  seeded offers (level 5 / 15 / 30 needed, costing 1-3 levels and as much lapis). Sharpness, Fire Aspect, Looting,
+  Knockback, Efficiency, Fortune, Silk Touch, Unbreaking, Protection, Feather Falling, Power, Infinity - all wired
+  into combat, mining speed, drops, wear, damage and the bow. Enchanted items shimmer in slots; tooltips list them;
+  enchantments survive dropping, chests, hoppers and dispensers.
+- **Anvil** (3 iron blocks, 4 iron ingots): repair an item with its material (planks, cobblestone, iron, diamond,
+  leather, gold, string) or merge two of the same item (durability plus a bonus, enchantments combined).
+- **Combat feel**: critical hits when falling (x1.5, sparks), floating damage numbers (Controls > Damage numbers),
+  an attack-cooldown bar under the crosshair, and a synthesized boss-fight music loop that fades in near a boss
+  (Audio > Boss Music).
+- **Wolves** now also roam forests. Feed one bones to tame it (1 in 3): it follows you (teleporting when left behind,
+  even across dimensions), sits or stands on right-click, heals on meat, and attacks whatever you hit or any monster
+  near you. Tamed wolves are kept in `meta.pets` and come back when you return. `node test/enchant.mjs`,
+  `node test/pets.mjs`.
+- **Fishing** (rod: 3 sticks, 2 string): cast into water; a trail of ripples closes in, the bobber dips with a
+  splash, and a right-click in that second lands raw cod or salmon (smeltable), junk, or treasure (emeralds, a
+  diamond, an enchanted bow or rod), plus experience. Rain makes fish bite sooner. `game.useRod`, `updateFishing`;
+  `node test/fishing.mjs`.
+- **Advancements** (`shared/advancements.js`): 25 survival milestones from Getting Wood to Monarch of Monsters, with a
+  toast when earned and a list with the day reached under pause > Advancements. Kept in `meta.advancements`.
+- **Golden apples** (an apple and 8 gold ingots; enchanted ones only in dungeon and pyramid chests) can be eaten
+  when full and give regeneration, golden absorption hearts and (enchanted) fire resistance. Vindicators may drop a
+  **Totem of Undying**: in the hotbar it saves you from one death. Effects show above the hotbar.
+- **Bounties** (not in Minecraft): every villager posts a job a day (seeded by world and day) on its trade screen:
+  bring goods (wheat, coal, wool, iron...) or hunt monsters (husks, skeletons, spiders, creepers, anything). One at a
+  time, tracked top-left; hunts pay out on the last kill, deliveries at any villager. Emeralds and experience.
+  `node test/bounty.mjs` (also checks golden apples and the totem).
+- **Wolf variants** from the pack: pale wolves in the taiga, snowy wolves in the snowy taiga, woods wolves in
+  forests, each with its own tamed skin.
+- **Fireflies and butterflies** (not in Minecraft): glowing, blinking fireflies near the ground on dry nights in
+  forests, plains, jungles and (most of all) swamps; butterflies in five colours on sunny days. `game.updateFauna`;
+  `node test/fauna.mjs`.
+- The pause menu scrolls when it is taller than the window (`justify-content: safe center`), so its top buttons can
+  always be reached.
+
 ## Controls
 
 WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·

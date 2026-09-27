@@ -5,6 +5,7 @@
 // fireballs, skeletons burning in daylight. Drops on death.
 import { VoxelBody } from './player.js';
 import { B, BLOCKS, F, I, C, ITEMS, Dim, isWater, isLava, isLiquid, mining } from '../shared/blocks.js';
+import { enchLevel } from '../shared/enchant.js';
 import { Biome } from '../shared/terrain.js';
 import { structuresIn } from '../shared/structures.js';
 import { skyTemples } from '../shared/skylands.js';
@@ -18,7 +19,13 @@ export const MOB_TYPES = {
   pig: { name: 'Pig', health: 10, speed: 1.2, half: 0.45, height: 0.9, kind: 'passive', drops: [[I.Porkchop, 1, 3]] },
   sheep: { name: 'Sheep', health: 8, speed: 1.1, half: 0.45, height: 1.3, kind: 'passive', drops: [[I.Mutton, 1, 2], ['white_wool', 1, 1]] },
   chicken: { name: 'Chicken', health: 4, speed: 1.0, half: 0.2, height: 0.7, kind: 'passive', drops: [[I.RawChicken, 1, 1], [I.Feather, 0, 2]], flutter: true },
-  wolf: { name: 'Wolf', health: 8, speed: 2.4, half: 0.3, height: 0.85, kind: 'neutral', damage: 4, drops: [] },
+  wolf: { name: 'Wolf', health: 8, speed: 2.4, half: 0.3, height: 0.85, kind: 'neutral', damage: 4, drops: [], tameAs: 'wolf_tame' },
+  // biome variants from the texture pack: snowy wolves in the snowy taiga, woods wolves in forests
+  wolf_snowy: { name: 'Snowy Wolf', health: 8, speed: 2.4, half: 0.3, height: 0.85, kind: 'neutral', damage: 4, drops: [], base: 'wolf', tameAs: 'wolf_snowy_tame' },
+  wolf_woods: { name: 'Woods Wolf', health: 8, speed: 2.4, half: 0.3, height: 0.85, kind: 'neutral', damage: 4, drops: [], base: 'wolf', tameAs: 'wolf_woods_tame' },
+  wolf_snowy_tame: { name: 'Tamed Wolf', health: 20, speed: 2.6, half: 0.3, height: 0.85, kind: 'pet', damage: 4, drops: [], base: 'wolf' },
+  wolf_woods_tame: { name: 'Tamed Wolf', health: 20, speed: 2.6, half: 0.3, height: 0.85, kind: 'pet', damage: 4, drops: [], base: 'wolf' },
+  wolf_tame: { name: 'Tamed Wolf', health: 20, speed: 2.6, half: 0.3, height: 0.85, kind: 'pet', damage: 4, drops: [], base: 'wolf' },
   husk: { name: 'Husk', health: 20, speed: 2.3, half: 0.3, height: 1.95, kind: 'hostile', damage: 3, drops: [[I.RottenFlesh, 0, 2]] },
   skeleton: { name: 'Skeleton', health: 20, speed: 2.3, half: 0.3, height: 1.99, kind: 'hostile', ranged: 'arrow', drops: [[I.Bone, 0, 2], [I.Arrow, 0, 2]], burns: true },
   creeper: { name: 'Creeper', health: 20, speed: 2.0, half: 0.3, height: 1.7, kind: 'hostile', explode: 3, drops: [[I.Gunpowder, 0, 2]] },
@@ -30,7 +37,7 @@ export const MOB_TYPES = {
   cave_spider: { name: 'Cave Spider', health: 12, speed: 3.1, half: 0.35, height: 0.5, kind: 'hostile', damage: 2, drops: [[I.String, 0, 2]], base: 'spider' },
   ghast: { name: 'Ghast', health: 10, speed: 1.6, half: 1, height: 2.2, kind: 'hostile', flying: true, ranged: 'ghastball', drops: [[I.GhastTear, 0, 1], [I.Gunpowder, 0, 2]], range: 32 },
   pillager: { name: 'Pillager', health: 24, speed: 2.3, half: 0.3, height: 1.95, kind: 'hostile', ranged: 'arrow', drops: [[I.Arrow, 0, 2]], armsForward: true },
-  vindicator: { name: 'Vindicator', health: 24, speed: 2.6, half: 0.3, height: 1.95, kind: 'hostile', damage: 8, drops: [[I.Emerald, 0, 1]], armsForward: true },
+  vindicator: { name: 'Vindicator', health: 24, speed: 2.6, half: 0.3, height: 1.95, kind: 'hostile', damage: 8, drops: [[I.Emerald, 0, 1], [I.Totem, 0, 1]], armsForward: true },
   slime_big: { name: 'Slime', health: 16, speed: 1.9, half: 1.0, height: 2.0, kind: 'hostile', damage: 4, hop: 1, splits: 'slime_medium', drops: [] },
   slime_medium: { name: 'Slime', health: 4, speed: 1.9, half: 0.5, height: 1.0, kind: 'hostile', damage: 2, hop: 1, splits: 'slime_small', drops: [] },
   slime_small: { name: 'Slime', health: 1, speed: 1.9, half: 0.26, height: 0.52, kind: 'hostile', damage: 0, hop: 1, drops: [[I.SlimeBall, 0, 2]] },
@@ -92,6 +99,7 @@ export class Mobs {
     const g = this.game, w = g.world;
     if (!w || g.state === 'loading') return;
     if ((this.spawnT -= dt) <= 0) { this.spawnT = 0.7; this.trySpawn(); }
+    if ((this.petT = (this.petT ?? 1) - dt) <= 0) { this.petT = 1; this.updatePets(); }
     if ((this.structT = (this.structT ?? 1) - dt) <= 0) { this.structT = 2.5; this.structureSpawns(); }
     const pp = g.player.body.pos;
     for (let i = this.list.length - 1; i >= 0; i--) {
@@ -102,6 +110,54 @@ export class Mobs {
       this.think(m, dt);
     }
     this.updateProjectiles(dt);
+  }
+
+  /** Tamed wolves live in meta.pets: the ones following come along wherever the player goes, sitting ones wait. */
+  updatePets() {
+    const g = this.game, meta = g.meta;
+    if (!meta || !meta.pets || !meta.pets.length || g.state !== 'playing') return;
+    const pp = g.player.body.pos;
+    for (const r of meta.pets) {
+      if (this.list.some((m) => m.pet === r && !m.dead)) continue;
+      if (!r.sitting) { r.dim = g.dim; r.x = pp[0] + (this.rng() - 0.5) * 3; r.y = pp[1] + 0.2; r.z = pp[2] + (this.rng() - 0.5) * 3; }
+      if ((r.dim || 0) !== (g.dim || 0) || Math.hypot(r.x - pp[0], r.z - pp[2]) > 90) continue;
+      const col = g.world.column(Math.floor(r.x) >> 5, Math.floor(r.z) >> 5);
+      if (!col || col.state !== 'ready') continue;
+      const m = this.spawnAt(MOB_TYPES[r.type] ? r.type : 'wolf_tame', [r.x, r.y, r.z]);
+      m.health = r.health || m.def.health; m.pet = r; m.angry = 0;
+    }
+  }
+
+  /** Right-click on a mob: tame a wolf with a bone, feed or sit a tamed one. Returns true when it did something. */
+  interactMob(m) {
+    const g = this.game, inv = g.inventory, held = inv.held, p = m.body.pos;
+    if (m.dead) return false;
+    if (m.def.tameAs && held && held.item === I.Bone) {
+      if (!g.creative) inv.consumeHeld();
+      if (g.creative || this.rng() < 0.34) {
+        const type = m.def.tameAs, r = { type, x: p[0], y: p[1], z: p[2], dim: g.dim, sitting: false, health: MOB_TYPES[type].health };
+        g.meta.pets = [...(g.meta.pets || []), r];
+        m.type = type; m.def = MOB_TYPES[type]; m.health = m.def.health; m.angry = 0; m.provoked = false; m.pet = r;
+        g.spawnEmbers([p[0], p[1] + 1, p[2]], 16, [1.9, 0.35, 0.45]);
+        g.emit('toast', 'You tamed a wolf! Right-click it to make it sit or follow.');
+        g.advance('wolf');
+      } else g.spawnEmbers([p[0], p[1] + 1, p[2]], 8, [0.5, 0.5, 0.5]);
+      return true;
+    }
+    if (m.pet) {
+      const meat = [I.Beef, I.CookedBeef, I.Porkchop, I.CookedPorkchop, I.RawChicken, I.CookedChicken, I.Mutton, I.CookedMutton, I.RottenFlesh, I.Cod, I.Salmon, I.CookedCod, I.CookedSalmon].filter(Boolean);
+      if (held && meat.includes(held.item) && m.health < m.def.health) {
+        m.health = Math.min(m.def.health, m.health + 2 * (ITEMS[held.item].food || 2));
+        if (!g.creative) inv.consumeHeld();
+        g.spawnEmbers([p[0], p[1] + 1, p[2]], 10, [1.9, 0.35, 0.45]); g.audio.eat();
+        return true;
+      }
+      m.pet.sitting = !m.pet.sitting; m.target = null;
+      g.emit('toast', m.pet.sitting ? 'Your wolf sits and waits' : 'Your wolf follows you');
+      g.audio.mobHurt('wolf');
+      return true;
+    }
+    return false;
   }
 
   /** Villages keep their villagers, outposts their pillagers, bastions their brutes; dungeon spawners work. */
@@ -193,8 +249,8 @@ export class Mobs {
           this.spawnGroup('polar_bear', x, h + 1, z, 1 + (this.rng() < 0.3 ? 1 : 0));
           return;
         }
-        if (open && !night && counts.passive < 12 && top === B.Grass && clim && GRASSY.has(clim.biome)) {
-          const kinds = clim.biome === Biome.Taiga || clim.biome === Biome.SnowyTaiga ? ['sheep', 'wolf', 'cow'] : ['cow', 'pig', 'sheep', 'chicken'];
+        if (open && !night && counts.passive < 12 && clim && (top === B.Grass || (top === B.SnowyGrass && clim.biome === Biome.SnowyTaiga)) && GRASSY.has(clim.biome)) {
+          const kinds = clim.biome === Biome.Taiga ? ['sheep', 'wolf', 'cow'] : clim.biome === Biome.SnowyTaiga ? ['sheep', 'wolf_snowy', 'cow'] : clim.biome === Biome.Forest || clim.biome === Biome.DenseForest ? ['cow', 'pig', 'sheep', 'chicken', 'wolf_woods'] : ['cow', 'pig', 'sheep', 'chicken'];
           this.spawnGroup(kinds[Math.floor(this.rng() * kinds.length)], x, h + 1, z, 2 + Math.floor(this.rng() * 3));
           return;
         }
@@ -281,7 +337,30 @@ export class Mobs {
     if (t.dayNeutral && (sky.daylight ?? 0) > 0.5 && !m.provoked) hostile = false;
     const sees = hostile && dist < (t.range || 20) && this.lineOfSight(b.pos[0], b.pos[1] + t.height * 0.85, b.pos[2], pp[0], pp[1] + 1.5, pp[2]);
     let wantX = 0, wantZ = 0, speed = 0;
-    if (m.flee > 0) {
+    if (m.pet) {
+      // a tamed wolf: follows, sits when told, and goes for whatever the player fights or whatever comes close
+      const r = m.pet;
+      hostile = false;
+      r.x = b.pos[0]; r.y = b.pos[1]; r.z = b.pos[2]; r.health = m.health; r.dim = g.dim;
+      m.sit = r.sitting;
+      if (m.target && (m.target.dead || m.target.pet || Math.hypot(m.target.body.pos[0] - b.pos[0], m.target.body.pos[2] - b.pos[2]) > 24)) m.target = null;
+      if (!m.target && !r.sitting) m.target = this.list.find((o) => !o.dead && !o.pet && o !== m && (o === this.lastPlayerTarget || (o.def.kind === 'hostile' && Math.hypot(o.body.pos[0] - pp[0], o.body.pos[2] - pp[2]) < 10))) || null;
+      m.attackT -= dt;
+      if (r.sitting) m.target = null;
+      else if (m.target) {
+        const o = m.target.body.pos, tx = o[0] - b.pos[0], tz = o[2] - b.pos[2], tl = Math.hypot(tx, tz) || 1;
+        wantX = tx / tl; wantZ = tz / tl; speed = t.speed * 1.35;
+        if (tl < m.target.def.half + 1.2 && Math.abs(o[1] - b.pos[1]) < 2.5 && m.attackT <= 0) {
+          m.attackT = 0.8; m.swing = 1;
+          m.target.playerHit = true; m.target.angry = 1;
+          this.hurt(m.target, t.damage, null);
+        }
+      } else {
+        const l = Math.hypot(dx, dz);
+        if (dist > 26 && g.state === 'playing') { b.pos = [pp[0] + (this.rng() - 0.5) * 2, pp[1] + 0.3, pp[2] + (this.rng() - 0.5) * 2]; b.vel = [0, 0, 0]; }
+        else if (l > 3.5) { wantX = dx / l; wantZ = dz / l; speed = t.speed * (l > 8 ? 1.5 : 1); }
+      }
+    } else if (m.flee > 0) {
       m.flee -= dt;
       const l = Math.hypot(dx, dz) || 1;
       wantX = -dx / l; wantZ = -dz / l; speed = t.speed * 1.9;
@@ -485,22 +564,28 @@ export class Mobs {
   // ---------------------------------------------------------------- damage
 
   /** attacker: the player (null for the world). Returns true when it died. */
-  hurt(m, amount, attacker) {
+  hurt(m, amount, attacker, crit) {
     if (m.dead) return false;
     const g = this.game;
     m.health -= amount;
+    if (attacker && attacker === g.player && !m.pet) this.lastPlayerTarget = m;
+    if (attacker && attacker === g.player) { m.playerHit = true; g.emit('dmgNum', [m.body.pos[0], m.body.pos[1] + m.def.height + 0.2, m.body.pos[2]], amount, crit); }
     m.hurtT = 0.4;
     if (attacker) {
       const pp = g.player.body.pos, dx = m.body.pos[0] - pp[0], dz = m.body.pos[2] - pp[2], l = Math.hypot(dx, dz) || 1;
       m.body.vel[0] += dx / l * 6; m.body.vel[2] += dz / l * 6; m.body.vel[1] = Math.max(m.body.vel[1], 5);
       if (m.def.kind === 'passive') m.flee = 4;
+      else if (m.pet) { /* your own wolf forgives you */ }
       else { m.angry = 1; m.provoked = true; }
       if (m.def.group) for (const o of this.list) if (o.type === m.type && Math.hypot(o.body.pos[0] - m.body.pos[0], o.body.pos[2] - m.body.pos[2]) < 16) { o.angry = 1; o.provoked = true; }
     }
-    g.audio.mobHurt(m.type);
+    g.audio.mobHurt(m.def.base || m.type);
     if (attacker && attacker === g.player && m.health > 0) {
       const held = g.inventory && g.inventory.heldItem;
       if (held && held.fire) m.onFire = 4;
+      const hs = g.inventory.held, fa = enchLevel(hs, 'fire_aspect'), kb = enchLevel(hs, 'knockback');
+      if (fa) m.onFire = Math.max(m.onFire || 0, 4 * fa);
+      if (kb) { const pp3 = g.player.body.pos, ex = m.body.pos[0] - pp3[0], ez = m.body.pos[2] - pp3[2], l3 = Math.hypot(ex, ez) || 1; m.body.vel[0] += ex / l3 * 5 * kb; m.body.vel[2] += ez / l3 * 5 * kb; m.body.vel[1] += 2; }
       if (held && held.frost) m.slowT = 4;
       if (held && held.heavy) { const pp2 = g.player.body.pos, ddx = m.body.pos[0] - pp2[0], ddz = m.body.pos[2] - pp2[2], l2 = Math.hypot(ddx, ddz) || 1; m.body.vel[0] += ddx / l2 * 6; m.body.vel[2] += ddz / l2 * 6; }
     }
@@ -513,6 +598,9 @@ export class Mobs {
     }
     if (m.health <= 0) {
       m.dead = 0.001;
+      if (m.pet && g.meta) { g.meta.pets = (g.meta.pets || []).filter((r) => r !== m.pet); g.emit('toast', 'Your wolf died'); }
+      if (m.playerHit && m.def.kind === 'hostile') { g.advance(m.def.boss ? 'boss' : 'hunter'); g.bountyKill(m); }
+      if (m.playerHit) g.giveXp(m.def.boss ? 100 : m.def.kind === 'hostile' ? 5 : 1 + Math.floor(this.rng() * 3), [m.body.pos[0], m.body.pos[1] + 0.5, m.body.pos[2]]);
       if (m.def.splits) {
         const n = 2 + Math.floor(this.rng() * 2);
         for (let k = 0; k < n; k++) {
@@ -520,16 +608,16 @@ export class Mobs {
           c.body.vel = [(this.rng() - 0.5) * 4, 4, (this.rng() - 0.5) * 4];
         }
       }
-      if (attacker || amount >= 1) this.drop(m);
+      if (attacker || amount >= 1) this.drop(m, attacker === g.player ? enchLevel(g.inventory.held, 'looting') : 0);
       return true;
     }
     return false;
   }
 
-  drop(m) {
+  drop(m, looting = 0) {
     const g = this.game, p = m.body.pos;
     for (const [item, lo, hi] of m.def.drops) {
-      const n = lo + Math.floor(this.rng() * (hi - lo + 1));
+      const n = lo + Math.floor(this.rng() * (hi - lo + 1 + (hi > 0 ? looting : 0)));
       const id = typeof item === 'string' ? C[item] : item;
       if (n > 0 && id && ITEMS[id]) g.spawnItem(id, n, [p[0], p[1] + 0.5, p[2]], [(this.rng() - 0.5) * 3, 3, (this.rng() - 0.5) * 3]);
     }

@@ -4,7 +4,7 @@
  "parts": 2,
  "baseLayers": 81,
  "catalog": {
-  "count": 771,
+  "count": 776,
   "parts": 7
  },
  "slots": 32,
@@ -5234,6 +5234,14 @@
   "StormTear",
   "Frostbrand",
   "FrozenHeart",
+  "FishingRod",
+  "Cod",
+  "Salmon",
+  "CookedCod",
+  "CookedSalmon",
+  "GoldenApple",
+  "EnchantedGoldenApple",
+  "Totem",
   "Backpack",
   "GrapplingHook",
   "SlimeCrown",

@@ -199,7 +199,8 @@ function sideTurn(f, k) {
       if (kind === K.Door) top = side = bottom = texLayer(tex[st & 1]);
       else if (kind === K.Tall) top = side = bottom = texLayer(tex[st]);
       else if (kind === K.Rail) top = side = bottom = texLayer(tex[st]);
-      else if (kind === K.Path || kind === K.Waystone) { top = texLayer(tex[0]); side = texLayer(tex[1]); bottom = texLayer(tex[2]); }
+      else if (kind === K.Anvil) { top = texLayer(tex[0]); side = bottom = texLayer(tex[1]); }
+      else if (kind === K.Path || kind === K.Waystone || kind === K.EnchTable) { top = texLayer(tex[0]); side = texLayer(tex[1]); bottom = texLayer(tex[2]); }
       else if (kind === K.Wire) { const b = st === 0 ? 0 : st <= 5 ? 1 : st <= 10 ? 2 : 3; top = side = bottom = texLayer(tex[b * 3]); }
       else if (kind === K.RTorch) top = side = bottom = texLayer(tex[st < 2 ? st : (st - 2) & 1]);
       else if (kind === K.Lever) top = side = bottom = texLayer(tex[0]);
@@ -344,7 +345,7 @@ export const I = {
   Gunpowder: 300, String: 301, GoldNugget: 302, BlazeRod: 303, GhastTear: 304, WoodenSword: 305, StoneSword: 306, IronSword: 307, DiamondSword: 308,
   IronIngot: 309, GoldIngot: 310, CopperIngot: 311, CookedBeef: 312, CookedPorkchop: 313, CookedMutton: 314, CookedChicken: 315, Charcoal: 316,
   Bread: 317, Wheat: 318, WheatSeeds: 319, WoodenHoe: 320, StoneHoe: 321, IronHoe: 322, DiamondHoe: 323,
-  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348, FlameBlade: 349, BoneGreatsword: 350, CloudBottle: 351, BlazingCore: 352, BoneCrown: 353, StormTear: 354, Frostbrand: 355, FrozenHeart: 356,
+  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348, FlameBlade: 349, BoneGreatsword: 350, CloudBottle: 351, BlazingCore: 352, BoneCrown: 353, StormTear: 354, Frostbrand: 355, FrozenHeart: 356, FishingRod: 357, Cod: 358, Salmon: 359, CookedCod: 360, CookedSalmon: 361, GoldenApple: 362, EnchantedGoldenApple: 363, Totem: 364,
   LeatherHelmet: 324,      // armour: 324 + material * 4 + piece (leather, golden, iron, diamond x helmet, chestplate, leggings, boots)
 };
 export const ARMOR_MATS = ['Leather', 'Golden', 'Iron', 'Diamond'], ARMOR_PIECES = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
@@ -409,6 +410,12 @@ ITEMS[I.BoneCrown] = { id: I.BoneCrown, name: 'Bone Crown', kind: Kind.Use, stac
 ITEMS[I.StormTear] = { id: I.StormTear, name: 'Storm Tear', kind: Kind.Use, stack: 1, summons: 'storm_ghast' };
 ITEMS[I.Frostbrand] = { id: I.Frostbrand, name: 'Frostbrand', kind: Kind.Tool, stack: 1, tool: ToolType.Sword, tier: Tier.Diamond, durability: 1800, damage: 11, frost: true };
 ITEMS[I.FrozenHeart] = { id: I.FrozenHeart, name: 'Frozen Heart', kind: Kind.Use, stack: 1, summons: 'frost_colossus' };
+// golden apples can be eaten when full and give effects; the Totem of Undying saves you once from dying
+ITEMS[I.GoldenApple] = { id: I.GoldenApple, name: 'Golden Apple', kind: Kind.Food, stack: 64, food: 4, sat: 9.6, always: true, effects: { regen: [5, 2], absorb: 4 } };
+ITEMS[I.EnchantedGoldenApple] = { id: I.EnchantedGoldenApple, name: 'Enchanted Golden Apple', kind: Kind.Food, stack: 64, food: 4, sat: 9.6, always: true, glint: true, effects: { regen: [20, 2], absorb: 16, fireRes: 300 } };
+ITEMS[I.Totem] = { id: I.Totem, name: 'Totem of Undying', kind: Kind.Material, stack: 1, glint: true };
+ITEMS[I.FishingRod] = { id: I.FishingRod, name: 'Fishing Rod', kind: Kind.Use, stack: 1, durability: 64 };
+food(I.Cod, 'Raw Cod', 2, 0.4); food(I.Salmon, 'Raw Salmon', 2, 0.4); food(I.CookedCod, 'Cooked Cod', 5, 6); food(I.CookedSalmon, 'Cooked Salmon', 6, 9.6);
 ITEMS[I.Bucket] = { id: I.Bucket, name: 'Bucket', kind: Kind.Use, stack: 16 };
 ITEMS[I.WaterBucket] = { id: I.WaterBucket, name: 'Water Bucket', kind: Kind.Use, stack: 1 };
 ITEMS[I.LavaBucket] = { id: I.LavaBucket, name: 'Lava Bucket', kind: Kind.Use, stack: 1 };
@@ -612,7 +619,11 @@ recipe(I.BlazingCore, 1, [[I.BlazeRod, 4], [I.GoldIngot, 4]]);
 recipe(I.BoneCrown, 1, [[I.Bone, 12], [I.Coal, 4], [I.GoldIngot, 1]]);
 recipe(I.StormTear, 1, [[I.GhastTear, 2], [I.GlowstoneDust, 6]]);
 if (C.packed_ice) recipe(I.FrozenHeart, 1, [[C.packed_ice, 4], [I.Diamond, 1]]);
+recipe(I.FishingRod, 1, [[I.Stick, 3], [I.String, 2]]);
+recipe(I.GoldenApple, 1, [[I.Apple, 1], [I.GoldIngot, 8]]);
 if (FAM.waystone) recipe(FAM.waystone.first, 1, [[B.StoneBricks, 6], [I.GoldIngot, 2]]);
+if (FAM.enchanting_table) recipe(FAM.enchanting_table.first, 1, [[B.Obsidian, 4], [I.Diamond, 2], [I.LapisLazuli, 3]]);
+if (FAM.anvil && C.iron_block) recipe(FAM.anvil.first, 1, [[C.iron_block, 3], [I.IronIngot, 4]]);
 recipe(I.Bread, 1, [[I.Wheat, 3]]);
 if (C.hay_block) recipe(C.hay_block, 1, [[I.Wheat, 9]]);
 recipe(I.IronIngot, 9, [[C.iron_block, 1]]);
@@ -693,6 +704,7 @@ toolMats.forEach((m, t) => {
 
 /** Furnace recipes: input -> [output, count]. */
 export const SMELT = new Map([[I.IronChunk, [I.IronIngot, 1]], [I.GoldChunk, [I.GoldIngot, 1]], [I.RawCopper, [I.CopperIngot, 1]],
+  [I.Cod, [I.CookedCod, 1]], [I.Salmon, [I.CookedSalmon, 1]],
   [I.Beef, [I.CookedBeef, 1]], [I.Porkchop, [I.CookedPorkchop, 1]], [I.Mutton, [I.CookedMutton, 1]], [I.RawChicken, [I.CookedChicken, 1]],
   [B.Sand, [C.glass, 1]], [C.red_sand, [C.glass, 1]], [B.Cobblestone, [B.Stone, 1]], [B.Stone, [C.smooth_stone, 1]], [C.clay, [C.terracotta, 1]],
   [C.cobbled_deepslate, [C.deepslate, 1]], [C.wet_sponge, [C.sponge, 1]], [B.Netherrack, [B.NetherBricks, 1]], [B.StoneBricks, [B.CrackedStoneBricks, 1]],

@@ -2,6 +2,7 @@
 // (Gameplay.SurvivalStats) and the weather Markov chain with surface wetness / snow (Rendering.WeatherModel).
 import { ITEMS, Kind, RECIPES, B, groupMembers } from '../shared/blocks.js';
 import { mulberry32 } from '../shared/noise.js';
+import { xpToNext } from '../shared/enchant.js';
 
 export const HOTBAR = 9, INV_SIZE = 36;
 export const CREATIVE_HOTBAR = [B.Cobblestone, B.Stone, B.Dirt, B.Planks, B.Bricks, B.OakLog, B.OakLeaves, B.Sandstone, B.Torch];
@@ -24,7 +25,8 @@ export class Inventory {
     for (let i = 0; i < INV_SIZE && count > 0; i++) {
       if (this.slots[i]) continue;
       const n = Math.min(count, max);
-      this.slots[i] = { item, count: n, ...(def.kind === Kind.Tool ? { wear: extra && extra.wear || 0 } : {}) };
+      // unstackable things keep their wear (tools, armour, a backpack's bag) and enchantments
+      this.slots[i] = { item, count: n, ...(max === 1 ? { wear: extra && extra.wear || 0, ...(extra && extra.ench ? { ench: { ...extra.ench } } : {}) } : {}) };
       count -= n;
     }
     this.changed();
@@ -56,6 +58,7 @@ export class Inventory {
   wearHeld() {
     const s = this.held, d = this.heldItem;
     if (!s || !d || !d.durability) return false;
+    if (s.ench && s.ench.unbreaking && Math.random() > 1 / (1 + s.ench.unbreaking)) return false;
     s.wear = (s.wear || 0) + 1;
     if (s.wear >= d.durability) { this.slots[this.selected] = null; this.changed(); return true; }
     this.changed();
@@ -97,8 +100,22 @@ export { RECIPES };
 export const MAX_HEALTH = 20, MAX_HUNGER = 20, MAX_AIR = 10, SAFE_FALL = 3;
 
 export class SurvivalStats {
-  constructor() { this.reset(); this.onDamage = null; this.onDeath = null; }
-  reset() { this.health = MAX_HEALTH; this.hunger = MAX_HUNGER; this.saturation = 5; this.exhaustion = 0; this.air = MAX_AIR; this.regen = this.starve = this.drown = 0; }
+  constructor() { this.reset(); this.onDamage = null; this.onDeath = null; this.level = 0; this.xp = 0; }
+  /** Effects from golden apples and the totem: regen [seconds, level], absorb (extra health), fireRes (seconds). */
+  applyEffects(e) {
+    if (e.regen) { this.fx.regen = Math.max(this.fx.regen, e.regen[0]); this.fx.regenLvl = Math.max(this.fx.regenLvl, e.regen[1]); }
+    if (e.absorb) this.absorb = Math.max(this.absorb, e.absorb);
+    if (e.fireRes) this.fx.fireRes = Math.max(this.fx.fireRes, e.fireRes);
+  }
+  /** Experience points; returns the levels gained. */
+  addXp(n) {
+    const before = this.level;
+    this.xp += n;
+    while (this.xp >= xpToNext(this.level)) { this.xp -= xpToNext(this.level); this.level++; }
+    return this.level - before;
+  }
+  spendLevels(n) { this.level = Math.max(0, this.level - n); this.xp = Math.min(this.xp, xpToNext(this.level) - 1); }
+  reset() { this.absorb = 0; this.fx = { regen: 0, regenLvl: 0, fireRes: 0 }; this.fxT = 0; this.health = MAX_HEALTH; this.hunger = MAX_HUNGER; this.saturation = 5; this.exhaustion = 0; this.air = MAX_AIR; this.regen = this.starve = this.drown = 0; }
   get dead() { return this.health <= 0; }
   addExhaustion(a) {
     if (this.restedBoost) a *= 0.5;
@@ -111,11 +128,17 @@ export class SurvivalStats {
   eat(food, sat) { this.hunger = Math.min(MAX_HUNGER, this.hunger + food); this.saturation = Math.min(this.hunger, this.saturation + sat); }
   damage(amount, cause) {
     if (this.dead || amount <= 0) return;
+    if (this.fx.fireRes > 0 && ['lava', 'magma', 'fire', 'blaze', 'inferno_spirit'].includes(cause)) return;
+    // Protection (and Feather Falling on boots for falls) takes 4% per point, up to 80%
+    if (this.protect && !['void', 'starve'].includes(cause)) { const epf = this.protect(cause); if (epf > 0) amount *= 1 - Math.min(20, epf) * 0.04; }
     // armour takes up to 80% of hits from mobs, explosions and fire (not falls, drowning, hunger or the void)
     if (this.armor && !['fall', 'void', 'starve', 'drown'].includes(cause)) {
       const def = this.armor();
       if (def > 0) { amount = amount * (1 - Math.min(20, def) / 25); if (this.onArmorHit) this.onArmorHit(); }
     }
+    // absorption hearts go first
+    if (this.absorb > 0) { const a = Math.min(this.absorb, amount); this.absorb -= a; amount -= a; if (amount <= 0) { if (this.onDamage) this.onDamage(0.5, cause); return; } }
+    if (this.health - amount <= 0 && this.onTotem && this.onTotem()) { this.health = 1; if (this.onDamage) this.onDamage(amount, cause); return; }
     this.health = Math.max(0, this.health - amount);
     this.addExhaustion(0.1);
     if (this.onDamage) this.onDamage(amount, cause);
@@ -124,6 +147,13 @@ export class SurvivalStats {
   land(distance, water) { if (water) return; const d = Math.floor(distance - SAFE_FALL); if (d > 0) this.damage(d, 'fall'); }
   tick(dt, moved, sprinting, jumps, headUnder) {
     if (this.dead) return;
+    const fx = this.fx;
+    if (fx.fireRes > 0) fx.fireRes = Math.max(0, fx.fireRes - dt);
+    if (fx.regen > 0) {
+      fx.regen = Math.max(0, fx.regen - dt); if (!fx.regen) fx.regenLvl = 0;
+      this.fxT += dt * (fx.regenLvl >= 2 ? 2 : 1);
+      while (this.fxT >= 1.25) { this.fxT -= 1.25; this.health = Math.min(MAX_HEALTH, this.health + 1); }
+    }
     this.addExhaustion(moved * (sprinting ? 0.1 : 0.01) + jumps * (sprinting ? 0.2 : 0.05) + dt * 0.005);
     if (headUnder) {
       this.air = Math.max(0, this.air - dt);
@@ -136,11 +166,12 @@ export class SurvivalStats {
     if (this.hunger <= 0) { this.starve += dt; while (this.starve >= 4) { this.starve -= 4; if (this.health > 1) this.damage(1, 'starvation'); } }
     else this.starve = 0;
   }
-  toJSON() { return { health: this.health, hunger: this.hunger, saturation: this.saturation, air: this.air }; }
+  toJSON() { return { health: this.health, hunger: this.hunger, saturation: this.saturation, air: this.air, level: this.level, xp: this.xp }; }
   load(o) {
     this.reset();
     this.health = Math.max(0, Math.min(MAX_HEALTH, o.health ?? MAX_HEALTH)); this.hunger = Math.max(0, Math.min(MAX_HUNGER, o.hunger ?? MAX_HUNGER));
     this.saturation = Math.min(this.hunger, o.saturation ?? 5); this.air = Math.min(MAX_AIR, o.air ?? MAX_AIR);
+    this.level = Math.max(0, o.level | 0); this.xp = Math.max(0, +o.xp || 0);
   }
 }
 

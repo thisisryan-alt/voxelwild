@@ -5,6 +5,9 @@ import { BIOME_NAMES } from '../shared/terrain.js';
 const FAM_WAYSTONE = () => (FAM.waystone ? FAM.waystone.first : 1);
 const BIOME_LABEL = (BIOME_NAMES || []).map((n) => n.replace(/([a-z])([A-Z])/g, '$1 $2'));
 import { canCraft, craft, HOTBAR, INV_SIZE, MAX_AIR } from './gameplay.js';
+import { enchText, enchantKind, xpToNext } from '../shared/enchant.js';
+import { ADVANCEMENTS } from '../shared/advancements.js';
+import { I as ITEM_IDS } from '../shared/blocks.js';
 import { MiniMap } from './minimap.js';
 
 // tips on the loading and pause screens (the Tips mod: not in Minecraft)
@@ -28,6 +31,15 @@ const TIPS = [
   'The Frost Colossus (summoned with a Frozen Heart) slams the ground and breathes frost that slows you. Keep your distance, but not too far.',
   'Bastions are guarded by the Hollow King and igloos by the Frost Colossus, once each. King Slime sometimes roams swamps at night.',
   'Boss Arena on the title screen: fight the bosses one after another, one at a time, or endlessly.',
+  'Fishing rods (3 sticks, 2 string): cast into water, wait for the ripples and the splash, then right-click to reel in. Rain makes fish bite sooner.',
+  'Golden apples (an apple and 8 gold ingots) give regeneration and golden hearts. Enchanted ones hide in dungeon and pyramid chests.',
+  'Vindicators sometimes drop a Totem of Undying: keep it in your hotbar and it saves you from one death.',
+  'Villagers post a bounty each day: bring them goods or hunt monsters for emeralds and experience.',
+  'On dry nights fireflies drift over forests, plains and swamps; on sunny days, butterflies.',
+  'Tame a wolf with bones. Right-click it to make it sit or follow; feed it meat to heal it. It fights whatever you fight.',
+  'An enchanting table (4 obsidian, 2 diamonds, 3 lapis) enchants tools, weapons, bows and armour for experience levels and lapis lazuli.',
+  'An anvil (3 iron blocks, 4 iron ingots) repairs worn gear with its material, or merges two of the same item and their enchantments.',
+  'Hit while falling for a critical hit: half as much damage again.',
   'Open the pause menu and choose Bosses for the list of bosses and how to find them.',
   'A Cloud in a Bottle, dropped by the Storm Ghast, gives you a second jump in the air.',
   'Seasons turn every three days: leaves go orange and gold in autumn, and crops barely grow in winter.',
@@ -43,7 +55,10 @@ function describe(s) {
   const d = ITEMS[s.item];
   if (!d) return itemName(s.item);
   const lines = [d.name];
+  if (s.ench) lines.push(enchText(s.ench));
   if (d.kind === Kind.Food) lines.push(`Restores ${d.food} hunger · ${d.sat} saturation`);
+  if (d.effects) lines.push([d.effects.regen && `Regeneration ${d.effects.regen[1] > 1 ? 'II' : 'I'} (${d.effects.regen[0]} s)`, d.effects.absorb && `+${d.effects.absorb / 2} golden hearts`, d.effects.fireRes && `Fire resistance (${d.effects.fireRes / 60} min)`].filter(Boolean).join(' · '));
+  if (d.id === ITEM_IDS.Totem) lines.push('Kept in your hotbar, it saves you from dying once');
   if (d.kind === Kind.Armor) lines.push(`Armour +${d.points}`);
   if (d.damage) lines.push(`Melee damage ${d.damage}`);
   if (d.durability && !(d.name === 'Backpack')) lines.push(`Durability ${d.durability - (s.wear || 0)} / ${d.durability}`);
@@ -58,7 +73,7 @@ const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, vol
   shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr',
   farDistance: 2000, resolution: '2160', dynamicRes: false, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
   rayStrength: 1, clouds: true, ao: 1, dayCycle: 'normal', fixedHour: 12, dayLength: 20, weatherMode: 'dynamic', brightness: 1,
-  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true, minimap: true, lookInfo: true, timber: true, veinMine: true, graves: true, dash: true, handLight: true, seasons: true, seasonDays: 3, cloudQuality: 1, ssao: true, aa: true, sharpen: 0.6 };
+  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true, minimap: true, lookInfo: true, timber: true, veinMine: true, graves: true, dash: true, damageNumbers: true, bossMusic: true, handLight: true, seasons: true, seasonDays: 3, cloudQuality: 1, ssao: true, aa: true, sharpen: 0.6 };
 const pct = (x) => `${Math.round(x * 100)}%`;
 // every option: tab, key, label and either a range (min/max/step/fmt) or a choice list (values + labels) or a toggle
 const OPTIONS = [
@@ -107,7 +122,9 @@ const OPTIONS = [
   { tab: 'Controls', key: 'veinMine', label: 'Mine Whole Ore Veins' },
   { tab: 'Controls', key: 'graves', label: 'Gravestones Keep Items' },
   { tab: 'Controls', key: 'dash', label: 'Dodge Dash (double-tap A/D)' },
+  { tab: 'Controls', key: 'damageNumbers', label: 'Damage numbers' },
   { tab: 'Quality', key: 'handLight', label: 'Held Torches Light Up' },
+  { tab: 'Audio', key: 'bossMusic', label: 'Boss Music' },
   { tab: 'Sky & Time', key: 'seasons', label: 'Seasons' },
   { tab: 'Sky & Time', key: 'seasonDays', label: 'Days per Season', min: 1, max: 10, step: 1, fmt: (x) => `${x}` },
 ];
@@ -176,6 +193,12 @@ export class UI {
     g.on('hud', () => this.renderStats());
     g.on('heldName', () => this.flashHeldName());
     g.on('toast', (t) => this.toast(t));
+    g.on('advancement', (a) => {
+      const el = $('advToast');
+      el.innerHTML = `<b>Advancement made!</b>${a.name}<small>${a.desc}</small>`;
+      el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+      clearTimeout(this.advTimer); this.advTimer = setTimeout(() => el.classList.remove('show'), 4500);
+    });
     g.on('pickup', (item, n) => this.pickup(item, n));
     g.on('loading', (p) => this.loadingProgress(p));
     g.on('travel', (d) => { this.travelTitle = ['Returning to the overworld', 'Entering the Nether', 'Entering the End', 'Entering the Skylands'][d]; });
@@ -385,6 +408,12 @@ export class UI {
         ...(startDim ? { startDim } : {}), ...(flat ? { flat: true } : {}) }, true);
     };
     $('btnResume').onclick = () => this.resume();
+    $('btnAdv').onclick = () => {
+      const el = $('advList'), done = (g.meta && g.meta.advancements) || {};
+      const n = ADVANCEMENTS.filter((a) => done[a.id]).length;
+      el.innerHTML = `<div><b>${n} / ${ADVANCEMENTS.length} advancements</b></div>` + ADVANCEMENTS.map((a) => `<div><span class="${done[a.id] ? 'done' : ''}">${done[a.id] ? '✔' : '·'} ${a.name}</span><small>${a.desc}${done[a.id] ? ` · day ${done[a.id]}` : ''}</small></div>`).join('');
+      el.hidden = !el.hidden;
+    };
     $('btnBosses').onclick = () => {
       const el = $('bossList'), beaten = (g.meta && g.meta.bossesDefeated) || {};
       const list = [['king_slime', 'King Slime', 'Craft a Slime Crown (20 slimeballs, 5 gold ingots) and use it.'],
@@ -672,6 +701,7 @@ export class UI {
     const def = ITEMS[stack.item];
     let h = `<div class="ico" style="${this.game.icons.css(stack.item, px)}"></div>`;
     if (stack.count > 1) h += `<span class="n">${stack.count}</span>`;
+    if (stack.ench || (def && def.glint)) h += '<div class="glint"></div>';
     if (def && def.durability && stack.wear) {
       const f = 1 - stack.wear / def.durability;
       h += `<div class="wear"><i style="width:${Math.round(f * 100)}%;background:hsl(${Math.round(f * 110)},70%,50%)"></i></div>`;
@@ -705,15 +735,18 @@ export class UI {
     if (!g.stats) return;
     const surv = !g.creative;
     $('stats').style.visibility = surv ? 'visible' : 'hidden';
+    $('xpBar').style.visibility = surv ? 'visible' : 'hidden';
     $('modeTag').textContent = g.creative ? (g.player.flying ? 'Creative · flying' : 'Creative') : '';
     if (surv) {
       const st = g.stats;
       const icons = (v, fn) => { let h = ''; for (let i = 0; i < 10; i++) { const x = v - i * 2; h += fn(x >= 2 ? 2 : x >= 1 ? 1 : 0); } return h; };
-      const hk = Math.ceil(st.health), fk = Math.ceil(st.hunger);
-      if (hk !== this.lastH) { $('hearts').innerHTML = icons(hk, svgHeart); this.lastH = hk; }
+      const hk = Math.ceil(st.health), fk = Math.ceil(st.hunger), ab = Math.ceil(st.absorb || 0);
+      if (hk * 100 + ab !== this.lastH) { $('hearts').innerHTML = icons(hk, svgHeart) + (ab > 0 ? `<span class="absorb">${icons(ab, svgHeart).split('</svg>').slice(0, Math.ceil(ab / 2)).join('</svg>')}</svg></span>` : ''); this.lastH = hk * 100 + ab; }
       if (fk !== this.lastF) { $('food').innerHTML = icons(fk, svgFood).split('</svg>').reverse().join('</svg>'); this.lastF = fk; }
       const ak2 = g.inventory.defense;
       if (ak2 !== this.lastArmor) { $('armorBar').innerHTML = ak2 > 0 ? icons(ak2, svgArmor) : ''; this.lastArmor = ak2; }
+      const xpk = `${st.level}:${Math.floor(st.xp)}`;
+      if (xpk !== this.lastXp) { this.lastXp = xpk; $('xpBar').firstChild.style.width = `${Math.min(100, st.xp / xpToNext(st.level) * 100)}%`; $('xpBar').lastChild.textContent = st.level > 0 ? st.level : ''; }
       const showAir = st.air < MAX_AIR - 0.01 || g.player.headInWater;
       const ak = showAir ? Math.ceil(st.air) : -1;
       if (ak !== this.lastA) { let h = ''; if (showAir) for (let i = 0; i < 10; i++) h += svgBubble(i < ak); $('air').innerHTML = h; this.lastA = ak; }
@@ -769,7 +802,7 @@ export class UI {
       el.title = inv.slots[+el.dataset.slot] ? describe(inv.slots[+el.dataset.slot]) : '';
     }
     // a chest or furnace, crafting (survival, or at a table), or the palette (creative)
-    const st = g.station, trade = st && (st.kind === 'trade' || st.kind === 'waystones'), box = st && (st.kind === 'chest' || st.kind === 'furnace'), crafting = !box && !trade && (!g.creative || (st && st.kind === 'table'));
+    const st = g.station, trade = st && (st.kind === 'trade' || st.kind === 'waystones' || st.kind === 'enchant' || st.kind === 'anvil'), box = st && (st.kind === 'chest' || st.kind === 'furnace'), crafting = !box && !trade && (!g.creative || (st && st.kind === 'table'));
     $('sideTitle').textContent = trade ? `${st.name} · Trades` : box ? st.name : crafting ? (st && st.kind === 'table' ? 'Crafting Table' : 'Crafting') : 'All blocks and items';
     $('station').hidden = !box;
     $('recipes').hidden = !crafting && !trade; $('recipeSearch').hidden = !crafting;
@@ -793,16 +826,36 @@ export class UI {
       this.updateCursor();
       return;
     }
+    if (st && (st.kind === 'enchant' || st.kind === 'anvil')) { this.renderMagic(st); this.updateCursor(); return; }
     if (trade) {
-      $('sideTip').textContent = 'Click an offer to trade. Emeralds come from trading and from chests.';
+      $('sideTip').textContent = 'Click an offer to trade. Emeralds come from trading, bounties and chests.';
       const rec = $('recipes');
       rec.innerHTML = '';
+      // the villager's bounty board
+      if (st.prof && g.meta && !g.meta.arena) {
+        const cur = g.meta.bounty, offer = g.bountyOffer(st.prof), done = (g.meta.bountiesDone || []).includes(offer.id);
+        const b = document.createElement('button');
+        b.className = 'recipe bounty';
+        let label, sub;
+        if (cur) {
+          const ready = cur.kind === 'bring' ? inv.count(cur.item) >= cur.n : cur.got >= cur.n;
+          label = `Bounty: ${cur.text}`; sub = cur.kind === 'bring' ? (ready ? 'Click to hand it in' : `You have ${inv.count(cur.item)} / ${cur.n}`) : `${cur.got} / ${cur.n} slain`;
+          b.disabled = !(cur.kind === 'bring' && ready);
+          b.onclick = () => { if (g.finishBounty()) { g.audio.click(); this.renderInventory(); } };
+        } else {
+          label = done ? 'No more work today' : `Bounty: ${offer.text}`; sub = done ? 'Come back tomorrow' : `Reward ${offer.reward} emeralds and experience · click to accept`;
+          b.disabled = done;
+          b.onclick = () => { if (g.acceptBounty(offer)) { g.audio.click(); this.renderInventory(); } };
+        }
+        b.innerHTML = `<div class="ico-slot"><div class="ico" style="${g.icons.css(ITEM_IDS.Emerald, 32)}"></div></div><div><span class="ench">${label}</span><small>${sub}</small></div>`;
+        rec.appendChild(b);
+      }
       for (const r of st.trades) {
         const ok = canCraft(inv, r), b = document.createElement('button');
         b.className = 'recipe'; b.disabled = !ok;
         const ins = r.inputs.map(([item, n]) => `<span class="${inv.count(item) >= n ? 'have' : 'miss'}">${n}× ${itemName(item)}</span>`).join('');
         b.innerHTML = `<div class="ico-slot"><div class="ico" style="${g.icons.css(r.out, 32)}"></div></div><div>${r.count > 1 ? r.count + '× ' : ''}${r.name}<small>${ins}</small></div>`;
-        b.onclick = () => { if (craft(inv, r)) { g.audio.click(); this.game.emit('toast', `Traded for ${r.count}× ${r.name}`); } };
+        b.onclick = () => { if (craft(inv, r)) { g.audio.click(); g.giveXp(2 + Math.floor(Math.random() * 3)); if (st.kind === 'trade') g.advance('trade'); this.game.emit('toast', `Traded for ${r.count}× ${r.name}`); } };
         rec.appendChild(b);
       }
       this.updateCursor();
@@ -923,6 +976,42 @@ export class UI {
   }
 
   /** The open chest's slots or the furnace (input, fuel, output with progress). */
+  /** The enchanting table and the anvil: pick an item from the inventory, then an offer. */
+  renderMagic(st) {
+    const g = this.game, inv = g.inventory, ench = st.kind === 'enchant', rec = $('recipes');
+    const ok = (s) => s && (ench ? enchantKind(s.item) && !s.ench : ITEMS[s.item] && ITEMS[s.item].durability && g.repairMaterial(s.item));
+    if (!ok(inv.slots[st.slot])) st.slot = inv.slots.findIndex(ok);
+    $('sideTitle').textContent = st.name;
+    $('sideTip').textContent = ench ? `Enchanting needs the offer's level and costs 1-3 levels and as much lapis lazuli. You are level ${g.stats.level}.`
+      : `Repair with the item's material, or combine two of the same item (their enchantments merge). You are level ${g.stats.level}.`;
+    rec.innerHTML = '';
+    const pick = document.createElement('div');
+    pick.className = 'magicPick';
+    inv.slots.forEach((s, i) => {
+      if (!ok(s)) return;
+      const el = document.createElement('div');
+      el.className = 'slot' + (i === st.slot ? ' on' : ''); el.innerHTML = this.slotHTML(s, 32); el.title = describe(s);
+      el.onclick = () => { st.slot = i; g.audio.click(); this.renderMagic(st); };
+      pick.appendChild(el);
+    });
+    rec.appendChild(pick);
+    if (st.slot < 0) { rec.insertAdjacentHTML('beforeend', `<p class="hint">${ench ? 'Bring an unenchanted tool, weapon, bow or piece of armour.' : 'Bring a worn tool, weapon, bow or piece of armour.'}</p>`); return; }
+    const s = inv.slots[st.slot], opts = ench ? g.enchantOffersFor(st.slot) : g.anvilOptions(st.slot);
+    if (!opts.length) rec.insertAdjacentHTML('beforeend', '<p class="hint">Nothing to do for this item.</p>');
+    opts.forEach((o, k) => {
+      const b = document.createElement('button');
+      b.className = 'recipe';
+      const need = ench ? o.levels : o.levels, cost = ench ? [[ITEM_IDS.LapisLazuli, o.lapis]] : o.inputs;
+      const can = g.creative || (g.stats.level >= need && cost.every(([it, n]) => inv.count(it) >= n));
+      b.disabled = !can;
+      const costs = cost.map(([it, n]) => `<span class="${inv.count(it) >= n ? 'have' : 'miss'}">${n}× ${itemName(it)}</span>`).join('');
+      const lv = `<span class="${g.stats.level >= need ? 'have' : 'miss'}">${ench ? `level ${need} (costs ${o.lapis})` : `${need} levels`}</span>`;
+      b.innerHTML = `<div class="ico-slot"><div class="ico" style="${g.icons.css(s.item, 32)}"></div></div><div><span class="ench">${ench ? enchText(o.ench) : o.label}</span><small>${lv}${costs}</small></div>`;
+      b.onclick = () => { if (ench ? g.enchantSlot(st.slot, k) : g.anvilUse(st.slot, k)) this.renderInventory(); };
+      rec.appendChild(b);
+    });
+  }
+
   renderStation() {
     const g = this.game, st = g.station;
     if (!st || !st.data) return;
@@ -1079,9 +1168,37 @@ export class UI {
   }
 
   /** Minimap, coordinates, the block info panel and the Rested tag. */
+  updateDamageNumbers(dt) {
+    const g = this.game, box = $('dmgNums'), m = g.renderer && g.renderer.viewProj;
+    if (!this.dmgNums) {
+      this.dmgNums = [];
+      g.on('dmgNum', (p, n, crit) => {
+        if (this.settings.damageNumbers === false) return;
+        const el = document.createElement('b');
+        el.textContent = (crit ? '✦' : '') + (Math.round(n * 10) / 10);
+        if (crit) el.className = 'crit';
+        box.appendChild(el);
+        this.dmgNums.push({ el, p: [p[0] + (Math.random() - 0.5) * 0.4, p[1], p[2] + (Math.random() - 0.5) * 0.4], t: 0 });
+      });
+    }
+    for (let i = this.dmgNums.length - 1; i >= 0; i--) {
+      const d = this.dmgNums[i];
+      d.t += dt; d.p[1] += dt * 0.9;
+      const cw = m ? m[3] * d.p[0] + m[7] * d.p[1] + m[11] * d.p[2] + m[15] : 0;
+      if (d.t > 1 || cw <= 0.1) { d.el.remove(); this.dmgNums.splice(i, 1); continue; }
+      const x = (m[0] * d.p[0] + m[4] * d.p[1] + m[8] * d.p[2] + m[12]) / cw, y = (m[1] * d.p[0] + m[5] * d.p[1] + m[9] * d.p[2] + m[13]) / cw;
+      d.el.style.left = `${(x * 0.5 + 0.5) * box.clientWidth}px`; d.el.style.top = `${(0.5 - y * 0.5) * box.clientHeight}px`;
+      d.el.style.opacity = Math.min(1, (1 - d.t) * 3);
+    }
+  }
+
   updateHudExtras(dt) {
     const g = this.game, s = this.settings, playing = this.screen === 'playing' || this.screen === 'inventory';
     if (!playing || !g.player || (g.meta && g.meta.menu)) return;
+    this.updateDamageNumbers(dt);
+    const cd = $('cooldown'), cdOn = !g.creative && g.attackT > 0 && this.screen === 'playing';
+    if (cd.hidden === cdOn) cd.hidden = !cdOn;
+    if (cdOn) cd.firstChild.style.width = `${Math.round((1 - g.attackT / 0.45) * 100)}%`;
     if (!this.map) this.map = new MiniMap(g, $('minimap'), $('bigmapCanvas'));
     $('mapWrap').hidden = s.minimap === false;
     if (s.minimap !== false) this.map.update(dt);
@@ -1107,8 +1224,15 @@ export class UI {
     const as = g.arena && g.meta && g.meta.arena ? g.arenaStatus() : null;
     $('arenaTag').hidden = !as;
     if (as) $('arenaTag').textContent = as;
-    $('restedTag').hidden = !(g.rested > 0);
-    if (g.rested > 0) $('restedTag').textContent = `Rested · ${Math.ceil(g.rested / 60)} min`;
+    const bt = g.meta && g.meta.bounty, bEl = $('bountyTag');
+    if (!!bt !== !bEl.hidden) bEl.hidden = !bt;
+    if (bt) { const t = bt.kind === 'bring' ? `${bt.text} · ${Math.min(bt.n, g.inventory.count(bt.item))}/${bt.n}` : `${bt.text} · ${bt.got}/${bt.n}`; if (bEl.textContent !== t) bEl.textContent = t; }
+    const fx = g.stats && g.stats.fx, tags = [];
+    if (g.rested > 0) tags.push(`Rested · ${Math.ceil(g.rested / 60)} min`);
+    if (fx && fx.regen > 0) tags.push(`Regeneration · ${Math.ceil(fx.regen)} s`);
+    if (fx && fx.fireRes > 0) tags.push(`Fire Resistance · ${Math.ceil(fx.fireRes)} s`);
+    $('restedTag').hidden = !tags.length;
+    if (tags.length) $('restedTag').textContent = tags.join('   ');
   }
 
   /** Dynamic resolution: trade pixels for frame rate when the GPU falls behind, recover when it has headroom. */
