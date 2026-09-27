@@ -162,6 +162,11 @@ roomier boxes (`pickBoxes`), and strays, wither skeletons and cave spiders join 
 
 ## Structures and more mobs
 
+Villages are common (a 256-block region grid, 85%, several candidate spots per region, most grassland, forest,
+jungle, swamp, desert, savanna, taiga and snowy biomes): typically 15–20 within a thousand blocks of spawn. A new
+world starts on a village road; the map marks villages, outposts, pyramids, igloos, ruined portals and huts within
+600 blocks.
+
 `src/shared/structures.js` places villages (roads, a well, houses with stair roofs, beds and chests, farms, lamps; styles
 for plains, taiga, savanna, desert and snowy biomes), pillager outposts, desert pyramids (a TNT-trapped treasure pit)
 and wells, igloos, ruined portals, swamp huts, underground dungeons with spawners, and Nether bastions. Every kind has a

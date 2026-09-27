@@ -67,6 +67,7 @@ await step('boot', async () => {
 });
 
 await step('new survival world', async () => {
+  await G(() => { window.voxelwild.game.noVillageStart = true; });   // these steps expect untouched land at spawn
   await page.click('#btnNew');
   await page.$eval('#nwSeed', (el) => { el.value = '20260925'; });
   await page.click('#newForm button[type=submit]');

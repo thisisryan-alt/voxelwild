@@ -3,6 +3,8 @@
 // bed, waystones). In the Nether and underground it maps the floor round the player instead of the sky-lit top.
 import { BLOCKS, B, isWater, isLava } from '../shared/blocks.js';
 import { Dim } from '../shared/blocks.js';
+import { structuresIn } from '../shared/structures.js';
+import { terrainFor } from '../shared/gen.js';
 
 const srgb = (v) => Math.round(255 * Math.pow(Math.min(1, Math.max(0, v)), 1 / 2.2));
 
@@ -140,8 +142,23 @@ export class MiniMap {
     ctx.restore();
   }
 
+  /** Structures near the player (villages, outposts, pyramids, igloos, ruined portals, huts), refreshed every few seconds. */
+  structures() {
+    const g = this.g;
+    if (g.dim !== Dim.Overworld || !g.meta || g.meta.flat) return [];
+    const p = g.player.body.pos, now = performance.now();
+    if (!this.structList || now - this.structT > 3000 || Math.hypot(p[0] - this.structAt[0], p[2] - this.structAt[1]) > 100) {
+      const T = terrainFor(g.meta.seed), names = { village: ['Village', '#ffd84a'], outpost: ['Pillager Outpost', '#ff7a4a'], pyramid: ['Desert Pyramid', '#ffe0a0'],
+        igloo: ['Igloo', '#bfe8ff'], portal: ['Ruined Portal', '#c07aff'], hut: ['Swamp Hut', '#9ad07a'], well: ['Desert Well', '#ffe0a0'] };
+      this.structList = structuresIn(g.meta.seed, T, p[0] - 600, p[2] - 600, p[0] + 600, p[2] + 600).filter((q) => names[q.kind])
+        .map((q) => ({ name: names[q.kind][0], color: names[q.kind][1], x: q.x + 0.5, z: q.z + 0.5, kind: 'structure' }));
+      this.structT = now; this.structAt = [p[0], p[2]];
+    }
+    return this.structList;
+  }
+
   waypoints() {
-    const g = this.g, m = g.meta || {}, out = [];
+    const g = this.g, m = g.meta || {}, out = [...this.structures()];
     for (const wp of m.waypoints || []) if ((wp.dim || 0) === (g.dim || 0)) out.push(wp);
     if (g.spawn && (g.dim || 0) === 0) out.push({ name: 'Spawn', x: g.spawn[0], z: g.spawn[2], color: '#6ec8ff' });
     return out;

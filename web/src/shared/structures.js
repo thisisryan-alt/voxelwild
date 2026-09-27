@@ -10,13 +10,13 @@ import { Biome } from './terrain.js';
 import { hash4, mulberry32 } from './noise.js';
 
 const KINDS = {
-  village: { size: 400, chance: 0.55, reach: 48, salt: 0x51A6 },
-  outpost: { size: 512, chance: 0.4, reach: 12, salt: 0x0B57 },
-  pyramid: { size: 320, chance: 0.5, reach: 13, salt: 0x9A3D },
+  village: { size: 256, chance: 0.85, reach: 48, salt: 0x51A6, tries: 4 },
+  outpost: { size: 384, chance: 0.5, reach: 12, salt: 0x0B57, tries: 3 },
+  pyramid: { size: 256, chance: 0.6, reach: 13, salt: 0x9A3D, tries: 3 },
   well: { size: 192, chance: 0.3, reach: 4, salt: 0x3E11 },
-  igloo: { size: 288, chance: 0.45, reach: 6, salt: 0x1611 },
+  igloo: { size: 224, chance: 0.55, reach: 6, salt: 0x1611, tries: 3 },
   portal: { size: 320, chance: 0.35, reach: 7, salt: 0x9047 },
-  hut: { size: 320, chance: 0.5, reach: 6, salt: 0x7A77 },
+  hut: { size: 256, chance: 0.6, reach: 6, salt: 0x7A77, tries: 3 },
   dungeon: { size: 72, chance: 0.4, reach: 5, salt: 0xD06E },
 };
 const NETHER = { bastion: { size: 384, chance: 0.5, reach: 16, salt: 0xBA57 } };
@@ -46,9 +46,17 @@ export function structureAt(seed, T, x, y, z, dim = 0) {
 
 // ---------------------------------------------------------------- plans
 
+/** A region's structure: a few candidate spots are tried (the first may be in the sea or on a mountain). */
 function planFor(kind, k, seed, T, rx, rz) {
-  const h = hash4(rx, rz, seed ^ k.salt, 7);
-  if ((h & 1023) / 1024 >= k.chance) return null;
+  const h0 = hash4(rx, rz, seed ^ k.salt, 7);
+  if ((h0 & 1023) / 1024 >= k.chance) return null;
+  for (let t = 0; t < (k.tries || 1); t++) {
+    const plan = planAt(kind, k, seed, T, rx, rz, t ? hash4(rx, rz, seed ^ k.salt, 7 + t) : h0);
+    if (plan) return plan;
+  }
+  return null;
+}
+function planAt(kind, k, seed, T, rx, rz, h) {
   const r = mulberry32(h | 1), m = Math.floor(k.size * 0.2);
   const x = rx * k.size + m + Math.floor(r() * (k.size - 2 * m)), z = rz * k.size + m + Math.floor(r() * (k.size - 2 * m));
   const rot = Math.floor(r() * 4);
@@ -61,14 +69,14 @@ function planFor(kind, k, seed, T, rx, rz) {
   if (kind === 'bastion') return box(kind, x, 20, z, 15, 30, 15, { rot, seed: h });
   if (!T) return null;
   const s = T.sample(x, z), g = Math.floor(s.height), b = s.biome;
-  if (g <= SEA + 1 || s.river > 0.15) return null;
+  if (g <= SEA + 1 || s.river > 0.3) return null;
   const flat = (rad) => { let lo = g, hi = g; for (const [dx, dz] of [[rad, 0], [-rad, 0], [0, rad], [0, -rad], [rad, rad], [-rad, -rad]]) { const v = Math.floor(T.sample(x + dx, z + dz).height); lo = Math.min(lo, v); hi = Math.max(hi, v); } return hi - lo; };
   // small buildings stand on the highest ground round their middle (foundations fill in below)
   const high = (rad) => { let hi = g; for (const [dx, dz] of [[rad, 0], [-rad, 0], [0, rad], [0, -rad]]) hi = Math.max(hi, Math.floor(T.sample(x + dx, z + dz).height)); return hi; };
   const desert = b === Biome.Desert || b === Biome.Badlands, snowy = b === Biome.SnowyTundra || b === Biome.SnowyTaiga;
   switch (kind) {
     case 'village': {
-      if (![Biome.Plains, Biome.Savanna, Biome.Desert, Biome.Taiga, Biome.SnowyTundra, Biome.SnowyTaiga].includes(b) || flat(24) > 9) return null;
+      if (![Biome.Plains, Biome.Savanna, Biome.Desert, Biome.Taiga, Biome.SnowyTundra, Biome.SnowyTaiga, Biome.Forest, Biome.Jungle, Biome.Swamp, Biome.Badlands].includes(b) || flat(24) > 14) return null;
       const style = desert ? 'desert' : b === Biome.Savanna ? 'savanna' : b === Biome.Taiga ? 'taiga' : snowy ? 'snowy' : 'plains';
       const pieces = [{ kind: 'well', x, z, y: g, rot: 0 }];
       const roads = [];
@@ -89,16 +97,16 @@ function planFor(kind, k, seed, T, rx, rz) {
       return box(kind, x, g - 8, z, 46, g + 16 - (g - 8), 46, { style, pieces, roads, seed: h });
     }
     case 'outpost':
-      if (![Biome.Plains, Biome.Savanna, Biome.Desert, Biome.Taiga, Biome.SnowyTundra, Biome.Forest].includes(b) || flat(6) > 5) return null;
+      if (![Biome.Plains, Biome.Savanna, Biome.Desert, Biome.Taiga, Biome.SnowyTundra, Biome.Forest].includes(b) || flat(6) > 8) return null;
       return box(kind, x, g - 4, z, 11, 30, 11, { rot, seed: h });
     case 'pyramid':
-      if (b !== Biome.Desert || flat(10) > 5) return null;
+      if (b !== Biome.Desert || flat(10) > 8) return null;
       return box(kind, x, g - 14, z, 11, 30, 11, { seed: h });
     case 'well':
       if (b !== Biome.Desert) return null;
       return box(kind, x, high(2) - 3, z, 3, 8, 3, { seed: h, gy: high(2) });
     case 'igloo':
-      if (!snowy || flat(4) > 3) return null;
+      if (!snowy || flat(4) > 5) return null;
       return box(kind, x, high(3) - 2, z, 5, 8, 5, { rot, seed: h, gy: high(3) });
     case 'portal':
       if (flat(4) > 4) return null;

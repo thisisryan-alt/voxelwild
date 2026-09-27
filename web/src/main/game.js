@@ -24,7 +24,7 @@ import { END_ARRIVAL, END_GATEWAY, outerGateway } from '../shared/end.js';
 import { netherClimate, nearestFortress } from '../shared/nether.js';
 import { Simplex } from '../shared/noise.js';
 import { terrainFor } from '../shared/gen.js';
-import { structureAt } from '../shared/structures.js';
+import { structureAt, structuresIn } from '../shared/structures.js';
 import { Biome, BIOME_NAMES } from '../shared/terrain.js';
 import { VoxelBody } from './player.js';
 import { MIN_Y, MAX_Y, SEA } from '../shared/const.js';
@@ -529,6 +529,18 @@ export class Game {
         this.arrival = () => { this.arriveEnd(); this.spawn = [...this.player.body.pos]; };
       } else {
         this.spawn = this.findSpawn();
+        // start by the nearest village (within about 900 blocks), on its road next to the well
+        if (!meta.flat && !this.noVillageStart) {
+          const T = terrainFor(meta.seed), sp = this.spawn;
+          const v = structuresIn(meta.seed, T, sp[0] - 900, sp[2] - 900, sp[0] + 900, sp[2] + 900).filter((q) => q.kind === 'village')
+            .sort((a2, b2) => Math.hypot(a2.x - sp[0], a2.z - sp[2]) - Math.hypot(b2.x - sp[0], b2.z - sp[2]))[0];
+          if (v) {
+            // a dry stretch of road a few steps from the well
+            let at = [v.x + 3, v.z];
+            outer: for (const rd of v.roads) for (let t = 4; t <= 12; t++) { const x = v.x + rd.ux * t, z = v.z + rd.uz * t; if (T.sample(x, z).height > SEA + 1.5) { at = [x, z]; break outer; } }
+            this.spawn = [at[0] + 0.5, v.y + 3, at[1] + 0.5]; this.villageStart = true;
+          }
+        }
         this.player.teleport(this.spawn, meta.spawnYaw ?? 0.6, -0.08);
         this.needGround = true;
       }
@@ -791,6 +803,7 @@ export class Game {
       if (prog >= 1 && c && c.state === 'ready') {
         if (this.arrival) { const a = this.arrival; this.arrival = null; a(); }
         else if (this.needGround) { this.settleOnGround(); this.needGround = false; }
+        if (this.villageStart) { this.villageStart = false; this.emit('toast', 'You wake up in a village. Right-click its waystone and villagers to trade'); }
         pl.body.unstick(w, 96);      // arrived inside something (a respawn into built-up land, a moved spawn): climb out
         this.state = 'playing';
         this.emit('state', this.state);
