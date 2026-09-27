@@ -123,6 +123,27 @@ GEOS = [
         part("wing1tip", (-9, 18, -8), [(16, 24, -13, 0, 0, 13, 1, 9, 0, True)], rot=(0, 0, -0.1), parent="wing1"),
         part("head", (0, 21, -7), [(0, 0, -4, -2, -5, 7, 3, 5)], rot=(0.2, 0, 0), parent="body"),
     ]),
+    # boat (Java BoatModel, lifted 18 px so the hull sits at the feet)
+    geometry("geometry.boat.custom", 128, 64, [
+        part("bottom", (0, 3 + 18, 1), [(0, 0, -14, -9, -3, 28, 16, 3)], rot=(math.pi / 2, 0, 0)),
+        part("back", (-15, 4 + 18, 4), [(0, 19, -13, -7, -1, 18, 6, 2)], rot=(0, math.pi * 1.5, 0)),
+        part("front", (15, 4 + 18, 0), [(0, 27, -8, -7, -1, 16, 6, 2)], rot=(0, math.pi / 2, 0)),
+        part("right", (0, 4 + 18, -9), [(0, 35, -14, -7, -1, 28, 6, 2)], rot=(0, math.pi, 0)),
+        part("left", (0, 4 + 18, 9), [(0, 43, -14, -7, -1, 28, 6, 2)]),
+    ]),
+    # cod and salmon (Java CodModel / SalmonModel)
+    geometry("geometry.cod.custom", 32, 32, [
+        part("body", (0, 22, 0), [(0, 0, -1, -2, 0, 2, 4, 7)]),
+        part("head", (0, 22, 0), [(11, 0, -1, -2, -3, 2, 4, 3)]),
+        part("nose", (0, 22, -3), [(0, 0, -1, -2, -1, 2, 3, 1)]),
+        part("fin", (0, 22, 7), [(22, 3, 0, -2, 0, 0, 4, 4)]),
+    ]),
+    geometry("geometry.salmon.custom", 32, 32, [
+        part("front", (0, 20, 0), [(0, 0, -1.5, -2.5, 0, 3, 5, 8)]),
+        part("back", (0, 20, 8), [(0, 13, -1.5, -2.5, 0, 3, 5, 8)]),
+        part("head", (0, 20, 0), [(22, 0, -1, -2, -3, 2, 4, 3)]),
+        part("fin", (0, 20, 16), [(20, 10, 0, -2.5, 0, 0, 5, 6)]),
+    ]),
     # strider: a body on two long legs
     geometry("geometry.strider.custom", 64, 128, [
         part("body", (0, 1, 0), [(0, 0, -8, -6, -8, 16, 14, 16)]),

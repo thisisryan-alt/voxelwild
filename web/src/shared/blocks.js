@@ -345,7 +345,7 @@ export const I = {
   Gunpowder: 300, String: 301, GoldNugget: 302, BlazeRod: 303, GhastTear: 304, WoodenSword: 305, StoneSword: 306, IronSword: 307, DiamondSword: 308,
   IronIngot: 309, GoldIngot: 310, CopperIngot: 311, CookedBeef: 312, CookedPorkchop: 313, CookedMutton: 314, CookedChicken: 315, Charcoal: 316,
   Bread: 317, Wheat: 318, WheatSeeds: 319, WoodenHoe: 320, StoneHoe: 321, IronHoe: 322, DiamondHoe: 323,
-  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348, FlameBlade: 349, BoneGreatsword: 350, CloudBottle: 351, BlazingCore: 352, BoneCrown: 353, StormTear: 354, Frostbrand: 355, FrozenHeart: 356, FishingRod: 357, Cod: 358, Salmon: 359, CookedCod: 360, CookedSalmon: 361, GoldenApple: 362, EnchantedGoldenApple: 363, Totem: 364, BoneMeal: 365, GlassBottle: 366, PotionHealing: 367, PotionSwiftness: 368, PotionStrength: 369, PotionNightVision: 370, PotionFireResistance: 371, PotionLeaping: 372, PotionWaterBreathing: 373, Sugar: 374, MilkBucket: 375, Shears: 376, Snowball: 377, Egg: 378, EnderPearl: 379, Glider: 380, PhantomMembrane: 381, Compass: 382, Spyglass: 383, Crossbow: 384,
+  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348, FlameBlade: 349, BoneGreatsword: 350, CloudBottle: 351, BlazingCore: 352, BoneCrown: 353, StormTear: 354, Frostbrand: 355, FrozenHeart: 356, FishingRod: 357, Cod: 358, Salmon: 359, CookedCod: 360, CookedSalmon: 361, GoldenApple: 362, EnchantedGoldenApple: 363, Totem: 364, BoneMeal: 365, GlassBottle: 366, PotionHealing: 367, PotionSwiftness: 368, PotionStrength: 369, PotionNightVision: 370, PotionFireResistance: 371, PotionLeaping: 372, PotionWaterBreathing: 373, Sugar: 374, MilkBucket: 375, Shears: 376, Snowball: 377, Egg: 378, EnderPearl: 379, Glider: 380, PhantomMembrane: 381, Compass: 382, Spyglass: 383, Crossbow: 384, Boat: 385, VoidWings: 386,
   LeatherHelmet: 324,      // armour: 324 + material * 4 + piece (leather, golden, iron, diamond x helmet, chestplate, leggings, boots)
 };
 export const ARMOR_MATS = ['Leather', 'Golden', 'Iron', 'Diamond'], ARMOR_PIECES = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
@@ -429,6 +429,8 @@ ITEMS[I.EnderPearl] = { id: I.EnderPearl, name: 'Ender Pearl', kind: Kind.Use, s
 ITEMS[I.Compass] = { id: I.Compass, name: 'Compass', kind: Kind.Material, stack: 1, compass: true };
 ITEMS[I.Spyglass] = { id: I.Spyglass, name: 'Spyglass', kind: Kind.Use, stack: 1, spyglass: true };
 ITEMS[I.Crossbow] = { id: I.Crossbow, name: 'Crossbow', kind: Kind.Use, stack: 1, durability: 465 };
+ITEMS[I.Boat] = { id: I.Boat, name: 'Boat', kind: Kind.Use, stack: 1, boat: true };
+ITEMS[I.VoidWings] = { id: I.VoidWings, name: 'Void Wings', kind: Kind.Armor, stack: 1, slot: 1, points: 3, durability: 2000, glider: true, fast: true, glint: true };
 ITEMS[I.Glider] = { id: I.Glider, name: 'Glider', kind: Kind.Armor, stack: 1, slot: 1, points: 0, durability: 432, glider: true };
 ITEMS[I.FishingRod] = { id: I.FishingRod, name: 'Fishing Rod', kind: Kind.Use, stack: 1, durability: 64 };
 food(I.Cod, 'Raw Cod', 2, 0.4); food(I.Salmon, 'Raw Salmon', 2, 0.4); food(I.CookedCod, 'Cooked Cod', 5, 6); food(I.CookedSalmon, 'Cooked Salmon', 6, 9.6);
@@ -649,6 +651,7 @@ recipe(I.PotionFireResistance, 1, [[I.GlassBottle, 1], [B.Magma, 1], [I.Glowston
 recipe(I.PotionLeaping, 1, [[I.GlassBottle, 1], [I.SlimeBall, 1], [I.Feather, 2]]);
 recipe(I.PotionWaterBreathing, 1, [[I.GlassBottle, 1], [I.Cod, 2], [I.GlowstoneDust, 1]]);
 recipe(I.Shears, 1, [[I.IronIngot, 2]]);
+recipe(I.Boat, 1, [['planks', 5]]);
 recipe(I.Compass, 1, [[I.IronIngot, 4], [I.Redstone, 1]]);
 recipe(I.Spyglass, 1, [[I.CopperIngot, 2], [C.glass || B.Sand, 1]]);
 recipe(I.Crossbow, 1, [[I.Stick, 3], [I.String, 2], [I.IronIngot, 1], [I.Flint, 1]]);

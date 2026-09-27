@@ -26,23 +26,45 @@ await page.waitForFunction(() => window.voxelwild && (window.voxelwild.game.icon
 const fatal = await page.evaluate(() => document.getElementById('fatal').hidden ? '' : document.getElementById('fatalMsg').textContent); if (fatal) { console.log('FATAL', fatal); process.exit(1); }
 await page.waitForFunction(() => window.voxelwild.game.state === 'menu', { timeout: 60000 }); await new Promise((r) => setTimeout(r, 1200));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-await page.evaluate(() => { window.voxelwild.game.noVillageStart = true; window.voxelwild.ui.play({ id: 'm3', name: 'Mobs3', seed: 20260925, mode: 'creative', unsaved: true, created: 0, lastPlayed: 0 }, true); });
+await page.evaluate(() => { window.voxelwild.game.noVillageStart = true; window.voxelwild.ui.play({ id: 'bt', name: 'Boat', seed: 20260925, mode: 'survival', unsaved: true, created: 0, lastPlayed: 0 }, true); });
 await page.waitForFunction(() => window.voxelwild.game.state === 'playing', { timeout: 120000 });
-await wait(2000);
+await wait(2500);
 const r = await page.evaluate(async () => {
-  const g = window.voxelwild.game, w = g.world; g.settings.mobs = false; g.mobs.list.length = 0;
+  const g = window.voxelwild.game, w = g.world, I = window.voxelwild.items, inv = g.inventory, wait = (ms) => new Promise((res) => setTimeout(res, ms)), out = {};
+  g.settings.mobs = false; g.mobs.list.length = 0;
   const p = g.player.body.pos.map(Math.floor), Y = p[1] + 30;
-  for (let dx = -10; dx <= 10; dx++) for (let dz = -12; dz <= 6; dz++) { w.setBlock(p[0] + dx, Y - 1, p[2] + dz, 3); for (let dy = 0; dy < 8; dy++) w.setBlock(p[0] + dx, Y + dy, p[2] + dz, 0); }
-  for (let dx = 2; dx <= 8; dx++) for (let dz = -10; dz <= -4; dz++) { w.setBlock(p[0] + dx, Y - 4, p[2] + dz, 1); for (let dy = -3; dy <= -1; dy++) w.setBlock(p[0] + dx, Y + dy, p[2] + dz, 8); }
-  g.player.flying = true; g.player.teleport([p[0] + 5, Y + 1.2, p[2] - 1.5], 0, -0.7);
-  const at = (t, dx, dy, dz, yaw) => { const m = g.mobs.spawnAt(t, [p[0] + dx, Y + dy, p[2] + dz]); m.yaw = yaw; return m; };
-  at('panda', -6, 0, -6, -1.2); at('brown_panda', -3, 0, -8, 0.6);
-  ['rabbit_brown', 'rabbit_white', 'rabbit_gold', 'rabbit_salt'].forEach((t, i) => at(t, -7 + i * 1.5, 0, -1, -1.57 + i * 0.4));
-  const ph = at('phantom', 0, 4, -6, 0.5);
-  const sq = at('squid', 4.5, -2.6, -8, 0), gs = at('glow_squid', 7, -2.6, -8, 1); for (let k = 0; k < 4; k++) { at('cod', 3.5 + k * 0.6, -1.5, -5, 1.2); at('salmon', 5 + k * 0.7, -1.8, -6, -0.5); }
-  await new Promise((res) => setTimeout(res, 1500));
-  return { n: g.mobs.list.length, sqWet: sq.body.pos[1].toFixed(2), gsAlive: !gs.dead, phY: (ph.body.pos[1] - Y).toFixed(1) };
+  for (let dx = -12; dx <= 12; dx++) for (let dz = -30; dz <= 4; dz++) { w.setBlock(p[0] + dx, Y - 1, p[2] + dz, 1); for (let dy = 0; dy < 6; dy++) w.setBlock(p[0] + dx, Y + dy, p[2] + dz, 0); }
+  for (let dx = -10; dx <= 10; dx++) for (let dz = -28; dz <= -2; dz++) { w.setBlock(p[0] + dx, Y - 3, p[2] + dz, 1); w.setBlock(p[0] + dx, Y - 2, p[2] + dz, 8); w.setBlock(p[0] + dx, Y - 1, p[2] + dz, 8); }
+  g.player.teleport([p[0] + 0.5, Y, p[2] + 2.5], 0, -0.6);
+  await wait(800);
+  inv.selected = 0; inv.slots[0] = { item: I.Boat, count: 1 };
+  out.placed = g.placeBoat();
+  const boat = g.mobs.list.find((m) => m.type === 'boat');
+  await wait(1200);
+  out.boatY = boat && +(boat.body.pos[1] - Y).toFixed(2);
+  g.mount(boat); g.player.pitch = -0.15;
+  const z0 = boat.body.pos[2];
+  g.keys.add('KeyW'); await wait(2500); g.keys.delete('KeyW');
+  out.rowed = +(z0 - boat.body.pos[2]).toFixed(1); out.riding = !!g.riding; out.seat = +(g.player.body.pos[1] - boat.body.pos[1]).toFixed(2);
+  return out;
 });
-await page.screenshot({ path: join(out, 'mobs3.png') });
-console.log(JSON.stringify(r), 'errors', await page.evaluate(() => window.voxelwild.game.errors || 0));
+await page.screenshot({ path: join(out, 'boat-ride.png') });
+const r2 = await page.evaluate(async () => {
+  const g = window.voxelwild.game, wait = (ms) => new Promise((res) => setTimeout(res, ms)), out = {};
+  g.keys.add('ShiftLeft'); await wait(400); g.keys.delete('ShiftLeft');
+  out.dismounted = !g.riding;
+  const boat = g.mobs.list.find((m) => m.type === 'boat'), b = boat.body.pos;
+  g.setMode(true); g.player.flying = true; g.player.teleport([b[0] + 2.5, b[1] + 2.5, b[2] + 2.5], Math.PI * 0.25, -0.55);
+  return out;
+});
+await wait(1200);
+await page.screenshot({ path: join(out, 'boat.png') });
+const r3 = await page.evaluate(async () => {
+  const g = window.voxelwild.game, wait = (ms) => new Promise((res) => setTimeout(res, ms)), p = g.player.body.pos;
+  const v = g.mobs.spawnAt('void_phantom', [p[0], p[1] + 8, p[2] - 16]); g.player.yaw = 0; g.player.pitch = 0.35;
+  await wait(4000);
+  return { alive: !v.dead, hp: v.health, bossBar: !document.getElementById('bossBar').hidden };
+});
+await page.screenshot({ path: join(out, 'void-phantom.png') });
+console.log(JSON.stringify({ ...r, ...r2, ...r3 }), 'errors', await page.evaluate(() => window.voxelwild.game.errors || 0));
 await browser.close(); server.close();

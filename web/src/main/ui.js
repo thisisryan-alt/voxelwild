@@ -47,6 +47,8 @@ const TIPS = [
   'Foxes live in the taiga, keep away from you unless you sneak, and hunt chickens.',
   'New structures: jungle temples, ruined watchtowers and shipwrecks on the sea floor, each with its own loot.',
   'A crossbow winds up an arrow and shoots it fast and flat; a spyglass zooms; a compass points back to spawn.',
+  'Boats (5 planks): place one on water, right-click to board, look to steer, W to row, Shift to get out.',
+  'The Void Phantom guards the End. Beat it for Void Wings: a glider that is faster and never wears out.',
   'Tame a wolf with bones. Right-click it to make it sit or follow; feed it meat to heal it. It fights whatever you fight.',
   'An enchanting table (4 obsidian, 2 diamonds, 3 lapis) enchants tools, weapons, bows and armour for experience levels and lapis lazuli.',
   'An anvil (3 iron blocks, 4 iron ingots) repairs worn gear with its material, or merges two of the same item and their enchantments.',
@@ -160,7 +162,7 @@ const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft',
 const CAUSES = { fall: 'You hit the ground too hard.', drowning: 'You ran out of air.', starvation: 'You starved.', void: 'You fell out of the world.',
   lava: 'You tried to swim in lava.', magma: 'You discovered the floor was lava.', explosion: 'You blew up.',
   husk: 'You were slain by a Husk.', skeleton: 'You were shot by a Skeleton.', creeper: 'You were blown up by a Creeper.', spider: 'You were slain by a Spider.',
-  wolf: 'You were slain by a Wolf.', zombified_piglin: 'You were slain by a Zombified Piglin.', blaze: 'You were burned by a Blaze.', ghast: 'You were fireballed by a Ghast.', stray: 'You were shot by a Stray.', wither_skeleton: 'You were slain by a Wither Skeleton.', cave_spider: 'You were slain by a Cave Spider.', king_slime: 'You were squashed by King Slime.', inferno_spirit: 'You were burned to ash by the Inferno Spirit.', hollow_king: 'You were slain by the Hollow King.', storm_ghast: 'You were struck down by the Storm Ghast.', frost_colossus: 'You were frozen by the Frost Colossus.', vindicator: 'You were slain by a Vindicator.', pillager: 'You were shot by a Pillager.', piglin_brute: 'You were slain by a Piglin Brute.', polar_bear: 'You were mauled by a Polar Bear.', slime_big: 'You were slain by a Slime.', slime_medium: 'You were slain by a Slime.' };
+  wolf: 'You were slain by a Wolf.', zombified_piglin: 'You were slain by a Zombified Piglin.', blaze: 'You were burned by a Blaze.', ghast: 'You were fireballed by a Ghast.', stray: 'You were shot by a Stray.', wither_skeleton: 'You were slain by a Wither Skeleton.', cave_spider: 'You were slain by a Cave Spider.', king_slime: 'You were squashed by King Slime.', inferno_spirit: 'You were burned to ash by the Inferno Spirit.', hollow_king: 'You were slain by the Hollow King.', storm_ghast: 'You were struck down by the Storm Ghast.', void_phantom: 'You were taken by the Void Phantom.', frost_colossus: 'You were frozen by the Frost Colossus.', vindicator: 'You were slain by a Vindicator.', pillager: 'You were shot by a Pillager.', piglin_brute: 'You were slain by a Piglin Brute.', polar_bear: 'You were mauled by a Polar Bear.', slime_big: 'You were slain by a Slime.', slime_medium: 'You were slain by a Slime.' };
 
 function svgHeart(fill) {
   const f = fill === 2 ? 'var(--heart)' : fill === 1 ? 'url(#half)' : 'rgba(0,0,0,0.45)';
@@ -446,7 +448,8 @@ export class UI {
         ['inferno_spirit', 'Inferno Spirit', 'Craft a Blazing Core (4 blaze rods, 4 gold ingots). Drops the Flame Blade.'],
         ['hollow_king', 'Hollow King', 'Craft a Bone Crown (12 bones, 4 coal, a gold ingot). Drops the Bone Greatsword.'],
         ['frost_colossus', 'Frost Colossus', 'Craft a Frozen Heart (4 packed ice, a diamond). Drops the Frostbrand.'],
-        ['storm_ghast', 'Storm Ghast', 'Guards the floating temples of the Skylands, or craft a Storm Tear. Drops a Cloud in a Bottle.']];
+        ['storm_ghast', 'Storm Ghast', 'Guards the floating temples of the Skylands, or craft a Storm Tear. Drops a Cloud in a Bottle.'],
+        ['void_phantom', 'Void Phantom', 'Descends on players who reach the End. Drops Void Wings, a faster glider that never wears out.']];
       el.innerHTML = list.map(([k, n, how]) => `<div><b>${n}</b> <span class="${beaten[k] ? 'done' : ''}">${beaten[k] ? `defeated ×${beaten[k]}` : 'not yet defeated'}</span><small>${how}</small></div>`).join('');
       el.hidden = !el.hidden;
     };

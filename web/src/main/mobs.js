@@ -36,6 +36,12 @@ export const MOB_TYPES = {
   rabbit_gold: { name: 'Rabbit', health: 3, speed: 2.4, half: 0.2, height: 0.5, kind: 'passive', drops: [[I.Leather, 0, 1]], hop: true, base: 'rabbit' },
   rabbit_salt: { name: 'Rabbit', health: 3, speed: 2.4, half: 0.2, height: 0.5, kind: 'passive', drops: [[I.Leather, 0, 1]], hop: true, base: 'rabbit' },
   phantom: { name: 'Phantom', health: 20, speed: 5, half: 0.45, height: 0.5, kind: 'hostile', damage: 3, flying: true, burns: true, drops: [[I.PhantomMembrane, 0, 1]], range: 40 },
+  cod: { name: 'Cod', health: 3, speed: 1.8, half: 0.25, height: 0.3, kind: 'water', drops: [[I.Cod, 1, 1]], swims: true },
+  salmon: { name: 'Salmon', health: 3, speed: 2.2, half: 0.3, height: 0.4, kind: 'water', drops: [[I.Salmon, 1, 1]], swims: true },
+  boat: { name: 'Boat', health: 4, speed: 0, half: 0.7, height: 0.6, kind: 'vehicle', vehicle: true, drops: [[I.Boat, 1, 1]] },
+  // the End's guardian (not in Minecraft): a giant phantom that swoops and spits void fire
+  void_phantom: { name: 'Void Phantom', health: 450, speed: 6, half: 1.8, height: 1.6, kind: 'hostile', damage: 8, flying: true, boss: true, bossAI: 'void', glow: 0.35, range: 64,
+    drops: [[I.VoidWings, 1, 1], [I.Diamond, 3, 6], [I.PhantomMembrane, 8, 12], [I.EnderPearl, 4, 8]] },
   // foxes keep their distance from the player and hunt chickens
   fox: { name: 'Fox', health: 10, speed: 2.8, half: 0.3, height: 0.7, kind: 'passive', drops: [], hunts: 'chicken', shy: true },
   snow_fox: { name: 'Snow Fox', health: 10, speed: 2.8, half: 0.3, height: 0.7, kind: 'passive', drops: [], hunts: 'chicken', shy: true, base: 'fox' },
@@ -168,6 +174,18 @@ export class Mobs {
     return true;
   }
 
+  /** Boats bob on the water surface, coast to a stop, and are dragged along slowly on land. */
+  float(m, dt) {
+    const w = this.game.world, b = m.body, wet = (dy) => isWater(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + dy), Math.floor(b.pos[2])));
+    const under = wet(0.3), on = wet(-0.05);
+    if (under) b.vel[1] = Math.min(b.vel[1] + 20 * dt, 1.5);
+    else if (on) b.vel[1] = Math.max(0, b.vel[1]) * 0.5;
+    else b.vel[1] = Math.max(b.vel[1] - 25 * dt, -30);
+    if (!m.rider) { const k = Math.exp(-dt * (on || under ? 1.2 : 6)); b.vel[0] *= k; b.vel[2] *= k; }
+    b.move(w, [b.vel[0] * dt, b.vel[1] * dt, b.vel[2] * dt]);
+    m.floating = on || under; m.walkSpeed = 0; m.rider = false;
+  }
+
   /** Where a thrown snowball, egg or pearl comes down. */
   landThrown(s, at) {
     const g = this.game;
@@ -298,7 +316,7 @@ export class Mobs {
   }
 
   counts() {
-    const c = { passive: 0, hostile: 0, neutral: 0, water: 0, pet: 0 };
+    const c = { passive: 0, hostile: 0, neutral: 0, water: 0, pet: 0, vehicle: 0 };
     for (const m of this.list) c[m.def.kind]++;
     return c;
   }
@@ -318,8 +336,13 @@ export class Mobs {
         const clim = w.climateAt(x, z);
         const top = w.getBlock(x, h, z);
         const open = this.standable(x, h + 1, z) && !isLiquid(top) && (BLOCKS[top].flags & F.Solid);
-        if (isWater(top) && counts.water < 6 && clim && (clim.biome === Biome.Ocean || clim.biome === Biome.River || clim.biome === Biome.Swamp) && isWater(w.getBlock(x, h - 3, z)) && this.rng() < 0.3) {
-          this.spawnAt(night && this.rng() < 0.4 ? 'glow_squid' : 'squid', [x + 0.5, h - 2.5, z + 0.5]);
+        if (isWater(top) && counts.water < 14 && clim && (clim.biome === Biome.Ocean || clim.biome === Biome.River || clim.biome === Biome.Swamp) && isWater(w.getBlock(x, h - 3, z)) && this.rng() < 0.4) {
+          if (this.rng() < 0.4) this.spawnAt(night && this.rng() < 0.4 ? 'glow_squid' : 'squid', [x + 0.5, h - 2.5, z + 0.5]);
+          else {
+            // a small school of fish
+            const kind = clim.biome === Biome.River ? 'salmon' : 'cod';
+            for (let k = 0; k < 3 + Math.floor(this.rng() * 3); k++) { const fx = x + 0.5 + (this.rng() - 0.5) * 3, fz = z + 0.5 + (this.rng() - 0.5) * 3; if (isWater(w.getBlock(Math.floor(fx), h - 2, Math.floor(fz)))) this.spawnAt(kind, [fx, h - 2 + this.rng(), fz]); }
+          }
           return;
         }
         if (open && counts.passive < 12 && clim && this.rng() < 0.18) {
@@ -362,6 +385,13 @@ export class Mobs {
         if (clim && clim.biome === Biome.Swamp && night && y >= h && this.rng() < 0.015 && !this.list.some((m) => m.def.boss && !m.dead)) { this.spawnAt('king_slime', [x + 0.5, y + 1, z + 0.5]); g.emit('toast', 'The ground shakes: King Slime is near!'); return; }
         if (kind === 'spider' && !this.standableWide(x, y, z)) continue;
         this.spawnGroup(kind, x, y, z, 1 + (this.rng() < 0.3 ? 1 : 0));
+        return;
+      }
+      if (dim === Dim.End && !peaceful && !((g.meta.bossesDefeated || {}).void_phantom) && !this.list.some((m) => m.def.boss && !m.dead) && (this.voidT = (this.voidT ?? 8) - 0.7) <= 0) {
+        this.voidT = 60;
+        const m = this.spawnAt('void_phantom', [p[0] + 20, p[1] + 25, p[2] + 20]);
+        m.yaw = 0;
+        g.emit('toast', 'The Void Phantom descends!');
         return;
       }
       if (dim === 3) {
@@ -420,6 +450,7 @@ export class Mobs {
     const pl = g.player, pp = pl.body.pos;
     const dx = pp[0] - b.pos[0], dz = pp[2] - b.pos[2], dy = pp[1] - b.pos[1], dist = Math.hypot(dx, dy, dz);
     if (t.swims && this.swim(m, dt)) return;
+    if (t.vehicle) { this.float(m, dt); return; }
     const sky = g.skyNow || g.tod.state;
     const targetable = g.state === 'playing' && !g.creative;
     let hostile = m.angry > 0 && targetable;
@@ -642,6 +673,22 @@ export class Mobs {
           if (!g.creative) { g.stats.damage(3, 'frost_colossus'); pl.slowT = 3; }
         }
       }
+    } else if (t.bossAI === 'void') {
+      // swoops at the player, and fires volleys of void fire from above
+      if (m.swoop > 0) {
+        m.swoop -= dt;
+        b.move(g.world, [m.swoopV[0] * dt, m.swoopV[1] * dt, m.swoopV[2] * dt]);
+        if (Math.random() < dt * 30) g.spawnEmbers([b.pos[0], b.pos[1] + 0.8, b.pos[2]], 2, [0.7, 0.2, 1.4]);
+        if (dist < t.half + 2 && m.attackT <= 0 && !g.creative) { m.attackT = 1; g.stats.damage(t.damage, 'void_phantom'); const pv = g.player.body.vel; pv[0] += m.swoopV[0] * 0.3; pv[1] = Math.max(pv[1], 6); pv[2] += m.swoopV[2] * 0.3; }
+      } else if (m.skillT <= 0) {
+        m.skillT = low ? 2.5 : 4;
+        if (this.rng() < 0.55) {
+          const tx = pp[0] - b.pos[0], ty = pp[1] + 1 - b.pos[1], tz = pp[2] - b.pos[2], l = Math.hypot(tx, ty, tz) || 1;
+          m.swoop = Math.min(1.6, l / 22 + 0.3); m.swoopV = [tx / l * 22, ty / l * 22, tz / l * 22];
+          g.audio.mobHurt('ghast');
+        } else for (let k = 0; k < (low ? 5 : 3); k++) this.shoot(m, [pp[0] + (this.rng() - 0.5) * 6, pp[1], pp[2] + (this.rng() - 0.5) * 6], 'ghastball');
+      }
+      m.attackT -= dt;
     } else if (t.bossAI === 'storm') {
       // lightning where the player stands (a warning glow first)
       if (m.strike) {
@@ -712,7 +759,7 @@ export class Mobs {
     if (m.health <= 0) {
       m.dead = 0.001;
       if (m.pet && g.meta) { g.meta.pets = (g.meta.pets || []).filter((r) => r !== m.pet); g.emit('toast', 'Your wolf died'); }
-      if (m.playerHit && m.def.kind === 'hostile') { g.advance(m.def.boss ? 'boss' : 'hunter'); g.bountyKill(m); }
+      if (m.playerHit && m.def.kind === 'hostile') { g.advance(m.def.boss ? 'boss' : 'hunter'); g.bountyKill(m); if (m.type === 'void_phantom') g.advance('void'); }
       if (m.playerHit) g.giveXp(m.def.boss ? 100 : m.def.kind === 'hostile' ? 5 : 1 + Math.floor(this.rng() * 3), [m.body.pos[0], m.body.pos[1] + 0.5, m.body.pos[2]]);
       if (m.def.splits) {
         const n = 2 + Math.floor(this.rng() * 2);

@@ -33,6 +33,8 @@ export const ADVANCEMENTS = [
   { id: 'brew', name: 'Local Brewery', desc: 'Drink a potion' },
   { id: 'pearl', name: 'Into Thin Air', desc: 'Teleport with an ender pearl' },
   { id: 'glide', name: 'Sky Rider', desc: 'Fly with a glider' },
+  { id: 'boat', name: 'Set Sail', desc: 'Ride a boat' },
+  { id: 'void', name: 'Free the End', desc: 'Defeat the Void Phantom' },
   { id: 'level30', name: 'Seasoned', desc: 'Reach level 30', level: 30 },
   { id: 'boss', name: 'Boss Slayer', desc: 'Defeat a boss' },
   { id: 'bosses', name: 'Monarch of Monsters', desc: 'Defeat all five bosses' },

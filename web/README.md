@@ -281,10 +281,21 @@ a Bottle). Waves heal and restock the player; a death retries the wave; the end 
   open it; diving trades height for speed, pulling up bleeds it off; it wears with use and mends with membrane.
 - **Music**: now and then a quiet generative piano piece in one of four scales (Audio > Music).
 - **New mobs** (models written from Minecraft's Java definitions in `tools/make_geo.py`, skins from the pack):
-  foxes and snow foxes (taiga; shy; hunt chickens), squid and glow squid (swim in oceans, rivers and swamps; dry out
+  foxes and snow foxes (taiga; shy; hunt chickens), schools of cod (oceans) and salmon (rivers), squid and glow squid (swim in oceans, rivers and swamps; dry out
   on land), pandas and the rare brown panda (jungle), rabbits in four coats by biome (they hop), and phantoms that
   swoop at players under the night sky from the third night and drop phantom membrane. `part(..., parent=)` lets
   a bone hang off another. `node test/content.mjs`, `node test/fox.mjs`, `node test/mobs3.mjs`.
+- **New structures** (`shared/structures.js`): mossy jungle temples (two floors, vines, two chests), ruined
+  stone-brick watchtowers with a broken crown and a ladder to the upper floors, and shipwrecks on the sea floor, each
+  with its own loot table (`game.fillLoot`) and minimap marker. `node test/structs3.mjs`.
+- **Compass** (held: the way to spawn and the time), **spyglass** (hold the right button: 5x zoom, slower look, a
+  scope), **crossbow** (hold to wind an arrow in 1.1 s, click to loose a fast flat bolt).
+- **Boats** (5 planks; the Java boat model with the pack's oak boat skin): place on water, right-click to board, look
+  to steer, W / S to row, Shift to get out. They float, coast and crawl on land. `game.placeBoat`, `updateRide`,
+  `mobs.float`.
+- **The Void Phantom** (not in Minecraft): a six-times phantom that descends on players in the End until beaten; it
+  swoops and fires volleys of void fire. It drops **Void Wings**, a glider that is faster (up to 48 m/s), armoured and
+  never wears out. `node test/boat.mjs` covers boats and the boss.
 - The pause menu scrolls when it is taller than the window (`justify-content: safe center`), so its top buttons can
   always be reached.
 

@@ -867,7 +867,7 @@ export class Game {
     }
     const before = pl.body.pos[1];
     pl.doubleJump = this.inventory.count(I.CloudBottle) > 0;
-    pl.update(w, dt, inp);
+    if (this.riding) this.updateRide(dt, inp); else pl.update(w, dt, inp);
     if (pl.didDoubleJump) { pl.didDoubleJump = false; for (let k = 0; k < 10; k++) this.spawnEmbers([pl.body.pos[0], pl.body.pos[1], pl.body.pos[2]], 1, [1.4, 1.4, 1.5]); }
     this.updateHazards(dt);
     if (pl.body.pos[1] < MIN_Y - 40) { if (this.creative) pl.teleport([pl.body.pos[0], MAX_Y - 4, pl.body.pos[2]]); else this.stats.damage(1000, 'void'); }
@@ -887,6 +887,7 @@ export class Game {
       this.audio.music(dt, this.settings.music !== false && this.state === 'playing' && !this.audio.bossSrc); if (!this.creative) this.updateRested(dt); this.updateDash(dt); }
     this.updateEyes(dt);
     if (!this.meta.menu) this.mobs.update(dt);
+    if (this.riding) this.seatRider();
     if ((this.advT = (this.advT || 0) - dt) <= 0) { this.advT = 1; this.checkAdvancements(); }
     // boss music while a boss is near
     if ((this.bossMusicT = (this.bossMusicT || 0) - dt) <= 0) {
@@ -939,6 +940,7 @@ export class Game {
     this.attackT = (this.attackT || 0) - dt;
     if (mobHit && (!hit || mobHit.dist < hit.dist)) {
       this.target = null;
+      if (this.mouse.rightClicked && this.state === 'playing' && mobHit.mob.def.vehicle && !this.riding) { this.mount(mobHit.mob); this.mining = null; return; }
       if (this.mouse.rightClicked && this.state === 'playing' && this.mobs.interactMob(mobHit.mob)) { this.swing = 1; this.mining = null; return; }
       if (this.mouse.rightClicked && mobHit.mob.def.villager && this.state === 'playing') {
         const v = mobHit.mob;
@@ -2432,6 +2434,44 @@ export class Game {
     this.swing = 1; this.audio.place(B.Grass);
   }
 
+  // ---------------------------------------------------------------- boats
+
+  /** Puts a boat on the first water (or ground) within 5 blocks along the view. */
+  placeBoat() {
+    const pl = this.player, e = pl.eye(), f = pl.forward(), w = this.world;
+    for (let t = 1; t <= 5; t += 0.25) {
+      const x = e[0] + f[0] * t, y = e[1] + f[1] * t, z = e[2] + f[2] * t, b = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
+      if (isWater(b) || (b > 0 && (BLOCKS[b].flags & F.Solid))) {
+        const m = this.mobs.spawnAt('boat', [x, Math.floor(y) + 1.05, z]);
+        m.yaw = pl.yaw + Math.PI / 2;
+        if (!this.creative) this.inventory.consumeHeld();
+        this.audio.place(B.Planks); this.swing = 1;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  mount(m) { this.riding = m; this.player.flying = false; this.emit('toast', 'Look to steer, W to row, Shift to get out'); this.advance('boat'); }
+
+  /** While riding the player steers the boat: it turns toward the view and rows with W / S. */
+  updateRide(dt, inp) {
+    const m = this.riding, pl = this.player;
+    if (!m || m.dead || !this.mobs.list.includes(m) || inp.descend || this.state !== 'playing') {
+      this.riding = null;
+      if (m) { pl.teleport([m.body.pos[0], m.body.pos[1] + 1.1, m.body.pos[2]], pl.yaw, pl.pitch); pl.body.vel = [0, 2, 0]; }
+      return;
+    }
+    const b = m.body, sp = m.floating ? 8 : 1.5, want = (inp.fwd || 0) * sp;
+    m.yaw = lerpAngleG(m.yaw, pl.yaw + Math.PI / 2, Math.min(1, dt * 3));
+    const fx = -Math.sin(m.yaw - Math.PI / 2), fz = -Math.cos(m.yaw - Math.PI / 2), k = Math.min(1, dt * 1.5);
+    b.vel[0] += (fx * want - b.vel[0]) * k; b.vel[2] += (fz * want - b.vel[2]) * k;
+    m.rider = true;
+    pl.body.vel = [0, 0, 0]; pl.fallStart = NaN;
+    this.seatRider();
+  }
+  seatRider() { const b = this.riding && this.riding.body; if (b) { this.player.body.pos = [b.pos[0], b.pos[1] + 0.15, b.pos[2]]; this.player.body.vel = [0, 0, 0]; } }
+
   /** Snowballs, eggs and ender pearls are thrown. */
   throwItem(def) {
     const pl = this.player, e = pl.eye(), f = pl.forward();
@@ -2446,7 +2486,7 @@ export class Game {
   updateGlide(dt) {
     const pl = this.player, a = this.inventory.armor[1], space = this.keys.has('Space');
     const pressed = space && !this.lastSpace; this.lastSpace = space;
-    if (!a || a.item !== I.Glider || pl.flying || pl.inWater || pl.body.grounded || this.state !== 'playing') { this.gliding = false; return; }
+    if (!a || !ITEMS[a.item] || !ITEMS[a.item].glider || pl.flying || pl.inWater || pl.body.grounded || this.state !== 'playing') { this.gliding = false; return; }
     if (!this.gliding) {
       if (pressed && pl.body.vel[1] < -2) {
         // opening the wing turns the fall into forward speed
@@ -2459,13 +2499,14 @@ export class Game {
     }
     if (pressed) { this.gliding = false; return; }
     const f = pl.forward(), v = pl.body.vel;
-    this.glideSpeed = Math.max(4, Math.min(34, this.glideSpeed + (-f[1] * 22 - 2) * dt));
+    const fast = ITEMS[a.item].fast;
+    this.glideSpeed = Math.max(4, Math.min(fast ? 48 : 34, this.glideSpeed + (-f[1] * (fast ? 28 : 22) - (fast ? 1 : 2)) * dt));
     v[1] += (pl.gravity || 30) * dt;   // the wing carries the player's weight; lift and drag come from the blend below
     const want = [f[0] * this.glideSpeed, f[1] * this.glideSpeed - 2, f[2] * this.glideSpeed], k = Math.min(1, dt * 5);
     for (let i = 0; i < 3; i++) v[i] += (want[i] - v[i]) * k;
     pl.fallStart = NaN;
     this.glideWear = (this.glideWear || 0) + dt;
-    if (this.glideWear >= 1 && !this.creative) {
+    if (this.glideWear >= 1 && !this.creative && !fast) {
       this.glideWear = 0; a.wear = (a.wear || 0) + 1;
       if (a.wear >= ITEMS[a.item].durability) { this.inventory.armor[1] = null; this.gliding = false; this.emit('toast', 'Glider broke'); this.inventory.changed(); }
     }
@@ -2475,6 +2516,7 @@ export class Game {
   useItem(def, hit) {
     if (def.id === I.BoneMeal) { this.useBoneMeal(hit); return; }
     if (def.throws) { this.throwItem(def); return; }
+    if (def.boat) { this.placeBoat(); return; }
     const inv = this.inventory, w = this.world;
     if (def.id === I.FlintAndSteel) {
       if (!hit) return;
@@ -3256,3 +3298,5 @@ export class Game {
 }
 
 export { itemName, canHarvest };
+
+function lerpAngleG(a, b, t) { let d = ((b - a) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI; return a + d * t; }

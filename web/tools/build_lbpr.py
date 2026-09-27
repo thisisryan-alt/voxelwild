@@ -754,7 +754,8 @@ def main():
                   "GoldenApple": "golden_apple", "EnchantedGoldenApple": "golden_apple", "Totem": "totem_head", "BoneMeal": "bone_meal",
                   "GlassBottle": "glass_bottle", "Sugar": "sugar", "MilkBucket": "milk_bucket", "Shears": "shears", "Snowball": "snowball",
                   "Egg": "egg", "EnderPearl": "ender_pearl", "Glider": "elytra", "PhantomMembrane": "phantom_membrane",
-                  "Compass": "compass/compass_000", "Spyglass": "spyglass", "Crossbow": "crossbow_standby"})
+                  "Compass": "compass/compass_000", "Spyglass": "spyglass", "Crossbow": "crossbow_standby",
+                  "Boat": "oak_boat_1", "VoidWings": "elytra"})
     items.update({"Backpack": "bundle", "GrapplingHook": "lead", "SlimeCrown": "golden_helmet", "SleepingBag": "green_bundle"})
     items.update({"SlimeBall": "slime_ball", "Bow": "bow", "Bucket": "bucket", "WaterBucket": "water_bucket", "LavaBucket": "lava_bucket", "fam:comparator": "comparator",
                   "fam:hopper": "hopper"})
