@@ -55,6 +55,48 @@ export class VoxelBody {
     return [ax, ay, az];
   }
 
+  /** Solid boxes the body is inside of (by more than a hair). */
+  overlapping(world) {
+    const mn = this.min(), mx = this.max(), boxes = [], out = [];
+    for (let y = Math.floor(mn[1]); y <= Math.floor(mx[1] - SKIN); y++) for (let z = Math.floor(mn[2] + SKIN); z <= Math.floor(mx[2] - SKIN); z++)
+      for (let x = Math.floor(mn[0] + SKIN); x <= Math.floor(mx[0] - SKIN); x++) world.collisionBoxes(x, y, z, boxes);
+    for (const b of boxes) {
+      if (Math.min(mx[0], b[3]) - Math.max(mn[0], b[0]) > 0.01 && Math.min(mx[1], b[4]) - Math.max(mn[1], b[1]) > 0.01 &&
+          Math.min(mx[2], b[5]) - Math.max(mn[2], b[2]) > 0.01) out.push(b);
+    }
+    return out;
+  }
+  /** Out of the ground: a shallow overlap is stepped up onto (or pushed out sideways), a deep one climbs to the
+   *  first free space above (up to maxLift blocks). Returns true when the body moved. */
+  unstick(world, maxLift = 1.2) {
+    let hit = this.overlapping(world);
+    if (!hit.length) return false;
+    if (hit.some((b) => b[0] === -Infinity)) return false;
+    const top = Math.max(...hit.map((b) => b[4]));
+    const start = [...this.pos];
+    if (top - this.pos[1] <= maxLift) {
+      this.pos[1] = top + SKIN;
+      if (!this.overlapping(world).length) { this.vel[1] = Math.max(0, this.vel[1]); return true; }
+    }
+    // sideways, by the shallowest way out
+    this.pos = [...start];
+    const mn = this.min(), mx = this.max();
+    for (const [a, dir] of [[0, 1], [0, -1], [2, 1], [2, -1]]) {
+      const d = dir > 0 ? Math.max(...hit.map((b) => b[3 + a] - mn[a])) : -Math.max(...hit.map((b) => mx[a] - b[a]));
+      if (Math.abs(d) > 0.35) continue;
+      this.pos[a] = start[a] + d + dir * SKIN;
+      if (!this.overlapping(world).length) return true;
+      this.pos = [...start];
+    }
+    // deep inside: climb to the first gap tall enough
+    for (let k = 1; k <= Math.max(1, Math.ceil(maxLift)); k++) {
+      this.pos = [start[0], Math.floor(start[1]) + k + SKIN, start[2]];
+      if (!this.overlapping(world).length) { this.vel = [0, 0, 0]; return true; }
+    }
+    this.pos = start;
+    return false;
+  }
+
   probeGround(world, depth = 0.05) { return this.sweep(world, 1, -depth) > -depth; }
 
   overlaps(bx, by, bz) {
@@ -113,6 +155,16 @@ export class Player {
 
   /** input: { fwd, strafe, jump, jumpPressed, sprint, descend, flyToggle, time } */
   update(world, dt, input) {
+    // long frames (a slow GPU at 4K) are split into steps, so the player keeps real-time speed
+    if (dt > 0.05) {
+      const n = Math.min(5, Math.ceil(dt / 0.05));
+      for (let k = 0; k < n; k++) this.step(world, dt / n, k === 0 ? input : { ...input, jumpPressed: false, flyToggle: false });
+      return;
+    }
+    this.step(world, dt, input);
+  }
+
+  step(world, dt, input) {
     dt = Math.min(dt, 0.05);
     const b = this.body, v = b.vel;
     if (this.canFly && input.flyToggle) this.flying = !this.flying;
@@ -173,6 +225,8 @@ export class Player {
     this.sprinting = input.sprint && (ix || iz) && !this.flying;
 
     const before = [b.pos[0], b.pos[2]];
+    // never stay inside the ground (blocks placed or moved into the player, respawns into built-up land)
+    if (b.unstick(world, 0.6)) this.fallStart = NaN;
     const canStep = !this.flying && !swimming && b.probeGround(world);
     const stepped = b.move(world, [v[0] * dt, v[1] * dt, v[2] * dt], canStep ? 0.6 : 0);
     // the camera eases up a step instead of jumping
@@ -225,7 +279,7 @@ export function raycast(world, origin, dir, maxDist, pick) {
       if (!d.model || !world.modelBoxesAt || d.shape !== 9) return { hit: [x, y, z], prev: [px, py, pz], face, block: b, dist: t, point: origin.map((o, k) => o + dir[k] * t) };
       // shaped blocks: the ray has to meet one of their boxes
       let best = null;
-      for (const k of world.modelBoxesAt(x, y, z, b, false)) {
+      for (const k of pickBoxes(d.model, world.modelBoxesAt(x, y, z, b, false))) {
         const r = rayBox(origin, dir, [x + k[0], y + k[1], z + k[2]], [x + k[3], y + k[4], z + k[5]]);
         if (r && (!best || r.t < best.t)) best = r;
       }
@@ -240,6 +294,21 @@ export function raycast(world, origin, dir, maxDist, pick) {
     else { z += sz; t = tmz; tmz += tdz; face = sz > 0 ? 5 : 4; }
   }
   return null;
+}
+
+/** Small parts (levers, buttons, dust, torches, rails ...) are aimed at by a roomier box around them, like Minecraft's
+ *  selection boxes, so right-clicking them does not slip past onto the block behind. */
+const SMALL = new Set([K.Lever, K.Button, K.Wire, K.RTorch, K.WallTorch, K.Plate, K.Rail, K.Ladder, K.Lily, K.Repeater, K.Comparator, K.Carpet]);
+export function pickBoxes(m, boxes) {
+  if (!SMALL.has(m.kind) || !boxes.length) return boxes;
+  const u = [1, 1, 1, 0, 0, 0];
+  for (const b of boxes) for (let k = 0; k < 3; k++) { u[k] = Math.min(u[k], b[k]); u[k + 3] = Math.max(u[k + 3], b[k + 3]); }
+  const pad = 2.5 / 16;
+  for (let k = 0; k < 3; k++) {
+    u[k] = Math.max(0, u[k] - pad); u[k + 3] = Math.min(1, u[k + 3] + pad);
+    if (u[k + 3] - u[k] < 0.25) { const c = (u[k] + u[k + 3]) / 2; u[k] = Math.max(0, c - 0.125); u[k + 3] = Math.min(1, c + 0.125); }
+  }
+  return [u];
 }
 
 /** Ray against an axis-aligned box: { t, face } of the entry face (0 +X 1 -X 2 +Y 3 -Y 4 +Z 5 -Z), or null. */

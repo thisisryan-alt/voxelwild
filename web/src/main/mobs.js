@@ -22,6 +22,9 @@ export const MOB_TYPES = {
   spider: { name: 'Spider', health: 16, speed: 2.9, half: 0.7, height: 0.9, kind: 'hostile', damage: 2, drops: [[I.String, 0, 2]], dayNeutral: true },
   zombified_piglin: { name: 'Zombified Piglin', health: 20, speed: 2.3, half: 0.3, height: 1.95, kind: 'neutral', damage: 5, group: true, drops: [[I.RottenFlesh, 0, 1], [I.GoldNugget, 0, 1]] },
   blaze: { name: 'Blaze', health: 20, speed: 2.3, half: 0.3, height: 1.8, kind: 'hostile', flying: true, ranged: 'fireball', drops: [[I.BlazeRod, 0, 1]], glow: 1 },
+  stray: { name: 'Stray', health: 20, speed: 2.3, half: 0.3, height: 1.99, kind: 'hostile', ranged: 'arrow', drops: [[I.Bone, 0, 2], [I.Arrow, 0, 2]], burns: true, base: 'skeleton' },
+  wither_skeleton: { name: 'Wither Skeleton', health: 20, speed: 2.4, half: 0.35, height: 2.4, kind: 'hostile', damage: 8, drops: [[I.Coal, 0, 1], [I.Bone, 0, 2]], base: 'skeleton', melee: true },
+  cave_spider: { name: 'Cave Spider', health: 12, speed: 3.1, half: 0.35, height: 0.5, kind: 'hostile', damage: 2, drops: [[I.String, 0, 2]], base: 'spider' },
   ghast: { name: 'Ghast', health: 10, speed: 1.6, half: 2, height: 4, kind: 'hostile', flying: true, ranged: 'ghastball', drops: [[I.GhastTear, 0, 1], [I.Gunpowder, 0, 2]], range: 40 },
 };
 
@@ -110,7 +113,9 @@ export class Mobs {
         }
         if (y == null) continue;
         const pick = this.rng();
-        const kind = pick < 0.35 ? 'husk' : pick < 0.62 ? 'skeleton' : pick < 0.82 ? 'creeper' : 'spider';
+        let kind = pick < 0.35 ? 'husk' : pick < 0.62 ? 'skeleton' : pick < 0.82 ? 'creeper' : 'spider';
+        if (kind === 'skeleton' && clim && (clim.biome === Biome.SnowyTaiga || clim.biome === Biome.SnowyTundra)) kind = 'stray';
+        if (kind === 'spider' && y < 20 && this.rng() < 0.6) kind = 'cave_spider';
         if (kind === 'spider' && !this.standableWide(x, y, z)) continue;
         this.spawnGroup(kind, x, y, z, 1 + (this.rng() < 0.3 ? 1 : 0));
         return;
@@ -123,7 +128,7 @@ export class Mobs {
           if (!this.standable(x, cy, z)) continue;
           const floor = w.getBlock(x, cy - 1, z);
           if (floor >= 0 && BLOCKS[floor].flags & F.Solid) {
-            if (floor === B.NetherBricks) { this.spawnGroup('blaze', x, cy + 1, z, 1); return; }
+            if (floor === B.NetherBricks) { if (this.rng() < 0.5) this.spawnGroup('blaze', x, cy + 1, z, 1); else if (this.standable(x, cy + 1, z)) this.spawnGroup('wither_skeleton', x, cy, z, 1); return; }
             this.spawnGroup('zombified_piglin', x, cy, z, 1 + Math.floor(this.rng() * 3));
             return;
           }

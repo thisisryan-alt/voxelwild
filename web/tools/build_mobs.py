@@ -33,6 +33,9 @@ MOBS = {
     "zombified_piglin": ("piglin", "geometry.piglin", "piglin/zombified_piglin", [], 1),
     "blaze": ("blaze", "geometry.blaze", "blaze", [], 1),
     "ghast": ("ghast", "geometry.ghast", "ghast/ghast", [], 4.5),
+    "stray": ("skeleton", "geometry.skeleton.v1.8", "skeleton/stray", [], 1),
+    "wither_skeleton": ("skeleton", "geometry.skeleton.v1.8", "skeleton/wither_skeleton", [], 1.2),
+    "cave_spider": ("spider", "geometry.spider.v1.8", "spider/cave_spider", [], 0.7),
 }
 
 

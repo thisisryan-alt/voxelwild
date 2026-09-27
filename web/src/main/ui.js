@@ -8,7 +8,7 @@ import { PACK_NAMES, listBuiltinPacks } from './respack.js';
 const $ = (id) => document.getElementById(id);
 const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, volume: 0.8, sfx: 1, ambience: 0.7, particles: 1,
   shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr',
-  farDistance: 2000, dynamicRes: true, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
+  farDistance: 2000, resolution: '2160', dynamicRes: false, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
   rayStrength: 1, clouds: true, ao: 1, dayCycle: 'normal', fixedHour: 12, dayLength: 20, weatherMode: 'dynamic', brightness: 1,
   nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true, cloudQuality: 1, ssao: true, aa: true, sharpen: 0.6 };
 const pct = (x) => `${Math.round(x * 100)}%`;
@@ -16,7 +16,8 @@ const pct = (x) => `${Math.round(x * 100)}%`;
 const OPTIONS = [
   { tab: 'Video', key: 'viewDistance', label: 'Render Distance', min: 3, max: 16, step: 1, fmt: (x) => `${x} chunks (${x * 32} m)` },
   { tab: 'Video', key: 'farDistance', label: 'Far Terrain', min: 0, max: 2000, step: 250, fmt: (x) => (x ? `${x} m` : 'OFF') },
-  { tab: 'Video', key: 'renderScale', label: 'Render Scale', min: 0.4, max: 1, step: 0.05, fmt: pct },
+  { tab: 'Video', key: 'resolution', label: 'Resolution', values: ['2160', '1440', '1080', '720', 'native'], labels: ['4K (2160p)', '1440p', '1080p', '720p', 'Native'] },
+  { tab: 'Video', key: 'renderScale', label: 'Render Scale', min: 0.4, max: 1.5, step: 0.05, fmt: pct },
   { tab: 'Video', key: 'dynamicRes', label: 'Dynamic Resolution' },
   { tab: 'Video', key: 'fov', label: 'FOV', min: 55, max: 110, step: 1, fmt: (x) => `${x}°` },
   { tab: 'Video', key: 'viewBob', label: 'View Bobbing' },
@@ -59,7 +60,7 @@ const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft',
 const CAUSES = { fall: 'You hit the ground too hard.', drowning: 'You ran out of air.', starvation: 'You starved.', void: 'You fell out of the world.',
   lava: 'You tried to swim in lava.', magma: 'You discovered the floor was lava.', explosion: 'You blew up.',
   husk: 'You were slain by a Husk.', skeleton: 'You were shot by a Skeleton.', creeper: 'You were blown up by a Creeper.', spider: 'You were slain by a Spider.',
-  wolf: 'You were slain by a Wolf.', zombified_piglin: 'You were slain by a Zombified Piglin.', blaze: 'You were burned by a Blaze.', ghast: 'You were fireballed by a Ghast.' };
+  wolf: 'You were slain by a Wolf.', zombified_piglin: 'You were slain by a Zombified Piglin.', blaze: 'You were burned by a Blaze.', ghast: 'You were fireballed by a Ghast.', stray: 'You were shot by a Stray.', wither_skeleton: 'You were slain by a Wither Skeleton.', cave_spider: 'You were slain by a Cave Spider.' };
 
 function svgHeart(fill) {
   const f = fill === 2 ? 'var(--heart)' : fill === 1 ? 'url(#half)' : 'rgba(0,0,0,0.45)';
@@ -200,6 +201,7 @@ export class UI {
   }
 
   pause() {
+    $('travelRow').hidden = !this.game.creative;
     if (!this.game.world || this.screen === 'pause') return;
     this.unlock();
     const g = this.game;
@@ -276,8 +278,15 @@ export class UI {
     const g = this.game, c = $('view');
     $('btnNew').onclick = () => { g.audio.start(); g.audio.click(); this.show('newWorld'); $('nwName').focus(); };
     $('btnContinue').onclick = () => this.worlds && this.worlds[0] && this.play(this.worlds[0], false);
-    $('btnSandbox').onclick = () => this.play({ id: `sandbox${Date.now().toString(36)}`, name: 'Creative sandbox', seed: (Math.random() * 4294967296) >>> 0,
-      mode: 'creative', unsaved: true, created: Date.now(), lastPlayed: Date.now() }, true);
+    const sandbox = (extra, name) => this.play({ id: `sandbox${Date.now().toString(36)}`, name, seed: (Math.random() * 4294967296) >>> 0,
+      mode: 'creative', unsaved: true, created: Date.now(), lastPlayed: Date.now(), ...extra }, true);
+    $('btnSandbox').onclick = () => sandbox({}, 'Creative sandbox');
+    $('btnSandboxNether').onclick = () => sandbox({ startDim: 1 }, 'Nether sandbox');
+    $('btnSandboxEnd').onclick = () => sandbox({ startDim: 2 }, 'End sandbox');
+    $('btnSandboxFlat').onclick = () => sandbox({ flat: true }, 'Superflat sandbox');
+    // creative: jump straight to another dimension from the pause menu
+    const go = (d) => { if (!g.creative || !g.world) return; this.resume(); g.goToDimension(d); };
+    $('btnGoOver').onclick = () => go(0); $('btnGoNether').onclick = () => go(1); $('btnGoEnd').onclick = () => go(2);
     $('btnSettingsT').onclick = () => { this.settingsBack = 'title'; this.openSettings(); };
     $('btnSettingsP').onclick = () => { this.settingsBack = 'pause'; this.openSettings(); };
     $('btnSettingsDone').onclick = () => { storeSettings(this.settings); this.show(this.settingsBack); };
@@ -289,13 +298,19 @@ export class UI {
       $('nwModeHint').textContent = m === 'survival' ? 'Health, hunger and breath. Blocks come from mining; tools come from crafting.'
         : 'Unlimited blocks, instant breaking, no damage. Double-tap Space or press F to fly.';
     };
+    let startDim = 0, flat = false;
+    const setDim = (d) => { startDim = d; for (let k = 0; k < 3; k++) $(`nwDim${k}`).setAttribute('aria-pressed', k === d); };
+    const setFlat = (f) => { flat = f; $('nwTypeDefault').setAttribute('aria-pressed', !f); $('nwTypeFlat').setAttribute('aria-pressed', f); };
+    for (let k = 0; k < 3; k++) $(`nwDim${k}`).onclick = () => setDim(k);
+    $('nwTypeDefault').onclick = () => setFlat(false); $('nwTypeFlat').onclick = () => setFlat(true);
     $('nwSurvival').onclick = () => setMode('survival');
     $('nwCreative').onclick = () => setMode('creative');
     $('newForm').onsubmit = (e) => {
       e.preventDefault();
       const seed = parseSeed($('nwSeed').value);
       const name = $('nwName').value.trim() || 'New World';
-      this.play({ id: `w${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`, name, seed, mode, created: Date.now(), lastPlayed: Date.now() }, true);
+      this.play({ id: `w${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`, name, seed, mode, created: Date.now(), lastPlayed: Date.now(),
+        ...(startDim ? { startDim } : {}), ...(flat ? { flat: true } : {}) }, true);
     };
     $('btnResume').onclick = () => this.resume();
     $('btnMode').onclick = () => { g.setMode(!g.creative); $('btnMode').textContent = g.creative ? 'Switch to survival' : 'Switch to creative'; this.renderStats(); };
@@ -891,7 +906,7 @@ export class UI {
   loop(now) {
     requestAnimationFrame((t) => this.loop(t));
     const g = this.game;
-    const dt = Math.min(0.1, (now - this.lastFrame) / 1000);
+    const dt = Math.min(0.25, (now - this.lastFrame) / 1000);   // slow frames still run in real time (the player sub-steps)
     this.lastFrame = now;
     this.frames++; this.fpsTime += dt;
     if (this.fpsTime >= 0.5) { g.fps = this.frames / this.fpsTime; this.frames = 0; this.fpsTime = 0; }
@@ -922,8 +937,9 @@ export class UI {
     this.govTimer = 0;
     const fps = 1 / this.avgDt, cur = r.dynScale || 1;
     let next = cur;
-    if (fps < 42) next = Math.max(0.55, cur - 0.1);
-    else if (fps > 57 && cur < 1) next = Math.min(1, cur + 0.05);
+    // only steps in when the game really struggles, and never below 70% of the chosen resolution
+    if (fps < 30) next = Math.max(0.7, cur - 0.1);
+    else if (fps > 45 && cur < 1) next = Math.min(1, cur + 0.05);
     if (next !== cur) r.dynScale = Math.round(next * 100) / 100;
   }
 }

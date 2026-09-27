@@ -10,7 +10,8 @@ const key3 = (cx, sy, cz) => `${cx},${sy},${cz}`;
 const FN = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
 export class World {
-  constructor({ seed, workerUrl, viewDistance = 8, onMesh, onUnloadSection, modified, dim = 0 }) {
+  constructor({ seed, workerUrl, viewDistance = 8, onMesh, onUnloadSection, modified, dim = 0, flat = false }) {
+    this.flat = flat;                             // superflat overworld
     this.seed = seed >>> 0;
     this.dim = dim;                               // 0 overworld, 1 nether, 2 end
     this.below = dim === 2 ? B.Air : B.Bedrock;   // what lies under the world: the End's void, bedrock elsewhere
@@ -163,7 +164,7 @@ export class World {
       if (!w) break;
       const col = { cx, cz, state: 'gen', surface: null, sections: null, heightmap: null, render: [], waterSeeds: null };
       this.columns.set(key2(cx, cz), col);
-      this.post(w, { type: 'gen', id: this.jobId++, cx, cz, seed: this.seed, dim: this.dim });
+      this.post(w, { type: 'gen', id: this.jobId++, cx, cz, seed: this.seed, dim: this.dim, flat: this.flat });
       started++;
     }
     // 2. decoration once all 8 neighbours have terrain

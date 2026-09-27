@@ -19,7 +19,8 @@ export function terrainFor(seed) {
 }
 
 /** Generates column (cx, cz). Returns { voxels: Uint16Array(HEIGHT*CS2) in colIdx order, surface: {...} }. */
-export function generateColumn(cx, cz, seed, dim = 0) {
+export function generateColumn(cx, cz, seed, dim = 0, flat = false) {
+  if (flat && dim === 0) return generateFlat();
   if (dim === 1) return generateNether(cx, cz, seed);
   if (dim === 2) return generateEnd(cx, cz, seed);
   const T = terrainFor(seed), n = T.n;
@@ -327,4 +328,17 @@ function placeSpring(vox, heights, P, sHeight, sBiome, cx, cz, seed) {
       }
     }
   }
+}
+
+/** Superflat: bedrock, three dirt and grass, surface at sea level; nothing grows (no surface heights). */
+function generateFlat() {
+  const vox = new Uint16Array(HEIGHT * CS2);
+  for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+    vox[colIdx(x, SEA - 4, z)] = B.Bedrock;
+    for (let y = SEA - 3; y < SEA; y++) vox[colIdx(x, y, z)] = B.Dirt;
+    vox[colIdx(x, SEA, z)] = B.Grass;
+  }
+  const sHeight = new Int32Array(CS2).fill(-9999), sTop = new Uint16Array(CS2).fill(B.Grass), sBiome = new Uint8Array(CS2);
+  const sTemp = new Uint8Array(CS2).fill(150), sHumid = new Uint8Array(CS2).fill(140);
+  return { voxels: vox, surface: { height: sHeight, top: sTop, biome: sBiome, temp: sTemp, humid: sHumid } };
 }

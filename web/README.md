@@ -152,6 +152,14 @@ textures from the pack (fire, sea lanterns, seagrass, prismarine, lit furnaces, 
 (`@frame:k:name`) and played by variant rows; primed TNT flashes; fires, furnaces and redstone give off embers and
 smoke; leaves sway in gusts that roll across the forest and drop drifting leaves. `node test/more.mjs` checks these.
 
+Worlds can start in the Nether (by a portal home), the End or as superflat (bedrock, dirt, grass; `flat` in the world
+meta, passed to the generator), from the new-world screen or the title's sandbox buttons; creative players travel
+between dimensions from the pause menu. Resolution: Options > Video > Resolution renders 4K (the default), 1440p,
+1080p, 720p or native device pixels; slow frames are split into physics sub-steps so the game keeps real-time speed.
+The player is lifted out of anything it ends up inside (`VoxelBody.unstick`), small redstone parts are aimed at by
+roomier boxes (`pickBoxes`), and strays, wither skeletons and cave spiders join the mobs. Tests: `node test/ground.mjs`
+(collision stress, respawn into built-up spawn), `test/piston-real.mjs`, `test/dims-start.mjs`.
+
 ## Controls
 
 WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·

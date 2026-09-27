@@ -550,12 +550,17 @@ export class Renderer {
 
   resize() {
     const gl = this.gl;
-    // device pixels, capped so a 4K/retina screen does not quadruple the shading cost; dynScale is set by the
-    // frame-time governor in ui.js
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    const k = dpr * this.settings.renderScale * (this.dynScale || 1);
-    const w = Math.max(64, Math.floor(this.canvas.clientWidth * k));
-    const h = Math.max(64, Math.floor(this.canvas.clientHeight * k));
+    // the resolution setting: 'native' uses every device pixel, a number renders that many lines (4K = 2160, more than
+    // the screen has is supersampled); dynScale is set by the frame-time governor in ui.js
+    const cw = Math.max(1, this.canvas.clientWidth), ch = Math.max(1, this.canvas.clientHeight);
+    const res = this.settings.resolution ?? '2160';
+    let k = res === 'native' ? (window.devicePixelRatio || 1) : +res / ch;
+    // never wider than 4K-by-aspect, and within what the GPU can render to
+    const maxSide = Math.min(this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE), 8192);
+    k = Math.min(k, maxSide / cw, maxSide / ch);
+    k *= this.settings.renderScale * (this.dynScale || 1);
+    const w = Math.max(64, Math.floor(cw * k));
+    const h = Math.max(64, Math.floor(ch * k));
     if (w === this.width && h === this.height) return;
     this.width = w; this.height = h;
     this.canvas.width = w; this.canvas.height = h;
@@ -775,7 +780,7 @@ export class Renderer {
 
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS);
     // far terrain: its own depth range, then the chunks draw over it on a cleared depth buffer
-    if (this.farOn && f.dim === 0) {
+    if (this.farOn && f.dim === 0 && !f.flat) {
       this.drawFar(f);
       gl.clear(gl.DEPTH_BUFFER_BIT);
     }

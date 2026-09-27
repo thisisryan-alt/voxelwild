@@ -81,11 +81,11 @@ export class MobModels {
       if (n === 'head') { r[1] += m.headYaw; r[0] += m.headPitch; }
       else if (/^leg[0-7]$/.test(n)) {
         const k = +n[3];
-        if (m.type === 'spider') { const ph = (k & 1 ? 1 : -1) * Math.sin(w * 1.3 + (k >> 1)) * 0.4 * ws; r[1] += ph; r[2] += Math.abs(Math.cos(w * 1.3 + (k >> 1))) * 0.2 * ws * (k & 1 ? 1 : -1); }
+        if ((m.def.base || m.type) === 'spider') { const ph = (k & 1 ? 1 : -1) * Math.sin(w * 1.3 + (k >> 1)) * 0.4 * ws; r[1] += ph; r[2] += Math.abs(Math.cos(w * 1.3 + (k >> 1))) * 0.2 * ws * (k & 1 ? 1 : -1); }
         else r[0] += (k === 0 || k === 3 ? 1 : -1) * swing;
       } else if (n === 'rightleg' || n === 'leftleg') r[0] += (n === 'rightleg' ? 1 : -1) * swing;
       else if (n === 'rightarm' || n === 'leftarm') {
-        const zombie = m.type === 'husk' || m.type === 'zombified_piglin' || (m.type === 'skeleton' && m.angry && m.def);
+        const zombie = m.type === 'husk' || m.type === 'zombified_piglin' || ((m.def.base || m.type) === 'skeleton' && m.angry && m.def);
         r[0] += zombie ? Math.PI / 2 + Math.sin(time * 1.5 + (n === 'leftarm' ? 1 : 0)) * 0.08 + (m.swing || 0) * 0.6 : (n === 'rightarm' ? -1 : 1) * swing;
         r[2] += (n === 'rightarm' ? 1 : -1) * (0.05 + Math.sin(time * 1.1) * 0.03);
       } else if (n === 'wing0' || n === 'wing1') r[2] += (n === 'wing0' ? 1 : -1) * (m.body.grounded ? ws * 0.3 * Math.abs(Math.sin(w * 2)) : Math.abs(Math.sin(time * 20)) * 1.1);

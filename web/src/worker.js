@@ -22,7 +22,7 @@ self.onmessage = (e) => {
       self.postMessage({ type: 'far', id: m.id, level: m.level, seed: m.seed, x0: m.x0, z0: m.z0, data }, [data.buffer]);
     } else if (m.type === 'gen') {
       const t0 = performance.now();
-      const { voxels, surface } = generateColumn(m.cx, m.cz, m.seed, m.dim | 0);
+      const { voxels, surface } = generateColumn(m.cx, m.cz, m.seed, m.dim | 0, !!m.flat);
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, voxels, surface, ms: performance.now() - t0 },
         [voxels.buffer, surface.height.buffer, surface.top.buffer, surface.biome.buffer, surface.temp.buffer, surface.humid.buffer]);
     } else if (m.type === 'decorate') {

@@ -3,7 +3,7 @@
 import { World } from './world.js';
 import { Renderer } from './renderer.js';
 import { TimeOfDay } from './sky.js';
-import { Player, raycast, targetable } from './player.js';
+import { Player, raycast, targetable, pickBoxes } from './player.js';
 import { Inventory, SurvivalStats, Weather, CREATIVE_HOTBAR, HOTBAR, WEATHER_NAMES } from './gameplay.js';
 import { GameAudio } from './audio.js';
 import { Icons } from './icons.js';
@@ -412,7 +412,7 @@ export class Game {
   applySettings(s) {
     this.settings = s;
     const r = this.renderer.settings;
-    r.renderScale = s.renderScale; r.shadows = s.shadows; r.bloom = s.bloom; r.godRays = s.godRays; r.fov = s.fov; r.pom = s.pom;
+    r.renderScale = s.renderScale; r.resolution = s.resolution ?? '2160'; r.shadows = s.shadows; r.bloom = s.bloom; r.godRays = s.godRays; r.fov = s.fov; r.pom = s.pom;
     Object.assign(r, { bloomStrength: s.bloomStrength ?? 1, rayStrength: s.rayStrength ?? 1, clouds: s.clouds !== false, ao: s.ao ?? 1,
       brightness: s.brightness ?? 1, nightBrightness: s.nightBrightness ?? 1, saturation: s.saturation ?? 1, fogMul: s.fog ?? 1,
       shadowDistance: s.shadowDistance ?? 88, farDistance: s.farDistance ?? 0, cloudQuality: s.cloudQuality ?? 1, ssao: s.ssao !== false,
@@ -450,6 +450,7 @@ export class Game {
   makeWorld(dim) {
     const w = new World({
       seed: this.meta.seed, workerUrl: this.workerUrl, viewDistance: this.settings.viewDistance, modified: this.dimModified[dim], dim,
+      flat: !!this.meta.flat && dim === Dim.Overworld,
       onMesh: (s, m) => this.renderer.uploadSection(s, m),
       onUnloadSection: (s) => this.renderer.freeSection(s),
     });
@@ -470,7 +471,7 @@ export class Game {
       const d = k.startsWith('N/') ? 1 : k.startsWith('E/') ? 2 : 0;
       this.dimModified[d].set(d ? k.slice(2) : k, v);
     }
-    this.dim = isNew ? Dim.Overworld : meta.dim || Dim.Overworld;
+    this.dim = isNew ? meta.startDim || Dim.Overworld : meta.dim || Dim.Overworld;
     meta.portals = meta.portals || [];
     this.world = this.makeWorld(this.dim);
     this.player = new Player();
@@ -505,10 +506,21 @@ export class Game {
     this.inventory.onChange = () => this.emit('inventory');
     if (isNew) {
       if (this.creative) CREATIVE_HOTBAR.forEach((b, i) => { this.inventory.slots[i] = { item: b, count: 64 }; });
-      this.spawn = this.findSpawn();
-      this.player.teleport(this.spawn, meta.spawnYaw ?? 0.6, -0.08);
-      this.needGround = true;
       this.tod.hour = 8.2;
+      if (this.dim === Dim.Nether) {
+        // start by a portal home
+        this.spawn = [0.5, 70, 0.5];
+        this.player.teleport(this.spawn, 0, 0);
+        this.arrival = () => { this.arrivePortal(Dim.Nether, 0, 0, null); this.spawn = [...this.player.body.pos]; };
+      } else if (this.dim === Dim.End) {
+        this.spawn = [...END_ARRIVAL];
+        this.player.teleport(this.spawn, Math.PI / 2, 0);
+        this.arrival = () => { this.arriveEnd(); this.spawn = [...this.player.body.pos]; };
+      } else {
+        this.spawn = this.findSpawn();
+        this.player.teleport(this.spawn, meta.spawnYaw ?? 0.6, -0.08);
+        this.needGround = true;
+      }
     } else {
       const p = meta.player;
       this.spawn = p.spawn;
@@ -527,6 +539,14 @@ export class Game {
     this.nextAutosave = this.time + 60;
     this.emit('state', this.state);
     this.emit('inventory');
+  }
+
+  /** Creative: straight to another dimension (a portal home is built on arrival in the Nether). */
+  goToDimension(d) {
+    if (d === this.dim) { this.emit('toast', 'Already here'); return; }
+    if (d === Dim.Nether) { const p = this.player.body.pos, k = this.dim === Dim.Overworld ? 1 / 8 : 1; const tx = Math.floor(p[0] * k), tz = Math.floor(p[2] * k); this.travel(Dim.Nether, [tx + 0.5, 70, tz + 0.5], this.player.yaw, () => this.arrivePortal(Dim.Nether, tx, tz, null)); }
+    else if (d === Dim.End) this.travel(Dim.End, END_ARRIVAL, Math.PI / 2, () => this.arriveEnd());
+    else this.travel(Dim.Overworld, this.dim === Dim.Nether ? [this.player.body.pos[0] * 8, 100, this.player.body.pos[2] * 8] : this.spawn, this.player.yaw, () => { this.settleOnGround(); });
   }
 
   stopWorld() {
@@ -732,6 +752,7 @@ export class Game {
       if (prog >= 1 && c && c.state === 'ready') {
         if (this.arrival) { const a = this.arrival; this.arrival = null; a(); }
         else if (this.needGround) { this.settleOnGround(); this.needGround = false; }
+        pl.body.unstick(w, 96);      // arrived inside something (a respawn into built-up land, a moved spawn): climb out
         this.state = 'playing';
         this.emit('state', this.state);
         this.emit('hud');
@@ -1273,7 +1294,7 @@ export class Game {
   selectionBoxes(t) {
     const d = BLOCKS[t.block];
     if (!d || !d.model || d.shape !== Shape.Model) return null;
-    const bs = this.world.modelBoxesAt(t.hit[0], t.hit[1], t.hit[2], t.block, false);
+    const bs = pickBoxes(d.model, this.world.modelBoxesAt(t.hit[0], t.hit[1], t.hit[2], t.block, false));
     if (!bs.length) return null;
     const u = [1, 1, 1, 0, 0, 0];
     for (const b of bs) for (let k = 0; k < 3; k++) { u[k] = Math.min(u[k], b[k]); u[k + 3] = Math.max(u[k + 3], b[k + 3]); }
@@ -2056,7 +2077,7 @@ export class Game {
     const inLava = this.headInLava;
     const f = {
       dt, time: this.time, camPos: eye, yaw: pl.yaw, pitch: pl.pitch, sky,
-      dim: this.dim, dimAmb: sky.dimAmb, dimFog: inLava ? 1.2 : other ? sky.fogDensity : null, portal: Math.min(1, (this.portalTime || 0) / 3),
+      dim: this.dim, flat: !!this.meta.flat, dimAmb: sky.dimAmb, dimFog: inLava ? 1.2 : other ? sky.fogDensity : null, portal: Math.min(1, (this.portalTime || 0) / 3),
       weather: other ? { cloudCover: 0, windX: 0.2, windZ: 0.1, windStrength: 0.3, gust: 0.2, fog: 0, storm: 0, wetness: 0, snowCover: 0 } : { cloudCover: wp.cloud, windX: this.windVec[0] / 20 || 0, windZ: this.windVec[1] / 20 || 0, windStrength: 0.35 + wp.wind * 5, gust: wp.gust,
         fog: (wp.fog - 1) * 0.02 + (1 - wp.fogDist) * 0.3, storm: Math.max(0, (wp.precip - 0.5) * 2), wetness: this.weather.wetness,
         snowCover: this.weather.snowCover * (clim && clim.temp < 0.25 ? 1 : 0) },
