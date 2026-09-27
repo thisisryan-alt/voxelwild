@@ -927,6 +927,10 @@ export class Game {
 
   interact(dt) {
     const pl = this.player, w = this.world, inv = this.inventory;
+    // the spyglass: hold the right button to look through it
+    const held0 = inv.heldItem;
+    this.zoom = !!(held0 && held0.spyglass && this.mouse.right && this.state === 'playing');
+    pl.zoomSens = this.zoom ? 0.2 : 1;
     const eye = pl.eye(), dir = pl.forward();
     let hit = raycast(w, eye, dir, REACH, targetable);
     this.swing = Math.max(0, (this.swing || 0) - dt * 3.2);
@@ -986,6 +990,23 @@ export class Game {
 
     // the bow: hold to draw, let go to shoot
     const heldDef = inv.heldItem;
+    // the crossbow: hold to wind (1.1 s, one arrow), then click to loose a fast, flat bolt
+    if (heldDef && heldDef.id === I.Crossbow && this.state === 'playing') {
+      const s = inv.held;
+      if (!this.mouse.right) this.xbowHold = false;
+      if (s.loaded) {
+        if (this.mouse.rightClicked) {
+          const f = pl.forward(), e = pl.eye();
+          this.mobs.projectiles.push({ kind: 'arrow', p: [e[0] + f[0] * 0.5, e[1] + f[1] * 0.5 - 0.1, e[2] + f[2] * 0.5], v: f.map((x) => x * 55), life: 8, owner: 'player', damage: 9 + 2 * enchLevel(s, 'power') });
+          s.loaded = false; this.xbowHold = true; this.swing = 1; this.audio.shoot('arrow'); this.audio.anvil();
+          if (!this.creative && inv.wearHeld()) this.emit('toast', 'Crossbow broke');
+          inv.changed();
+        }
+      } else if (this.mouse.right && !this.xbowHold && (this.creative || inv.count(I.Arrow) > 0)) {
+        this.xbowCharge = (this.xbowCharge || 0) + dt; this.bowDraw = Math.min(1, this.xbowCharge / 1.1);
+        if (this.xbowCharge >= 1.1) { s.loaded = true; this.xbowCharge = 0; this.bowDraw = 0; this.xbowHold = true; if (!this.creative) inv.remove(I.Arrow, 1); this.audio.click(); inv.changed(); }
+      } else { this.xbowCharge = 0; this.bowDraw = 0; }
+    }
     if (heldDef && heldDef.id === I.Bow && this.state === 'playing') {
       if (this.mouse.right && (this.creative || inv.count(I.Arrow) > 0)) this.bowDraw = Math.min(1, (this.bowDraw || 0) + dt);
       else if (this.bowDraw > 0) {
@@ -1319,6 +1340,9 @@ export class Game {
       portal: [[I.GoldNugget, 4, 18], [I.GoldIngot, 1, 3], [I.FlintAndSteel, 1, 1], [B.Obsidian, 1, 3], [I.IronIngot, 1, 2], [CK.gold_block, 1, 1]],
       bastion: [[I.GoldenApple, 1, 2], [I.GoldIngot, 3, 9], [CK.gold_block, 1, 2], [I.Diamond, 1, 2], [I.Arrow, 5, 16], [B.Magma, 2, 5], [I.CookedPorkchop, 2, 5], [CK.gilded_blackstone, 1, 4]],
       igloo: [[I.Apple, 1, 3], [I.Coal, 1, 4], [I.GoldNugget, 1, 3], [I.Emerald, 1, 1], [I.StoneAxe, 1, 1]],
+      temple: [[I.Diamond, 1, 3], [I.GoldIngot, 2, 7], [I.Emerald, 1, 3], [I.Bone, 2, 6], [I.RottenFlesh, 2, 6], [I.EnderPearl, 1, 1], [I.Crossbow, 1, 1], [I.GoldenApple, 1, 1]],
+      tower: [[I.IronIngot, 1, 4], [I.Arrow, 4, 16], [I.Bread, 1, 4], [I.EnderPearl, 1, 2], [I.Spyglass, 1, 1], [I.Compass, 1, 1], [I.PotionHealing, 1, 1], [I.Crossbow, 1, 1], [I.Emerald, 1, 2]],
+      shipwreck: [[I.Emerald, 1, 4], [I.GoldNugget, 3, 12], [I.IronIngot, 1, 5], [I.Diamond, 1, 1], [I.Compass, 1, 1], [I.Bread, 1, 4], [I.PotionWaterBreathing, 1, 1], [I.Coal, 2, 8], [I.Cod, 1, 4]],
       hut: [[I.PotionHealing, 1, 1], [I.PotionNightVision, 1, 1], [I.PotionLeaping, 1, 1], [I.PotionSwiftness, 1, 1], [I.GlassBottle, 1, 3], [I.Sugar, 1, 4], [I.RottenFlesh, 1, 4], [I.Bone, 1, 3], [I.Redstone, 1, 4], [I.GlowstoneDust, 1, 4]],
     }[kind] || [];
     const n = 3 + Math.floor(rnd() * 5);
@@ -2474,7 +2498,7 @@ export class Game {
       return;
     }
     if (def.id === I.Bucket || def.id === I.WaterBucket || def.id === I.LavaBucket) { this.useBucket(def); return; }
-    if (def.id === I.Bow) return;       // drawn while the button is held (interact)
+    if (def.id === I.Bow || def.id === I.Crossbow || def.spyglass) return;       // drawn / aimed while the button is held (interact)
     if (def.id === I.Backpack) { this.openBackpack(); return; }
     if (def.id === I.GrapplingHook) { this.fireGrapple(); return; }
     if (def.id === I.FishingRod) { this.useRod(); return; }
@@ -3173,7 +3197,7 @@ export class Game {
     this.shake = Math.max(0, (this.shake || 0) - dt * 2.5);
     const sh = camFx ? this.shake * this.shake * 0.035 : 0;
     const f = {
-      dt, time: this.time, camPos: eye, yaw: pl.yaw + Math.sin(this.time * 47) * sh, pitch: pl.pitch + Math.cos(this.time * 39) * sh, sky, fovMul: this.fovK * (this.gliding ? 1 + Math.min(0.15, (this.glideSpeed || 0) / 200) : 1), nightVision: !!(this.stats && this.stats.fx && this.stats.fx.night > 0),
+      dt, time: this.time, camPos: eye, yaw: pl.yaw + Math.sin(this.time * 47) * sh, pitch: pl.pitch + Math.cos(this.time * 39) * sh, sky, fovMul: (this.zoom ? 0.2 : 1) * this.fovK * (this.gliding ? 1 + Math.min(0.15, (this.glideSpeed || 0) / 200) : 1), nightVision: !!(this.stats && this.stats.fx && this.stats.fx.night > 0),
       dim: this.dim === Dim.Sky ? 0 : this.dim, flat: !!this.meta.flat || this.dim === Dim.Sky, dimAmb: sky.dimAmb, dimFog: inLava ? 1.2 : other ? sky.fogDensity : null, portal: Math.min(1, (this.portalTime || 0) / 3),
       weather: other ? { cloudCover: 0, windX: 0.2, windZ: 0.1, windStrength: 0.3, gust: 0.2, fog: 0, storm: 0, wetness: 0, snowCover: 0 } : { cloudCover: wp.cloud, windX: this.windVec[0] / 20 || 0, windZ: this.windVec[1] / 20 || 0, windStrength: 0.35 + wp.wind * 5, gust: wp.gust,
         fog: (wp.fog - 1) * 0.02 + (1 - wp.fogDist) * 0.3, storm: Math.max(0, (wp.precip - 0.5) * 2), wetness: this.weather.wetness,

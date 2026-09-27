@@ -18,6 +18,9 @@ const KINDS = {
   portal: { size: 320, chance: 0.35, reach: 7, salt: 0x9047 },
   hut: { size: 256, chance: 0.6, reach: 6, salt: 0x7A77, tries: 3 },
   dungeon: { size: 72, chance: 0.4, reach: 5, salt: 0xD06E },
+  temple: { size: 320, chance: 0.6, reach: 8, salt: 0x7E3B, tries: 4 },
+  tower: { size: 288, chance: 0.45, reach: 5, salt: 0x70E2, tries: 3 },
+  shipwreck: { size: 224, chance: 0.5, reach: 7, salt: 0x5419, tries: 4 },
 };
 const NETHER = { bastion: { size: 384, chance: 0.5, reach: 16, salt: 0xBA57 } };
 const cache = new Map();
@@ -69,6 +72,11 @@ function planAt(kind, k, seed, T, rx, rz, h) {
   if (kind === 'bastion') return box(kind, x, 20, z, 15, 30, 15, { rot, seed: h });
   if (!T) return null;
   const s = T.sample(x, z), g = Math.floor(s.height), b = s.biome;
+  if (kind === 'shipwreck') {
+    // on the sea floor, well under the surface
+    if (b !== Biome.Ocean || g > SEA - 5 || g < SEA - 40) return null;
+    return box(kind, x, g - 1, z, 7, 10, 7, { rot, seed: h, gy: g });
+  }
   if (g <= SEA + 1 || s.river > 0.3) return null;
   const flat = (rad) => { let lo = g, hi = g; for (const [dx, dz] of [[rad, 0], [-rad, 0], [0, rad], [0, -rad], [rad, rad], [-rad, -rad]]) { const v = Math.floor(T.sample(x + dx, z + dz).height); lo = Math.min(lo, v); hi = Math.max(hi, v); } return hi - lo; };
   // small buildings stand on the highest ground round their middle (foundations fill in below)
@@ -111,6 +119,12 @@ function planAt(kind, k, seed, T, rx, rz, h) {
     case 'portal':
       if (flat(4) > 4) return null;
       return box(kind, x, high(2) - 3, z, 6, 12, 6, { rot, seed: h, gy: high(2), mossy: b === Biome.Jungle || b === Biome.Swamp });
+    case 'temple':
+      if (b !== Biome.Jungle || flat(6) > 8) return null;
+      return box(kind, x, high(6) - 3, z, 7, 16, 7, { rot, seed: h, gy: high(6) });
+    case 'tower':
+      if (![Biome.Plains, Biome.Forest, Biome.Taiga, Biome.Mountains, Biome.Savanna, Biome.DenseForest].includes(b) || flat(3) > 5) return null;
+      return box(kind, x, high(3) - 3, z, 4, 22, 4, { seed: h, gy: high(3) });
     case 'hut':
       if (b !== Biome.Swamp) return null;
       return box(kind, x, high(3) - 3, z, 5, 12, 5, { rot, seed: h, gy: high(3) });
@@ -346,6 +360,66 @@ const BUILD = {
     f.set(0, 1, -3, sp); f.set(0, 1, -4, sp);
     f.set(2, 2, 1, C.crafting_table); f.set(-2, 2, 1, C.chest);
     for (let lz = -2; lz <= 2; lz++) for (let lx = -3; lx <= 3; lx++) { const [x, z] = f.at(lx, lz); W.noTrees(x, z); }
+  },
+  /** A jungle temple: mossy cobblestone, two floors, a hidden chest behind a lever wall. */
+  temple(W, p, r) {
+    const f = frame(W, p.x, p.gy, p.z, p.rot), mc = id('mossy_cobblestone'), cob = B.Cobblestone, chis = id('chiseled_stone_bricks');
+    const stone = () => (r() < 0.45 ? mc : cob);
+    f.ground(-6, 6, -5, 5, cob, 14, cob);
+    for (let ly = 1; ly <= 9; ly++) for (let lz = -5; lz <= 5; lz++) for (let lx = -6; lx <= 6; lx++) {
+      const edge = Math.abs(lx) === 6 || Math.abs(lz) === 5, floor = ly === 5;
+      if (edge || floor) f.set(lx, ly, lz, ly === 3 && edge && (lx === 0 || lz === 0) && !(lz === -5) ? chis : stone());
+      else f.set(lx, ly, lz, B.Air);
+    }
+    // stepped roof and an upper room
+    for (let k = 0; k < 3; k++) for (let lz = -4 + k; lz <= 4 - k; lz++) for (let lx = -5 + k; lx <= 5 - k; lx++) f.set(lx, 10 + k, lz, stone());
+    // the door and stairs up
+    for (let ly = 1; ly <= 3; ly++) f.set(0, ly, -5, B.Air);
+    const st = fam('cobblestone_stairs');
+    for (let k = 0; k < 4; k++) f.set(4 - k, 1 + k, 3, st ? st.first + f.face(1) * 2 : cob);
+    for (let lx = 1; lx <= 4; lx++) f.set(lx, 5, 3, B.Air);
+    // vines on the walls, torches inside, the chests
+    for (let k = 0; k < 24; k++) { const lx = -6 + Math.floor(r() * 13), lz = r() < 0.5 ? -6 : 6; const v = fam('vine'); if (v) f.set(lx, 2 + Math.floor(r() * 7), lz, v.first + f.face(lz < 0 ? 2 : 3)); }
+    f.set(-5, 1, 4, C.chest); f.set(5, 6, -4, C.chest);
+    f.set(-3, 3, -4, FAM.wall_torch.first + f.face(3)); f.set(3, 8, 4, FAM.wall_torch.first + f.face(2));
+    for (let lz = -6; lz <= 6; lz++) for (let lx = -7; lx <= 7; lx++) { const [x, z] = f.at(lx, lz); W.noTrees(x, z); }
+  },
+  /** A ruined watchtower: a round stone-brick shaft with a crumbled top and a chest on the upper floor. */
+  tower(W, p, r) {
+    const f = frame(W, p.x, p.gy, p.z, 0), sb = B.StoneBricks, cr = B.CrackedStoneBricks, ms = B.MossyStoneBricks;
+    const brick = () => (r() < 0.25 ? cr : r() < 0.3 ? ms : sb);
+    f.ground(-3, 3, -3, 3, sb, 22, sb);
+    const top = 14 + Math.floor(r() * 5), lad = fam('ladder');
+    for (let ly = 1; ly <= top + 3; ly++) for (let lz = -3; lz <= 3; lz++) for (let lx = -3; lx <= 3; lx++) {
+      const d = Math.hypot(lx, lz);
+      if (d > 3.4) continue;
+      const wall = d > 2.4;
+      if (ly > top && (r() < (ly - top) * 0.3 || !wall)) continue;          // the broken crown
+      if (wall) f.set(lx, ly, lz, ly % 5 === 3 && (lx === 0 || lz === 0) ? B.Air : brick());
+      else if (ly === 7 || ly === top - 1) f.set(lx, ly, lz, lx === 0 && lz === 2 ? B.Air : brick());
+      else f.set(lx, ly, lz, B.Air);
+    }
+    for (let ly = 1; ly <= 2; ly++) f.set(0, ly, -3, B.Air);
+    for (let ly = 1; ly < top; ly++) f.set(0, ly, 2, lad ? lad.first + f.face(2) : B.Air);   // a ladder up the back wall
+    f.set(-1, 8, -1, C.chest); f.set(1, top, -1, C.chest);
+    f.set(1, 8, 1, B.Torch);
+    for (let lz = -4; lz <= 4; lz++) for (let lx = -4; lx <= 4; lx++) { const [x, z] = f.at(lx, lz); W.noTrees(x, z); }
+  },
+  /** A wrecked ship on the sea floor: a hollow oak hull, broken in places, a stump of a mast and two chests. */
+  shipwreck(W, p, r) {
+    const f = frame(W, p.x, p.gy, p.z, p.rot), pl = B.Planks, log = B.OakLog, water = B.Water;
+    const tilt = r() < 0.5 ? 0 : 1;
+    for (let lz = -7; lz <= 7; lz++) {
+      const half = lz < -4 ? Math.max(0, 2 - (-4 - lz)) : lz > 5 ? Math.max(0, 2 - (lz - 5)) : 2;
+      for (let lx = -half; lx <= half; lx++) for (let ly = 0; ly <= 3; ly++) {
+        const shell = Math.abs(lx) === half || ly === 0 || (ly === 3 && Math.abs(lz) > 3);
+        const y = ly + (tilt && lx > 0 ? -1 : 0);
+        if (shell && r() > 0.18) f.set(lx, y, lz, ly === 0 ? log : pl);
+        else if (!shell) f.set(lx, y, lz, water);
+      }
+    }
+    for (let ly = 1; ly <= 3 + Math.floor(r() * 5); ly++) f.set(0, ly, -1, log);
+    f.set(0, 1, 5, C.chest); f.set(-1, 1, -5, C.chest);
   },
   dungeon(W, p, r) {
     for (let y = p.y; y <= p.y + 5; y++) for (let z = p.z - 4; z <= p.z + 4; z++) for (let x = p.x - 4; x <= p.x + 4; x++) {

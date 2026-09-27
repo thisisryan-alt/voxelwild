@@ -149,7 +149,8 @@ export class MiniMap {
     const p = g.player.body.pos, now = performance.now();
     if (!this.structList || now - this.structT > 3000 || Math.hypot(p[0] - this.structAt[0], p[2] - this.structAt[1]) > 100) {
       const T = terrainFor(g.meta.seed), names = { village: ['Village', '#ffd84a'], outpost: ['Pillager Outpost', '#ff7a4a'], pyramid: ['Desert Pyramid', '#ffe0a0'],
-        igloo: ['Igloo', '#bfe8ff'], portal: ['Ruined Portal', '#c07aff'], hut: ['Swamp Hut', '#9ad07a'], well: ['Desert Well', '#ffe0a0'] };
+        igloo: ['Igloo', '#bfe8ff'], portal: ['Ruined Portal', '#c07aff'], hut: ['Swamp Hut', '#9ad07a'], well: ['Desert Well', '#ffe0a0'],
+        temple: ['Jungle Temple', '#7ad07a'], tower: ['Ruined Tower', '#c8c8c8'], shipwreck: ['Shipwreck', '#6ea8ff'] };
       this.structList = structuresIn(g.meta.seed, T, p[0] - 600, p[2] - 600, p[0] + 600, p[2] + 600).filter((q) => names[q.kind])
         .map((q) => ({ name: names[q.kind][0], color: names[q.kind][1], x: q.x + 0.5, z: q.z + 0.5, kind: 'structure' }));
       this.structT = now; this.structAt = [p[0], p[2]];

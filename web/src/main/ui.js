@@ -45,6 +45,8 @@ const TIPS = [
   'Squid swim in oceans and rivers (glow squid at night), pandas roam the jungle, rabbits hop across plains, deserts and snow.',
   'Phantoms swoop at players out under the night sky from the third night; they drop membranes that make and mend gliders.',
   'Foxes live in the taiga, keep away from you unless you sneak, and hunt chickens.',
+  'New structures: jungle temples, ruined watchtowers and shipwrecks on the sea floor, each with its own loot.',
+  'A crossbow winds up an arrow and shoots it fast and flat; a spyglass zooms; a compass points back to spawn.',
   'Tame a wolf with bones. Right-click it to make it sit or follow; feed it meat to heal it. It fights whatever you fight.',
   'An enchanting table (4 obsidian, 2 diamonds, 3 lapis) enchants tools, weapons, bows and armour for experience levels and lapis lazuli.',
   'An anvil (3 iron blocks, 4 iron ingots) repairs worn gear with its material, or merges two of the same item and their enchantments.',
@@ -75,6 +77,9 @@ function describe(s) {
   if (d.milk) lines.push('Clears all effects');
   if (d.throws) lines.push(d.throws === 'pearl' ? 'Throw it to teleport where it lands' : 'Right-click to throw');
   if (d.glider) lines.push('Wear it; jump while falling to glide. Look down to speed up');
+  if (d.compass) lines.push('Hold it to see the way home and the time');
+  if (d.spyglass) lines.push('Hold the right button to look through it');
+  if (d.id === ITEM_IDS.Crossbow) lines.push(s.loaded ? 'Loaded: right-click to shoot' : 'Hold the right button to load an arrow');
   if (d.shears) lines.push('Shear sheep; keeps leaves and grass when breaking them');
   if (d.id === ITEM_IDS.Totem) lines.push('Kept in your hotbar, it saves you from dying once');
   if (d.kind === Kind.Armor) lines.push(`Armour +${d.points}`);
@@ -1254,6 +1259,15 @@ export class UI {
     if (fx && fx.fireRes > 0) tags.push(`Fire Resistance · ${Math.ceil(fx.fireRes)} s`);
     for (const [k, n] of [['speed', 'Speed'], ['strength', 'Strength'], ['night', 'Night Vision'], ['jump', 'Jump Boost'], ['water', 'Water Breathing']]) if (fx && fx[k] > 0) tags.push(`${n} · ${Math.ceil(fx[k])} s`);
     if (g.gliding) tags.push(`Gliding · ${Math.round(g.glideSpeed || 0)} m/s`);
+    // a compass in the hand points home (and tells the time)
+    const hd = g.inventory && g.inventory.heldItem;
+    if (hd && hd.compass && g.spawn && g.player) {
+      const pp = g.player.body.pos, dx = g.spawn[0] - pp[0], dz = g.spawn[2] - pp[2], d = Math.hypot(dx, dz);
+      const rel = Math.atan2(-dx, -dz) - g.player.yaw, k = ((Math.round(rel / (Math.PI / 4)) % 8) + 8) % 8, arrow = ['↑', '↖', '←', '↙', '↓', '↘', '→', '↗'][k];
+      const hr = g.tod ? g.tod.hour : 12;
+      tags.push((g.dim || 0) === 0 ? `Spawn ${arrow} ${Math.round(d)} m · ${String(Math.floor(hr)).padStart(2, '0')}:${String(Math.floor((hr % 1) * 60)).padStart(2, '0')}` : 'The needle spins wildly');
+    }
+    const sc = $('scope'); if (sc.hidden === !!g.zoom) sc.hidden = !g.zoom;
     $('restedTag').hidden = !tags.length;
     if (tags.length) $('restedTag').textContent = tags.join('   ');
   }

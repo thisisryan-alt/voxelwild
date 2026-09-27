@@ -153,6 +153,7 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
 #bossList b { color: #ffe38a; font-weight: normal; } #bossList .done { color: #8f8; } #bossList small { color: #bbb; display: block; }
 #arenaTag { position: absolute; left: 8px; top: calc(28px + env(safe-area-inset-top, 0px)); color: #ffd966; font-size: 15px; text-shadow: var(--px) var(--px) 0 #000; background: rgba(0,0,0,0.35); padding: 3px 8px; }
 #hearts .absorb { display: flex; filter: sepia(1) saturate(5) hue-rotate(5deg) brightness(1.15); margin-left: 2px; }
+#scope { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at center, transparent 0, transparent 34vmin, rgba(0,0,0,0.92) 35vmin, #000 60vmin); }
 #bountyTag { position: absolute; left: 8px; top: calc(40px + env(safe-area-inset-top, 0px)); color: #b8ff9a; font-size: 14px; text-shadow: var(--px) var(--px) 0 #000; background: rgba(0,0,0,0.35); padding: 2px 8px; }
 #bountyTag::before { content: "Bounty: "; color: #ffe38a; }
 #restedTag { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); color: #ffe38a; font-size: 13px; text-shadow: var(--px) var(--px) 0 #000; }
@@ -282,6 +283,7 @@ button.mini { height: auto; padding: 2px 10px; font-size: 13px; margin-left: 10p
     <div id="toast"></div>
     <div id="advToast"></div>
     <div id="bountyTag" hidden></div>
+    <div id="scope" hidden></div>
     <div id="pickups"></div>
     <div id="clickHint" hidden>Click to look around</div>
     <div id="bottom">

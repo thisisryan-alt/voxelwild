@@ -146,6 +146,7 @@ export class Player {
   forward() { const cp = Math.cos(this.pitch); return [-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp]; }
 
   look(dx, dy, sens) {
+    sens *= this.zoomSens || 1;            // slower while looking through a spyglass
     this.yaw -= dx * sens;
     this.pitch = Math.max(-1.5621, Math.min(1.5621, this.pitch - dy * sens));
     this.yaw %= Math.PI * 2;
