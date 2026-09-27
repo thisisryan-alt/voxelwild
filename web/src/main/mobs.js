@@ -11,6 +11,7 @@ import { structuresIn } from '../shared/structures.js';
 import { skyTemples } from '../shared/skylands.js';
 import { terrainFor } from '../shared/gen.js';
 
+const VOICES = { cow: 'cow', sheep: 'sheep', pig: 'pig', chicken: 'chicken', villager: 'villager', wolf: 'wolf', husk: 'husk', skeleton: 'skeleton' };
 const GRASSY = new Set([Biome.Plains, Biome.Forest, Biome.DenseForest, Biome.Savanna, Biome.Taiga, Biome.SnowyTaiga, Biome.Jungle, Biome.Swamp, Biome.Mountains, Biome.SnowyTundra]);
 
 // size in blocks, health in half hearts (Minecraft's), speed in blocks/second
@@ -411,6 +412,16 @@ export class Mobs {
     // lava hurts them too
     if (isLava(w.getBlock(Math.floor(b.pos[0]), Math.floor(b.pos[1] + 0.2), Math.floor(b.pos[2]))) && !['blaze', 'zombified_piglin', 'ghast', 'strider'].includes(m.type)) this.hurt(m, dt * 8, null);
     if (t.bossAI && hostile) this.bossThink(m, dt, dist, dx, dz, pp);
+    // idle calls now and then when the player is near
+    const voice = VOICES[t.villager ? 'villager' : (t.base || m.type).replace('_tame', '')];
+    if (voice && dist < 16 && g.settings.mobVoices !== false) {
+      m.voiceT = (m.voiceT ?? 3 + this.rng() * 12) - dt;
+      if (m.voiceT <= 0) {
+        m.voiceT = 8 + this.rng() * 16;
+        const yaw = pl.yaw, rx = Math.cos(yaw), rz = -Math.sin(yaw), l = Math.hypot(dx, dz) || 1;
+        g.audio.mobVoice(voice, dist, Math.max(-0.8, Math.min(0.8, -(dx * rx + dz * rz) / l)));
+      }
+    }
     if (m.slowT > 0) { m.slowT -= dt; speed *= 0.4; if (Math.random() < dt * 4) g.spawnEmbers([b.pos[0], b.pos[1] + t.height * 0.6, b.pos[2]], 1, [1.2, 1.5, 2.0]); }
     if (m.onFire > 0) {
       m.onFire -= dt; m.fireT = (m.fireT || 0) - dt;

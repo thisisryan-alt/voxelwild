@@ -264,6 +264,10 @@ a Bottle). Waves heal and restock the player; a death retries the wave; the end 
   trees, if there is room. **Bone meal** (a bone makes three) jumps crops 2-4 stages, grows a sapling 45% of the
   time, and sprouts grass and flowers on grass. `game.growTree`, `updateSaplings`, `useBoneMeal`;
   `node test/growth.mjs`.
+- **Animal and monster calls** (Audio > Animal and Monster Calls): cows, sheep, pigs, chickens, villagers, wolves,
+  husks and skeletons make synthesized idle sounds now and then (a pulse train through two formant filters per
+  species, `SYNTH.voice`), quieter with distance and panned toward the mob; villagers "hmm" when you open trading.
+  `node test/voices.mjs`.
 - The pause menu scrolls when it is taller than the window (`justify-content: safe center`), so its top buttons can
   always be reached.
 

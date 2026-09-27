@@ -936,6 +936,7 @@ export class Game {
       if (this.mouse.rightClicked && this.state === 'playing' && this.mobs.interactMob(mobHit.mob)) { this.swing = 1; this.mining = null; return; }
       if (this.mouse.rightClicked && mobHit.mob.def.villager && this.state === 'playing') {
         const v = mobHit.mob;
+        this.audio.mobVoice('villager', 2, 0);
         this.openStation({ kind: 'trade', prof: v.def.villager, name: `${v.def.villager[0].toUpperCase()}${v.def.villager.slice(1)}`, trades: this.trades(v.def.villager) });
         this.audio.click();
         this.mining = null;

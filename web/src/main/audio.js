@@ -87,6 +87,36 @@ const SYNTH = {
     for (let i = 0; i < n; i++) { const t = i / SR; lp += aL * (rng.signed() - lp); ph += TAU * (140 - 60 * Math.min(t / 0.2, 1)) / SR; o[i] = (Math.sin(ph) * 0.9 + lp * 0.8) * Math.min(t / 0.003, 1) * Math.exp(-t / 0.06); }
     fadeOut(o, 0.02); return normalize(o, 0.8);
   },
+  /** Idle calls: a voiced tone (glottal pulses through two formants) shaped per animal. */
+  voice: (kind, k) => {
+    const P = {
+      cow: { len: 1.1, f0: [118, 92], f1: 500, f2: 900, vib: 5, trem: 0, noise: 0.05 },
+      sheep: { len: 0.75, f0: [330, 300], f1: 750, f2: 1500, vib: 7, trem: 22, noise: 0.05 },
+      pig: { len: 0.22, f0: [190, 150], f1: 420, f2: 1100, vib: 0, trem: 0, noise: 0.35, rep: 2 },
+      chicken: { len: 0.08, f0: [720, 640], f1: 1100, f2: 2600, vib: 0, trem: 0, noise: 0.1, rep: 3 },
+      villager: { len: 0.45, f0: [210, 165], f1: 450, f2: 1300, vib: 3, trem: 0, noise: 0.1 },
+      wolf: { len: 0.14, f0: [420, 300], f1: 800, f2: 1700, vib: 0, trem: 0, noise: 0.3, rep: 2 },
+      husk: { len: 1.2, f0: [85, 70], f1: 350, f2: 800, vib: 2, trem: 6, noise: 0.25 },
+      skeleton: { len: 0.05, f0: [0, 0], f1: 2500, f2: 4000, vib: 0, trem: 0, noise: 1, rep: 5 },
+    }[kind];
+    const rng = new Rng(k * 733 + kind.length * 41), rep = P.rep || 1, gap = P.len * 0.6, n = Math.floor((P.len * rep + gap * (rep - 1) + 0.05) * SR), o = new Float32Array(n);
+    const pitch = 0.9 + rng.next() * 0.2;
+    for (let r = 0; r < rep; r++) {
+      const at = Math.floor(r * (P.len + gap) * SR), len = Math.floor(P.len * SR);
+      let ph = 0, b1 = 0, b2 = 0, lp = 0;
+      const a1 = coef(P.f1), a2 = coef(P.f2);
+      for (let i = 0; i < len && at + i < n; i++) {
+        const t = i / SR, u = t / P.len;
+        const f = (P.f0[0] + (P.f0[1] - P.f0[0]) * u) * pitch * (1 + (P.vib ? 0.02 * Math.sin(TAU * P.vib * t) : 0));
+        ph += f / SR; if (ph >= 1) ph -= 1;
+        const src = (P.f0[0] ? (ph < 0.3 ? Math.sin(Math.PI * ph / 0.3) : 0) * 2 - 0.4 : 0) + rng.signed() * P.noise;
+        b1 += a1 * (src - b1); b2 += a2 * (src - b2); lp = b1 * 0.8 + (b2 - b1) * 0.5;
+        const env = Math.min(t / 0.02, 1) * Math.min((P.len - t) / 0.06, 1) * (P.trem ? 0.65 + 0.35 * Math.sin(TAU * P.trem * t) : 1);
+        o[at + i] += lp * Math.max(0, env);
+      }
+    }
+    fadeOut(o, 0.02); return normalize(o, 0.6);
+  },
   orb: () => {
     // a small bright chime, like picking up experience
     const n = Math.floor(0.25 * SR), o = new Float32Array(n);
@@ -441,6 +471,11 @@ export class GameAudio {
       g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 3);
       this.bossSrc.stop(t + 3.1); this.bossSrc = null;
     }
+  }
+  /** A mob's idle call, quieter with distance and panned toward it. */
+  mobVoice(kind, dist, pan) {
+    const k = this.nextVariant() % 3;
+    this.play(this.get(`voice_${kind}_${k}`, () => SYNTH.voice(kind, k)), 0.5 * Math.max(0, 1 - dist / 18), 1, pan);
   }
   orb() { this.play(this.get('orb', SYNTH.orb), 0.3, 0.85 + Math.random() * 0.4); }
   levelUp() { this.play(this.get('levelUp', SYNTH.levelUp), 0.5); }

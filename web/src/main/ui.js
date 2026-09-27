@@ -74,7 +74,7 @@ const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, vol
   shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr',
   farDistance: 2000, resolution: '2160', dynamicRes: false, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
   rayStrength: 1, clouds: true, ao: 1, dayCycle: 'normal', fixedHour: 12, dayLength: 20, weatherMode: 'dynamic', brightness: 1,
-  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true, minimap: true, lookInfo: true, timber: true, veinMine: true, graves: true, dash: true, damageNumbers: true, bossMusic: true, cameraEffects: true, handLight: true, seasons: true, seasonDays: 3, cloudQuality: 1, ssao: true, aa: true, sharpen: 0.6 };
+  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true, minimap: true, lookInfo: true, timber: true, veinMine: true, graves: true, dash: true, damageNumbers: true, bossMusic: true, cameraEffects: true, mobVoices: true, handLight: true, seasons: true, seasonDays: 3, cloudQuality: 1, ssao: true, aa: true, sharpen: 0.6 };
 const pct = (x) => `${Math.round(x * 100)}%`;
 // every option: tab, key, label and either a range (min/max/step/fmt) or a choice list (values + labels) or a toggle
 const OPTIONS = [
@@ -127,6 +127,7 @@ const OPTIONS = [
   { tab: 'Controls', key: 'damageNumbers', label: 'Damage numbers' },
   { tab: 'Quality', key: 'handLight', label: 'Held Torches Light Up' },
   { tab: 'Audio', key: 'bossMusic', label: 'Boss Music' },
+  { tab: 'Audio', key: 'mobVoices', label: 'Animal and Monster Calls' },
   { tab: 'Sky & Time', key: 'seasons', label: 'Seasons' },
   { tab: 'Sky & Time', key: 'seasonDays', label: 'Days per Season', min: 1, max: 10, step: 1, fmt: (x) => `${x}` },
 ];
