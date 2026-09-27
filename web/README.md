@@ -231,6 +231,9 @@ a Bottle). Waves heal and restock the player; a death retries the wave; the end 
   enchantments survive dropping, chests, hoppers and dispensers.
 - **Anvil** (3 iron blocks, 4 iron ingots): repair an item with its material (planks, cobblestone, iron, diamond,
   leather, gold, string) or merge two of the same item (durability plus a bonus, enchantments combined).
+- **Experience orbs**: kills, ores, fishing and bounties drop glowing green orbs that arc out and home in on the
+  player (`game.giveXp(n, pos)` -> `particles.orbs`, `updateOrbs`, `collectXp`). **Camera effects** (Video >
+  Camera Effects): the field of view widens when sprinting, dashing or flying fast, and the view shakes when hurt.
 - **Combat feel**: critical hits when falling (x1.5, sparks), floating damage numbers (Controls > Damage numbers),
   an attack-cooldown bar under the crosshair, and a synthesized boss-fight music loop that fades in near a boss
   (Audio > Boss Music).
@@ -256,6 +259,11 @@ a Bottle). Waves heal and restock the player; a death retries the wave; the end 
 - **Fireflies and butterflies** (not in Minecraft): glowing, blinking fireflies near the ground on dry nights in
   forests, plains, jungles and (most of all) swamps; butterflies in five colours on sunny days. `game.updateFauna`;
   `node test/fauna.mjs`.
+- **Saplings grow** (they never did): placed saplings are kept in `meta.saplings` and grow after two to five minutes
+  of loaded time into oak, birch (tall), spruce (cone), jungle (big), acacia (flat) and cherry / dark oak / pale oak
+  trees, if there is room. **Bone meal** (a bone makes three) jumps crops 2-4 stages, grows a sapling 45% of the
+  time, and sprouts grass and flowers on grass. `game.growTree`, `updateSaplings`, `useBoneMeal`;
+  `node test/growth.mjs`.
 - The pause menu scrolls when it is taller than the window (`justify-content: safe center`), so its top buttons can
   always be reached.
 

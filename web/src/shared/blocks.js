@@ -345,7 +345,7 @@ export const I = {
   Gunpowder: 300, String: 301, GoldNugget: 302, BlazeRod: 303, GhastTear: 304, WoodenSword: 305, StoneSword: 306, IronSword: 307, DiamondSword: 308,
   IronIngot: 309, GoldIngot: 310, CopperIngot: 311, CookedBeef: 312, CookedPorkchop: 313, CookedMutton: 314, CookedChicken: 315, Charcoal: 316,
   Bread: 317, Wheat: 318, WheatSeeds: 319, WoodenHoe: 320, StoneHoe: 321, IronHoe: 322, DiamondHoe: 323,
-  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348, FlameBlade: 349, BoneGreatsword: 350, CloudBottle: 351, BlazingCore: 352, BoneCrown: 353, StormTear: 354, Frostbrand: 355, FrozenHeart: 356, FishingRod: 357, Cod: 358, Salmon: 359, CookedCod: 360, CookedSalmon: 361, GoldenApple: 362, EnchantedGoldenApple: 363, Totem: 364,
+  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348, FlameBlade: 349, BoneGreatsword: 350, CloudBottle: 351, BlazingCore: 352, BoneCrown: 353, StormTear: 354, Frostbrand: 355, FrozenHeart: 356, FishingRod: 357, Cod: 358, Salmon: 359, CookedCod: 360, CookedSalmon: 361, GoldenApple: 362, EnchantedGoldenApple: 363, Totem: 364, BoneMeal: 365,
   LeatherHelmet: 324,      // armour: 324 + material * 4 + piece (leather, golden, iron, diamond x helmet, chestplate, leggings, boots)
 };
 export const ARMOR_MATS = ['Leather', 'Golden', 'Iron', 'Diamond'], ARMOR_PIECES = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
@@ -414,6 +414,7 @@ ITEMS[I.FrozenHeart] = { id: I.FrozenHeart, name: 'Frozen Heart', kind: Kind.Use
 ITEMS[I.GoldenApple] = { id: I.GoldenApple, name: 'Golden Apple', kind: Kind.Food, stack: 64, food: 4, sat: 9.6, always: true, effects: { regen: [5, 2], absorb: 4 } };
 ITEMS[I.EnchantedGoldenApple] = { id: I.EnchantedGoldenApple, name: 'Enchanted Golden Apple', kind: Kind.Food, stack: 64, food: 4, sat: 9.6, always: true, glint: true, effects: { regen: [20, 2], absorb: 16, fireRes: 300 } };
 ITEMS[I.Totem] = { id: I.Totem, name: 'Totem of Undying', kind: Kind.Material, stack: 1, glint: true };
+ITEMS[I.BoneMeal] = { id: I.BoneMeal, name: 'Bone Meal', kind: Kind.Use, stack: 64 };
 ITEMS[I.FishingRod] = { id: I.FishingRod, name: 'Fishing Rod', kind: Kind.Use, stack: 1, durability: 64 };
 food(I.Cod, 'Raw Cod', 2, 0.4); food(I.Salmon, 'Raw Salmon', 2, 0.4); food(I.CookedCod, 'Cooked Cod', 5, 6); food(I.CookedSalmon, 'Cooked Salmon', 6, 9.6);
 ITEMS[I.Bucket] = { id: I.Bucket, name: 'Bucket', kind: Kind.Use, stack: 16 };
@@ -621,6 +622,7 @@ recipe(I.StormTear, 1, [[I.GhastTear, 2], [I.GlowstoneDust, 6]]);
 if (C.packed_ice) recipe(I.FrozenHeart, 1, [[C.packed_ice, 4], [I.Diamond, 1]]);
 recipe(I.FishingRod, 1, [[I.Stick, 3], [I.String, 2]]);
 recipe(I.GoldenApple, 1, [[I.Apple, 1], [I.GoldIngot, 8]]);
+recipe(I.BoneMeal, 3, [[I.Bone, 1]]);
 if (FAM.waystone) recipe(FAM.waystone.first, 1, [[B.StoneBricks, 6], [I.GoldIngot, 2]]);
 if (FAM.enchanting_table) recipe(FAM.enchanting_table.first, 1, [[B.Obsidian, 4], [I.Diamond, 2], [I.LapisLazuli, 3]]);
 if (FAM.anvil && C.iron_block) recipe(FAM.anvil.first, 1, [[C.iron_block, 3], [I.IronIngot, 4]]);

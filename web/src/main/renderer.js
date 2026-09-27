@@ -673,7 +673,7 @@ export class Renderer {
     this.frame++;
     const W = this.width, H = this.height;
     const far = Math.max(160, f.viewDistance * CS + 48), near = 0.06;
-    mat4.perspective(this.proj, this.settings.fov * Math.PI / 180, W / H, near, far);
+    mat4.perspective(this.proj, this.settings.fov * (f.fovMul || 1) * Math.PI / 180, W / H, near, far);
     mat4.fpsView(this.view, f.camPos, f.yaw, f.pitch);
     mat4.mul(this.viewProj, this.proj, this.view);
     mat4.invert(this.invViewProj, this.viewProj);

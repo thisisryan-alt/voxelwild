@@ -36,6 +36,7 @@ const TIPS = [
   'Vindicators sometimes drop a Totem of Undying: keep it in your hotbar and it saves you from one death.',
   'Villagers post a bounty each day: bring them goods or hunt monsters for emeralds and experience.',
   'On dry nights fireflies drift over forests, plains and swamps; on sunny days, butterflies.',
+  'Saplings grow into trees in a few minutes. Bone meal (one bone makes three) speeds up crops and saplings and sprouts flowers on grass.',
   'Tame a wolf with bones. Right-click it to make it sit or follow; feed it meat to heal it. It fights whatever you fight.',
   'An enchanting table (4 obsidian, 2 diamonds, 3 lapis) enchants tools, weapons, bows and armour for experience levels and lapis lazuli.',
   'An anvil (3 iron blocks, 4 iron ingots) repairs worn gear with its material, or merges two of the same item and their enchantments.',
@@ -73,7 +74,7 @@ const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, vol
   shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr',
   farDistance: 2000, resolution: '2160', dynamicRes: false, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
   rayStrength: 1, clouds: true, ao: 1, dayCycle: 'normal', fixedHour: 12, dayLength: 20, weatherMode: 'dynamic', brightness: 1,
-  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true, minimap: true, lookInfo: true, timber: true, veinMine: true, graves: true, dash: true, damageNumbers: true, bossMusic: true, handLight: true, seasons: true, seasonDays: 3, cloudQuality: 1, ssao: true, aa: true, sharpen: 0.6 };
+  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true, minimap: true, lookInfo: true, timber: true, veinMine: true, graves: true, dash: true, damageNumbers: true, bossMusic: true, cameraEffects: true, handLight: true, seasons: true, seasonDays: 3, cloudQuality: 1, ssao: true, aa: true, sharpen: 0.6 };
 const pct = (x) => `${Math.round(x * 100)}%`;
 // every option: tab, key, label and either a range (min/max/step/fmt) or a choice list (values + labels) or a toggle
 const OPTIONS = [
@@ -84,6 +85,7 @@ const OPTIONS = [
   { tab: 'Video', key: 'dynamicRes', label: 'Dynamic Resolution' },
   { tab: 'Video', key: 'fov', label: 'FOV', min: 55, max: 110, step: 1, fmt: (x) => `${x}°` },
   { tab: 'Video', key: 'viewBob', label: 'View Bobbing' },
+  { tab: 'Video', key: 'cameraEffects', label: 'Camera Effects (sprint FOV, hurt shake)' },
   { tab: 'Video', key: 'showFps', label: 'Show FPS' },
   { tab: 'Video', key: 'brightness', label: 'Brightness', min: 0.5, max: 2, step: 0.05, fmt: pct },
   { tab: 'Quality', key: 'shadows', label: 'Shadows' },

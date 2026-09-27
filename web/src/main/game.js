@@ -496,7 +496,7 @@ export class Game {
       if (!this.creative && under !== CK.powder_snow && under !== CK.slime_block && !(under > 0 && BLOCKS[under].model && BLOCKS[under].model.kind === K.Bed)) this.stats.land(h, water);
     };
     this.player.onStep = () => this.audio.step(this.blockUnderFeet());
-    this.stats.onDamage = (a) => { this.damageFlash = Math.min(1, this.damageFlash + 0.5 + a * 0.05); this.audio.hurt(); this.emit('hud'); };
+    this.stats.onDamage = (a) => { this.damageFlash = Math.min(1, this.damageFlash + 0.5 + a * 0.05); this.shake = Math.min(1, (this.shake || 0) + 0.25 + a * 0.06); this.audio.hurt(); this.emit('hud'); };
     this.stats.onDeath = (cause) => this.die(cause);
     this.stats.armor = () => this.inventory.defense;
     this.stats.onTotem = () => {
@@ -1139,6 +1139,7 @@ export class Game {
       if (!smoker && !blast && lit !== (id === CK.lit_furnace)) w.setBlock(x, y, z, lit ? CK.lit_furnace : CK.furnace);
       if (this.station && this.station.key === k) this.emit('station');
     }
+    this.updateSaplings();
     for (const [k, t] of Object.entries(m.crops || {})) {
       if (!k.startsWith(prefix)) continue;
       const [x, y, z] = k.slice(prefix.length).split(',').map(Number), id = w.getBlock(x, y, z), f = famOf(id);
@@ -2150,6 +2151,7 @@ export class Game {
     if (fam && (fam.kind === K.Door || fam.kind === K.Tall || fam.kind === K.Waystone)) w.setBlock(x, y + 1, z, id + 1);
     if (fam && fam.kind === K.Bed) { const n = [[1, 0], [-1, 0], [0, 1], [0, -1]][(id - fam.first) >> 1]; w.setBlock(x + n[0], y, z + n[1], id + 1); }
     if (fam && fam.kind === K.Crop) this.meta.crops = { ...(this.meta.crops || {}), [this.bkey(x, y, z)]: this.meta.clock || 0 };
+    if (this.saplingWood(id)) this.meta.saplings = { ...(this.meta.saplings || {}), [this.bkey(x, y, z)]: this.meta.clock || 0 };
     if (fam && (fam.kind === K.Hopper || fam.kind === K.Dispenser)) this.blockData([x, y, z], 'chest', fam.kind === K.Hopper ? 5 : 9);
     if (id === CK.chest || id === CK.barrel) this.blockData([x, y, z], 'chest', 27);      // placed chests start empty (found ones hold loot)
     this.redstone.track(x, y, z);
@@ -2314,7 +2316,91 @@ export class Game {
   }
 
   /** Flint and steel on an obsidian frame lights a portal; an eye of ender goes into a frame or flies toward a stronghold. */
+  // ---------------------------------------------------------------- saplings and bone meal
+
+  /** [log, leaves, shape] for a sapling block, or null. */
+  saplingWood(id) {
+    if (!this.saplingMap) {
+      const m = this.saplingMap = {};
+      const add = (key, log, leaves, shape) => { if (CK[key + '_sapling'] && log && leaves) m[CK[key + '_sapling']] = [log, leaves, shape]; };
+      add('oak', B.OakLog, B.OakLeaves, 'round'); add('birch', B.BirchLog, B.BirchLeaves, 'tall'); add('spruce', B.SpruceLog, B.SpruceLeaves, 'cone');
+      add('jungle', B.JungleLog, B.JungleLeaves, 'jungle');
+      for (const k of ['acacia', 'dark_oak', 'cherry', 'pale_oak']) add(k, CK[k + '_log'], CK[k + '_leaves'], k === 'acacia' ? 'flat' : 'round');
+    }
+    return this.saplingMap[id] || null;
+  }
+
+  /** Grows the sapling at x, y, z into a tree if there is room. Returns true when it grew. */
+  growTree(x, y, z) {
+    const w = this.world, wood = this.saplingWood(w.getBlock(x, y, z));
+    if (!wood) return false;
+    const [log, leaves, shape] = wood;
+    const h = { round: 4 + Math.floor(Math.random() * 3), tall: 5 + Math.floor(Math.random() * 3), cone: 6 + Math.floor(Math.random() * 3), jungle: 8 + Math.floor(Math.random() * 3), flat: 5 + Math.floor(Math.random() * 2) }[shape];
+    const free = (b) => b === B.Air || (b > 0 && (BLOCKS[b].flags & F.Replaceable) && !isLiquid(b));
+    for (let k = 1; k <= h; k++) if (!free(w.getBlock(x, y + k, z))) return false;
+    const leaf = (lx, ly, lz) => { if (free(w.getBlock(lx, ly, lz))) w.setBlock(lx, ly, lz, leaves); };
+    for (let k = 0; k < h; k++) w.setBlock(x, y + k, z, log);
+    const top = y + h;
+    if (shape === 'cone') {
+      for (let k = 0; k < h - 1; k++) { const r = k === h - 2 ? 0 : Math.max(1, Math.round((h - 1 - k) / 2.2)) - (k % 2); for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) if ((dx || dz) && Math.abs(dx) + Math.abs(dz) <= r + 1) leaf(x + dx, y + 2 + k, z + dz); }
+      leaf(x, top, z);
+    } else if (shape === 'flat') {
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) if (Math.abs(dx) + Math.abs(dz) < 4) { leaf(x + dx, top - 1, z + dz); if (Math.abs(dx) + Math.abs(dz) < 2) leaf(x + dx, top, z + dz); }
+    } else {
+      const r2 = shape === 'jungle' ? 3 : 2;
+      for (let ly = top - 3; ly <= top; ly++) {
+        const r = ly >= top - 1 ? 1 : r2;
+        for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+          if (Math.abs(dx) === r && Math.abs(dz) === r && (ly === top || Math.random() < 0.5)) continue;   // ragged corners
+          leaf(x + dx, ly, z + dz);
+        }
+      }
+    }
+    this.spawnEmbers([x + 0.5, y + 1, z + 0.5], 12, [0.6, 1.6, 0.5]);
+    if (this.meta.saplings) delete this.meta.saplings[this.bkey(x, y, z)];
+    return true;
+  }
+
+  /** Saplings grow in two to five minutes of loaded time. */
+  updateSaplings() {
+    const m = this.meta, w = this.world, prefix = `${this.dim || 0}:`;
+    for (const [k, t] of Object.entries(m.saplings || {})) {
+      if (!k.startsWith(prefix)) continue;
+      const [x, y, z] = k.slice(prefix.length).split(',').map(Number), id = w.getBlock(x, y, z);
+      if (id < 0) continue;
+      if (!this.saplingWood(id)) { delete m.saplings[k]; continue; }
+      const due = t + 120 + ((Math.imul(x, 73856093) ^ Math.imul(z, 19349663)) >>> 0) % 180;
+      if ((m.clock || 0) >= due && !this.growTree(x, y, z)) m.saplings[k] = m.clock;   // no room: try again later
+    }
+  }
+
+  /** Bone meal: crops jump ahead, saplings may grow at once, grass sprouts plants and flowers. */
+  useBoneMeal(hit) {
+    if (!hit) return;
+    const [x, y, z] = hit.hit, w = this.world, id = hit.block, f = famOf(id), m = this.meta, k = this.bkey(x, y, z);
+    let used = false;
+    if (f && f.kind === K.Crop && BLOCKS[id].model.state < 7) {
+      const st = Math.min(7, BLOCKS[id].model.state + 2 + Math.floor(Math.random() * 3));
+      w.setBlock(x, y, z, f.first + st);
+      m.cropRate = m.cropRate || {}; m.cropRate[k] = Math.max(m.cropRate[k] || 0, st * 30);
+      used = true;
+    } else if (this.saplingWood(id)) { if (Math.random() < 0.45) this.growTree(x, y, z); used = true; }
+    else if (id === B.Grass) {
+      const plants = [B.TallGrass, B.TallGrass, B.TallGrass, B.FlowerRed, B.FlowerYellow, CK.cornflower, CK.azure_bluet].filter(Boolean);
+      for (let t = 0; t < 14; t++) {
+        const px = x + Math.round((Math.random() - 0.5) * 6), pz = z + Math.round((Math.random() - 0.5) * 6);
+        if (w.getBlock(px, y, pz) === B.Grass && w.getBlock(px, y + 1, pz) === B.Air) w.setBlock(px, y + 1, pz, plants[Math.floor(Math.random() * plants.length)]);
+      }
+      used = true;
+    }
+    if (!used) return;
+    this.spawnEmbers([x + 0.5, y + 1, z + 0.5], 10, [0.6, 1.6, 0.5]);
+    if (!this.creative) this.inventory.consumeHeld();
+    this.swing = 1; this.audio.place(B.Grass);
+  }
+
   useItem(def, hit) {
+    if (def.id === I.BoneMeal) { this.useBoneMeal(hit); return; }
     const inv = this.inventory, w = this.world;
     if (def.id === I.FlintAndSteel) {
       if (!hit) return;
@@ -2594,10 +2680,19 @@ export class Game {
     if (['king_slime', 'inferno_spirit', 'hollow_king', 'frost_colossus', 'storm_ghast'].every((k) => beaten[k])) this.advance('bosses');
   }
 
+  /** Experience: from a place it comes as orbs that fly to the player; without one it is added at once. */
   giveXp(n, pos) {
     if (this.creative || !(n > 0) || !this.stats) return;
+    if (pos && this.particles) {
+      const list = this.particles.orbs || (this.particles.orbs = []), k = Math.min(6, Math.ceil(n / 3));
+      for (let i = 0; i < k; i++) list.push({ p: [pos[0], pos[1] + 0.3, pos[2]], v: [(Math.random() - 0.5) * 4, 3 + Math.random() * 2.5, (Math.random() - 0.5) * 4], amt: n / k, t: 0, ph: Math.random() * 6, c: [1, 2, 0.3], size: 0.08 });
+      return;
+    }
+    this.collectXp(n);
+  }
+
+  collectXp(n) {
     const up = this.stats.addXp(n);
-    if (pos) this.spawnEmbers(pos, Math.min(14, 3 + n), [0.8, 1.8, 0.3]);
     this.audio.orb();
     if (up) { this.audio.levelUp(); if (this.stats.level % 5 === 0) this.emit('toast', `Level ${this.stats.level}!`); }
     this.emit('hud');
@@ -2796,8 +2891,26 @@ export class Game {
     }
   }
 
+  updateOrbs(dt) {
+    const list = this.particles.orbs;
+    if (!list || !list.length) return;
+    const pp = this.player.body.pos, tx = pp[0], ty = pp[1] + 0.9, tz = pp[2], alive = this.state !== 'dead';
+    for (let i = list.length - 1; i >= 0; i--) {
+      const o = list[i];
+      o.t += dt; o.ph += dt * 7;
+      const dx = tx - o.p[0], dy = ty - o.p[1], dz = tz - o.p[2], d = Math.hypot(dx, dy, dz) || 1;
+      if (o.t > 0.35 && alive) { const k = 45 * dt / d; o.v[0] += dx * k; o.v[1] += dy * k; o.v[2] += dz * k; const damp = Math.exp(-3.5 * dt); o.v[0] *= damp; o.v[1] *= damp; o.v[2] *= damp; }
+      else o.v[1] -= 12 * dt;
+      o.p[0] += o.v[0] * dt; o.p[1] += o.v[1] * dt; o.p[2] += o.v[2] * dt;
+      o.size = 0.07 + 0.025 * Math.sin(o.ph); o.c = [1.1 + 0.5 * Math.sin(o.ph * 0.5), 2.1, 0.3];
+      if (alive && ((d < 0.9 && o.t > 0.3) || o.t > 5)) { list.splice(i, 1); this.collectXp(o.amt); }
+      else if (o.t > 30) list.splice(i, 1);
+    }
+  }
+
   updateParticles(dt) {
     const w = this.world;
+    this.updateOrbs(dt);
     const br = this.particles.break;
     // drifting leaves: sway down on the wind, settle on the ground and fade
     if (dt > 0) this.spawnLeaves(dt);
@@ -2884,6 +2997,7 @@ export class Game {
     pack(this.particles.rain, () => [amb[0] * 0.55, amb[1] * 0.6, amb[2] * 0.7, 0.32], 0.012, [-wind[0] * 0.03 * 3, 0.42, -wind[1] * 0.03 * 3], false);
     pack(this.particles.snow, () => [amb[0] * 0.95, amb[1] * 0.95, amb[2], 0.9], 0.045, null, true);
     if (this.particles.motes && this.particles.motes.length) pack(this.particles.motes, (p) => [p.c[0], p.c[1], p.c[2], Math.min(1, p.life) * p.a], 0.03, null, true, 'm');
+    if (this.particles.orbs && this.particles.orbs.length) pack(this.particles.orbs, (p) => [p.c[0], p.c[1], p.c[2], 1], 0.08, null, true, 'o');
     // fireflies glow on their own; butterflies are lit by the sky
     if (this.particles.flies && this.particles.flies.length) pack(this.particles.flies, (p) => p.kind === 'firefly' ? [p.c[0] * p.a, p.c[1] * p.a, p.c[2] * p.a, p.a] : [p.c[0] * amb[0] * 1.3, p.c[1] * amb[1] * 1.3, p.c[2] * amb[2] * 1.3, p.a], 0.04, null, true, 'f');
     return groups;
@@ -2993,8 +3107,14 @@ export class Game {
     }
     const other = !this.openSky(), sky = this.skyNow || this.tod.state;
     const inLava = this.headInLava;
+    // camera feel: the view widens a little when sprinting (and more in a dash), and shakes when hurt
+    const camFx = this.settings.cameraEffects !== false;
+    const fovWant = camFx ? 1 + (pl.sprinting && Math.hypot(pl.body.vel[0], pl.body.vel[2]) > 4 ? 0.08 : 0) + ((this.dashCool || 0) > 0.75 ? 0.08 : 0) + (pl.flying && Math.hypot(pl.body.vel[0], pl.body.vel[2]) > 12 ? 0.06 : 0) : 1;
+    this.fovK = (this.fovK || 1) + (fovWant - (this.fovK || 1)) * Math.min(1, dt * 8);
+    this.shake = Math.max(0, (this.shake || 0) - dt * 2.5);
+    const sh = camFx ? this.shake * this.shake * 0.035 : 0;
     const f = {
-      dt, time: this.time, camPos: eye, yaw: pl.yaw, pitch: pl.pitch, sky,
+      dt, time: this.time, camPos: eye, yaw: pl.yaw + Math.sin(this.time * 47) * sh, pitch: pl.pitch + Math.cos(this.time * 39) * sh, sky, fovMul: this.fovK,
       dim: this.dim === Dim.Sky ? 0 : this.dim, flat: !!this.meta.flat || this.dim === Dim.Sky, dimAmb: sky.dimAmb, dimFog: inLava ? 1.2 : other ? sky.fogDensity : null, portal: Math.min(1, (this.portalTime || 0) / 3),
       weather: other ? { cloudCover: 0, windX: 0.2, windZ: 0.1, windStrength: 0.3, gust: 0.2, fog: 0, storm: 0, wetness: 0, snowCover: 0 } : { cloudCover: wp.cloud, windX: this.windVec[0] / 20 || 0, windZ: this.windVec[1] / 20 || 0, windStrength: 0.35 + wp.wind * 5, gust: wp.gust,
         fog: (wp.fog - 1) * 0.02 + (1 - wp.fogDist) * 0.3, storm: Math.max(0, (wp.precip - 0.5) * 2), wetness: this.weather.wetness,
