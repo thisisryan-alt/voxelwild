@@ -33,6 +33,9 @@ export const MOB_TYPES = {
   slime_big: { name: 'Slime', health: 16, speed: 1.9, half: 1.0, height: 2.0, kind: 'hostile', damage: 4, hop: 1, splits: 'slime_medium', drops: [] },
   slime_medium: { name: 'Slime', health: 4, speed: 1.9, half: 0.5, height: 1.0, kind: 'hostile', damage: 2, hop: 1, splits: 'slime_small', drops: [] },
   slime_small: { name: 'Slime', health: 1, speed: 1.9, half: 0.26, height: 0.52, kind: 'hostile', damage: 0, hop: 1, drops: [[I.SlimeBall, 0, 2]] },
+  // a boss (Terraria's King Slime, not in Minecraft): summoned with a Slime Crown
+  king_slime: { name: 'King Slime', health: 300, speed: 2.4, half: 2.0, height: 4.0, kind: 'hostile', damage: 8, hop: 2, boss: true,
+    drops: [[I.GoldIngot, 5, 10], [I.SlimeBall, 10, 20], [I.Diamond, 1, 3], [I.Emerald, 2, 6]] },
   polar_bear: { name: 'Polar Bear', health: 30, speed: 1.7, half: 0.7, height: 1.4, kind: 'neutral', damage: 6, drops: [] },
   strider: { name: 'Strider', health: 20, speed: 1.2, half: 0.45, height: 1.7, kind: 'passive', lavaWalk: true, drops: [[I.String, 0, 3]] },
   piglin_brute: { name: 'Piglin Brute', health: 50, speed: 2.4, half: 0.3, height: 1.95, kind: 'hostile', damage: 9, drops: [[I.GoldIngot, 0, 1]], armsForward: true },
@@ -290,12 +293,25 @@ export class Mobs {
     if (t.hop) {
       // slimes do not walk: they gather themselves and jump
       m.hopT = (m.hopT ?? 1) - dt;
+      if (t.boss && targetable) {
+        // the King teleports back to a player who got away (shrinking into a puddle of motes first)
+        m.farT = dist > 28 || (b.hitWall && b.grounded) ? (m.farT || 0) + dt : 0;
+        if (m.farT > 4) {
+          m.farT = 0;
+          g.spawnEmbers([b.pos[0], b.pos[1] + 1, b.pos[2]], 40, [0.4, 1.4, 0.5]);
+          const a = this.rng() * Math.PI * 2;
+          b.pos = [pp[0] + Math.cos(a) * 6, pp[1] + 6, pp[2] + Math.sin(a) * 6]; b.vel = [0, 0, 0];
+          g.spawnEmbers([b.pos[0], b.pos[1] + 1, b.pos[2]], 40, [0.4, 1.4, 0.5]);
+          g.emit('toast', 'King Slime teleports!');
+        }
+      }
       if (b.grounded) {
         b.vel[0] *= 0.6; b.vel[2] *= 0.6;
         if (m.hopT <= 0 && (wantX || wantZ || hostile)) {
           m.hopT = hostile ? 0.6 + this.rng() * 0.6 : 1.5 + this.rng() * 2;
           const l = Math.hypot(wantX, wantZ) || 1, hs = t.speed * (hostile ? 1.6 : 1) * (0.8 + t.height * 0.3);
-          b.vel[0] = wantX / l * hs; b.vel[2] = wantZ / l * hs; b.vel[1] = 6 + t.height * 1.5;
+          b.vel[0] = wantX / l * hs; b.vel[2] = wantZ / l * hs; b.vel[1] = t.boss ? 9 + Math.min(8, dist * 0.35) : 6 + t.height * 1.5;
+          if (t.boss) m.hopT = 0.9 + this.rng() * 0.8;
           m.squish = 1;
         }
       }
@@ -376,6 +392,11 @@ export class Mobs {
       if (m.def.group) for (const o of this.list) if (o.type === m.type && Math.hypot(o.body.pos[0] - m.body.pos[0], o.body.pos[2] - m.body.pos[2]) < 16) { o.angry = 1; o.provoked = true; }
     }
     g.audio.mobHurt(m.type);
+    if (m.def.boss && m.health > 0) {
+      // the King sheds slimes as it is hurt
+      m.shed = (m.shed || 0) + amount;
+      while (m.shed >= 25) { m.shed -= 25; const c = this.spawnAt(this.rng() < 0.7 ? 'slime_small' : 'slime_medium', [m.body.pos[0] + (this.rng() - 0.5) * 3, m.body.pos[1] + 2, m.body.pos[2] + (this.rng() - 0.5) * 3]); c.body.vel = [(this.rng() - 0.5) * 8, 6, (this.rng() - 0.5) * 8]; }
+    }
     if (m.health <= 0) {
       m.dead = 0.001;
       if (m.def.splits) {

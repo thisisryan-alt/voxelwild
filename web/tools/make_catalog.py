@@ -332,6 +332,9 @@ def model_families(have, keys):
         beds = [f"@rot{r}:@crop:entity/bed/{c}:6,6,16,16" for r in (0, 90, 180, 270)] + [f"@rot{r}:@crop:entity/bed/{c}:6,28,16,16" for r in (0, 90, 180, 270)]
         fam(f"{c}_bed", "bed", tex=beds + [f"{c}_wool", "B:Planks"], cat="wool")
     fam("wheat", "crop", tex=[f"wheat_stage{k}" for k in range(8)], list="cutout", cat="plant", noitem=True, name="Wheat Crops")
+    # ---- not in Minecraft: a waystone (a fast-travel obelisk, two blocks tall) and a gravestone that keeps a death's items
+    fam("waystone", "waystone", tex=["lodestone_top", "lodestone_side", "B:StoneBricks"], cat="stone", name="Waystone")
+    fam("gravestone", "grave", tex=["mossy_cobblestone", "B:Cobblestone"], cat="stone", noitem=True, name="Gravestone")
     return out, texinfo
 
 

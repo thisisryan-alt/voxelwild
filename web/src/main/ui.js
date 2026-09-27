@@ -1,7 +1,48 @@
 // Screens and HUD (Unity UI.*): title, new world, loading, HUD, inventory + crafting, creative palette, pause,
 // settings, death. Also owns input: keyboard, mouse with pointer lock (free-look fallback), wheel, touch.
-import { ITEMS, Kind, itemName, RECIPES, SMELT, fuelTime } from '../shared/blocks.js';
+import { ITEMS, Kind, itemName, RECIPES, SMELT, fuelTime, FAM } from '../shared/blocks.js';
+import { BIOME_NAMES } from '../shared/terrain.js';
+const FAM_WAYSTONE = () => (FAM.waystone ? FAM.waystone.first : 1);
+const BIOME_LABEL = (BIOME_NAMES || []).map((n) => n.replace(/([a-z])([A-Z])/g, '$1 $2'));
 import { canCraft, craft, HOTBAR, INV_SIZE, MAX_AIR } from './gameplay.js';
+import { MiniMap } from './minimap.js';
+
+// tips on the loading and pause screens (the Tips mod: not in Minecraft)
+const TIPS = [
+  'Chop the bottom log of a tree with an axe and the whole tree comes down. Hold Shift to take just one log.',
+  'Mine one ore with a pickaxe and the whole vein follows. Hold Shift to mine a single block.',
+  'Die with items and they wait in a gravestone. Right-click it to get everything back where it was.',
+  'Every village has a waystone by its well. Right-click one to join it to your network, then travel between them.',
+  'Press M for the map. The minimap shows monsters in red, villagers in green and waystones in purple.',
+  'Double-tap A or D to dodge sideways.',
+  'Sit by a fire under a roof for a few seconds to get Rested: faster healing, less hunger and quicker mining.',
+  'A backpack (6 leather, 2 string) carries 27 more stacks. Right-click it to open.',
+  'A grappling hook (3 iron, 4 string) pulls you to any block within 32. Jump to let go.',
+  'Doors next to each other open together.',
+  'Press R to auto-walk; press it again (or S) to stop.',
+  'Hold a torch, glowstone or a lava bucket to light your way through caves.',
+  'A sleeping bag (3 wool, 2 leather) lets you sleep through the night anywhere without moving your respawn point.',
+  'Craft a Slime Crown (20 slimeballs, 5 gold ingots) and use it to summon King Slime. Bring armour.',
+  'Seasons turn every three days: leaves go orange and gold in autumn, and crops barely grow in winter.',
+  'Sort your inventory or a chest with the Sort button.',
+  'Chests in villages, dungeons, pyramids and bastions hold loot the first time you open them.',
+  'Villagers trade: right-click one. Farmers buy wheat, fletchers buy sticks, toolsmiths sell iron tools.',
+  'Levers and buttons are easy to click now: aim anywhere near them.',
+  'A hopper under a chest feeds a furnace below it: ores from above, fuel from the side.',
+];
+const tip = () => TIPS[Math.floor(Math.random() * TIPS.length)];
+/** A fuller tooltip than Minecraft's: food values, durability, armour points, damage. */
+function describe(s) {
+  const d = ITEMS[s.item];
+  if (!d) return itemName(s.item);
+  const lines = [d.name];
+  if (d.kind === Kind.Food) lines.push(`Restores ${d.food} hunger · ${d.sat} saturation`);
+  if (d.kind === Kind.Armor) lines.push(`Armour +${d.points}`);
+  if (d.damage) lines.push(`Melee damage ${d.damage}`);
+  if (d.durability && !(d.name === 'Backpack')) lines.push(`Durability ${d.durability - (s.wear || 0)} / ${d.durability}`);
+  if (d.name === 'Backpack') lines.push('Right-click to open (27 slots)');
+  return lines.join(String.fromCharCode(10));
+}
 import { loadSettings, storeSettings } from './save.js';
 import { PACK_NAMES, listBuiltinPacks } from './respack.js';
 
@@ -10,7 +51,7 @@ const DEFAULTS = { viewDistance: 7, renderScale: 1, fov: 75, sensitivity: 1, vol
   shadows: true, bloom: true, godRays: true, invertY: false, pom: 1, textures: 'lbpr',
   farDistance: 2000, resolution: '2160', dynamicRes: false, showFps: false, shadowQuality: 2048, shadowDistance: 88, leaves: 'fluffy', bloomStrength: 1,
   rayStrength: 1, clouds: true, ao: 1, dayCycle: 'normal', fixedHour: 12, dayLength: 20, weatherMode: 'dynamic', brightness: 1,
-  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true, cloudQuality: 1, ssao: true, aa: true, sharpen: 0.6 };
+  nightBrightness: 1, saturation: 1, fog: 1, viewBob: true, difficulty: 'normal', mobs: true, minimap: true, lookInfo: true, timber: true, veinMine: true, graves: true, dash: true, handLight: true, seasons: true, seasonDays: 3, cloudQuality: 1, ssao: true, aa: true, sharpen: 0.6 };
 const pct = (x) => `${Math.round(x * 100)}%`;
 // every option: tab, key, label and either a range (min/max/step/fmt) or a choice list (values + labels) or a toggle
 const OPTIONS = [
@@ -53,6 +94,15 @@ const OPTIONS = [
   { tab: 'Audio', key: 'ambience', label: 'Ambient', min: 0, max: 1, step: 0.05, fmt: pct },
   { tab: 'Controls', key: 'sensitivity', label: 'Sensitivity', min: 0.2, max: 3, step: 0.05, fmt: (x) => x.toFixed(2) },
   { tab: 'Controls', key: 'invertY', label: 'Invert Mouse' },
+  { tab: 'Controls', key: 'minimap', label: 'Minimap' },
+  { tab: 'Controls', key: 'lookInfo', label: 'Block Info Panel' },
+  { tab: 'Controls', key: 'timber', label: 'Fell Whole Trees' },
+  { tab: 'Controls', key: 'veinMine', label: 'Mine Whole Ore Veins' },
+  { tab: 'Controls', key: 'graves', label: 'Gravestones Keep Items' },
+  { tab: 'Controls', key: 'dash', label: 'Dodge Dash (double-tap A/D)' },
+  { tab: 'Quality', key: 'handLight', label: 'Held Torches Light Up' },
+  { tab: 'Sky & Time', key: 'seasons', label: 'Seasons' },
+  { tab: 'Sky & Time', key: 'seasonDays', label: 'Days per Season', min: 1, max: 10, step: 1, fmt: (x) => `${x}` },
 ];
 const TABS = ['Video', 'Quality', 'Sky & Time', 'Audio', 'Controls', 'Textures'];
 const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'KeyE', 'KeyQ', 'KeyF',
@@ -140,7 +190,9 @@ export class UI {
   // ---------------------------------------------------------------- screens
 
   show(name) {
-    for (const id of ['title', 'newWorld', 'loading', 'pause', 'settings', 'inventory', 'death', 'fatal']) $(id).hidden = id !== name;
+    for (const id of ['title', 'newWorld', 'loading', 'pause', 'settings', 'inventory', 'death', 'fatal', 'bigmap']) $(id).hidden = id !== name;
+    if (name === 'loading') $('loadTip').textContent = tip();
+    if (name === 'pause') $('pauseTip').textContent = tip();
     $('hud').hidden = !['playing', 'inventory', 'pause', 'death'].includes(name) || !this.game.world || !!(this.game.meta && this.game.meta.menu);
     $('touch').hidden = !(this.touchMode && name === 'playing');
     this.screen = name;
@@ -360,10 +412,12 @@ export class UI {
         if (k === 'KeyE' || k === 'Tab') this.openInventory();
         else if (k === 'Escape' || k === 'KeyP') this.pause();
         else if (k === 'F3') { this.debug = !this.debug; $('debug').hidden = !this.debug; }
+        else if (k === 'KeyM') this.openMap();
       } else if (this.screen === 'inventory') {
         if (k === 'KeyE' || k === 'Tab' || k === 'Escape') this.closeInventory();
         else if (/^Digit[1-9]$/.test(k) && this.hoverSlot != null) { g.inventory.move(this.hoverSlot, +k.slice(5) - 1); }
-      } else if (this.screen === 'pause' && (k === 'Escape' || k === 'KeyP')) this.resume();
+      } else if (this.screen === 'bigmap' && (k === 'KeyM' || k === 'Escape')) this.resume();
+      else if (this.screen === 'pause' && (k === 'Escape' || k === 'KeyP')) this.resume();
       else if (this.screen === 'settings' && k === 'Escape') { storeSettings(this.settings); this.show(this.settingsBack); }
     });
     window.addEventListener('keyup', (e) => g.keys.delete(e.code));
@@ -390,7 +444,7 @@ export class UI {
 
   renderControls() {
     const rows = [['W A S D', 'Move'], ['Space', 'Jump · swim up · double-tap to fly (creative)'], ['Ctrl / double-tap W', 'Sprint'], ['Shift', 'Fly down · swim down'],
-      ['Left mouse', 'Mine (hold)'], ['Right mouse', 'Place block · eat · put on armour'], ['Right mouse on a block', 'Use it: crafting table, furnace, chest, bed, door, lever, button, repeater'], ['Shift + right mouse', 'Place against a usable block'], ['Middle mouse', 'Pick block'], ['1–9 / wheel', 'Choose hotbar slot'], ['E', 'Inventory and crafting'],
+      ['Left mouse', 'Mine (hold)'], ['Right mouse', 'Place block · eat · put on armour'], ['Right mouse on a block', 'Use it: crafting table, furnace, chest, bed, door, lever, button, repeater'], ['M', 'Map'], ['R', 'Auto-walk'], ['Double-tap A / D', 'Dodge'], ['Shift + right mouse', 'Place against a usable block'], ['Middle mouse', 'Pick block'], ['1–9 / wheel', 'Choose hotbar slot'], ['E', 'Inventory and crafting'],
       ['Q', 'Drop item (Ctrl+Q: stack)'], ['F', 'Toggle flight (creative)'], ['F3', 'Debug info'], ['Esc', 'Pause']];
     $('controlsList').innerHTML = rows.map(([k, v]) => `<span>${k.split(' / ').map((x) => `<kbd>${x}</kbd>`).join(' ')}</span><span>${v}</span>`).join('');
   }
@@ -607,7 +661,9 @@ export class UI {
 
   flashHeldName() {
     const g = this.game, s = g.inventory.held, el = $('heldName');
-    el.textContent = s ? itemName(s.item) : '';
+    const d = s && ITEMS[s.item];
+    // AppleSkin-style: what the held food restores
+    el.textContent = s ? itemName(s.item) + (d && d.kind === Kind.Food ? `  (+${d.food} hunger, +${d.sat} saturation)` : '') : '';
     el.style.opacity = 1;
     g.handSwap = 1;
     clearTimeout(this.nameTimer);
@@ -662,6 +718,7 @@ export class UI {
     for (let i = HOTBAR; i < INV_SIZE; i++) main += slot(i);
     for (let i = 0; i < HOTBAR; i++) hot += slot(i);
     $('invMain').innerHTML = main; $('invHot').innerHTML = hot;
+    $('btnSort').onclick = () => { this.sortSlots(inv.slots, HOTBAR, INV_SIZE); g.audio.click(); inv.changed(); };
     const names = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
     $('invArmor').innerHTML = inv.armor.map((s, i) => `<div class="slot" data-armor="${i}" title="${s ? itemName(s.item) : names[i]}">${this.slotHTML(s, px)}</div>`).join('');
     for (const el of document.querySelectorAll('#invArmor .slot')) {
@@ -679,14 +736,33 @@ export class UI {
       el.oncontextmenu = (e) => e.preventDefault();
       el.onmouseenter = () => { this.hoverSlot = +el.dataset.slot; };
       el.onmouseleave = () => { this.hoverSlot = null; };
-      el.title = inv.slots[+el.dataset.slot] ? itemName(inv.slots[+el.dataset.slot].item) : '';
+      el.title = inv.slots[+el.dataset.slot] ? describe(inv.slots[+el.dataset.slot]) : '';
     }
     // a chest or furnace, crafting (survival, or at a table), or the palette (creative)
-    const st = g.station, trade = st && st.kind === 'trade', box = st && (st.kind === 'chest' || st.kind === 'furnace'), crafting = !box && !trade && (!g.creative || (st && st.kind === 'table'));
+    const st = g.station, trade = st && (st.kind === 'trade' || st.kind === 'waystones'), box = st && (st.kind === 'chest' || st.kind === 'furnace'), crafting = !box && !trade && (!g.creative || (st && st.kind === 'table'));
     $('sideTitle').textContent = trade ? `${st.name} · Trades` : box ? st.name : crafting ? (st && st.kind === 'table' ? 'Crafting Table' : 'Crafting') : 'All blocks and items';
     $('station').hidden = !box;
     $('recipes').hidden = !crafting && !trade; $('recipeSearch').hidden = !crafting;
     $('palette').hidden = !(g.creative && !st); $('paletteSearch').hidden = !(g.creative && !st);
+    if (st && st.kind === 'waystones') {
+      $('sideTitle').textContent = `${st.name} · Waystones`;
+      $('sideTip').textContent = g.creative ? 'Click a waystone to travel there.' : 'Travelling costs three hunger points.';
+      const rec = $('recipes');
+      rec.innerHTML = '';
+      const list = (g.meta.waystones || []).filter((w) => w !== st.from && !(w.x === st.from.x && w.y === st.from.y && w.z === st.from.z && w.dim === st.from.dim));
+      if (!list.length) rec.innerHTML = '<p class="hint">No other waystones yet. Every village has one by its well, and you can craft them (6 stone bricks, 2 gold ingots).</p>';
+      const here = g.player.body.pos;
+      for (const w of list) {
+        const b = document.createElement('button');
+        b.className = 'recipe';
+        const dist = (w.dim || 0) === (g.dim || 0) ? `${Math.round(Math.hypot(w.x - here[0], w.z - here[2]))} m away` : ['Overworld', 'Nether', 'The End'][w.dim || 0];
+        b.innerHTML = `<div class="ico-slot"><div class="ico" style="${g.icons.css(FAM_WAYSTONE(), 32)}"></div></div><div>${w.name}<small><span class="have">${w.x} ${w.y} ${w.z} · ${dist}</span></small></div>`;
+        b.onclick = () => { this.closeInventory(); g.travelWaystone(w); };
+        rec.appendChild(b);
+      }
+      this.updateCursor();
+      return;
+    }
     if (trade) {
       $('sideTip').textContent = 'Click an offer to trade. Emeralds come from trading and from chests.';
       const rec = $('recipes');
@@ -755,7 +831,7 @@ export class UI {
   slotClick(i, button, shift) {
     const g = this.game, inv = g.inventory, s = inv.slots[i];
     g.audio.click();
-    if (shift && !this.cursor && s && g.station && g.station.data) {
+    if (shift && !this.cursor && s && g.station && g.station.data && !(g.station.bag && ITEMS[s.item] && ITEMS[s.item].name === 'Backpack')) {
       const d = g.station.data;
       if (g.station.kind === 'furnace') {
         const k = SMELT.has(s.item) ? 0 : fuelTime(s.item) > 0 ? 1 : -1;
@@ -802,6 +878,20 @@ export class UI {
     this.updateCursor();
   }
 
+  /** Stacks merged and ordered by kind: tools, weapons, armour, food, blocks, materials. */
+  sortSlots(arr, from, to) {
+    const items = arr.slice(from, to).filter(Boolean), merged = [];
+    for (const s of items) {
+      const def = ITEMS[s.item];
+      const m = def && def.stack > 1 && merged.find((t) => t.item === s.item && t.count < def.stack);
+      if (m) { const n = Math.min(s.count, def.stack - m.count); m.count += n; s.count -= n; if (s.count > 0) merged.push({ ...s }); }
+      else merged.push({ ...s });
+    }
+    const order = (s) => { const d = ITEMS[s.item] || {}; return d.kind === Kind.Tool ? 0 : d.kind === Kind.Armor ? 1 : d.kind === Kind.Use ? 2 : d.kind === Kind.Food ? 3 : d.kind === Kind.Block ? 4 : 5; };
+    merged.sort((a, b) => order(a) - order(b) || a.item - b.item || b.count - a.count);
+    for (let i = from; i < to; i++) arr[i] = merged[i - from] || null;
+  }
+
   /** The open chest's slots or the furnace (input, fuel, output with progress). */
   renderStation() {
     const g = this.game, st = g.station;
@@ -813,7 +903,9 @@ export class UI {
       el.innerHTML = `<div class="furnace">${slot(0)}<div></div><div></div>
         <div class="flame"><i style="width:${Math.round(burn * 100)}%"></i></div><div class="arrow"><i style="width:${Math.round(cook * 100)}%"></i></div>${slot(2)}
         ${slot(1)}<div></div><div></div></div>`;
-    } else el.innerHTML = `<div class="grid9">${d.slots.map((_, i) => slot(i)).join('')}</div>`;
+    } else el.innerHTML = `<div class="grid9">${d.slots.map((_, i) => slot(i)).join('')}</div><button type="button" class="mini" id="btnSortBox">Sort</button>`;
+    const sb = el.querySelector('#btnSortBox');
+    if (sb) sb.onclick = () => { this.sortSlots(d.slots, 0, d.slots.length); g.audio.click(); this.renderStation(); };
     for (const s of el.querySelectorAll('.slot[data-st]')) {
       const i = +s.dataset.st;
       s.title = d.slots[i] ? itemName(d.slots[i].item) : '';
@@ -826,7 +918,7 @@ export class UI {
           if (left) it.count = left; else d.slots[i] = null;
           g.audio.click(); this.renderStation(); return;
         }
-        const accept = st.kind !== 'furnace' ? null : i === 2 ? () => false : i === 1 ? (item) => fuelTime(item) > 0 : null;
+        const accept = st.kind !== 'furnace' ? (st.bag ? (item) => !(ITEMS[item] && ITEMS[item].name === 'Backpack') : null) : i === 2 ? () => false : i === 1 ? (item) => fuelTime(item) > 0 : null;
         this.arrClick(d.slots, i, e.button, accept);
         inv.changed(); this.renderStation();
       };
@@ -932,10 +1024,58 @@ export class UI {
     }
     g.frameMs = g.frameMs * 0.9 + (performance.now() - t0) * 0.1;
     this.governResolution(dt);
+    this.updateHudExtras(dt);
     // mining progress under the crosshair (survival: blocks take time)
     const m = g.mining, show = this.screen === 'playing' && m && !g.creative && m.time > 0.15 && m.progress > 0;
     if (show !== !$('mineBar').hidden) $('mineBar').hidden = !show;
     if (show) $('mineBar').firstChild.style.width = `${Math.min(100, m.progress * 100).toFixed(0)}%`;
+  }
+
+  /** The map screen (M): 2 blocks a pixel; the wheel zooms. */
+  openMap() {
+    const g = this.game;
+    if (!this.map) this.map = new MiniMap(g, $('minimap'), $('bigmapCanvas'));
+    g.state = 'inventory'; g.keys.clear(); g.mouse.left = g.mouse.right = false;
+    this.unlock();
+    this.show('bigmap');
+    const p = g.player.body.pos;
+    $('bigmapTitle').textContent = `Map · ${['Overworld', 'Nether', 'The End'][g.dim || 0]} · ${Math.floor(p[0])} ${Math.floor(p[1])} ${Math.floor(p[2])}`;
+    this.map.drawBig();
+    const cv = $('bigmapCanvas');
+    if (!cv.bound) {
+      cv.bound = true;
+      cv.addEventListener('wheel', (e) => { e.preventDefault(); this.map.bigScale = Math.max(1, Math.min(8, (this.map.bigScale || 2) * (e.deltaY > 0 ? 1.5 : 1 / 1.5))); this.map.drawBig(); }, { passive: false });
+    }
+  }
+
+  /** Minimap, coordinates, the block info panel and the Rested tag. */
+  updateHudExtras(dt) {
+    const g = this.game, s = this.settings, playing = this.screen === 'playing' || this.screen === 'inventory';
+    if (!playing || !g.player || (g.meta && g.meta.menu)) return;
+    if (!this.map) this.map = new MiniMap(g, $('minimap'), $('bigmapCanvas'));
+    $('mapWrap').hidden = s.minimap === false;
+    if (s.minimap !== false) this.map.update(dt);
+    this.hudT = (this.hudT || 0) - dt;
+    if (this.hudT > 0) return;
+    this.hudT = 0.12;
+    const p = g.player.body.pos, clim = g.world.climateAt ? g.world.climateAt(Math.floor(p[0]), Math.floor(p[2])) : null;
+    const season = g.dim === 0 && s.seasons !== false ? ` · ${g.seasonNow()[3]}` : '';
+    $('coords').textContent = `${Math.floor(p[0])} ${Math.floor(p[1])} ${Math.floor(p[2])}${clim && g.dim === 0 && BIOME_LABEL[clim.biome] ? ' · ' + BIOME_LABEL[clim.biome] : ''}${season}`;
+    const info = s.lookInfo !== false && this.screen === 'playing' ? g.lookInfo() : null, el = $('lookInfo');
+    el.hidden = !info;
+    if (info) {
+      el.className = info.kind || '';
+      el.querySelector('b').textContent = info.name;
+      el.querySelector('small').textContent = info.sub;
+      const ico = el.querySelector('.ico');
+      ico.style.display = info.item ? '' : 'none';
+      if (info.item && ico.dataset.item !== String(info.item)) { ico.dataset.item = info.item; ico.setAttribute('style', g.icons.css(info.item, 32)); }
+    }
+    const boss = g.mobs.list.find((m) => m.def.boss && !m.dead && Math.hypot(m.body.pos[0] - p[0], m.body.pos[2] - p[2]) < 90);
+    $('bossBar').hidden = !boss;
+    if (boss) { $('bossBar').querySelector('span').textContent = boss.def.name; $('bossBar').querySelector('i').style.width = `${Math.max(0, boss.health / boss.def.health * 100).toFixed(1)}%`; }
+    $('restedTag').hidden = !(g.rested > 0);
+    if (g.rested > 0) $('restedTag').textContent = `Rested · ${Math.ceil(g.rested / 60)} min`;
   }
 
   /** Dynamic resolution: trade pixels for frame rate when the GPU falls behind, recover when it has headroom. */

@@ -173,6 +173,21 @@ split), polar bears, striders (they walk on lava), piglin brutes; their models a
 definitions by `tools/make_geo.py` (Java pivots and boxes converted to Bedrock geometry, `tools/geo/custom.json`).
 Ghasts are smaller and rare. Tests: `node test/structures.mjs`, `test/structures2.mjs`.
 
+## Beyond Minecraft
+
+Features Minecraft does not have, picked from the most downloaded mods and from other survival games:
+a minimap with coordinates, biome and season, mobs and waypoints, and a full map on M that remembers explored land
+(Xaero's Minimap, `src/main/minimap.js`); a panel naming the block or mob under the crosshair, the tool it needs,
+a mob's health and a container's contents (Jade); felling whole trees with an axe and mining whole ore veins with a
+pickaxe, sneak for one block (Timber, Veinminer); gravestones that keep everything on death and put it back in place
+(Gravestone mods); waystones, a fast-travel network, one by every village well and craftable (Waystones); backpacks,
+a grappling hook, double doors, Sort buttons, auto-walk on R (Quark, Terraria); Rested by a fire under a roof:
+double healing, half the hunger, quicker mining (Valheim); seasons that turn leaves orange and gold, fade winter
+and change crop growth (Serene Seasons, Vintage Story); a dodge dash on a double-tapped A or D and a summonable boss,
+King Slime, with a health bar (Terraria); tips on loading and pause screens; fuller item tooltips (AppleSkin).
+All can be switched off under Options > Controls and Sky & Time. `node test/extras.mjs`, `test/boss.mjs`,
+`test/seasons.mjs` check them.
+
 ## Controls
 
 WASD move · Space jump (double-tap to fly in creative) · Ctrl or double-tap W sprint · Shift fly/swim down ·

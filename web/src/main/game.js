@@ -15,7 +15,7 @@ import { decodeLarge, fetchBuiltinPack, square } from './respack.js';
 import { readPackZip, convertPack } from './packconv.js';
 import { LAYER_TUNING, LAYER_NAMES, I, BASE_LAYERS, CAT } from '../shared/blocks.js';
 import CATALOG from '../shared/catalog.json';
-import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, isLava, isPortal, Dim, breakSeconds, drops, canHarvest, itemName, layerFor, FAMS, FAM, famOf, isLiquid } from '../shared/blocks.js';
+import { BLOCKS, B, F, ITEMS, Kind, Shape, isWater, isLava, isPortal, Dim, breakSeconds, drops, canHarvest, itemName, layerFor, FAMS, FAM, famOf, isLiquid, mining } from '../shared/blocks.js';
 import { K, facingFromYaw, facingFromFace, opposite, DIR6 } from '../shared/shapes.js';
 import { Redstone } from './redstone.js';
 import { C as CK, SMELT, fuelTime, ToolType } from '../shared/blocks.js';
@@ -643,6 +643,12 @@ export class Game {
 
   die(cause) {
     const p = this.player.body.pos;
+    // a gravestone keeps everything (not in Minecraft): the items wait where the player fell
+    if (this.settings.graves !== false && this.makeGrave()) {
+      this.deathCause = cause; this.state = 'dead'; this.mining = null;
+      this.emit('state', this.state, cause);
+      return;
+    }
     // scatter the inventory where the player fell
     for (let i = 0; i < this.inventory.slots.length; i++) {
       const s = this.inventory.slots[i];
@@ -704,7 +710,18 @@ export class Game {
       const b = w.getBlock(bx, yy, bz);
       if (b > 0) light -= Math.max(1, OPACITY[b] === 15 ? 15 : OPACITY[b]);
     }
-    return { sky: Math.max(0, light) / 15, block: this.blockLightNear(x, y, z) };
+    const hl = this.handLightNow(), hd = Math.hypot(x - hl[0], y - hl[1], z - hl[2]);
+    return { sky: Math.max(0, light) / 15, block: Math.max(this.blockLightNear(x, y, z), hl[3] * 0.7 * Math.max(0, 1 - hd / 11) ** 2) };
+  }
+  /** The light of what the player holds: [x, y, z, strength] (a torch 14/15, glowstone or a lava bucket 1). */
+  handLightNow() {
+    if (!this.player || !this.inventory || (this.settings && this.settings.handLight === false) || (this.meta && this.meta.menu)) return [0, 0, 0, 0];
+    const s = this.inventory.held;
+    if (!s) return [0, 0, 0, 0];
+    const d = BLOCKS[s.item], e = s.item === I.LavaBucket ? 15 : ITEMS[s.item] && ITEMS[s.item].kind === Kind.Block && d ? d.emission || 0 : 0;
+    if (!e) return [0, 0, 0, 0];
+    const p = this.player.eye(), f = this.player.forward();
+    return [p[0] + f[0] * 0.5, p[1] - 0.3, p[2] + f[2] * 0.5, e / 15];
   }
   blockLightNear(x, y, z) {
     const w = this.world, bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
@@ -773,7 +790,7 @@ export class Game {
     const locked = this.state === 'playing';
     const on = (c) => locked && k.has(c);
     return {
-      fwd: (on('KeyW') || on('ArrowUp') ? 1 : 0) - (on('KeyS') || on('ArrowDown') ? 1 : 0) + (this.touch ? this.touch.fwd : 0),
+      fwd: Math.min(1, (on('KeyW') || on('ArrowUp') || this.autoWalk ? 1 : 0) - (on('KeyS') || on('ArrowDown') ? 1 : 0) + (this.touch ? this.touch.fwd : 0)),
       strafe: (on('KeyD') ? 1 : 0) - (on('KeyA') ? 1 : 0) + (this.touch ? this.touch.strafe : 0),
       jump: on('Space') || !!(this.touch && this.touch.jump),
       jumpPressed: locked && p.has('Space'),
@@ -812,7 +829,7 @@ export class Game {
       this.interact(dt);
     }
     this.updateEntities(dt);
-    if (!this.meta.menu) { this.redstone.update(dt); this.updateBlocks(dt); }
+    if (!this.meta.menu) { this.redstone.update(dt); this.updateBlocks(dt); this.updateGrapple(dt); if (!this.creative) this.updateRested(dt); this.updateDash(dt); }
     this.updateEyes(dt);
     if (!this.meta.menu) this.mobs.update(dt);
 
@@ -824,6 +841,9 @@ export class Game {
   }
 
   hotbarKeys() {
+    // auto-walk (Quark, not in Minecraft): R toggles walking forward; S stops it
+    if (this.pressed.has('KeyR')) { this.autoWalk = !this.autoWalk; this.emit('toast', this.autoWalk ? 'Auto-walk on (R or S to stop)' : 'Auto-walk off'); }
+    if (this.autoWalk && this.pressed.has('KeyS')) this.autoWalk = false;
     for (let i = 0; i < HOTBAR; i++) if (this.pressed.has(`Digit${i + 1}`)) this.select(i);
     if (this.pressed.has('KeyQ')) this.dropHeld(this.keys.has('ControlLeft'));
   }
@@ -849,6 +869,7 @@ export class Game {
     let hit = raycast(w, eye, dir, REACH, targetable);
     this.swing = Math.max(0, (this.swing || 0) - dt * 3.2);
     const mobHit = this.mobs.pick(eye, dir, 3.6);
+    this.lookMob = mobHit && (!hit || mobHit.dist < hit.dist) ? mobHit.mob : null;
     this.attackT = (this.attackT || 0) - dt;
     if (mobHit && (!hit || mobHit.dist < hit.dist)) {
       this.target = null;
@@ -877,7 +898,7 @@ export class Game {
       const key = hit.hit.join(',');
       if (!this.mining || this.mining.key !== key || this.mining.block !== hit.block) {
         const held = inv.held ? inv.held.item : 0;
-        this.mining = { key, pos: hit.hit, block: hit.block, progress: 0, time: this.creative ? 0 : breakSeconds(hit.block, held), hitTimer: 0 };
+        this.mining = { key, pos: hit.hit, block: hit.block, progress: 0, time: this.creative ? 0 : breakSeconds(hit.block, held) / (this.rested > 0 ? 1.2 : 1), hitTimer: 0 };
       }
       const m = this.mining;
       if (this.creative) {
@@ -929,6 +950,7 @@ export class Game {
   breakBlock(pos, block, survival) {
     const w = this.world;
     const [x, y, z] = pos;
+    if (!this.chainBreaking && this.settings) this.chainBreak(pos, block, survival);
     const inv = this.inventory, held = inv.held ? inv.held.item : 0;
     if (!w.setBlock(x, y, z, B.Air)) return;
     if (block === B.Obsidian) this.breakPortalsAround(x, y, z);
@@ -962,7 +984,9 @@ export class Game {
       }
     }
     if (fam && fam.kind === K.Crop && this.meta.crops) delete this.meta.crops[this.bkey(x, y, z)];
-    if (fam && (fam.kind === K.Door || fam.kind === K.Tall)) {
+    if (fam && fam.kind === K.Waystone) this.forgetWaystone(x, BLOCKS[block].model.state & 1 ? y - 1 : y, z);
+    if (fam && fam.kind === K.Grave) this.openGrave([x, y, z], true);
+    if (fam && (fam.kind === K.Door || fam.kind === K.Tall || fam.kind === K.Waystone)) {
       const oy = BLOCKS[block].model.state & 1 ? y - 1 : y + 1, other = w.getBlock(x, oy, z);
       if (other > 0 && famOf(other) === fam) { w.setBlock(x, oy, z, B.Air); this.spawnBreakParticles([x, oy, z], other, 10); }
     }
@@ -1047,8 +1071,14 @@ export class Game {
       if (!k.startsWith(prefix)) continue;
       const [x, y, z] = k.slice(prefix.length).split(',').map(Number), id = w.getBlock(x, y, z), f = famOf(id);
       if (id < 0) continue;
-      if (!f || f.kind !== K.Crop) { delete m.crops[k]; continue; }
-      const stage = Math.min(7, Math.floor((m.clock - t) / 30));     // about four minutes from seed to wheat
+      if (!f || f.kind !== K.Crop) { delete m.crops[k]; if (m.cropRate) delete m.cropRate[k]; if (m.cropSeen) delete m.cropSeen[k]; continue; }
+      // about four minutes from seed to wheat; slower in autumn, far slower in winter, quicker in spring
+      const rate = [1.3, 1, 0.7, 0.25][this.seasonNow()[2]] ?? 1;
+      m.cropRate = m.cropRate || {}; m.cropSeen = m.cropSeen || {};
+      const since = m.clock - (m.cropSeen[k] ?? t);        // time since this crop was last looked at (it may have been unloaded)
+      m.cropSeen[k] = m.clock;
+      m.cropRate[k] = (m.cropRate[k] || 0) + Math.max(0, since) * rate;
+      const stage = Math.min(7, Math.floor(m.cropRate[k] / 30));
       if (stage > BLOCKS[id].model.state) w.setBlock(x, y, z, f.first + stage);
     }
   }
@@ -1304,6 +1334,252 @@ export class Game {
     this.audio.click();
   }
 
+  // ---------------------------------------------------------------- beyond Minecraft: timber, vein mining, graves, waystones, backpacks, hooks
+
+  /** Felling a whole tree with an axe, mining a whole ore vein with a pickaxe (hold sneak to break just one). */
+  chainBreak(pos, block, survival) {
+    const inv = this.inventory, held = inv.heldItem, w = this.world;
+    if (!held || held.kind !== Kind.Tool || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')) return;
+    const isLog = (b) => [B.OakLog, B.BirchLog, B.SpruceLog, B.JungleLog, B.CrimsonStem, B.WarpedStem].includes(b) || (CAT[b] && CAT[b].cat === 'wood' && /_log$|_stem$/.test(CAT[b].key));
+    const isOre = (b) => [B.CoalOre, B.IronOre, B.GoldOre, B.DiamondOre, B.NetherQuartzOre, B.NetherGoldOre].includes(b) || (CAT[b] && CAT[b].cat === 'ore');
+    let kind = null;
+    if (held.tool === ToolType.Axe && isLog(block) && this.settings.timber !== false) kind = 'tree';
+    else if (held.tool === ToolType.Pickaxe && isOre(block) && this.settings.veinMine !== false) kind = 'vein';
+    if (!kind) return;
+    const max = kind === 'tree' ? 96 : 40, seen = new Set([pos.join(',')]), list = [], queue = [pos];
+    while (queue.length && list.length < max) {
+      const [cx, cy, cz] = queue.shift();
+      for (let dy = kind === 'tree' ? 0 : -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = cx + dx, ny = cy + dy, nz = cz + dz, k = `${nx},${ny},${nz}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        const b = w.getBlock(nx, ny, nz);
+        if (kind === 'tree' ? b === block : b === block) { list.push([nx, ny, nz]); queue.push([nx, ny, nz]); }
+      }
+    }
+    if (!list.length) return;
+    this.chainBreaking = true;
+    // the rest falls in a quick ripple, not all at once
+    list.sort((a, b) => a[1] - b[1]);
+    list.forEach((q, i) => setTimeout(() => {
+      if (this.world !== w || w.getBlock(...q) !== block) return;
+      this.chainBreaking = true;
+      this.breakBlock(q, block, survival);
+      this.chainBreaking = false;
+    }, 40 + i * 25));
+    this.chainBreaking = false;
+    // a felled tree drops its leaves too
+    if (kind === 'tree') {
+      const top = list.reduce((a, q) => Math.max(a, q[1]), y0(pos));
+      setTimeout(() => this.decayLeaves(pos[0], top, pos[2], list), 60 + list.length * 25);
+    }
+    function y0(p) { return p[1]; }
+  }
+  decayLeaves(x, top, z, logs) {
+    const w = this.world, isLeaf = (b) => b > 0 && ((b >= B.OakLeaves && b <= B.JungleLeaves) || (CAT[b] && CAT[b].cat === 'leaves'));
+    const leaves = [];
+    for (let dy = -6; dy <= 3; dy++) for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) {
+      const b = w.getBlock(x + dx, top + dy, z + dz);
+      if (!isLeaf(b)) continue;
+      // keep leaves still held by another tree's log
+      let held = false;
+      for (let ly = -3; ly <= 3 && !held; ly++) for (let lz = -3; lz <= 3 && !held; lz++) for (let lx = -3; lx <= 3 && !held; lx++) {
+        const l = w.getBlock(x + dx + lx, top + dy + ly, z + dz + lz);
+        if (l === B.OakLog || l === B.BirchLog || l === B.SpruceLog || l === B.JungleLog || (CAT[l] && CAT[l].cat === 'wood' && /_log$/.test(CAT[l].key))) held = true;
+      }
+      if (!held) leaves.push([x + dx, top + dy, z + dz, b]);
+    }
+    leaves.forEach((q, i) => setTimeout(() => {
+      if (w.getBlock(q[0], q[1], q[2]) !== q[3]) return;
+      w.setBlock(q[0], q[1], q[2], B.Air);
+      if (i % 3 === 0) this.spawnBreakParticles([q[0], q[1], q[2]], q[3], 4);
+      if (!this.creative) for (const [item, n] of drops(q[3], 0, Math.random())) this.spawnItem(item, n, [q[0] + 0.5, q[1] + 0.5, q[2] + 0.5], [0, 1, 0]);
+    }, i * 12));
+  }
+
+  /** On death: the inventory and armour go into a gravestone at the nearest free spot. Returns false if there is nothing to keep. */
+  makeGrave() {
+    const inv = this.inventory, w = this.world, p = this.player.body.pos;
+    if (this.creative || !FAM.gravestone || (!inv.slots.some(Boolean) && !inv.armor.some(Boolean))) return false;
+    let [x, y, z] = [Math.floor(p[0]), Math.max(MIN_Y + 2, Math.floor(p[1])), Math.floor(p[2])];
+    for (let k = 0; k < 40; k++) { const b = w.getBlock(x, y, z); if (b === B.Air || (b > 0 && (BLOCKS[b].flags & F.Replaceable))) break; y++; }
+    w.setBlock(x, y, z, FAM.gravestone.first + facingFromYaw(this.player.yaw));
+    const key = this.bkey(x, y, z);
+    this.meta.graves = this.meta.graves || {};
+    this.meta.graves[key] = { slots: inv.slots.map((s) => s && { ...s }), armor: inv.armor.map((s) => s && { ...s }), time: Date.now() };
+    inv.slots.fill(null); inv.armor = [null, null, null, null];
+    inv.changed();
+    this.setWaypoint('grave', 'Grave', [x, y, z], '#b8b8c8');
+    this.emit('toast', `Your items wait in a gravestone at ${x} ${y} ${z}`);
+    return true;
+  }
+  /** Right-click (or break) a gravestone: everything back where it was. */
+  openGrave(pos, broken) {
+    const key = this.bkey(...pos), g = this.meta.graves && this.meta.graves[key], inv = this.inventory;
+    if (!g) { if (!broken) this.world.setBlock(...pos, B.Air); return; }
+    delete this.meta.graves[key];
+    g.slots.forEach((s, i) => { if (!s) return; if (!inv.slots[i]) inv.slots[i] = s; else if (inv.add(s.item, s.count, s)) this.spawnItem(s.item, s.count, [pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5], [0, 2, 0], s.wear); });
+    g.armor.forEach((s, i) => { if (!s) return; if (!inv.armor[i]) inv.armor[i] = s; else if (inv.add(s.item, 1, s)) this.spawnItem(s.item, 1, [pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5], [0, 2, 0], s.wear); });
+    inv.changed(); this.emit('hud');
+    if (!broken) this.world.setBlock(...pos, B.Air);
+    this.spawnEmbers([pos[0] + 0.5, pos[1] + 0.8, pos[2] + 0.5], 20, [0.8, 0.9, 1.4]);
+    this.removeWaypoint('grave');
+    this.emit('toast', 'Items recovered');
+  }
+
+  setWaypoint(kind, name, pos, color) {
+    const m = this.meta;
+    m.waypoints = (m.waypoints || []).filter((w) => !(w.kind === kind && kind !== 'waystone'));
+    m.waypoints.push({ kind, name, x: pos[0] + 0.5, y: pos[1], z: pos[2] + 0.5, dim: this.dim || 0, color });
+  }
+  removeWaypoint(kind) { this.meta.waypoints = (this.meta.waypoints || []).filter((w) => w.kind !== kind); }
+
+  /** Waystones: the first use joins one to the network; after that it lists the others to travel to. */
+  useWaystone(x, y, z) {
+    const m = this.meta;
+    m.waystones = m.waystones || [];
+    let ws = m.waystones.find((s) => s.x === x && s.y === y && s.z === z && s.dim === (this.dim || 0));
+    if (!ws) {
+      const near = ['Village', 'Outpost', 'Camp', 'Hill', 'Lake', 'Crossing', 'Ridge', 'Grove'][Math.abs(x * 7 + z * 13) % 8];
+      ws = { name: `${near} ${m.waystones.length + 1}`, x, y, z, dim: this.dim || 0 };
+      m.waystones.push(ws);
+      this.setWaypoint('waystone', ws.name, [x, y, z], '#b48cff');
+      this.spawnEmbers([x + 0.5, y + 2, z + 0.5], 24, [0.9, 0.6, 1.8]);
+      this.audio.place(B.Obsidian);
+      this.emit('toast', `Waystone activated: ${ws.name}`);
+    }
+    this.openStation({ kind: 'waystones', name: ws.name, from: ws });
+  }
+  forgetWaystone(x, y, z) {
+    const m = this.meta;
+    m.waystones = (m.waystones || []).filter((s) => !(s.x === x && s.y === y && s.z === z));
+    m.waypoints = (m.waypoints || []).filter((w) => !(w.kind === 'waystone' && Math.floor(w.x) === x && w.y === y && Math.floor(w.z) === z));
+  }
+  /** Travel to a waystone (costs three hunger points in survival). */
+  travelWaystone(ws) {
+    if (!this.creative) {
+      if (this.stats.hunger < 6) { this.emit('toast', 'Too hungry to travel'); return false; }
+      this.stats.hunger -= 3;
+    }
+    const to = [ws.x + 0.5, ws.y, ws.z + 1.5];
+    if ((ws.dim || 0) !== (this.dim || 0)) this.travel(ws.dim, to, this.player.yaw, () => { this.player.teleport(to); });
+    else { this.player.teleport(to, this.player.yaw, 0); this.state = 'loading'; this.needGround = false; this.emit('state', 'loading'); }
+    this.audio.place(B.Obsidian);
+    this.emit('toast', `Travelled to ${ws.name}`);
+    return true;
+  }
+
+  /** Backpacks: 27 more slots you carry (the pack's id rides in its wear field, so it survives drops). */
+  openBackpack() {
+    const inv = this.inventory, s = inv.held, m = this.meta;
+    m.bags = m.bags || {};
+    if (!s.wear) { m.nextBag = (m.nextBag || 0) + 1; s.wear = m.nextBag; }
+    m.bags[s.wear] = m.bags[s.wear] || { kind: 'chest', slots: new Array(27).fill(null) };
+    this.openStation({ kind: 'chest', name: 'Backpack', bag: s.wear, data: m.bags[s.wear] });
+    this.audio.place(B.Planks);
+  }
+
+  /** The grappling hook: fire, catch on a block up to 32 away, get reeled in. */
+  fireGrapple() {
+    if (this.grapple) { this.grapple = null; return; }
+    const pl = this.player, hit = raycast(this.world, pl.eye(), pl.forward(), 32, (b) => b > 0 && (BLOCKS[b].flags & F.Solid) !== 0);
+    if (!hit) { this.emit('toast', 'Out of reach'); return; }
+    this.grapple = { point: hit.point || hit.hit.map((v) => v + 0.5), t: 0 };
+    this.audio.shoot('arrow');
+    this.swing = 1;
+    if (!this.creative && this.inventory.wearHeld()) this.emit('toast', 'Grappling hook broke');
+  }
+  updateGrapple(dt) {
+    const gr = this.grapple, pl = this.player;
+    if (!gr) return;
+    gr.t += dt;
+    const e = pl.body.pos, to = [gr.point[0] - e[0], gr.point[1] - (e[1] + 1), gr.point[2] - e[2]], d = Math.hypot(...to);
+    if (d < 1.4 || gr.t > 4 || (this.keys.has('Space') && gr.t > 0.3)) { this.grapple = null; pl.fallStart = NaN; return; }
+    const v = pl.body.vel, sp = 20;
+    for (let k = 0; k < 3; k++) v[k] += (to[k] / d * sp - v[k]) * Math.min(1, dt * 8);
+    pl.fallStart = NaN;
+    // the rope: a line of motes from the hand to the hook
+    gr.rope = (gr.rope || 0) - dt;
+    if (gr.rope <= 0) {
+      gr.rope = 0.04;
+      const eye = pl.eye();
+      for (let k = 1; k < 8; k++) { const f = k / 8; this.particles.break.push({ p: [eye[0] + (gr.point[0] - eye[0]) * f, eye[1] - 0.3 + (gr.point[1] - eye[1] + 0.3) * f, eye[2] + (gr.point[2] - eye[2]) * f], v: [0, 0, 0], life: 0.06, size: 0.025, c: [0.55, 0.45, 0.3], sky: 1, blk: 0.5 }); }
+    }
+  }
+
+  /** Seasons (Serene Seasons, not in Minecraft): each lasts settings.seasonDays days. Returns [autumn, winter, index, name]. */
+  seasonNow() {
+    if (!this.tod || (this.settings && this.settings.seasons === false)) return [0, 0, 1, 'Summer'];
+    const len = (this.settings && this.settings.seasonDays) || 3;
+    const t = (((this.tod.day || 0) + (this.tod.hour || 0) / 24) / len) % 4;
+    const autumn = Math.max(0, 1 - Math.abs(t - 2.6) / 0.85), winter = Math.max(0, 1 - Math.min(Math.abs(t - 3.5), Math.abs(t + 4 - 3.5), Math.abs(t - 7.5)) / 0.85);
+    const i = Math.floor(t);
+    return [autumn, winter, i, ['Spring', 'Summer', 'Autumn', 'Winter'][i]];
+  }
+
+  /** Terraria's dodge: double-tap A or D for a quick sideways dash. */
+  updateDash(dt) {
+    this.dashCool = Math.max(0, (this.dashCool || 0) - dt);
+    if (this.state !== 'playing' || this.settings.dash === false) return;
+    for (const [key, side] of [['KeyA', -1], ['KeyD', 1]]) {
+      if (!this.pressed.has(key)) continue;
+      const last = this.lastTap && this.lastTap[key];
+      this.lastTap = { ...(this.lastTap || {}), [key]: this.time };
+      if (last != null && this.time - last < 0.25 && this.dashCool <= 0 && !this.player.flying) {
+        const yaw = this.player.yaw, rx = Math.cos(yaw), rz = -Math.sin(yaw), v = this.player.body.vel;
+        v[0] += rx * side * 13; v[2] += rz * side * 13; v[1] = Math.max(v[1], 2.5);
+        this.dashCool = 1;
+        if (!this.creative) this.stats.addExhaustion(0.3);
+        for (let k = 0; k < 8; k++) this.spawnBreakParticles([this.player.body.pos[0] - 0.5, this.player.body.pos[1] - 0.8, this.player.body.pos[2] - 0.5], this.blockUnderFeet() > 0 ? this.blockUnderFeet() : B.Dirt, 1);
+      }
+    }
+  }
+
+  /** Valheim's rest: by a fire and under a roof for a little while -> Rested (faster healing, less hunger, quicker mining). */
+  updateRested(dt) {
+    const w = this.world, p = this.player.body.pos, st = this.stats;
+    this.restTimer = (this.restTimer || 0) - dt;
+    if (this.restTimer > 0) return;
+    this.restTimer = 1;
+    const x = Math.floor(p[0]), y = Math.floor(p[1]), z = Math.floor(p[2]);
+    const roof = (w.heightmapAt(x, z) ?? -999) > y + 1;
+    let fire = false, comfort = 0;
+    const found = new Set();
+    for (let dy = -2; dy <= 3; dy++) for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) {
+      const b = w.getBlock(x + dx, y + dy, z + dz);
+      if (b <= 0) continue;
+      if (b === CK.fire || b === CK.soul_fire || b === CK.lit_furnace || isLava(b) || b === CK.jack_o_lantern) fire = true;
+      const f = famOf(b), tag = f ? (f.kind === K.Bed ? 'bed' : f.kind === K.Carpet ? 'carpet' : f.kind === K.Stairs ? 'seat' : null) : b === CK.crafting_table ? 'table' : b === CK.chest ? 'chest' : b === B.Torch || b === CK.sea_lantern || b === CK.lit_redstone_lamp ? 'light' : null;
+      if (tag && !found.has(tag)) { found.add(tag); comfort++; }
+    }
+    if (fire && roof) {
+      this.restNear = (this.restNear || 0) + 1;
+      if (this.restNear >= 8 && !(this.rested > 0)) this.emit('toast', `Rested · comfort ${comfort + 1}`);
+      if (this.restNear >= 8) this.rested = Math.max(this.rested || 0, 180 + comfort * 60);
+    } else this.restNear = 0;
+    if (this.rested > 0) { this.rested -= 1; st.restedBoost = true; } else st.restedBoost = false;
+  }
+
+  /** What the crosshair is on: a name and a line of detail (Jade/WAILA, not in Minecraft). */
+  lookInfo() {
+    if (this.lookMob && !this.lookMob.dead) {
+      const m = this.lookMob;
+      return { name: m.def.villager ? `Villager · ${m.def.villager}` : m.def.name, sub: `Health ${Math.ceil(m.health)} / ${m.def.health}`, kind: m.def.kind };
+    }
+    const t = this.target;
+    if (!t) return null;
+    const d = BLOCKS[t.block], f = famOf(t.block);
+    const item = f && ITEMS[f.first] ? f.first : ITEMS[t.block] ? t.block : null;
+    const m = mining(t.block), tools = ['Hand', 'Pickaxe', 'Axe', 'Shovel', 'Sword', 'Hoe'], tiers = ['', 'Wood', 'Stone', 'Iron', 'Diamond'];
+    let sub = m.hardness < 0 ? 'Unbreakable' : m.tool ? `${tools[m.tool]}${m.required > 1 ? ` · ${tiers[m.required]}+` : ''}` : 'Any tool';
+    const key = this.bkey(...t.hit);
+    if (this.meta.graves && this.meta.graves[key]) sub = 'Right-click to recover your items';
+    if (f && f.kind === K.Waystone) sub = 'Right-click to travel';
+    const bd = this.meta.blockData && this.meta.blockData[key];
+    if (bd && bd.slots) { const n = bd.slots.filter(Boolean).length; sub += ` · ${n} stack${n === 1 ? '' : 's'}`; }
+    return { name: d ? d.name : '?', sub, item };
+  }
+
   /** A hoe turns grass and dirt into farmland. */
   till(hit) {
     const [x, y, z] = hit.hit, b = hit.block, w = this.world;
@@ -1319,10 +1595,20 @@ export class Game {
   }
 
   /** Beds: set the respawn point; at night (or in a storm) sleep through to the morning. */
-  sleep(pos) {
+  sleep(pos, bag) {
     const [x, y, z] = pos;
+    if (bag) {
+      // a sleeping bag (a Minecraft idea Mojang turned down): rest anywhere, the respawn point stays where it was
+      const h = this.tod ? this.tod.hour : 12;
+      if (this.dim !== Dim.Overworld || !(h < 6 || h > 18.5)) { this.emit('toast', 'You can only sleep at night in the overworld'); return; }
+      if (this.mobs.list.some((m) => !m.dead && m.def.kind === 'hostile' && Math.hypot(m.body.pos[0] - x, m.body.pos[2] - z) < 8)) { this.emit('toast', 'You may not rest now; there are monsters nearby'); return; }
+      this.emit('toast', 'Sleeping…');
+      setTimeout(() => { if (this.tod) { if (this.tod.hour > 12) this.tod.day++; this.tod.hour = 6.2; } this.emit('toast', 'Good morning'); }, 1500);
+      return;
+    }
     if (this.dim !== Dim.Overworld) { this.emit('toast', 'Beds explode here'); this.mobs.explode(x + 0.5, y + 0.5, z + 0.5, 3, null); return; }
     this.spawn = [x + 0.5, y + 0.6, z + 0.5];
+    this.setWaypoint('bed', 'Bed', pos, '#ff6a6a');
     const h = this.tod ? this.tod.hour : 12, night = h < 6 || h > 18.5;
     if (!night) { this.emit('toast', 'Respawn point set. You can only sleep at night'); return; }
     const near = this.mobs.list.some((m) => !m.dead && m.def.kind === 'hostile' && Math.hypot(m.body.pos[0] - x, m.body.pos[1] - y, m.body.pos[2] - z) < 8);
@@ -1365,6 +1651,8 @@ export class Game {
     if (!fam) return false;
     const st0 = BLOCKS[hit.block].model.state;
     if (fam.kind === K.Bed) { this.sleep(hit.hit); return true; }
+    if (fam.kind === K.Waystone) { this.useWaystone(hx, st0 & 1 ? hy - 1 : hy, hz); return true; }
+    if (fam.kind === K.Grave) { this.openGrave(hit.hit, false); return true; }
     if (fam.kind === K.Lever) { w.setBlock(hx, hy, hz, fam.first + (st0 >= 6 ? st0 - 6 : st0 + 6)); this.redstone.track(hx, hy, hz); this.audio.click(); return true; }
     if (fam.kind === K.Button) { this.redstone.press(hx, hy, hz, hit.block); this.audio.click(); return true; }
     if (fam.kind === K.Repeater) { w.setBlock(hx, hy, hz, fam.first + ((st0 & ~12) | ((((st0 >> 2) & 3) + 1) & 3) << 2)); this.audio.click(); return true; }
@@ -1375,6 +1663,18 @@ export class Game {
     if (fam.kind === K.Door) {
       const oy = st & 1 ? y - 1 : y + 1, other = w.getBlock(x, oy, z);
       if (other > 0 && famOf(other) === fam) w.setBlock(x, oy, z, fam.first + (BLOCKS[other].model.state ^ 2));
+      // double doors open together (not in Minecraft)
+      const by = st & 1 ? y - 1 : y;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const n = w.getBlock(x + dx, by, z + dz), nf = famOf(n);
+        if (!nf || nf.kind !== K.Door || this.doubleDoor) continue;
+        const ns = BLOCKS[n].model.state;
+        if (((ns >> 1) & 1) !== ((st >> 1) & 1)) continue;      // it was in the same state as this one
+        this.doubleDoor = true;
+        this.toggle({ hit: [x + dx, by, z + dz], block: n });
+        this.doubleDoor = false;
+        break;
+      }
     }
     this.audio.place(hit.block);
     return true;
@@ -1465,7 +1765,7 @@ export class Game {
       const st = this.modelState(fam, hit, [x, y, z]);
       if (st < 0) return;
       id = fam.first + st;
-      if (fam.kind === K.Door || fam.kind === K.Tall) {
+      if (fam.kind === K.Door || fam.kind === K.Tall || fam.kind === K.Waystone) {
         const up = w.getBlock(x, y + 1, z);
         if (up < 0 || !(BLOCKS[up].flags & F.Replaceable) || isLiquid(up)) return;
       }
@@ -1475,7 +1775,7 @@ export class Game {
       if (bs.some((b) => mx[0] > x + b[0] + 1e-3 && mn[0] < x + b[3] - 1e-3 && mx[1] > y + b[1] + 1e-3 && mn[1] < y + b[4] - 1e-3 && mx[2] > z + b[2] + 1e-3 && mn[2] < z + b[5] - 1e-3)) return;
     }
     if (!w.setBlock(x, y, z, id)) return;
-    if (fam && (fam.kind === K.Door || fam.kind === K.Tall)) w.setBlock(x, y + 1, z, id + 1);
+    if (fam && (fam.kind === K.Door || fam.kind === K.Tall || fam.kind === K.Waystone)) w.setBlock(x, y + 1, z, id + 1);
     if (fam && fam.kind === K.Bed) { const n = [[1, 0], [-1, 0], [0, 1], [0, -1]][(id - fam.first) >> 1]; w.setBlock(x + n[0], y, z + n[1], id + 1); }
     if (fam && fam.kind === K.Crop) this.meta.crops = { ...(this.meta.crops || {}), [this.bkey(x, y, z)]: this.meta.clock || 0 };
     if (fam && (fam.kind === K.Hopper || fam.kind === K.Dispenser)) this.blockData([x, y, z], 'chest', fam.kind === K.Hopper ? 5 : 9);
@@ -1658,6 +1958,18 @@ export class Game {
     }
     if (def.id === I.Bucket || def.id === I.WaterBucket || def.id === I.LavaBucket) { this.useBucket(def); return; }
     if (def.id === I.Bow) return;       // drawn while the button is held (interact)
+    if (def.id === I.Backpack) { this.openBackpack(); return; }
+    if (def.id === I.GrapplingHook) { this.fireGrapple(); return; }
+    if (def.id === I.SleepingBag) { this.sleep(this.player.body.pos.map(Math.floor), true); return; }
+    if (def.id === I.SlimeCrown) {
+      if (this.mobs.list.some((m) => m.def.boss && !m.dead)) { this.emit('toast', 'A boss is already here'); return; }
+      const p = this.player.body.pos, a = this.player.yaw;
+      this.mobs.spawnAt('king_slime', [p[0] - Math.sin(a) * 12, p[1] + 8, p[2] - Math.cos(a) * 12]);
+      this.emit('toast', 'King Slime has awoken!');
+      this.audio.explosion();
+      if (!this.creative) inv.consumeHeld();
+      return;
+    }
     if (def.id === I.EyeOfEnder) {
       if (hit && hit.block === B.EndPortalFrame) {
         const [x, y, z] = hit.hit;
@@ -2129,7 +2441,9 @@ export class Game {
       dim: this.dim, flat: !!this.meta.flat, dimAmb: sky.dimAmb, dimFog: inLava ? 1.2 : other ? sky.fogDensity : null, portal: Math.min(1, (this.portalTime || 0) / 3),
       weather: other ? { cloudCover: 0, windX: 0.2, windZ: 0.1, windStrength: 0.3, gust: 0.2, fog: 0, storm: 0, wetness: 0, snowCover: 0 } : { cloudCover: wp.cloud, windX: this.windVec[0] / 20 || 0, windZ: this.windVec[1] / 20 || 0, windStrength: 0.35 + wp.wind * 5, gust: wp.gust,
         fog: (wp.fog - 1) * 0.02 + (1 - wp.fogDist) * 0.3, storm: Math.max(0, (wp.precip - 0.5) * 2), wetness: this.weather.wetness,
-        snowCover: this.weather.snowCover * (clim && clim.temp < 0.25 ? 1 : 0) },
+        snowCover: Math.max(this.weather.snowCover * (clim && clim.temp < 0.25 ? 1 : 0), this.seasonNow()[1] * (clim && clim.temp < 0.75 ? 0.55 : 0)) },
+      season: this.dim === Dim.Overworld && !this.meta.menu ? this.seasonNow().slice(0, 2) : [0, 0],
+      handLight: this.handLightNow(),
       viewDistance: this.world.viewDistance, camSky: this.camSky, underwater: pl.headInWater || inLava, underwaterColor: inLava ? [0.9, 0.25, 0.02] : null,
       selection: this.target && this.state === 'playing' ? this.target.hit : null,
       selectionBoxes: this.target && this.state === 'playing' ? this.selectionBoxes(this.target) : null,

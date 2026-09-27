@@ -30,6 +30,22 @@ vec3 plantCell(vec3 texPos, int face, vec2 corner) {
   return floor(c);
 }
 float hash21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+// dynamic light (LambDynamicLights, not in Minecraft): a torch or glowstone in the hand lights the blocks round it
+uniform vec4 uHandLight;   // position, strength (0..1)
+float handLight(vec3 p) { if (uHandLight.w <= 0.0) return 0.0; float f = clamp(1.0 - distance(p, uHandLight.xyz) / 11.0, 0.0, 1.0); return uHandLight.w * 0.7 * f * f; }
+// seasons (not in Minecraft): autumn recolours foliage by brightness (per-tree red, orange or gold), winter fades it.
+// mode: 1 grass, 2 leaves, 3 birch, 4 spruce (evergreen)
+uniform vec2 uSeason;
+vec3 seasonAlbedo(int mode, vec3 a, vec3 cell) {
+  if (mode <= 0 || mode == 4 || (uSeason.x <= 0.0 && uSeason.y <= 0.0)) return a;
+  float l = dot(a, vec3(0.3, 0.59, 0.11));
+  float v = hash21(floor(cell.xz / 3.0) + 0.37);
+  vec3 fall = mode == 3 ? vec3(2.2, 1.75, 0.45) : v < 0.33 ? vec3(2.6, 0.75, 0.3) : v < 0.7 ? vec3(2.5, 1.25, 0.35) : vec3(2.2, 1.8, 0.45);
+  float k = mode == 1 ? 0.3 : 0.88;
+  a = mix(a, l * fall, uSeason.x * k);
+  a = mix(a, l * vec3(1.25, 1.12, 0.88), uSeason.y * (mode == 1 ? 0.5 : 0.65));
+  return a;
+}
 float vnoise(vec2 p) {
   vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash21(i), hash21(i + vec2(1, 0)), f.x), mix(hash21(i + vec2(0, 1)), hash21(i + vec2(1, 1)), f.x), f.y);
@@ -303,6 +319,7 @@ Layer sampleLayer(int layer, int tl, vec2 uv, vec2 gx, vec2 gy) {
   Layer s;
   s.albedo = pow(a.rgb, vec3(2.2)) * TLT(layer).rgb;
   if (TLP2(layer).z > 0.5) s.albedo *= biomeTint(int(vClim.z + 0.5), vClim.x, vClim.y);
+  if (int(vClim.z + 0.5) > 0) s.albedo = seasonAlbedo(int(vClim.z + 0.5), s.albedo, vTexPos);   // seasons: leaves turn, grass dries, winter fades
   s.alpha = a.a;
   s.nts = n.xyz * 2.0 - 1.0; s.nts.xy *= TLP(layer).y; s.nts = normalize(s.nts);
   s.ao = m.r; s.rough = clamp(m.g * TLP(layer).z, 0.0, 1.0); s.metal = m.b; s.emis = m.a * TLP2(layer).x;
@@ -468,7 +485,7 @@ void main() {
   vao = mix(1.0, vao, uAOStrength);
   float directShade = mix(1.0, vao, uAODirect);
   vec3 col = shade(s.albedo * directShade, n, s.rough, s.metal, s.ao * vao, TLT(layer).w, s.albedo * s.emis,
-                   TLP2(layer).y, vPos, vLight.y, vLight.z, pomShadow, uSkyLut);
+                   TLP2(layer).y, vPos, vLight.y, max(vLight.z, handLight(vPos)), pomShadow, uSkyLut);
   col += s.albedo * uFlash * vLight.y * 2.0;
 #ifdef TRANSLUCENT
   outColor = vec4(applyFog(col, vPos), clamp(s.alpha, 0.15, 1.0));   // stained glass, slime, honey
@@ -750,7 +767,8 @@ void main() {
   vec3 absorb = exp(-vec3(0.45, 0.12, 0.08) * thick);
   vec3 body = vec3(0.02, 0.09, 0.12);
   float sky = vLight.y, skyAmb = mix(0.015, 1.0, sky * sky);
-  vec3 ambient = hemi(vec3(0, 1, 0)) * skyAmb + uBlockColor * vLight.z * vLight.z;
+  float bl = max(vLight.z, handLight(vPos));
+  vec3 ambient = hemi(vec3(0, 1, 0)) * skyAmb + uBlockColor * bl * bl;
   vec3 water = refr * absorb + body * ambient * (1.0 - absorb);
   float fres = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
   vec3 R = reflect(-V, N);
@@ -1010,6 +1028,7 @@ void main() {
     albedo = pow(vColor.rgb, vec3(2.2));
     if (uFoliage > 0.5) {
       albedo *= mix(vec3(1.0), grassTint(vLight.z, vLight.w), vUV.z);
+      albedo = seasonAlbedo(2, albedo, vPos);
       N = normalize(N + vec3(0, 0.8, 0));
       trans = 0.6; spec = 0.3;
     }
@@ -1114,7 +1133,7 @@ void main() {
   if (vMat == 0) col *= biomeTint(1, vClimate.x, vClimate.y);
   float trees = smoothstep(0.35, 0.65, vCover + (grain - 0.5) * 0.6);
   if (trees > 0.0) {
-    vec3 leaf = uFarLeaf * biomeTint(2, vClimate.x, vClimate.y) * (0.5 + 0.35 * grain);
+    vec3 leaf = seasonAlbedo(2, uFarLeaf * biomeTint(2, vClimate.x, vClimate.y) * (0.5 + 0.35 * grain), vPos);
     col = mix(col, leaf, trees);
     n = normalize(mix(n, vec3(0, 1, 0), trees * 0.5));
   }

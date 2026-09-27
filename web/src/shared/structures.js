@@ -239,7 +239,11 @@ const BUILD = {
       else if (q.kind === 'bighouse') house(W, piece, pr, true);
       else if (q.kind === 'farm') farm(W, piece, pr, M);
       else if (q.kind === 'lamp') lamp(W, piece, M);
-      else if (q.kind === 'well') well(W, piece, p.style === 'desert' ? B.Sandstone : B.Cobblestone, M);
+      else if (q.kind === 'well') {
+        well(W, piece, p.style === 'desert' ? B.Sandstone : B.Cobblestone, M);
+        // every village has a waystone by its well (fast travel: not in Minecraft)
+        if (FAM.waystone) { W.set(q.x + 4, q.y + 1, q.z, FAM.waystone.first); W.set(q.x + 4, q.y + 2, q.z, FAM.waystone.first + 1); W.set(q.x + 4, q.y, q.z, B.StoneBricks); }
+      }
     }
   },
   outpost(W, p, r) {

@@ -688,7 +688,7 @@ export class Renderer {
     this.cloudOff[0] += wth.windX * f.dt * 6; this.cloudOff[1] += wth.windZ * f.dt * 6;
     const shadowsOn = this.settings.shadows && sky.lightColor[0] + sky.lightColor[1] > 0.004;
     this.U = {
-      uTime: f.time, uWind: [wth.windX, wth.windStrength, wth.windZ, wth.gust],
+      uTime: f.time, uWind: [wth.windX, wth.windStrength, wth.windZ, wth.gust], uSeason: f.season || [0, 0], uHandLight: f.handLight || [0, 0, 0, 0],
       uViewProj: this.viewProj, uCamPos: f.camPos,
       uLightDir: sky.lightDir, uLightColor: sky.lightColor,
       uAmbUp: sky.ambUp, uAmbHorizon: sky.ambHorizon, uAmbDown: sky.ambDown,

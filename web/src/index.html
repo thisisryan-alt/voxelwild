@@ -118,6 +118,22 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
 .meter { display: flex; }
 .meter svg { width: 18px; height: 18px; margin-right: -2px; shape-rendering: crispEdges; }
 #air { margin-left: auto; margin-right: 8px; }
+#mapWrap { position: absolute; right: 8px; top: calc(26px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
+#minimap { width: 150px; height: 150px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(0,0,0,0.55), 0 0 0 4px rgba(255,255,255,0.25); image-rendering: pixelated; }
+#coords { color: #fff; font-size: 13px; text-shadow: var(--px) var(--px) 0 #000; white-space: nowrap; }
+#lookInfo { position: absolute; left: 50%; top: calc(6px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 4px 10px 4px 4px;
+  background: rgba(16, 0, 16, 0.78); border: 2px solid #28005a; box-shadow: inset 0 0 0 1px #50008a; color: #fff; pointer-events: none; min-width: 120px; }
+#lookInfo .ico { width: 32px; height: 32px; background-repeat: no-repeat; image-rendering: pixelated; flex: none; }
+#lookInfo b { display: block; font-weight: normal; font-size: 15px; }
+#lookInfo small { display: block; color: #aaa; font-size: 12px; }
+#lookInfo.hostile b { color: #ff7a6a; } #lookInfo.passive b { color: #c8ffc8; }
+#bossBar { position: absolute; left: 50%; top: calc(58px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: min(420px, 70vw); text-align: center; color: #fff; text-shadow: var(--px) var(--px) 0 #000; pointer-events: none; }
+#bossBar div { height: 8px; margin-top: 3px; background: #300; border: 2px solid #000; }
+#bossBar i { display: block; height: 100%; background: linear-gradient(#e0305a, #a0102e); }
+#restedTag { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); color: #ffe38a; font-size: 13px; text-shadow: var(--px) var(--px) 0 #000; }
+#bigmapCanvas { width: min(640px, 80vh, 92vw); height: min(640px, 80vh, 92vw); image-rendering: pixelated; border: 3px solid #000; box-shadow: 0 0 0 2px #888; }
+.tip { max-width: 560px; color: #e8e8a0; margin-top: 14px; }
+button.mini { height: auto; padding: 2px 10px; font-size: 13px; margin-left: 10px; width: auto; }
 #armorBar { align-self: flex-start; padding-left: 2px; min-height: 0; }
 .armorRow { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 #invArmor { display: flex; gap: 2px; }
@@ -231,6 +247,10 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
     <div id="crosshair"></div>
     <div id="mineBar" hidden><i></i></div>
     <div id="modeTag"></div>
+    <div id="mapWrap"><canvas id="minimap" width="150" height="150"></canvas><div id="coords"></div></div>
+    <div id="lookInfo" hidden><div class="ico"></div><div><b></b><small></small></div></div>
+    <div id="restedTag" hidden>Rested</div>
+    <div id="bossBar" hidden><span></span><div><i></i></div></div>
     <div id="debug" hidden></div>
     <div id="fpsTag" hidden></div>
     <div id="toast"></div>
@@ -288,6 +308,7 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
     <p class="hint" id="loadEyebrow">Building terrain</p>
     <div class="bar"><i id="loadBar"></i></div>
     <p class="hint" id="loadDetail"></p>
+    <p class="hint tip" id="loadTip"></p>
   </div>
 
   <div id="pause" class="layer dim" hidden>
@@ -299,6 +320,7 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
       <button id="btnQuit">Save and Quit to Title</button>
     </div>
     <p class="hint" id="pauseInfo"></p>
+    <p class="hint tip" id="pauseTip"></p>
     <div class="controls" id="controlsList"></div>
   </div>
 
@@ -346,7 +368,7 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
   <div id="inventory" class="layer" hidden>
     <div class="gui">
       <div class="col">
-        <h3>Inventory</h3>
+        <h3>Inventory <button type="button" id="btnSort" class="mini">Sort</button></h3>
         <div class="armorRow"><span>Armour</span><div id="invArmor"></div></div>
         <div class="grid9" id="invMain"></div>
         <div class="gap"></div>
@@ -363,6 +385,12 @@ kbd { font: 14px var(--font); color: var(--white); background: rgba(0, 0, 0, 0.5
         <span class="tip" id="sideTip">Shift-click a recipe to craft as many as you can.</span>
       </div>
     </div>
+  </div>
+
+  <div id="bigmap" class="layer dim" hidden>
+    <h2 id="bigmapTitle">Map</h2>
+    <canvas id="bigmapCanvas" width="640" height="640"></canvas>
+    <p class="hint">M or Esc to close · scroll to zoom · white: you · red: monsters · green: villagers · purple: waystones</p>
   </div>
 
   <div id="death" class="layer" hidden>

@@ -199,7 +199,7 @@ function sideTurn(f, k) {
       if (kind === K.Door) top = side = bottom = texLayer(tex[st & 1]);
       else if (kind === K.Tall) top = side = bottom = texLayer(tex[st]);
       else if (kind === K.Rail) top = side = bottom = texLayer(tex[st]);
-      else if (kind === K.Path) { top = texLayer(tex[0]); side = texLayer(tex[1]); bottom = texLayer(tex[2]); }
+      else if (kind === K.Path || kind === K.Waystone) { top = texLayer(tex[0]); side = texLayer(tex[1]); bottom = texLayer(tex[2]); }
       else if (kind === K.Wire) { const b = st === 0 ? 0 : st <= 5 ? 1 : st <= 10 ? 2 : 3; top = side = bottom = texLayer(tex[b * 3]); }
       else if (kind === K.RTorch) top = side = bottom = texLayer(tex[st < 2 ? st : (st - 2) & 1]);
       else if (kind === K.Lever) top = side = bottom = texLayer(tex[0]);
@@ -344,7 +344,7 @@ export const I = {
   Gunpowder: 300, String: 301, GoldNugget: 302, BlazeRod: 303, GhastTear: 304, WoodenSword: 305, StoneSword: 306, IronSword: 307, DiamondSword: 308,
   IronIngot: 309, GoldIngot: 310, CopperIngot: 311, CookedBeef: 312, CookedPorkchop: 313, CookedMutton: 314, CookedChicken: 315, Charcoal: 316,
   Bread: 317, Wheat: 318, WheatSeeds: 319, WoodenHoe: 320, StoneHoe: 321, IronHoe: 322, DiamondHoe: 323,
-  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344,
+  Bow: 340, Bucket: 341, WaterBucket: 342, LavaBucket: 343, SlimeBall: 344, Backpack: 345, GrapplingHook: 346, SlimeCrown: 347, SleepingBag: 348,
   LeatherHelmet: 324,      // armour: 324 + material * 4 + piece (leather, golden, iron, diamond x helmet, chestplate, leggings, boots)
 };
 export const ARMOR_MATS = ['Leather', 'Golden', 'Iron', 'Diamond'], ARMOR_PIECES = ['Helmet', 'Chestplate', 'Leggings', 'Boots'];
@@ -396,6 +396,10 @@ if (FAM.wheat) ITEMS[I.WheatSeeds].places = FAM.wheat.first;
 ITEMS[I.EyeOfEnder] = { id: I.EyeOfEnder, name: 'Eye of Ender', kind: Kind.Use, stack: 64 };
 ITEMS[I.Bow] = { id: I.Bow, name: 'Bow', kind: Kind.Use, stack: 1, durability: 385 };
 mat(I.SlimeBall, 'Slimeball');
+ITEMS[I.Backpack] = { id: I.Backpack, name: 'Backpack', kind: Kind.Use, stack: 1 };
+ITEMS[I.GrapplingHook] = { id: I.GrapplingHook, name: 'Grappling Hook', kind: Kind.Use, stack: 1, durability: 250 };
+ITEMS[I.SlimeCrown] = { id: I.SlimeCrown, name: 'Slime Crown', kind: Kind.Use, stack: 1 };
+ITEMS[I.SleepingBag] = { id: I.SleepingBag, name: 'Sleeping Bag', kind: Kind.Use, stack: 1 };
 ITEMS[I.Bucket] = { id: I.Bucket, name: 'Bucket', kind: Kind.Use, stack: 16 };
 ITEMS[I.WaterBucket] = { id: I.WaterBucket, name: 'Water Bucket', kind: Kind.Use, stack: 1 };
 ITEMS[I.LavaBucket] = { id: I.LavaBucket, name: 'Lava Bucket', kind: Kind.Use, stack: 1 };
@@ -451,6 +455,7 @@ export function mining(block) {
         if ([K.Tall, K.Lily, K.WallTorch, K.Wire, K.RTorch, K.Lever, K.Repeater, K.Crop, K.Comparator].includes(fam.kind)) return { hardness: 0, tool: ToolType.None, required: Tier.Hand };
         if (fam.kind === K.Piston || fam.kind === K.Head) return { hardness: 1.5, tool: ToolType.Pickaxe, required: Tier.Hand };
         if (fam.kind === K.Bed) return { hardness: 0.2, tool: ToolType.None, required: Tier.Hand };
+        if (fam.kind === K.Grave) return { hardness: 0.6, tool: ToolType.None, required: Tier.Hand };
         if (fam.kind === K.Ladder) return { hardness: 0.4, tool: ToolType.Axe, required: Tier.Hand };
         if (fam.kind === K.Snow) return { hardness: 0.1, tool: ToolType.Shovel, required: Tier.Hand };
         if (fam.kind === K.Carpet) return { hardness: 0.1, tool: ToolType.None, required: Tier.Hand };
@@ -534,7 +539,8 @@ export function drops(block, held, rnd) {
         if (fam.kind === K.Bed) return st & 1 ? [] : [[fam.first, 1]];
         if (fam.kind === K.Crop) return st === 7 ? [[I.Wheat, 1], [I.WheatSeeds, 1 + Math.floor(rnd * 3)]] : [[I.WheatSeeds, 1]];
         if (fam.kind === K.Slab && st === 2) return [[fam.first, 2]];
-        if ((fam.kind === K.Door || fam.kind === K.Tall) && (st & 1)) return [];
+        if ((fam.kind === K.Door || fam.kind === K.Tall || fam.kind === K.Waystone) && (st & 1)) return [];
+        if (fam.kind === K.Grave) return [];
         if (fam.kind === K.Tall && BLOCKS[block].flags & F.Replaceable) return [];
         if (fam.kind === K.Snow) return [[fam.first, st + 1]];
         return [[fam.first, 1]];
@@ -588,6 +594,11 @@ for (const c of ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', '
 recipe(I.Bow, 1, [[I.Stick, 3], [I.String, 3]]);
 recipe(I.Arrow, 4, [[I.Flint, 1], [I.Stick, 1], [I.Feather, 1]]);
 recipe(I.Bucket, 1, [[I.IronIngot, 3]]);
+recipe(I.Backpack, 1, [[I.Leather, 6], [I.String, 2]]);
+recipe(I.GrapplingHook, 1, [[I.IronIngot, 3], [I.String, 4]]);
+recipe(I.SlimeCrown, 1, [[I.SlimeBall, 20], [I.GoldIngot, 5]]);
+recipe(I.SleepingBag, 1, [['wool', 3], [I.Leather, 2]]);
+if (FAM.waystone) recipe(FAM.waystone.first, 1, [[B.StoneBricks, 6], [I.GoldIngot, 2]]);
 recipe(I.Bread, 1, [[I.Wheat, 3]]);
 if (C.hay_block) recipe(C.hay_block, 1, [[I.Wheat, 9]]);
 recipe(I.IronIngot, 9, [[C.iron_block, 1]]);

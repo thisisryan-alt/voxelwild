@@ -44,6 +44,7 @@ MOBS = {
     "slime_big": ("custom", "geometry.slime.custom", "slime/slime", [], 4),
     "slime_medium": ("custom", "geometry.slime.custom", "slime/slime", [], 2),
     "slime_small": ("custom", "geometry.slime.custom", "slime/slime", [], 1),
+    "king_slime": ("custom", "geometry.slime.custom", "slime/slime", [], 8),
     "polar_bear": ("custom", "geometry.polarbear.custom", "bear/polarbear", [], 1),
     "strider": ("custom", "geometry.strider.custom", "strider/strider", [], 1),
     "piglin_brute": ("piglin", "geometry.piglin", "piglin/piglin_brute", [], 1),

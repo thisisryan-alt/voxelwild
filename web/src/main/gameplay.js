@@ -101,6 +101,7 @@ export class SurvivalStats {
   reset() { this.health = MAX_HEALTH; this.hunger = MAX_HUNGER; this.saturation = 5; this.exhaustion = 0; this.air = MAX_AIR; this.regen = this.starve = this.drown = 0; }
   get dead() { return this.health <= 0; }
   addExhaustion(a) {
+    if (this.restedBoost) a *= 0.5;
     this.exhaustion += a;
     while (this.exhaustion >= 4) {
       this.exhaustion -= 4;
@@ -129,7 +130,7 @@ export class SurvivalStats {
       if (this.air <= 0) { this.drown += dt; while (this.drown >= 1) { this.drown -= 1; this.damage(2, 'drowning'); } }
     } else { this.air = Math.min(MAX_AIR, this.air + dt * 5); this.drown = 0; }
     if (this.hunger >= 18 && this.health < MAX_HEALTH) {
-      this.regen += dt * (this.saturation > 0 ? 2 : 1);
+      this.regen += dt * (this.saturation > 0 ? 2 : 1) * (this.restedBoost ? 2 : 1);   // Rested heals twice as fast
       while (this.regen >= 4 && this.health < MAX_HEALTH) { this.regen -= 4; this.health = Math.min(MAX_HEALTH, this.health + 1); this.addExhaustion(6); }
     } else this.regen = 0;
     if (this.hunger <= 0) { this.starve += dt; while (this.starve >= 4) { this.starve -= 4; if (this.health > 1) this.damage(1, 'starvation'); } }
