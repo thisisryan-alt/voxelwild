@@ -31,6 +31,8 @@ URL flags: `?quick=1` skips the title screen, `?manual=1` stops the real-time lo
 | Map | M |
 | Pause / options | Esc or P |
 | Quick save | F5 |
+| Minimap: off / small / large | N |
+| Photo mode | F2 |
 
 Gamepads work as well.
 
@@ -48,14 +50,14 @@ cosmetic dyes.
 **Combat.** Three-hit combos, charged heavy, dash with i-frames, block and parry with riposte, an ultimate, poise and armour on
 enemies, status effects, hit-stop, screen shake and camera kicks. Every strike leaves a crescent in the water and a starburst on the
 target; kills shatter the enemy's own sprite pixels; a combo counter rewards unbroken streaks. Seventeen abilities (four more sit at
-the end of the skill tree: Crescent Wave, Aegis Bubble, Tide Step, Storm Call) and a 36-node tree with capstone passives. About forty
+the end of the skill tree: Crescent Wave, Aegis Bubble, Tide Step, Storm Call) and a 36-node tree with capstone passives. About forty-five
 enemy types with distinct AI (chargers, swarmers, ambushers, turrets, shield-bearers, kiters, mimics, and the newer three-strike
 flurry shrimp, healing menders, brood spawners, splitting jellies, hooking pikes, wall-stunning rams and cloud-laying fungi).
 
-**World.** Twenty-nine zones in seven biomes: the Reef, Sunken Forest, Coral Kingdom, Ship Graveyard, Abyss, Trench of the
+**World.** Thirty zones in seven biomes: the Reef, Sunken Forest, Coral Kingdom, Ship Graveyard, Abyss, Trench of the
 Forgotten and Poseidon's Domain. Each has its own palette, music, enemies and hazards (timed vent plumes, currents, pressure). Doors and
-tide gates are tied to body size and form; hidden passages and breakable walls hide secrets, including four optional zones: the Sunken
-Tidepools, Glowcap Grotto, Pearl Vaults and Ember Vents. The world breathes: drifting caustics, parallax plankton, schools of fish,
+tide gates are tied to body size and form; hidden passages and breakable walls hide secrets, including five optional zones: the Sunken
+Tidepools, Glowcap Grotto, Pearl Vaults, Ember Vents and the night-only Moonpool Cove. The world breathes: drifting caustics, parallax plankton, schools of fish,
 jellies and wisps behind the terrain, and soft foreground silhouettes at the screen edges.
 
 **Bosses.** Grumbold, the Moray Twins, Aurelia, Captain Rust, the Lurelord, Krael, Kyros, the
@@ -67,6 +69,25 @@ Sporemother, the Brass Colossus and Magmaw.
 cutscenes (`src/systems/story.js`): the intro, each realm's first entry, every boss's fall, each molt and the Throne. Several quests end in
 moral choices (spare or slay Krael, redeem Aurelia, free the hatchlings), and these feed four
 endings: Slay, Trident, Mercy, and a secret one.
+
+**Tidal Rifts and the Pearl Gauntlet.** Procedurally built chambers reached from the Tide Board in the reef: clear every room,
+choose a relic between depths, and fight the Rift Warden at the bottom. Elite dens, ambushes, treasure vaults and altars vary
+the run; modifier "tides" twist individual chambers; a daily rift shares one seed with everyone. The Pearl Gauntlet is an
+endless wave arena. Four new creatures (blinking shardlings, clinging latchleeches, gust-calling tidecallers, shattering glass
+golems) live in the rifts. Every run is logged in the Hall of Tides.
+
+**Things to do between fights.** Cook (ingredients from creatures, forage patches and fishing), fish at posts in every realm
+with a bite-and-reel minigame (18 species, four rarities, some only at certain hours, baits you cook yourself), sell your catch
+to Old Tunny, take four hunt bounties and three kitchen orders a day from the Tide Board, adopt a hatchling companion, collect
+equipment sets, and watch for the occasional tidal surge that pushes you across a zone and washes up flotsam.
+
+**A living clock.** A day on the reef lasts ten minutes: dawn, high sun, dusk and a deep night in which the picture turns
+blue, plankton glow, foes grow wary and experience is richer. The hour changes fishing, shop prices and a secret passage.
+
+**Polish.** Post-processing (grading, bloom, refraction, heat haze), per-tile detail, squash-and-stretch body language, a
+status-effect system with icons and particles, a damage meter, minimap with fog of war, photo mode, sound captions,
+colour-blind palettes, reduced motion, key rebinding with controller rumble, three save slots with backups and pasteable save
+codes, a developer console (`` ` ``), a help compendium and ninety-nine trophies with titles and wakes to unlock.
 
 **Audio.** Twenty-one composed tracks (a fixed 16-bar song per area, built from a motif by `src/audio/compose.js`)
 played on synthesised instruments with a ping-pong delay. Layers fade in with combat danger and boss phase, boss
@@ -84,19 +105,24 @@ src/world/            zone builder DSL, scatter placement, tile baking, physics,
 src/entities/         player, enemies, AI library, boss base, interactables
 src/bosses/           one file per boss + registry
 src/combat/           abilities and ultimates
-src/systems/          progression, evolution, quests, dialogue, codex, endings, zone scripts
+src/systems/          progression, evolution, quests, dialogue, codex, endings, zone scripts, rifts, arena, bounties, fishing, market,
+                      tide clock, surges, run history, difficulty, accessibility, statistics and trophies
 src/data/             forms, skills, items, enemies, quests, lore, dialogue, zones (pure data)
 src/ui/               HUD, play scene, menus, shops, evolution scene, title/credits
 src/audio/            WebAudio SFX, ambience, adaptive music
+src/dev/              developer console and sprite gallery
+docs/                 architecture, content guide, systems reference, testing guide
 tools/                static server, Playwright runner and screenshot helpers
 tests/                validators and Playwright scenarios
 ```
 
 ## Tests
 
-Validators are plain Node and need nothing installed:
+Unit tests and validators are plain Node and need nothing installed:
 
 ```
+npm test             # 229 unit tests: rules, tables, formulas, behaviours against stub worlds
+npm run check        # unit tests + validators + the browser smoke test
 npm run validate     # zone reachability per form size, exit/entry links, content cross-checks, composer checks
 npm run economy      # XP / evolution-point pacing report
 ```
@@ -119,3 +145,10 @@ node tools/run.mjs tests/scripts/combatshots.mjs   # frames of a combo (also fxs
 ZONE=forest_grotto node tools/run.mjs tests/scripts/bossdps.mjs   # idealised DPS against one boss (also bosslog.mjs, fair.mjs)
 node tests/ascii.mjs reef_tidepools          # ASCII map of any zone
 ```
+
+## More
+
+* `docs/ARCHITECTURE.md` - how the engine, world, entities, systems, saves and rendering fit together.
+* `docs/CONTENT_GUIDE.md` - how to add a creature, boss, zone, NPC, quest, item, fish, relic, trophy or setting.
+* `docs/SYSTEMS.md` - the rules and numbers of the newer systems.
+* `docs/TESTING.md` - the test layers, conventions and every script.
