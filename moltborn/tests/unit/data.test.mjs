@@ -63,3 +63,18 @@ test('set bonuses change computed stats', () => { const st = newState(), base = 
 test('barks belong to real people and have lines', () => { for (const [id, lines] of Object.entries(BARKS)) { ok(NPCS[id], id); ok(lines.some((l) => typeof l === 'string'), id + ' needs a plain line'); for (const l of lines) { const t = typeof l === 'string' ? l : l.text; ok(t.length > 8 && t.length < 120, `${id}: "${t}"`); if (typeof l === 'object') ok(typeof l.when === 'function', id); } } });
 test('quests give rewards that exist', () => { for (const [id, q] of Object.entries(QUESTS)) { ok(q.steps.length, id); for (const s of q.steps) ok(typeof s.done === 'function', id); } });
 test('lore entries are well formed', () => { for (const [id, e] of Object.entries(LORE)) ok(e.title && e.text, id); });
+
+// ---- music references ----------------------------------------------------------------------------------------------------------------------------
+import { TRACKS } from '../../src/audio/music.js';
+import { buildZone } from '../../src/data/zones.js';
+import { STORIES } from '../../src/systems/story.js';
+import { BIOMES } from '../../src/data/biomes.js';
+import { riftId, setRiftThemes, THEME_ORDER } from '../../src/world/rift_gen.js';
+
+test('every zone names a track that exists (or uses its realm\'s)', () => { for (const id of Object.keys(ZONE_INFO)) { const z = buildZone(id); if (z.music) ok(TRACKS[z.music], `${id} -> ${z.music}`); } });
+test('every realm has a theme track', () => { for (const [k, b] of Object.entries(BIOMES)) ok(TRACKS[b.music], `${k} -> ${b.music}`); });
+test('rift chambers play the rift theme, and the trial and Moonpool have their own', () => {
+  setRiftThemes(THEME_ORDER); for (const d of [1, 2, 3]) eq(buildZone(riftId(7, d, 4)).music, 'riftdeep'); ok(TRACKS.riftdeep && TRACKS.trial && TRACKS.moonpool); eq(buildZone('reef_moonpool').music, 'moonpool');
+});
+test('story scenes only ask for tracks that exist', () => { for (const [id, s] of Object.entries(STORIES)) { if (s.music) ok(TRACKS[s.music], `${id} -> ${s.music}`); for (const p of s.panels) if (p.music) ok(TRACKS[p.music], `${id} panel -> ${p.music}`); } });
+test('boss music is named by every boss class that sets it', async () => { await import('../../src/bosses/index.js'); const { BOSS_CLASSES } = await import('../../src/entities/bosses.js'); for (const [k, C] of Object.entries(BOSS_CLASSES)) if (C.def.music) ok(TRACKS[C.def.music], `${k} -> ${C.def.music}`); });

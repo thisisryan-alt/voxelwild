@@ -89,7 +89,7 @@ export class Rifts {
     run.ambush = kind === 'ambush' ? { fired: false, x: world.zone.w * 16 * 0.38 } : null;
     if (world.zone.rift?.last) { if (!world.boss) this.crown(world); }
     else if (kind === 'elite') { this.crown(world, { hp: 1.4, scale: 1.15, name: 'Elite Champion' }); run.bonusOffer = true; }
-    else if (kind === 'trial') { run.bonusOffer = true; world.overlayExtra.push((ctx) => this.drawTrial(ctx)); }
+    else if (kind === 'trial') { run.bonusOffer = true; world.overlayExtra.push((ctx) => this.drawTrial(ctx)); g.audio.music.play('trial'); }
     else if (kind === 'treasure' || kind === 'altar') { run.cleared = true; run.noOffer = true; }
     world.player.recalc?.(); world.player.hp = Math.min(world.player.hp, world.player.stats.maxHp);
     const quiet = kind === 'treasure' || kind === 'altar', shown = quiet ? [] : mods;
@@ -132,7 +132,7 @@ export class Rifts {
       const salt = 60 + tr.waves;
       this.ambush(w, n, { salt, text: `Wave ${tr.waves}`, elite: waveElite(tr, run.depth) });
     }
-    if (!was && tr.done) { this.g.toast('The tide turns. Finish what is left.', '#9ad8ff'); this.g.audio.sfx('wave_clear'); }
+    if (!was && tr.done) { this.g.toast('The tide turns. Finish what is left.', '#9ad8ff'); this.g.audio.sfx('wave_clear'); this.g.audio.music.play('riftdeep'); }
   }
   drawTrial(ctx) {
     const run = this.run, tr = run?.trial; if (!tr || run.done) return;

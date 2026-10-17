@@ -18,6 +18,10 @@ export const TRACKS = {
   abyss:   { bpm: 52, root: 38, scale: 'minor', prog: [0, 0, 5, 0], progB: [0, 5, 3, 0], form: ['A', 'B', 'A', 'B'], pad: 'choir', lead: 'ping', arp: 'ping', perc: 'none', lp: 0.25, bass: 'drone', sparse: true },
   trench:  { bpm: 56, root: 42, scale: 'phryg', prog: [0, 0, 1, 0], progB: [0, 5, 1, 0], form: ['A', 'B', 'A', 'B'], pad: 'choir', lead: 'bell', arp: 'ping', perc: 'taiko', lp: 0.3, bass: 'drone', sparse: true },
   domain:  { bpm: 80, root: 50, scale: 'minor', prog: [0, 5, 2, 6], progB: [3, 5, 6, 0], style: 'march', rich: true, pad: 'strings', lead: 'brass', arp: 'harp', perc: 'taiko', lp: 0.4, bass: 'pulse', choir: true },
+  // the newer places: a still night pool, the inside of a rift, and a rift trial against the clock
+  moonpool: { bpm: 58, root: 52, scale: 'lydian', prog: [0, 4, 1, 4], progB: [3, 4, 0, 5], style: 'sparse', rich: true, pad: 'warm', lead: 'musicbox', arp: 'harp', perc: 'none', lp: 0.4, bass: 'soft' },
+  riftdeep: { bpm: 84, root: 44, scale: 'harm', prog: [0, 5, 3, 4], progB: [0, 3, 5, 4], style: 'march', rich: true, pad: 'choir', lead: 'bell', arp: 'ping', perc: 'soft', lp: 0.4, bass: 'pulse' },
+  trial:   { bpm: 122, root: 43, scale: 'phryg', prog: [0, 1, 0, 6], progB: [0, 3, 1, 0], style: 'drive', pad: 'strings', lead: 'ping', arp: 'pluck', perc: 'taiko', lp: 0.55, bass: 'drive' },
   boss1:   { bpm: 126, root: 40, scale: 'minpent', prog: [0, 0, 3, 4], style: 'drive', pad: 'strings', lead: 'brass', arp: 'pluck', perc: 'heavy', boss: true, lp: 0.6, bass: 'drive' },
   boss2:   { bpm: 118, root: 45, scale: 'mixo', prog: [0, 6, 0, 3], style: 'drive', pad: 'choir', lead: 'flute', arp: 'pluck', perc: 'taiko', boss: true, lp: 0.6, bass: 'drive' },
   boss3:   { bpm: 112, root: 47, scale: 'harm', prog: [0, 3, 4, 0], progB: [5, 3, 4, 0], style: 'drive', pad: 'strings', lead: 'harp', arp: 'harp', perc: 'timp', boss: true, lp: 0.6, bass: 'drive' },

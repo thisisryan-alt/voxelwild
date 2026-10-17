@@ -112,7 +112,7 @@ export function buildRift(id) {
   const P = parseId(id), r = rng(P.seed * 131 + P.depth * 977 + 5), themes = riftThemes(P.seed, currentThemes);
   const key = themes[(P.depth - 1) % themes.length], T0 = THEMES[key];
   const w = 72 + Math.floor(r() * 28), h = 36;
-  const b = new ZoneBuilder({ id, name: 'Tidal Rift', title: `Rift - Depth ${P.depth}`, biome: T0.biome, w, h, seed: P.seed * 17 + P.depth, pressure: 0 });
+  const b = new ZoneBuilder({ id, name: 'Tidal Rift', title: `Rift - Depth ${P.depth}`, biome: T0.biome, w, h, seed: P.seed * 17 + P.depth, pressure: 0, music: 'riftdeep' });
   const floorY = cavern(b, r, w, h);
   b.surface(T0.surface, 1); b.smooth(1);
   b.keep(3, 4, 8, h - 9);

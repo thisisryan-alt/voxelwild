@@ -15,7 +15,7 @@ test('the first wave comes after the first delay and the rest at the set gap', (
 });
 test('no wave arrives in the last seconds, so the end is a clean-up', () => { const { waves } = simulate(); for (const w of waves) ok(w.t <= TRIAL.length - TRIAL.stopSpawning + 0.1, 'wave at ' + w.t); });
 test('the trial ends exactly when the clock runs out, and then stays ended', () => { const { tr } = simulate(); ok(tr.done); eq(tr.left, 0); eq(stepTrial(tr, 5, 3), 0); eq(tr.waves, simulate().tr.waves, 'no waves after the end'); });
-test('waves grow with depth', () => { ok(waveSize(2) < waveSize(8)); eq(waveSize(3), 3); eq(waveSize(8), 6); for (let d = 1; d <= 8; d++) ok(waveSize(d) >= 2 && waveSize(d) <= TRIAL.maxPending); // rifts are at most eight deep });
+test('waves grow with depth (rifts are at most eight deep)', () => { ok(waveSize(2) < waveSize(8)); eq(waveSize(3), 3); eq(waveSize(8), 6); for (let d = 1; d <= 8; d++) ok(waveSize(d) >= 2 && waveSize(d) <= TRIAL.maxPending);  });
 test('a crowd already in the water limits the next wave, and a full house blocks it', () => {
   const tr = newTrial(); tr.next = 0; eq(stepTrial(tr, 0.1, 6, 5), TRIAL.maxPending - 5); const tr2 = newTrial(); tr2.next = 0; eq(stepTrial(tr2, 0.1, 6, 9), 0); eq(tr2.waves, 1, 'the wave is still counted and the clock still resets'); ok(tr2.next > 0);
 });

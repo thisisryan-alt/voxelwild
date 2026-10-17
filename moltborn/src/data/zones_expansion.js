@@ -156,7 +156,7 @@ const MOON_DECOR = {
 };
 
 export function reef_moonpool() {
-  const b = new ZoneBuilder({ id: 'reef_moonpool', name: 'Moonpool Cove', biome: 'reef', w: 92, h: 44, seed: 29, music: 'reef', title: 'Moonpool Cove', dark: 0.22 });
+  const b = new ZoneBuilder({ id: 'reef_moonpool', name: 'Moonpool Cove', biome: 'reef', w: 92, h: 44, seed: 29, music: 'moonpool', title: 'Moonpool Cove', dark: 0.22 });
 
   // one wide chamber with a basin in the middle: the pool the moon looks into
   b.fill(T.ROCK);
