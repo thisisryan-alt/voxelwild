@@ -29,6 +29,11 @@ export const RELICS = {
   leech_tooth:    { name: 'Leech Tooth', rarity: 'rare', icon: ['claw', 'red'], hook: 'siphon', desc: 'Heal for 4% of the damage you deal.' },
   adrenal_gland:  { name: 'Adrenal Gland', rarity: 'rare', icon: ['drop', 'red'], hook: 'adrenal', desc: 'Taking a hit makes you faster for four seconds.' },
 
+  anglers_knot:   { name: "Angler's Knot", rarity: 'common', icon: ['charm', 'blue'], fx: { magnet: 40, coinBonus: 0.15 }, desc: 'Coins find you from farther away, and richer.' },
+  driftwood_ward: { name: 'Driftwood Ward', rarity: 'common', icon: ['shell', 'brown'], fx: { def: 1, hp: 0.06, thorns: 0.05 }, desc: 'A little of everything: health, defence, a splinter or two.' },
+  moon_scale:     { name: 'Moon Scale', rarity: 'rare', icon: ['gem', 'white'], fx: { crit: 0.1, light: 20 }, desc: 'A pale scale that sees in the dark: sharper eyes, a steadier light.' },
+  heron_feather:  { name: 'Heron Feather', rarity: 'rare', icon: ['charm', 'white'], fx: { dashCd: -0.2, speed: 0.06, iframes: 0.1 }, desc: 'Dash more often, swim lighter, stay untouchable a moment longer.' },
+  koi_scale:      { name: 'Gilded Koi Scale', rarity: 'epic', icon: ['gem', 'gold'], fx: { coinBonus: 0.5, dmg: 0.1, lifeOnKill: 2 }, desc: 'Fortune, a little strength, and a bite of health from every kill.' },
   godshard:       { name: 'Godshard', rarity: 'epic', icon: ['gem', 'gold'], fx: { dmg: 0.25, hp: 0.15 }, desc: '+25% damage and +15% health.' },
   black_tide:     { name: 'Black Tide', rarity: 'epic', icon: ['pearl', 'black'], fx: { lifeOnKill: 4, killRush: 1 }, desc: 'Kills heal and set you rushing.' },
   storm_shell:    { name: 'Storm in a Shell', rarity: 'epic', icon: ['shell', 'cyan'], fx: { furyGain: 0.5, ultCharge: 0.4 }, desc: 'Fury builds far faster.' },

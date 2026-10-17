@@ -24,6 +24,8 @@ export const BARKS = {
     'Did you see the whale? I saw the whale. Nobody believes me.', 'I am going to be a hero one day. I have a stick.', 'Hello! Hello! Are you going to fight something?',
   ],
   cowrie: [
+    { when: (g) => (g.state.records?.fished || 0) >= 5, text: 'Is that fish I smell, darling? The kitchen is round the back, not the parlour.' },
+    { when: night, text: 'Night at the Garden: the pearls glow and the gossip glows brighter.' },
     { when: (g) => g.state.coins > 800, text: 'Ooh, a heavy purse. Do come closer, darling.' },
     { when: low, text: 'A kelp wrap, my dear? Thirty coins and a smile.' },
     'Everything has a price. Even the things that say they do not.', 'Pearls, shells, charms. Take your time. Spend slowly.', 'I buy, I sell, I do not ask where it came from.',
@@ -74,6 +76,7 @@ export const BARKS = {
     'Crew tokens, all of them. Count them twice.', 'Aye, Captain. Er, you are not the Captain.',
   ],
   glimmer: [
+    { when: night, text: 'Night is when my lamps earn their keep. Do not blow on them.' },
     { when: done('sq_lantern'), text: 'The lanterns are lit again. The deep looks brighter.' },
     'Lights out down there. Take a lantern.', 'You can follow a glow into a lot of trouble.',
   ],

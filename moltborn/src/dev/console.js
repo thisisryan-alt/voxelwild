@@ -9,6 +9,7 @@ import { STATUS } from '../systems/status.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { RIFT_TIERS } from '../data/relics.js';
 import { Enemy } from '../entities/enemy.js';
+import { OATHS } from '../data/oaths.js';
 
 const num = (v, d = 1) => (v === undefined || isNaN(+v) ? d : +v);
 
@@ -32,6 +33,13 @@ export const COMMANDS = {
   trophy: { args: '<id|all>', run: (g, [id]) => { const A = g.systems.achievements; let n = 0; for (const a of ACHIEVEMENTS) if ((id === 'all' || a.id === id) && A.award(a, true)) n++; return [`Awarded ${n}`]; } },
   elite: { args: '<affix>', run: (g, [a]) => { const e = g.world.enemies.find((x) => x.alive && !x.def.friendly && !x.def.boss && !x.affixes); if (!e) return ['No candidate foe']; g.systems.elites.apply(e, [a]); return [`${e.name}`]; } },
   time: { args: '[dawn|day|dusk|night|0..1]', run: (g, [t]) => { const C = g.systems.clock; if (t !== undefined) { const n = parseFloat(t); C.jump(Number.isFinite(n) ? n : t); C.update(0); } return [`${C.phase.name} (${C.frac().toFixed(2)}), next phase in ${Math.round(C.untilNext())}s`]; } },
+  // ---- the newer systems --------------------------------------------------------------------------------------------------------------------------
+  surge: { args: '', run: (g) => { const S = g.systems.surge; if (!S.allowed()) return ['Surges are not allowed here (a rift, a boss, the deep, or switched off).']; S.begin(); return ['A surge is coming.']; } },
+  bounties: { args: '[done]', run: (g, [what]) => { const B = g.systems.bounties, list = B.refresh(); if (what === 'done') { for (const b of list) { if (b.kind === 'hunt') g.state.records.kills[b.target] = (g.state.records.kills[b.target] || 0) + b.n; else { const path = { chests: 'chests', forage: 'forage', crafted: 'crafted', elites: 'elites', rifts: 'rifts', gauntlet: 'arenaKills', dashes: 'dashes', rests: 'rests', crits: 'crits', healed: 'healed' }[b.target]; g.state.records[path] += b.n; } } } return list.map((b) => `${B.complete(b) ? '[x]' : '[ ]'} ${B.label(b)} ${B.progress(b)}/${b.n}${b.claimed ? ' (claimed)' : ''}`); } },
+  fish: { args: '[species] [n]', run: (g, [id, n]) => { const F = g.systems.fishing; if (!id) return [`Caught ${F.log.total} of ${F.speciesCaught()} species. Try: fish silverfin 3`]; if (!ITEMS['fish_' + id]) return [`No species '${id}'`]; g.grantItem('fish_' + id, num(n), false); return [`Gave ${num(n)} ${ITEMS['fish_' + id].name}`]; } },
+  tricks: { args: '<level 1-10>', run: (g, [lv]) => { const d = g.state.companion; if (!d) return ['No companion yet. Give yourself a hatchling_egg and use it.']; d.level = Math.max(1, Math.min(10, num(lv, d.level))); return [`${d.name} is level ${d.level}: ` + g.systems.companion.tricks().map((t) => t.name).join(', ')]; } },
+  journal: { args: '[n]', run: (g, [n]) => { const J = g.systems.journal; return [`${J.count()} entries`, ...J.recent(num(n, 6)).map((e) => `${e.kind}: ${e.text}`)]; } },
+  oaths: { args: '<id ...>', run: (g, ids) => { const keep = ids.filter((id) => id in OATHS); g.state.lastOaths = keep; return [keep.length ? `Next rift oaths: ${keep.join(', ')}` : 'Oaths cleared. Ids: ' + Object.keys(OATHS).join(', ')]; } },
   items: { args: '[filter]', run: (g, [f]) => [Object.keys(ITEMS).filter((k) => !f || k.includes(f)).slice(0, 40).join(', ')] },
   stats: { args: '', run: (g) => { const p = g.world.player, S = p.stats; return [`hp ${Math.round(p.hp)}/${S.maxHp} atk ${S.atk.toFixed(1)} def ${S.def} speed ${S.speed.toFixed(2)} crit ${S.crit}`, `diff ${JSON.stringify(g.systems.difficulty.scale())}`]; } },
 };
