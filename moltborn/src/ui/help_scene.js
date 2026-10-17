@@ -57,10 +57,9 @@ export class HelpScene {
     let x = 40; PAGES.forEach((p, i) => { const w = textWidth(p.name) + 12; button(ctx, p.name, x, 40, w, 14, i === this.page); x += w + 3; });
     const L = this.layout(), top = 62, h = 160;
     ctx.save(); ctx.beginPath(); ctx.rect(40, top, 400, h); ctx.clip();
-    let ei = -1;
     for (const ln of L.lines) {
       const y = top + ln.y - this.scroll; if (y < top - 12 || y > top + h) continue;
-      if (ln.k === 't') { ei++; if (ln.icon) { ctx.drawImage(statusIcon(ln.icon, 1), 42, y - 1); text(ctx, ln.s, 54, y, ln.color); } else text(ctx, ln.s, 44, y, ln.color); }
+      if (ln.k === 't') { if (ln.icon) { ctx.drawImage(statusIcon(ln.icon, 1), 42, y - 1); text(ctx, ln.s, 54, y, ln.color); } else text(ctx, ln.s, 44, y, ln.color); }
       else text(ctx, ln.s, 52, y, COL.text);
     }
     ctx.restore();

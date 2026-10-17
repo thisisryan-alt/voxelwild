@@ -43,7 +43,7 @@ export class FishingScene {
   }
 
   draw(ctx) {
-    const g = this.g, F = this.F, ci = this.catchInfo;
+    const g = this.g, F = this.F;
     ctx.fillStyle = 'rgba(2,8,20,0.62)'; ctx.fillRect(0, 0, 480, 270);
     panel(ctx, 90, 40, 300, 190, { alpha: 0.96 }); drawText(ctx, 'FISHING', 240, 46, { color: COL.gold, align: 'center', shadow: '#000' });
     // the water window with the bobber

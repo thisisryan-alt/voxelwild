@@ -33,7 +33,6 @@ export class HallScene {
     if (PAGES[this.page] === 'Journal') { const max = Math.max(0, g.systems.journal.count() - JOURNAL_ROWS); if (inp.pressed('up')) this.scroll = Math.max(0, this.scroll - 1); if (inp.pressed('down')) this.scroll = Math.min(max, this.scroll + 1); }
   }
   draw(ctx) {
-    const g = this.g;
     ctx.fillStyle = 'rgba(2,8,20,0.84)'; ctx.fillRect(0, 0, 480, 270);
     panel(ctx, 24, 12, 432, 246, { alpha: 0.97 }); drawText(ctx, 'HALL OF TIDES', 240, 18, { color: COL.gold, scale: 2, align: 'center', shadow: '#000' });
     let x = 36; PAGES.forEach((p, i) => { button(ctx, p, x, 40, 60, 14, i === this.page); x += 63; });

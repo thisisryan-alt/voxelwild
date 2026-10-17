@@ -1,6 +1,6 @@
 // Swearing oaths before a rift: toggle up to three handicaps for a bigger payout, then set off. ENTER toggles the selected
 // oath, TAB (or the last line) starts the run, ESC goes back to the Tide Board.
-import { panel, text, button, COL, drawText, textWidth, wrapText } from './ui.js';
+import { panel, text, button, COL, drawText, textWidth } from './ui.js';
 import { OATHS, OATH_IDS, MAX_OATHS, cleanOaths, rewardBonus } from '../data/oaths.js';
 
 export class OathScene {
