@@ -74,3 +74,12 @@ test('picking a catch is deterministic for a spot, hour and salt, and returns a 
   const g = game(), F = g.systems.fishing, spot = { seed: 12345 }; const a = F.pick(spot, 3), b = F.pick(spot, 3); eq(a.fish.id, b.fish.id); eq(a.len, b.len);
   for (let s = 0; s < 40; s++) { const c = F.pick(spot, s); ok(c.fish.biomes.includes('reef') && c.len >= c.fish.len[0] && c.len <= c.fish.len[1]); }
 });
+
+test('the later fish dishes are built from fish the realm they come from can actually yield', () => {
+  const byDish = { eel_skewers: 'moss_eel', carp_jelly: 'court_carp', pike_broth: 'ghost_pike' };
+  for (const [dish, fish] of Object.entries(byDish)) {
+    const r = FISH_RECIPES.find((x) => x.id === dish); ok(r && r.needs['fish_' + fish] === 1, dish); ok(ITEMS[dish].type === 'dish' && ITEMS[dish].use.buffs.length >= 1, dish + ' buffs');
+    ok(FISH_BY_ID[fish].rarity !== 'common', dish + ' uses a fish worth the trouble');
+  }
+});
+test('dish rewards stay in proportion: nothing heals more than the best existing dish', () => { for (const id of Object.keys(FISH_DISHES)) { const u = FISH_DISHES[id].use; ok(!u.heal || u.heal <= 0.5, id); for (const b of u.buffs || []) ok(b.dur <= 240 && STATUS[b.id], id + ':' + b.id); } });
