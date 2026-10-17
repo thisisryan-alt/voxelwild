@@ -343,6 +343,26 @@ export const DIALOGUE = {
     yield c.say("Break the old seals, in the vault below. You will need to be very old, and very large, to do it. That is what the Ancient Molt is for.");
   },
 
+  *selene(c) {
+    if (!c.flag('met_selene')) {
+      c.set('met_selene');
+      yield c.say("You came at night. Good. Most people try the passage at noon, get a mouthful of reef, and decide I am a rumour.");
+      yield c.say("I keep the pool. It is not hard work. I sit here and I let the moon look at itself, and sometimes something comes up to see what the fuss is.");
+    }
+    const i = yield c.ask("What do you need, little tide?", ['Tell me about the pool', 'A blessing, please', 'Goodbye']);
+    if (i === 0) {
+      yield c.say("It is the deepest basin on the reef, and the stillest. The moon falls in at night and does not come out again until morning. Things that are drawn to the moon are drawn here.");
+      yield c.say("There is a koi. White, with gold along the spine. It rises only in the dark, only in the pool, and only when it chooses. Cast from the stone by the water. Bring patience. Bring something warm to drink.");
+      c.g.systems.codex.unlock('moon_koi_tale');
+    } else if (i === 1) {
+      const last = c.g.state.flags.selene_blessed_at, now = c.g.state.playtime;
+      if (last !== undefined && now - last < 600) yield c.say("I gave you my light not long ago. It is still on you. Do not be greedy: the moon does not like to be asked twice in a night.");
+      else {
+        c.g.state.flags.selene_blessed_at = now; const st = c.g.world.player.status; st.apply('fortune', { dur: 120 }); st.apply('focus', { dur: 120 });
+        yield c.say("Hold still. There. It will not last, but nothing worth having does.");
+      }
+    } else yield c.say("Go well. Leave the pool as you found it. Moonlit.");
+  },
   *tunny(c) {
     if (!c.flag('met_tunny')) {
       c.set('met_tunny');

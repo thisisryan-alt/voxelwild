@@ -24,6 +24,13 @@ export class Clock {
   // 0 in full day, 1 in deep night: used by things that glow
   nightness() { const g = this.grade(); return Math.min(1, g.dark / 0.36); }
 
+  // an exit condition for passages that only open at night; says why, but not too often
+  gate(message) {
+    if (!this.on || this.phase.id === 'night' || this.phase.id === 'dusk' && this.nightness() > 0.4) return true;
+    if (!this.gateT || this.g.state.playtime - this.gateT > 3) { this.gateT = this.g.state.playtime; this.g.toast(message, '#9ab0ff'); this.g.audio.sfx('deny'); }
+    return false;
+  }
+
   jump(to) {
     // to: a phase id or a fraction; moves the clock by changing the shift
     const target = typeof to === 'number' ? to : (() => { const p = PHASES.find((x) => x.id === to) || PHASES[0]; return p.from + (p.to - p.from) * 0.4; })(), st = this.g.state;

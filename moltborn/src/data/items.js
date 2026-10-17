@@ -57,6 +57,7 @@ export const ITEMS = {
   // equipment — charm / relic
   charm_pearlstring: { name: 'Pearl String', type: 'equip', slot: 'charm', price: 150, desc: 'Coins and pearls are drawn to you from farther away.', fx: { magnet: 60 } },
   charm_lure: { name: "Tunny's Lucky Lure", type: 'equip', slot: 'charm', desc: 'A bent spoon on a hook, polished by forty years of hope. Rarer fish rise to it.', fx: { fishLuck: 0.2 } },
+  charm_moonpearl: { name: 'Moonpearl', type: 'equip', slot: 'charm', desc: 'A pearl that only shines when it is dark. Sharper eyes, a steadier glow, and a feel for the moon.', fx: { crit: 0.08, light: 24, fishLuck: 0.1 } },
   charm_lantern: { name: 'Lantern Charm', type: 'equip', slot: 'charm', desc: 'A steady glow lights the dark around you.', fx: { light: 40 } },
   charm_tideglass: { name: 'Tideglass Locket', type: 'equip', slot: 'charm', desc: '+25% Tide regen.', fx: { tideRegen: 0.25 } },
   charm_ghostcoin: { name: "Ghostcoin", type: 'equip', slot: 'charm', desc: 'Pay the toll: +30% coin from enemies.', fx: { coinBonus: 0.3 } },

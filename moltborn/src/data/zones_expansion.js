@@ -139,3 +139,91 @@ export function abyss_vents() {
   b.decorate(VENT_DECOR, 0.22);
   return b.finish();
 }
+
+// ---- Moonpool Cove (reef, off the Coral Garden's west wall) -------------------------------------------------------------------------------
+// A still basin lit from above. The way in only opens at night (see Clock.gate): by day the passage is a plain wall of water.
+// Inside are a keeper who knows the tides, a fishing spot where the Moon Koi rises, a hidden chest and a mural.
+const MOON_DECOR = {
+  floor: [
+    ['seaweed', 4, 3],
+    ['brain', 2, 3],
+    ['fan', 2, 3],
+    ['shell', 1.5, 3],
+    ['pebbles', 1.5, 2],
+    ['anemone', 1, 3],
+  ],
+  ceil: [['stalactite', 1.5, 3]],
+};
+
+export function reef_moonpool() {
+  const b = new ZoneBuilder({ id: 'reef_moonpool', name: 'Moonpool Cove', biome: 'reef', w: 92, h: 44, seed: 29, music: 'reef', title: 'Moonpool Cove', dark: 0.22 });
+
+  // one wide chamber with a basin in the middle: the pool the moon looks into
+  b.fill(T.ROCK);
+  b.carve(3, 6, 86, 34);
+  const floor = (x) => {
+    const basin = x > 36 && x < 56 ? 4 : 0;
+    return 34 + basin + Math.round(Math.sin(x * 0.13) * 1.2);
+  };
+  b.seabed(3, 89, floor);
+  b.ceiling(3, 89, (x) => 7 + Math.round(Math.sin(x * 0.22) * 1.2));
+
+  // terraces climb away from the basin on both sides; the east one leads to the keeper's ledge
+  b.platform(8, 31, 5);
+  b.platform(16, 28, 5);
+  b.platform(24, 25, 5);
+  b.platform(62, 31, 5);
+  b.platform(70, 28, 5);
+  b.platform(78, 25, 6);
+  // two stone islands in the middle of the water, close enough to hop between
+  b.rect(41, 26, 4, 2, T.ROCK);
+  b.rect(49, 24, 4, 2, T.ROCK);
+
+  // a cracked wall hides the cache under the western terraces
+  b.carve(4, 36, 10, 3);
+  b.breakable(14, 36, 1, 2);
+  b.keep(3, 34, 14, 7);
+
+  b.surface(T.GROUND, 2);
+  b.smooth(1);
+
+  // the way in is on the west wall; it is only open at night
+  b.exitW(26, 30, 'reef_garden', 'moon');
+  b.exits[b.exits.length - 1].cond = (g) => g.systems.clock.gate('The Moonpool is only open at night.');
+  b.entryFloor('west', 5, { facing: 1, from: 24 });
+
+  // light: a cool glow over the pool and a lamp at each terrace
+  b.light(46, 22, 120, '#aab8ff', 0.9);
+  b.light(12, 28, 60, '#7ae8ff', 0.6);
+  b.light(80, 22, 60, '#7ae8ff', 0.6);
+
+  b.shrine('rest', 66, { from: 20 });
+  b.npc('selene', 80, { from: 20, facing: -1 });
+  b.sign(28, 'The pool is deepest where the moon is brightest. Cast there.', { speaker: 'Tideworn Marker', from: 20 });
+  b.mural(20, 'mural_moonpool', { from: 20 });
+  // the pool itself: the fishing spot where the Moon Koi rises (see Fishing.pick)
+  b.propFloor('fishspot', 40, { from: 24, boost: 'moon' });
+
+  b.itemAt(10, 28, 'glow_spore');
+  b.itemAt(72, 25, 'glow_spore');
+  b.chest(8, { item: 'charm_moonpearl', coins: [40, 80] }, { from: 33, tint: 1, secret: true, key: 'moonpool_cache' });
+  b.chest(86, { coins: [30, 60], pearl: 1 }, { from: 20 });
+  b.coins(12, 29, 4);
+  b.coins(28, 22, 3);
+  b.coins(60, 28, 4);
+  b.coins(74, 25, 4);
+
+  // night creatures: wary, plentiful, nothing too large
+  b.spawnFloor('pinchling', 22, 8, { count: 2, spread: 20 });
+  b.spawnFloor('urchin', 30, 8);
+  b.spawnFloor('hermit', 66, 8);
+  b.spawnFloor('pinchling', 84, 8);
+  b.spawn('minnow', 40, 20, { count: 4 });
+  b.spawn('minnow', 56, 18, { count: 4 });
+  b.spawn('venomjelly', 46, 16);
+  b.spawn('venomjelly', 36, 24);
+  b.spawn('puffer', 52, 28);
+
+  b.decorate(MOON_DECOR, 0.3);
+  return b.finish();
+}

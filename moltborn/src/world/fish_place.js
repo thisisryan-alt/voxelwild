@@ -9,6 +9,7 @@ const NEAR = new Set(['shrine', 'chest', 'npc', 'sign', 'mural', 'lockdoor', 'bu
 
 export function placeFishing(zone) {
   if (!FISH_BIOMES.includes(zone.biome) || zone.safe || zone.rift || zone.arena) return zone;
+  if (zone.props.some((p) => p.type === 'fishspot')) return zone;      // a zone that places its own spots keeps them
   const g = zone.grid, W = g.w, r = rng((zone.seed | 0) * 71 + 43), open = (x, y) => g.in(x, y) && !isSolid(g.get(x, y));
   const seen = new Uint8Array(W * g.h), q = [];
   for (const e of Object.values(zone.entries)) { const x = Math.floor(e.x / TS), y = Math.floor((e.y - 4) / TS); if (open(x, y) && !seen[y * W + x]) { seen[y * W + x] = 1; q.push(x, y); } }

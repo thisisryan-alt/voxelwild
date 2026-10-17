@@ -190,7 +190,7 @@ INTERACTABLES.forage = ForagePatch;
 
 // A fishing spot: a post at the edge of deep water. Interact to cast a line; spots take a while to recover.
 export class FishSpot extends Interactable {
-  constructor(world, o) { super(world, o, 20, 26); this.range = 24; this.t = Math.random() * 6; this.seed = Math.floor(hash2(Math.round(o.x), Math.round(o.y), 11) * 1e6); }
+  constructor(world, o) { super(world, o, 20, 26); this.range = 24; this.t = Math.random() * 6; this.boost = o.boost || null; this.seed = Math.floor(hash2(Math.round(o.x), Math.round(o.y), 11) * 1e6); }
   get ready() { return this.world.game.systems.fishing.ready(this.zs, this.key); }
   prompt() { return this.ready ? 'Cast a line' : 'The water is still'; }
   canInteract(pl) { return this.ready && super.canInteract(pl); }

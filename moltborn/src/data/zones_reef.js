@@ -55,6 +55,10 @@ export function reef_garden() {
   b.surface(T.GROUND, 1); b.smooth(1); b.carve(99, 24, 7, 6); b.breakable(94, 28, 2, 2); b.keep(93, 20, 19, 12);
   b.exitW(33, 39, 'reef_nursery', 'east'); b.entryFloor('west', 4, { facing: 1 });
   b.exitE(33, 39, 'reef_hollow', 'west'); b.entryFloor('east', 114, { facing: -1 });
+  // a stair of platforms up the west wall to a night-only passage (Moonpool Cove)
+  b.platform(10, 34, 4); b.platform(6, 31, 4); b.platform(2, 28, 6);
+  b.exitW(24, 27, 'reef_moonpool', 'west'); b.exits[b.exits.length - 1].cond = (g) => g.systems.clock.gate('The pool beyond is only open at night.');
+  b.entry('moon', 4, 27);
   b.shrine('rest', 17, { from: 10 });
   b.npc('cowrie', 11, { from: 10 }); b.npc('pip', 49, { from: 10 });
   b.spawnFloor('pinchling', 28, 10); b.spawnFloor('hermit', 38, 10); b.spawn('minnow', 46, 26, { count: 4 }); b.spawnFloor('urchin', 55, 10); b.spawnFloor('urchin', 57, 10);

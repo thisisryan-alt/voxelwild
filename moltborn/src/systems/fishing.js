@@ -6,15 +6,18 @@ import { rng, clamp } from '../core/util.js';
 
 // the weighted catch for a place and an hour; `luck` shifts weight from common fish to rare ones
 export function candidates(biome, phase) { return FISH.filter((f) => f.biomes.includes(biome) && (!f.phases || f.phases.includes(phase))); }
-export function rollFish(r, biome, phase, luck = 0) {
+export function rollFish(r, biome, phase, luck = 0, boost = null) {
   const pool = candidates(biome, phase); if (!pool.length) return null;
-  const w = pool.map((f) => { const R = RARITY[f.rarity]; return R.weight * (f.rarity === 'common' ? Math.max(0.3, 1 - luck) : 1 + luck * 1.5); });
+  const w = pool.map((f) => { const R = RARITY[f.rarity]; return R.weight * (f.rarity === 'common' ? Math.max(0.3, 1 - luck) : 1 + luck * 1.5) * (boost && boost.fish === f.id ? boost.mult : 1); });
   let x = r() * w.reduce((a, b) => a + b, 0), i = 0; for (; i < pool.length - 1; i++) { x -= w[i]; if (x <= 0) break; }
   return pool[i];
 }
 // length in cm: skewed small, with an occasional whopper
 export function rollLength(r, fish) { const [lo, hi] = fish.len, t = Math.pow(r(), 1.6), big = r() < 0.06 ? 0.2 : 0; return Math.round(lo + (hi - lo) * clamp(t + big, 0, 1)); }
 export const isBig = (fish, len) => len >= fish.len[0] + (fish.len[1] - fish.len[0]) * 0.85;
+
+// special spots favour one fish: the Moonpool makes the Moon Koi six times likelier (it still only rises at night)
+export const SPOT_BOOSTS = { moon: { fish: 'moon_koi', mult: 6 } };
 
 // ---- the reeling game ------------------------------------------------------------------------------------------------------------------------------------
 export class Reel {
@@ -55,7 +58,7 @@ export class Fishing {
   // choose the fish for a spot; `salt` makes every cast different but a given cast repeatable
   pick(spot, salt) {
     const r = rng(Math.floor(this.g.state.playtime * 13) + (spot?.seed || 0) + salt * 101), biome = this.g.world.zone.biome;
-    const fish = rollFish(r, biome, this.phase(), this.luck()); if (!fish) return null;
+    const fish = rollFish(r, biome, this.phase(), this.luck(), SPOT_BOOSTS[spot?.boost] || null); if (!fish) return null;
     return { fish, len: rollLength(r, fish), seed: Math.floor(r() * 1e6) };
   }
 

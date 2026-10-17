@@ -4,6 +4,7 @@ export const ZONE_INFO = {
   reef_nursery: { name: 'Shoreline Nursery', biome: 'reef', map: { x: 0, y: 0 } },
   reef_garden: { name: 'Coral Garden', biome: 'reef', map: { x: 1, y: 0 } },
   reef_clam: { name: 'Pearl Hollow', biome: 'reef', map: { x: 1, y: 1 }, boss: 'pearl_tyrant', secret: true },
+  reef_moonpool: { name: 'Moonpool Cove', biome: 'reef', map: { x: 0, y: 1 }, secret: true },
   reef_hollow: { name: 'Kelp Hollow', biome: 'reef', map: { x: 2, y: 0 } },
   reef_arena: { name: "Grumbold's Den", biome: 'reef', map: { x: 3, y: 0 }, boss: 'grumbold', molt: true },
   reef_tidepools: { name: 'Sunken Tidepools', biome: 'reef', map: { x: 2, y: 1 }, boss: 'hermit_king', secret: true },
@@ -32,7 +33,7 @@ export const ZONE_INFO = {
   domain_throne: { name: 'Throne of Tides', biome: 'domain', map: { x: 5, y: 5 }, boss: 'poseidon' },
 };
 export const ZONE_LINKS = [
-  ['reef_garden', 'reef_clam'], ['reef_hollow', 'reef_tidepools'], ['forest_roots', 'forest_grotto'], ['kingdom_gate', 'kingdom_vaults'], ['abyss_lanterns', 'abyss_vents'],
+  ['reef_garden', 'reef_clam'], ['reef_garden', 'reef_moonpool'], ['reef_hollow', 'reef_tidepools'], ['forest_roots', 'forest_grotto'], ['kingdom_gate', 'kingdom_vaults'], ['abyss_lanterns', 'abyss_vents'],
   ['reef_nursery', 'reef_garden'], ['reef_garden', 'reef_hollow'], ['reef_hollow', 'reef_arena'], ['reef_arena', 'forest_edge'], ['forest_edge', 'forest_roots'], ['forest_roots', 'forest_heart'],
   ['forest_heart', 'kingdom_gate'], ['kingdom_gate', 'kingdom_spires'], ['kingdom_spires', 'kingdom_court'], ['kingdom_court', 'grave_shallows'], ['grave_shallows', 'grave_galleon'], ['grave_galleon', 'grave_captain'],
   ['grave_captain', 'abyss_descent'], ['abyss_descent', 'abyss_lanterns'], ['abyss_lanterns', 'abyss_throat'], ['abyss_throat', 'trench_bones'], ['trench_bones', 'trench_temple'], ['trench_temple', 'trench_titan'],
