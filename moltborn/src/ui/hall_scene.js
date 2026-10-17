@@ -4,7 +4,10 @@ import { panel, text, button, COL, drawText, textWidth } from './ui.js';
 import { FISH, RARITY } from '../data/fish.js';
 import { itemIcon } from '../gfx/sprites_ui.js';
 
-const PAGES = ['Runs', 'Fish', 'Totals'];
+import { KINDS, Journal } from '../systems/journal.js';
+
+const PAGES = ['Runs', 'Fish', 'Journal', 'Totals'];
+const JOURNAL_ROWS = 11;
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.round(s) % 60).padStart(2, '0')}`;
 export const num = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 10000 ? Math.round(n / 1000) + 'k' : String(Math.round(n)));
 const hours = (s) => `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, '0')}m`;
@@ -21,19 +24,20 @@ export function totals(state) {
 }
 
 export class HallScene {
-  constructor(game, page = 0) { this.g = game; this.opaque = false; this.page = page; this.t = 0; }
+  constructor(game, page = 0) { this.g = game; this.opaque = false; this.page = page; this.t = 0; this.scroll = 0; }
   onEnter() { this.g.audio.sfx('select'); }
   update(dt) {
     const g = this.g, inp = g.input; this.t += dt;
     if (inp.pressed('cancel') || inp.pressed('pause')) { g.audio.sfx('back'); g.engine.pop(); return; }
-    const n = PAGES.length; if (inp.pressed('left') || inp.pressed('tabL')) { this.page = (this.page + n - 1) % n; g.audio.sfx('tick'); } if (inp.pressed('right') || inp.pressed('tabR')) { this.page = (this.page + 1) % n; g.audio.sfx('tick'); }
+    const n = PAGES.length; if (inp.pressed('left') || inp.pressed('tabL')) { this.page = (this.page + n - 1) % n; this.scroll = 0; g.audio.sfx('tick'); } if (inp.pressed('right') || inp.pressed('tabR')) { this.page = (this.page + 1) % n; this.scroll = 0; g.audio.sfx('tick'); }
+    if (PAGES[this.page] === 'Journal') { const max = Math.max(0, g.systems.journal.count() - JOURNAL_ROWS); if (inp.pressed('up')) this.scroll = Math.max(0, this.scroll - 1); if (inp.pressed('down')) this.scroll = Math.min(max, this.scroll + 1); }
   }
   draw(ctx) {
     const g = this.g;
     ctx.fillStyle = 'rgba(2,8,20,0.84)'; ctx.fillRect(0, 0, 480, 270);
     panel(ctx, 24, 12, 432, 246, { alpha: 0.97 }); drawText(ctx, 'HALL OF TIDES', 240, 18, { color: COL.gold, scale: 2, align: 'center', shadow: '#000' });
     let x = 36; PAGES.forEach((p, i) => { button(ctx, p, x, 40, 60, 14, i === this.page); x += 63; });
-    if (this.page === 0) this.drawRuns(ctx); else if (this.page === 1) this.drawFish(ctx); else this.drawTotals(ctx);
+    const page = PAGES[this.page]; if (page === 'Runs') this.drawRuns(ctx); else if (page === 'Fish') this.drawFish(ctx); else if (page === 'Journal') this.drawJournal(ctx); else this.drawTotals(ctx);
     const h = 'LEFT / RIGHT page    ESC close'; text(ctx, h, 240 - textWidth(h) / 2, 240, '#9ad8ff');
   }
   drawRuns(ctx) {
@@ -59,6 +63,17 @@ export class HallScene {
       text(ctx, e ? f.name : '???', x + 16, y, e ? R.color : '#4a5a74');
       if (e) { const s = `x${e.n}  ${e.best} cm`; text(ctx, s, x + 196 - textWidth(s), y, COL.dim); }
     });
+  }
+  drawJournal(ctx) {
+    const J = this.g.systems.journal, rows = J.recent(JOURNAL_ROWS, this.scroll);
+    text(ctx, `${J.count()} entr${J.count() === 1 ? 'y' : 'ies'} in the dive log`, 36, 60, COL.dim);
+    if (!rows.length) { text(ctx, 'Nothing yet. Guardians, molts, quests and legendary catches will be written here.', 36, 90, COL.dim); return; }
+    rows.forEach((e, i) => {
+      const y = 76 + i * 14, K = KINDS[e.kind] || KINDS.quest;
+      if (i % 2 === 0) { ctx.fillStyle = 'rgba(20,48,90,0.35)'; ctx.fillRect(32, y - 2, 416, 13); }
+      text(ctx, Journal.stamp(e.t), 36, y, COL.dim); text(ctx, K.label, 90, y, K.color); text(ctx, e.text, 148, y, COL.text);
+    });
+    if (J.count() > JOURNAL_ROWS) text(ctx, 'UP / DOWN scroll', 444 - textWidth('UP / DOWN scroll'), 60, COL.dim);
   }
   drawTotals(ctx) {
     totals(this.g.state).forEach(([k, v], i) => {

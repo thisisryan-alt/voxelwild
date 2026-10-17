@@ -87,8 +87,10 @@ export class Minimap {
     const at = (tx, ty) => [x0 + Math.round((tx - sx) * s), y0 + Math.round((ty - sy) * s)];
     const dot = (tx, ty, col, n = s + 1) => { const [x, y] = at(tx, ty); if (x < x0 - 2 || y < y0 - 2 || x > x0 + pw || y > y0 + ph) return; ctx.fillStyle = col; ctx.fillRect(x - (n >> 1), y - (n >> 1), n, n); };
     for (const e of z.exits || []) { const tx = (e.x + e.w / 2) / TS, ty = (e.y + e.h / 2) / TS; if (this.isSeen(tx, ty)) dot(tx, ty, '#6af0ff', s + 2); }
+    const sense = this.g.systems.companion?.has('sense');      // the hatchling's treasure sense shows closed chests through the fog
     for (const i of w.interactables) {
-      const tx = i.x / TS, ty = i.y / TS; if (!this.isSeen(tx, ty)) continue;
+      const tx = i.x / TS, ty = i.y / TS, hidden = !this.isSeen(tx, ty);
+      if (hidden && !(sense && i instanceof INTERACTABLES.chest && !i.opened)) continue;
       if (i instanceof INTERACTABLES.shrine) dot(tx, ty, '#ff9ad8', s + 2);
       else if (i instanceof INTERACTABLES.chest && !i.opened) dot(tx, ty, '#ffd84a');
       else if (i instanceof INTERACTABLES.npc) dot(tx, ty, '#8aff9a');

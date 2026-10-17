@@ -8,10 +8,27 @@ import { ENEMIES } from '../data/enemies.js';
 export const COMPANION_MAX = 10;
 export const killsForLevel = (lv) => Math.round(6 * Math.pow(lv, 1.5));
 
+// what the hatchling learns as it grows. `lv` is the level that teaches it.
+export const TRICKS = [
+  { id: 'nip',    lv: 1,  name: 'Nip',          desc: 'Darts in to nip at foes that come close.' },
+  { id: 'mend',   lv: 4,  name: 'Mend',         desc: 'Heals a little when your health runs low.' },
+  { id: 'angle',  lv: 5,  name: 'Patient Line', desc: 'Sits beside you while you fish: bites come sooner.' },
+  { id: 'ward',   lv: 6,  name: 'Warning Shell', desc: 'Squeals before a heavy blow and gives you a ward, now and then.' },
+  { id: 'sense',  lv: 8,  name: 'Treasure Sense', desc: 'Sniffs out unopened chests: they show on the minimap through the fog.' },
+  { id: 'bond',   lv: 10, name: 'Bond',         desc: 'Experience from every kill is a little richer.' },
+];
+export const tricksAt = (lv) => TRICKS.filter((t) => t.lv <= lv);
+export const hasTrick = (lv, id) => TRICKS.some((t) => t.id === id && t.lv <= lv);
+// fishing: each level above the fourth trims the wait for a bite by 3%, to at most a quarter off
+export const biteSpeedup = (lv) => (lv >= 5 ? Math.min(0.25, (lv - 4) * 0.04 + 0.01) : 0);
+// the warning shell's cooldown and ward length
+export const WARD = { every: 45, dur: 5, power: 1 };
+export const XP_BOND = 0.05;
+
 export class Companion {
   constructor(world, data) {
     this.world = world; this.data = data; const p = world.player;
-    this.x = p.x - 16; this.y = p.y - 6; this.vx = 0; this.vy = 0; this.facing = 1; this.t = Math.random() * 6; this.atkT = 2; this.healT = 20; this.lunge = null; this.chirpT = 0; this.mood = 0;
+    this.x = p.x - 16; this.y = p.y - 6; this.vx = 0; this.vy = 0; this.facing = 1; this.t = Math.random() * 6; this.atkT = 2; this.healT = 20; this.wardT = 10; this.lunge = null; this.chirpT = 0; this.mood = 0;
   }
   get level() { return this.data.level; }
   near(x, y) { return Math.hypot(x - this.x, y - this.y) < 50 + this.level * 4; }
@@ -31,9 +48,13 @@ export class Companion {
     // keep out of solid rock
     const g = w.grid; if (g.solidPx(this.x, this.y)) { this.x += (p.x - this.x) * 0.2; this.y += (p.y - this.y) * 0.2; }
     if (!p.alive || p.locked) return;
-    this.atkT -= dt; this.healT -= dt;
+    this.atkT -= dt; this.healT -= dt; this.wardT -= dt;
     if (this.atkT <= 0 && !this.lunge) this.tryNip();
     if (d.level >= 4 && this.healT <= 0 && p.hp < p.stats.maxHp * 0.6) { this.healT = 25; p.heal(Math.round(p.stats.maxHp * (0.04 + d.level * 0.004))); w.fx.ring(this.x, this.y, 3, 20, 0.4, '#7aff9a', 2); this.chirp(); }
+    // the warning shell: a heavy blow winding up close by earns a ward, once in a while
+    if (hasTrick(d.level, 'ward') && this.wardT <= 0 && p.hp > 0 && w.enemies.some((e) => e.alive && !e.def.friendly && e.state === 'windup' && Math.hypot(e.x - p.x, e.y - p.y) < 110)) {
+      this.wardT = WARD.every; p.status.apply('ward', { dur: WARD.dur, power: WARD.power }); this.chirp(); w.fx.ring(p.x, p.y, 4, 26, 0.5, '#9ad8ff', 2);
+    }
     // an aggravated foe close by makes it chirp once
     if (this.chirpT <= 0 && w.enemies.some((e) => e.alive && !e.def.friendly && e.state === 'windup' && Math.hypot(e.x - p.x, e.y - p.y) < 130)) this.chirp();
   }

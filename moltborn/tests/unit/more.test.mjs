@@ -49,3 +49,19 @@ test('respec: refunds spent points and removes skill-granted abilities', () => {
   ok(respec(s)); eq(s.sp, spent); eq(s.coins, 500 - cost); eq(Object.keys(s.skills).length, 0); ok(!s.slots.includes(SKILLS[ids[0]].ability));
 });
 test('respec: free at low level, refused without coins or skills', () => { const s = newState(); eq(respecCost(s), 0); eq(respec(s), false); s.level = 20; s.skills.tide1 = true; s.coins = 0; eq(respec(s), false); ok(respecCost(s) > 0); });
+
+// ---- companion tricks -------------------------------------------------------------------------------------------------------------------------
+import { TRICKS, tricksAt, hasTrick, biteSpeedup, WARD, XP_BOND, COMPANION_MAX, killsForLevel } from '../../src/entities/companion.js';
+import { CompanionSys } from '../../src/systems/companion.js';
+
+test('tricks are taught in level order, from the very first level, and none beyond the maximum', () => { eq(TRICKS[0].lv, 1); for (let i = 1; i < TRICKS.length; i++) ok(TRICKS[i].lv > TRICKS[i - 1].lv); ok(TRICKS.every((t) => t.lv <= COMPANION_MAX && t.name && t.desc.length > 15)); eq(new Set(TRICKS.map((t) => t.id)).size, TRICKS.length); });
+test('tricksAt and hasTrick agree', () => { eq(tricksAt(1).length, 1); eq(tricksAt(COMPANION_MAX).length, TRICKS.length); ok(hasTrick(4, 'mend') && !hasTrick(3, 'mend')); ok(!hasTrick(10, 'nonsense')); for (const t of TRICKS) ok(hasTrick(t.lv, t.id) && (t.lv === 1 || !hasTrick(t.lv - 1, t.id))); });
+test('the patient line trims the wait for a bite, gently, and never past a quarter', () => { eq(biteSpeedup(0), 0); eq(biteSpeedup(4), 0); ok(biteSpeedup(5) > 0 && biteSpeedup(5) < biteSpeedup(8)); for (let lv = 0; lv <= 20; lv++) ok(biteSpeedup(lv) <= 0.25); });
+test('the warning shell is rare and short', () => { ok(WARD.every >= 30 && WARD.dur >= 3 && WARD.dur <= 8); });
+test('levels need more kills each time', () => { for (let lv = 1; lv < COMPANION_MAX; lv++) ok(killsForLevel(lv + 1) > killsForLevel(lv)); });
+test('the companion system reports tricks, the next goal and the bond bonus', () => {
+  const state = { companion: null, playtime: 0 }, g = { state, systems: {}, events: { on() {}, emit() {} } }, C = new CompanionSys(g);
+  eq(C.tricks().length, 0); eq(C.nextTrick(), null); ok(!C.has('nip')); eq(C.xpBonus(), 1);
+  state.companion = { kind: 'crab', name: 'Bub', level: 4, kills: 0 }; eq(C.tricks().map((t) => t.id).join(), 'nip,mend'); eq(C.nextTrick().id, 'angle'); ok(C.has('mend') && !C.has('sense')); eq(C.xpBonus(), 1);
+  state.companion.level = 10; eq(C.nextTrick(), null); eq(C.xpBonus(), 1 + XP_BOND); ok(C.has('bond') && C.has('sense'));
+});

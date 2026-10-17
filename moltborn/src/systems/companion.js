@@ -1,5 +1,5 @@
 // Companion bookkeeping: adoption (the Hatchling Egg), experience, naming and creating the entity for each world.
-import { Companion, COMPANION_MAX, killsForLevel } from '../entities/companion.js';
+import { Companion, COMPANION_MAX, killsForLevel, TRICKS, tricksAt, hasTrick, XP_BOND } from '../entities/companion.js';
 import { rng } from '../core/util.js';
 
 const NAMES = ['Bub', 'Nip', 'Clack', 'Scuttle', 'Pebble', 'Snap', 'Mote', 'Tide', 'Pinch', 'Barnacle', 'Limpet', 'Skitter'];
@@ -23,5 +23,11 @@ export class CompanionSys {
     d.kills++;
     if (d.kills >= killsForLevel(d.level)) { d.level++; d.flash = 3; this.g.toast(`${d.name} grew to level ${d.level}`, '#ffd8f0'); this.g.audio.sfx('levelup'); this.g.events.emit('companion', 'level', d.level); }
   }
+  // the tricks the hatchling knows now, and the next one to look forward to
+  tricks() { const d = this.data; return d ? tricksAt(d.level) : []; }
+  nextTrick() { const d = this.data; return d ? TRICKS.find((t) => t.lv > d.level) || null : null; }
+  has(id) { const d = this.data; return !!d && hasTrick(d.level, id); }
+  // experience multiplier from the bond trick
+  xpBonus() { return this.has('bond') ? 1 + XP_BOND : 1; }
   describe() { const d = this.data; if (!d) return null; return `${d.name}  Lv ${d.level}  (${d.level >= COMPANION_MAX ? 'max' : d.kills + '/' + killsForLevel(d.level)})`; }
 }

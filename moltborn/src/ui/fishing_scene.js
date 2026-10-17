@@ -3,6 +3,7 @@
 import { panel, text, COL, drawText, textWidth, wrapText } from './ui.js';
 import { RARITY, WAIT, HOOK_WINDOW } from '../data/fish.js';
 import { Reel } from '../systems/fishing.js';
+import { biteSpeedup } from '../entities/companion.js';
 import { itemIcon } from '../gfx/sprites_ui.js';
 import { rng } from '../core/util.js';
 
@@ -10,7 +11,7 @@ export class FishingScene {
   constructor(game, spot) {
     this.g = game; this.spot = spot; this.opaque = false; this.t = 0; this.state = 'wait'; this.cast = 0;
     this.F = game.systems.fishing; this.r = rng(Math.floor(game.state.playtime * 9) + spot.seed);
-    this.wait = WAIT[0] + this.r() * (WAIT[1] - WAIT[0]); this.catchInfo = null; this.reel = null; this.msg = ''; this.result = null; this.bite = 0; this.bob = 0; this.ripples = [];
+    this.wait = (WAIT[0] + this.r() * (WAIT[1] - WAIT[0])) * (1 - biteSpeedup(game.state.companion?.level || 0)); this.catchInfo = null; this.reel = null; this.msg = ''; this.result = null; this.bite = 0; this.bob = 0; this.ripples = [];
   }
   onEnter() { this.g.audio.sfx('select'); this.g.audio.setMuffle?.(0.3); }
   onExit() { this.g.audio.setMuffle?.(0); }

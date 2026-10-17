@@ -19,6 +19,7 @@ export const PAGES = [
   { id: 'elites', name: 'Elites', from: 'affixes' },
   { id: 'world', name: 'World', entries: [
     { t: 'Tide clock', from: 'clock' },
+    { t: 'Your hatchling', from: 'companion' },
     { t: 'Shrines', x: ['Shrines are checkpoints and fast-travel points. Once you have rested at two, you can travel between them from any shrine.'] },
     { t: 'Chests, murals and lore', x: ['Chests hold coins, gear and keys. Murals and notes add to the Codex. The map screen shows how much of each zone you have found.'] },
     { t: 'Dangers', x: ['Spikes, hot vents, currents and the crushing pressure of the deep all hurt. Gear, food and later forms resist them.'] },

@@ -6,6 +6,7 @@ import { STATUS, statusIcon } from '../systems/status.js';
 import { AFFIXES, AFFIX_IDS, ELITE_REWARD } from '../data/affixes.js';
 import { PHASES, CYCLE } from '../data/clock.js';
 import { TIERS } from '../systems/difficulty.js';
+import { TRICKS } from '../entities/companion.js';
 import { DIFFICULTIES } from '../systems/settings.js';
 
 const pct = (m) => (m === 1 ? '-' : (m > 1 ? '+' : '') + Math.round((m - 1) * 100) + '%');
@@ -21,6 +22,7 @@ export function entriesFor(page, game) {
   return [];
 }
 function resolve(e) {
+  if (e.from === 'companion') return { t: 'Your hatchling', x: ['Buy a Hatchling Egg from Madame Cowrie and a small crab will follow you, grow with every foe you defeat (to level 10), and learn tricks:', ...TRICKS.map((t) => `Level ${t.lv}, ${t.name}: ${t.desc}`)] };
   if (e.from === 'clock') return { t: 'The tide clock', x: [`A day on the reef lasts ${Math.round(CYCLE / 60)} minutes of play. Light, foes and rewards change with the hour:`, ...PHASES.map((p) => `${p.name}: ${[p.mods.xp !== 1 && `${pct(p.mods.xp)} experience`, p.mods.coin !== 1 && `${pct(p.mods.coin)} coins`, p.mods.aggro !== 1 && `foes ${pct(p.mods.aggro)} warier`, p.status && 'a passive boon'].filter(Boolean).join(', ') || 'no change'}`), 'Turn it off in Options > Video > Day and night.'] };
   return e;
 }

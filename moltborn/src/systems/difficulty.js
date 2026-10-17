@@ -27,6 +27,7 @@ export class Difficulty {
     const s = { hp: t.hp * (1 + ng * NG_STEP.hp), dmg: t.dmg * (1 + ng * NG_STEP.dmg), xp: t.xp * (1 + ng * NG_STEP.xp), coin: t.coin * (1 + ng * NG_STEP.coin) };
     const r = this.g.systems.rifts?.mult() || this.g.systems.arena?.mult(); if (r) for (const k of Object.keys(s)) s[k] *= r[k];
     const c = this.g.systems.clock?.mult(); if (c) { s.xp *= c.xp; s.coin *= c.coin; }
+    s.xp *= this.g.systems.companion?.xpBonus?.() ?? 1;
     return s;
   }
   label() { const ng = this.ng; return TIERS[this.tierKey].name + (ng ? `  NG+${ng}` : ''); }
