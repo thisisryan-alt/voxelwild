@@ -22,7 +22,7 @@ export class DialogueBox {
     if (!done) { const before = Math.floor(this.shown); this.shown += dt * 55; if (Math.floor(this.shown / 2) !== Math.floor(before / 2) && this.cur.speaker) this.g.audio.sfx('talk'); }
     if (inp.pressed('confirm') || inp.pressed('interact') || inp.pressed('attack')) {
       if (!done) { this.shown = this.full.length; }
-      else if (this.choices) { const c = this.choices[this.sel]; this.g.audio.sfx('select'); this.cur.onChoose?.(c, this.sel); if (c.onSelect) c.onSelect(); if (c.next) { this.open(Array.isArray(c.next) ? c.next : [c.next], this.onDone); } else if (!this.queue.length) this.close(); else this.next(); }
+      else if (this.choices) { const c = this.choices[this.sel], cb = this.cur.onChoose, i = this.sel; this.g.audio.sfx('select'); this.queue = []; this.active = false; this.cur = null; this.onDone = null; cb?.(c, i); }
       else { this.g.audio.sfx('tick'); this.next(); }
     }
     if (this.choices && done) {

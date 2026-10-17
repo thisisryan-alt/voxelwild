@@ -9,7 +9,7 @@ const errors = [];
 page.on('console', (m) => { const t = m.text(); if (m.type() === 'error' || m.type() === 'warning' || t.startsWith('[t]')) console.log('[console:' + m.type() + ']', t); });
 page.on('pageerror', (e) => { errors.push(e.message); console.log('[pageerror]', e.stack || e.message); });
 const H = {
-  async load(q = '') { await page.goto('http://localhost:8124/index.html' + q); await page.waitForFunction(() => window.__game && window.__game.world, null, { timeout: 15000 }); },
+  async load(q = '') { await page.goto('http://localhost:8124/index.html' + (q.includes('quick') ? q : (q ? q + '&quick=1' : '?quick=1'))); await page.waitForFunction(() => window.__game && window.__game.world, null, { timeout: 15000 }); },
   async adv(n) { await page.evaluate((n) => window.__game.advance(n), n); },
   async eval(fn, arg) { return page.evaluate(fn, arg); },
   async shot(path) { await page.screenshot({ path }); },

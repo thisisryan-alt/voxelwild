@@ -80,7 +80,7 @@ export class Projectile extends Entity {
     } else {
       for (const e of this.world.enemies) {
         if (!e.alive || this.hits.has(e) || !e.canBeHit()) continue;
-        if (this.overlaps(e.hurtBox())) { this.hits.add(e); e.takeHit({ dmg: this.dmg, dir: Math.sign(this.vx) || 1, kb: this.kb, poise: this.poise, stop: 2, status: this.status, stun: this.stun, ranged: true, x: this.x, y: this.y, fromAbility: true }, this.world.player); if (this.onHit) this.onHit(e, this); if (!this.pierce) { this.die(true); break; } }
+        if ((e.hurtBoxes ? e.hurtBoxes() : [e.hurtBox()]).some((b) => this.x - this.w / 2 < b.x + b.w && this.x + this.w / 2 > b.x && this.y - this.h / 2 < b.y + b.h && this.y + this.h / 2 > b.y)) { this.hits.add(e); e.takeHit({ dmg: this.dmg, dir: Math.sign(this.vx) || 1, kb: this.kb, poise: this.poise, stop: 2, status: this.status, stun: this.stun, ranged: true, x: this.x, y: this.y, fromAbility: true }, this.world.player); if (this.onHit) this.onHit(e, this); if (!this.pierce) { this.die(true); break; } }
       }
     }
   }

@@ -41,8 +41,7 @@ export class Shrine extends Interactable {
   prompt() { return this.kind === 'molt' ? 'Molt Shrine' : 'Rest'; }
   update(dt) { this.t += dt; if (Math.random() < 0.03) this.world.fx.bubble(this.x, this.y - 10, 1, 6, -14); if (Math.random() < 0.04) this.world.fx.sparkle(this.x + (Math.random() - 0.5) * 20, this.y - 6 - Math.random() * 20, this.kind === 'molt' ? '#ffb0d8' : '#a0f0ff'); }
   interact(game) {
-    if (this.kind === 'molt') game.openMoltShrine(this);
-    game.rest(this);
+    if (this.kind === 'molt') game.openMoltShrine(this); else game.rest(this);
   }
   draw(ctx, cam) {
     const active = this.world.game.state.checkpoint.zone === this.world.zone.id && this.world.game.state.checkpoint.shrine === this.key;

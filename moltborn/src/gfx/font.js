@@ -103,8 +103,12 @@ const G = {
   '▼': '00000 00000 00000 11111 01110 00100 00000 00000', // down
   '•': '00000 00000 01110 01110 01110 00000 00000 00000', // bullet
   '→': '00000 00100 00010 11111 00010 00100 00000 00000', // arrow right
-  '…': '00000 00000 00000 00000 00000 00000 10101 00000', // ellipsis
+  '\u2713': '00000 00001 00010 10100 01000 00000 00000 00000', // check
+  '\u2717': '00000 10001 01010 00100 01010 10001 00000 00000', // cross
+  '\u25c6': '00000 00100 01110 11111 01110 00100 00000 00000', // diamond
 };
+const SUBS = { '\u2014': '-', '\u2013': '-', '\u2019': "'", '\u2018': "'", '\u201c': '"', '\u201d': '"', '\u2026': '...', '\u00b7': '.', '\u00e9': 'e', '\u2605': '*' };
+export const norm = (s) => String(s).replace(/[\u2014\u2013\u2019\u2018\u201c\u201d\u2026\u00b7\u00e9\u2605]/g, (c) => SUBS[c]);
 const GW = 5, GH = 8, ADV = 6, LH = 10;
 export const FONT = { GW, GH, ADV, LH };
 const glyphs = {};
@@ -127,14 +131,14 @@ function atlas(color) {
 
 export function textWidth(str, scale = 1) {
   let w = 0, best = 0;
-  for (const ch of String(str)) { if (ch === '\n') { best = Math.max(best, w); w = 0; } else w += ADV; }
+  for (const ch of norm(str)) { if (ch === '\n') { best = Math.max(best, w); w = 0; } else w += ADV; }
   return Math.max(0, Math.max(best, w) - 1) * scale;
 }
 
 // Word-wrap into lines no wider than maxW pixels
 export function wrapText(str, maxW, scale = 1) {
   const out = [];
-  for (const para of String(str).split('\n')) {
+  for (const para of norm(str).split('\n')) {
     let line = '';
     for (const word of para.split(' ')) {
       const test = line ? line + ' ' + word : word;
@@ -148,7 +152,7 @@ export function wrapText(str, maxW, scale = 1) {
 // opts: color, scale, shadow (color), outline (color), align ('left'|'center'|'right'), alpha
 export function drawText(ctx, str, x, y, opts = {}) {
   const { color = '#ffffff', scale = 1, shadow = null, outline = null, align = 'left', alpha = 1 } = opts;
-  str = String(str);
+  str = norm(str);
   x = Math.round(x); y = Math.round(y);
   const lines = str.split('\n');
   const prevA = ctx.globalAlpha; ctx.globalAlpha = prevA * alpha;

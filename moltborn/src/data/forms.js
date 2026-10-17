@@ -123,11 +123,11 @@ export const BRANCHES = {
 };
 
 export const EVOLUTIONS = {
-  warrior:   { from: 'shore', level: 4, ep: 6, item: 'brine_core', shrine: 'molt_reef', branches: ['bulwark', 'duelist'], title: 'The Hardshell Molt' },
-  abyssal:   { from: 'warrior', level: 10, ep: 16, item: 'abyssal_core', shrine: 'molt_deep', branches: ['venom', 'lumen'], title: 'The Deep Molt' },
-  leviathan: { from: 'abyssal', level: 16, ep: 30, item: 'titan_heart', shrine: 'molt_trench', branches: ['tidebreaker', 'tideweaver'], title: 'The Ancient Molt' },
-  mythic:    { from: 'leviathan', level: 22, ep: 50, item: 'tide_sigil', shrine: 'molt_domain', branches: [], title: 'The Apotheosis' },
-  primordial:{ from: 'leviathan', level: 22, ep: 50, item: 'tide_sigil', shrine: 'molt_domain', branches: [], title: 'The Unmolting', secret: true },
+  warrior:   { from: 'shore', level: 4, ep: 5, item: 'brine_core', shrine: 'molt_reef', branches: ['bulwark', 'duelist'], title: 'The Hardshell Molt' },
+  abyssal:   { from: 'warrior', level: 9, ep: 10, item: 'abyssal_core', shrine: 'molt_deep', branches: ['venom', 'lumen'], title: 'The Deep Molt' },
+  leviathan: { from: 'abyssal', level: 15, ep: 12, item: 'titan_heart', shrine: 'molt_trench', branches: ['tidebreaker', 'tideweaver'], title: 'The Ancient Molt' },
+  mythic:    { from: 'leviathan', level: 21, ep: 10, item: 'tide_sigil', shrine: 'molt_domain', branches: [], title: 'The Apotheosis' },
+  primordial:{ from: 'leviathan', level: 21, ep: 10, item: 'tide_sigil', shrine: 'molt_domain', branches: [], title: 'The Unmolting', secret: true },
 };
 
 export const nextForms = (id) => Object.keys(EVOLUTIONS).filter((k) => EVOLUTIONS[k].from === id);

@@ -6,7 +6,7 @@ const server = await serve(8123);
 const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: +W, height: +H } });
 page.on('console', (m) => console.log('[console]', m.text()));
-page.on('pageerror', (e) => console.log('[pageerror]', e.message));
+page.on('pageerror', (e) => console.log('[pageerror]', e.stack || e.message));
 await page.goto('http://localhost:8123/' + url);
 await page.waitForTimeout(+wait);
 if (script) { const fn = (await import(script)).default; await fn(page); }

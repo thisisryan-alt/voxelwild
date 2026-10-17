@@ -98,3 +98,14 @@ const AB = {
   ult: (p) => { p.poly([[7, 0], [9, 5], [14, 5], [10, 8], [12, 13], [7, 10], [2, 13], [4, 8], [0, 5], [5, 5]], R.gold, {}); },
 };
 export function abilityIcon(name) { return mk('ab:' + name, 14, 14, (p) => (AB[name] || AB.pearl)(p)); }
+
+// ---- little form glyphs for the evolution chart (26x18) -----------------------------------------------------------
+const FORM_GLYPH = {
+  shore: (p) => { p.shape(R.shore, { dither: 0.3 }, (s) => s.ellipse(11, 11, 8, 5)); p.ellipse(18, 9, 2.6, 2.6, R.shore, {}); p.px(8, 4, '#fff'); p.px(12, 4, '#fff'); p.line(4, 15, 3, 17, R.shoreFar.hex[2]); p.line(11, 16, 11, 17, R.shoreFar.hex[2]); p.line(17, 15, 18, 17, R.shoreFar.hex[2]); },
+  warrior: (p) => { p.shape(R.steel, { dither: 0.3 }, (s) => s.ellipse(11, 10, 9, 6)); p.ellipse(20, 8, 3.4, 3.4, R.steel, {}); p.poly([[6, 5], [8, 0], [10, 5]], R.bone, {}); p.px(14, 3, '#fff'); p.px(17, 3, '#fff'); p.line(4, 15, 3, 17, R.steel.hex[1]); p.line(12, 16, 12, 17, R.steel.hex[1]); },
+  abyssal: (p) => { p.shape(R.abyssal, { dither: 0.3 }, (s) => { s.capsule(4, 10, 16, 9, 3.6, 3); s.ellipse(18, 9, 4, 3.4); }); p.line(18, 6, 22, 1, R.chain.hex[3]); p.glow(22, 1, 4, '#a0f8ff', 0.8); p.px(22, 1, '#fff'); p.px(19, 8, '#a0f8ff'); for (let i = 0; i < 3; i++) p.line(6 + i * 3, 13, 4 + i * 3, 16, R.abyssal.hex[2]); },
+  leviathan: (p) => { p.chain([[2, 12], [3, 6], [6, 3]], 1.6, 1, R.leviathan, {}); p.shape(R.leviathan, { dither: 0.3 }, (s) => { s.ellipse(11, 11, 8, 4.5); s.ellipse(19, 10, 5, 4.2); }); p.px(21, 8, '#ffb44a'); p.px(18, 8, '#ffb44a'); p.line(7, 15, 6, 17, R.leviathan.hex[2]); p.line(12, 15, 12, 17, R.leviathan.hex[2]); },
+  mythic: (p) => { p.shape(R.pearl, { dither: 0.3 }, (s) => { s.ellipse(12, 11, 9, 5.5); s.ellipse(19, 9, 4, 4); }); for (let i = 0; i < 4; i++) p.poly([[14 + i * 2, 5], [15 + i * 2, 0 + (i === 1 ? 0 : 2)], [16 + i * 2, 5]], R.divine, {}); p.px(18, 8, '#9af0ff'); p.px(21, 8, '#9af0ff'); p.glow(13, 11, 10, '#9af0ff', 0.3); },
+  primordial: (p) => { p.shape(R.pearl, { dither: 0.3 }, (s) => { s.ellipse(12, 11, 9, 5.5); s.ellipse(19, 9, 4, 4); }); for (let i = 0; i < 4; i++) p.poly([[14 + i * 2, 5], [15 + i * 2, 0 + (i === 1 ? 0 : 2)], [16 + i * 2, 5]], R.gold, {}); for (let i = 0; i < 8; i++) p.px(3 + (i * 7) % 22, 2 + (i * 5) % 14, '#fff'); p.glow(13, 11, 12, '#ffffff', 0.4); },
+};
+export function formIcon(id) { return mk('form:' + id, 26, 18, (p) => (FORM_GLYPH[id] || FORM_GLYPH.shore)(p)); }

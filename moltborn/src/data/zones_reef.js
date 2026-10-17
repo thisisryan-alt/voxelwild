@@ -67,3 +67,56 @@ export function reef_garden() {
   b.decorate(REEF_DECOR, 0.3);
   return b.finish();
 }
+
+export function reef_hollow() {
+  const b = new ZoneBuilder({ id: 'reef_hollow', name: 'Kelp Hollow', biome: 'reef', w: 100, h: 44, seed: 13, music: 'reef' });
+  b.fill(T.ROCK);
+  // main route west -> east through chambers, with a shaft up to the canopy ledge
+  b.path([[2, 31], [10, 30], [20, 29], [28, 31], [38, 34], [48, 31], [56, 28], [64, 24]], [3.2, 4.2], { wobble: 1.1 });
+  b.ellipse(22, 28, 9, 6); b.ellipse(48, 29, 10, 7); b.ellipse(78, 28, 9, 6.5);
+  b.path([[62, 26], [66, 18], [68, 12], [74, 10]], 3.4, { wobble: 0.8 });          // shaft up
+  b.ellipse(78, 10, 8, 5);
+  b.path([[78, 12], [80, 20], [80, 26], [86, 31], [97, 32]], 3.4, { wobble: 0.9 }); // back down to the exit
+  b.path([[74, 10], [60, 8], [50, 9]], 2.6, { wobble: 0.6 });                        // canopy passage west
+  b.ellipse(46, 9, 6, 4);
+  // flat-ish floors so the crab can walk
+  b.floorLine(4, 16, 32); b.floorLine(16, 30, 32); b.platform(30, 26, 5); b.platform(38, 22, 4);
+  b.platform(54, 20, 4); b.platform(62, 16, 4);
+  b.smooth(1); b.surface(T.GROUND, 2);
+  // crevice pocket (1 tile tall) under chamber A: only the small forms fit
+  b.carve(6, 36, 14, 1); b.carve(3, 35, 4, 3); b.keep(2, 34, 20, 5);
+  // secret vault behind cracked stone near the top-right chamber
+  b.carve(86, 6, 8, 5); b.breakable(84, 9, 2, 2); b.keep(84, 5, 12, 7);
+  b.exitW(28, 33, 'reef_garden', 'east'); b.entryFloor('west', 5, { facing: 1 });
+  b.exitE(30, 34, 'reef_arena', 'west'); b.entryFloor('east', 94, { facing: -1 });
+  b.shrine('rest', 50, { from: 24 });
+  b.spawnFloor('pinchling', 18, 20); b.spawnFloor('pinchling', 24, 20); b.spawn('minnow', 30, 24, { count: 4 }); b.spawnFloor('urchin', 34, 26);
+  b.spawnFloor('hermit', 44, 22); b.spawn('minnow', 56, 18, { count: 3 }); b.spawnFloor('pinchling', 76, 18, { count: 2, spread: 22 }); b.spawnFloor('urchin', 70, 20); b.spawnFloor('hermit', 82, 20);
+  b.coins(20, 27, 5); b.coins(56, 18, 3); b.coins(66, 9, 4); b.coins(48, 8, 3);
+  b.chest(5, { item: 'spiral_shell' }, { from: 34, key: 'spiral_shell_chest' });
+  b.chest(90, { pearl: 3, coins: [30, 40] }, { from: 6, tint: 1 });
+  b.chest(78, { item: 'shell_driftwood', coins: [20, 30] }, { from: 6 });
+  b.mural(30, 'mural_hollow', { from: 24 });
+  b.sign(8, 'Tessa the hermit-child says: the spiral shell is in the little hole under the first cavern. You have to be small. (Dash is useful here.)', { from: 28 });
+  b.decorate(REEF_DECOR, 0.3);
+  return b.finish();
+}
+
+export function reef_arena() {
+  const b = new ZoneBuilder({ id: 'reef_arena', name: "Grumbold's Den", biome: 'reef', w: 70, h: 30, seed: 14, music: 'reef', title: "Grumbold's Den" });
+  b.fill(T.ROCK);
+  b.carve(3, 17, 9, 5); b.carve(12, 6, 40, 16); b.carve(52, 17, 15, 5);
+  b.floorLine(2, 68, 22, T.ROCK); b.rect(2, 22, 66, 8, T.ROCK);
+  // a few pillars and ledges for the fight
+  b.rect(20, 17, 3, 5, T.ROCK); b.rect(41, 17, 3, 5, T.ROCK); b.platform(26, 15, 6); b.platform(34, 12, 6);
+  b.ceiling(12, 52, (x) => 6 + (x % 7 === 0 ? 1 : 0));
+  b.surface(T.GROUND, 2);
+  b.exitW(18, 21, 'reef_hollow', 'east'); b.entryFloor('west', 5, { facing: 1 });
+  b.exitE(18, 21, 'forest_edge', 'west'); b.entryFloor('east', 64, { facing: -1 });
+  b.shrine('molt_reef', 58, { kind: 'molt' });
+  b.props.push({ type: 'sign', x: 8 * 16, y: 22 * 16 - 9, text: 'Claw-marks everywhere. Something big lives here. (Save at the shrine in the Hollow first.)', speaker: 'Warning' });
+  b.spawns.push({ boss: 'grumbold', floor: true, x: 40 * 16, y: 22 * 16, arena: { x: 12, y: 6, w: 40, h: 18 }, trigger: { x: 15, y: 8, w: 34, h: 13 }, barriers: [{ x: 11, y: 17, w: 1, h: 5 }, { x: 52, y: 17, w: 1, h: 5 }] });
+  b.coins(60, 20, 4);
+  b.decorate({ floor: [['rocks', 3, 2], ['pebbles', 3, 2], ['seaweed', 1, 3], ['bones', 1, 1]], ceil: [['stalactite', 2, 3]] }, 0.25);
+  return b.finish();
+}

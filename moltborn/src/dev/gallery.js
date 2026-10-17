@@ -1,5 +1,6 @@
 // Dev gallery: ?gallery=player  — renders sprite sheets at 5x for visual QA.
-import { playerFrame, ANIMS, FORMS, defaultVariant } from '../gfx/sprites_player.js';
+import { playerFrame, ANIMS, FORMS, defaultVariant, variantFor } from '../gfx/sprites_player.js';
+import '../gfx/sprites_forms.js';
 import { drawText } from '../gfx/font.js';
 import { R } from '../gfx/palette.js';
 
@@ -9,7 +10,7 @@ export function gallery(kind) {
   const rows = [];
   if (kind === 'player' || !kind) {
     const form = new URLSearchParams(location.search).get('form') || 'shore';
-    for (const a of Object.keys(ANIMS)) rows.push({ label: a, frames: Array.from({ length: ANIMS[a].n }, (_, i) => playerFrame(form, defaultVariant(), a, i)) });
+    for (const a of Object.keys(ANIMS)) rows.push({ label: a, frames: Array.from({ length: ANIMS[a].n }, (_, i) => playerFrame(form, variantFor({ form, branches: Object.fromEntries((new URLSearchParams(location.search).get('br') || '').split(',').filter(Boolean).map((x) => x.split(':'))), dye: 'default' }), a, i)) });
   }
   cv.width = 1280; cv.height = 720; cv.style.width = '100%';
   const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;

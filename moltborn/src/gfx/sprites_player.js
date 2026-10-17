@@ -2,6 +2,7 @@
 import { Painter, flashOf } from './painter.js';
 import { R, OUTLINE } from './palette.js';
 
+export const TAU_ = Math.PI * 2;
 const TAU = Math.PI * 2;
 const sin = Math.sin, cos = Math.cos;
 
@@ -33,17 +34,17 @@ def('attack2', 22, false, [
   { c2: { ext: 0.7, lift: 0, open: 0.3 }, lunge: 1 },
   { c2: { ext: 0.3, lift: 0, open: 0.4 } }]);
 def('attack3', 20, false, [
-  { c1: { ext: 0.2, lift: 1, open: 1 }, c2: { ext: 0.2, lift: 1, open: 1 }, lunge: -1, bob: 1 },
-  { c1: { ext: 0.3, lift: 1, open: 1 }, c2: { ext: 0.3, lift: 1, open: 1 }, lunge: -2, bob: 2 },
-  { c1: { ext: 0.8, lift: -0.5, open: 1 }, c2: { ext: 0.8, lift: -0.5, open: 1 }, lunge: 2, bob: -1 },
-  { c1: { ext: 1, lift: -0.8, open: 0 }, c2: { ext: 1, lift: -0.8, open: 0 }, lunge: 3, bob: -1 },
+  { c1: { ext: 0.2, lift: 1, open: 1 }, c2: { ext: 0.2, lift: 1, open: 1 }, lunge: -1, bob: 1, tail: -1 },
+  { c1: { ext: 0.3, lift: 1, open: 1 }, c2: { ext: 0.3, lift: 1, open: 1 }, lunge: -2, bob: 2, tail: -1.4 },
+  { c1: { ext: 0.8, lift: -0.5, open: 1 }, c2: { ext: 0.8, lift: -0.5, open: 1 }, lunge: 2, bob: -1, tail: 1.2 },
+  { c1: { ext: 1, lift: -0.8, open: 0 }, c2: { ext: 1, lift: -0.8, open: 0 }, lunge: 3, bob: -1, tail: 1.6 },
   { c1: { ext: 0.8, lift: -0.4, open: 0.2 }, c2: { ext: 0.6, lift: -0.2, open: 0.2 }, lunge: 1 },
   { c1: { ext: 0.4 }, c2: { ext: 0.3 } }]);
 def('heavy_charge', 10, true, gen(4, (k, i) => ({ legs: 'idle', squash: 0.3, bob: i % 2, c1: { ext: -0.2, lift: 0.9, open: 1 }, c2: { ext: -0.2, lift: 0.9, open: 1 }, glow: 0.4 + 0.3 * sin(k * TAU), lunge: -1 })));
 def('heavy', 16, false, [
-  { c1: { ext: 0.2, lift: 1, open: 1 }, c2: { ext: 0.2, lift: 1, open: 1 }, bob: 1, lunge: -2 },
-  { c1: { ext: 1, lift: -0.2, open: 1 }, c2: { ext: 1, lift: -0.2, open: 1 }, lunge: 3, glow: 0.8 },
-  { c1: { ext: 1, lift: -0.4, open: 0 }, c2: { ext: 1, lift: -0.4, open: 0 }, lunge: 4, glow: 1 },
+  { c1: { ext: 0.2, lift: 1, open: 1 }, c2: { ext: 0.2, lift: 1, open: 1 }, bob: 1, lunge: -2, tail: -1.5 },
+  { c1: { ext: 1, lift: -0.2, open: 1 }, c2: { ext: 1, lift: -0.2, open: 1 }, lunge: 3, glow: 0.8, tail: 1.5 },
+  { c1: { ext: 1, lift: -0.4, open: 0 }, c2: { ext: 1, lift: -0.4, open: 0 }, lunge: 4, glow: 1, tail: 2 },
   { c1: { ext: 1, lift: -0.4, open: 0 }, c2: { ext: 1, lift: -0.4, open: 0 }, lunge: 3, glow: 0.5 },
   { c1: { ext: 0.6, open: 0.3 }, c2: { ext: 0.5, open: 0.3 }, lunge: 1 }, { c1: { ext: 0.4 } }]);
 def('dash', 14, true, [{ legs: 'trail', legT: 0, lunge: 3, c1: { ext: 1, open: 0.1 }, c2: { ext: 1, open: 0.1 }, squash: 0.2 }, { legs: 'trail', legT: 0.5, lunge: 3, c1: { ext: 1, open: 0.1 }, c2: { ext: 1, open: 0.1 }, squash: 0.2 }]);
@@ -58,13 +59,13 @@ def('respawn', 8, false, [{ legs: 'tuck', squash: 0.8, glow: 1, shut: true }, { 
 
 // ---- form painters -------------------------------------------------------------------
 // Each: { w, h, ax, ay, hit:[w,h], paint(p, pose, o) } ; sprite faces RIGHT; (ax,ay) = feet anchor.
-const eye = (p, x, y, shut, look = 0, big = 1.8) => {
+export const eye = (p, x, y, shut, look = 0, big = 1.8) => {
   if (shut) { p.line(x - 1, y, x + 1, y, OUTLINE); return; }
   p.ellipse(x, y, big, big, R.eyeWhite, { dither: 0 });
   p.px(x, y, '#170d1c'); p.px(x + 1, y, '#170d1c'); p.px(x, y + 1, '#170d1c'); p.px(x - 1, y - 1, '#ffffff');
 };
 
-function legsPose(p, pose, hipX, hipY, footY, n, col, spacing, thick = 1) {
+export function legsPose(p, pose, hipX, hipY, footY, n, col, spacing, thick = 1) {
   // short bent legs; near legs 2px wide. col=[main, foot-tip]
   for (let i = 0; i < n; i++) {
     let lift = 0, stride = 0, spreadX = 0;
@@ -83,16 +84,18 @@ function legsPose(p, pose, hipX, hipY, footY, n, col, spacing, thick = 1) {
   }
 }
 
-function claw(p, sx, sy, ext, lift, open, scale, ramp, back) {
+export function claw(p, sx, sy, ext, lift, open, scale, ramp, back, st = {}) {
   sx = Math.round(sx); sy = Math.round(sy);
-  const reach = (2.5 + ext * 4.5) * scale, up = -lift * 5 * scale;
-  const wx = Math.round(sx + reach), wy = Math.round(sy + up - 1 * scale);
-  p.shape(ramp, {}, (s) => { s.capsule(sx, sy, wx, wy, 1.5 * scale, 2 * scale); });
-  const a = 0.12 + open * 0.6, L = 6 * scale;
-  p.shape(ramp, {}, (s) => s.capsule(wx, wy + 1, wx + L * cos(a * 0.6), wy + 1 + L * sin(a * 0.6) * 0.8, 1.8 * scale, 0.8 * scale));
-  p.shape(ramp, {}, (s) => s.capsule(wx, wy - 1, wx + L * cos(-a) * 1.05, wy - 1 + L * sin(-a), 2.2 * scale, 0.9 * scale));
-  p.shape(ramp, {}, (s) => s.ellipse(wx, wy, 3.2 * scale, 3 * scale));
+  const jm = st.jaw || 1, th = st.thin || 1;
+  const reach = (2.5 + ext * 4.5) * scale * (st.reach || 1), up = -lift * 5 * scale, wx = Math.round(sx + reach), wy = Math.round(sy + up - 1 * scale);
+  p.shape(ramp, {}, (s) => { s.capsule(sx, sy, wx, wy, 1.5 * scale * th, 2 * scale * th); });
+  const a = 0.2 + open * 0.6, L = 6 * scale * jm;
+  p.shape(ramp, {}, (s) => s.capsule(wx, wy + 1, wx + L * cos(a * 0.6), wy + 1 + L * sin(a * 0.6) * 0.8, 1.8 * scale * th, 0.8 * scale * th));
+  p.shape(ramp, {}, (s) => s.capsule(wx, wy - 1, wx + L * cos(-a) * 1.05, wy - 1 + L * sin(-a), 2.2 * scale * th, 0.9 * scale * th));
+  p.shape(ramp, {}, (s) => s.ellipse(wx, wy, 3.2 * scale * (st.palm || 1), 3 * scale * (st.palm || 1)));
   if (!back) { p.px(wx - 1, wy - 2, ramp.c[4]); p.px(wx, wy - 2, ramp.c[4]); }
+  if (st.edge) { p.line(wx + 2, wy - 1, wx + L * cos(-a), wy - 1 + L * sin(-a), st.edge); }
+  return [wx, wy];
 }
 
 export const FORMS = {};
@@ -128,7 +131,7 @@ export function variantFor(state) {
   const dye = DYES[state.dye];
   let ramp = base.ramp, far = base.far;
   if (dye) { ramp = ramp.tint(dye.hue, dye.sat, dye.light); far = far.tint(dye.hue, dye.sat, dye.light * 0.9); }
-  v = { key, ramp, far, branch: base.branch, accent: base.accent, form: state.form }; variantCache.set(key, v); return v;
+  v = { key, ramp, far, branch: base.branch, accent: base.accent, glow: base.glow, form: state.form }; variantCache.set(key, v); return v;
 }
 const variantCache = new Map();
 const FORM_RAMPS = {

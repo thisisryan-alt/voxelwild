@@ -12,6 +12,14 @@ import { ITEMS } from './data/items.js';
 import { FORMS, xpToNext } from './data/forms.js';
 import { PlayScene } from './ui/playscene.js';
 import { Pickup } from './entities/entity.js';
+import './gfx/sprites_forms.js';
+import './bosses/index.js';
+import { Quests } from './systems/quests.js';
+import { Dialogue } from './systems/dialogue.js';
+import { Codex } from './systems/codex.js';
+import { Evolution } from './systems/evolution.js';
+import { MenuScene } from './ui/menu.js';
+import { PauseScene, OptionsScene, ShopScene, ForgeScene, MoltShrineScene, CutsceneScene, TitleScene } from './ui/screens.js';
 import { rng } from './core/util.js';
 
 const rand = rng(8080);
@@ -26,6 +34,7 @@ export class Game {
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -178,8 +187,29 @@ export class Game {
     this.events.emit('kill', e.type, e);
   }
   bossDefeated(key) { this.state.bosses[key] = true; this.events.emit('boss', key); this.saveGame(true); }
-  questMarker() { return null; }
   readLore(id, src) { this.systems.codex?.read(id); }
-  openMoltShrine(shrine) {}
+  openPause() { this.engine.push(new PauseScene(this)); }
+  openMenu(tab) { this.engine.push(new MenuScene(this, tab)); }
+  openOptions() { this.engine.push(new OptionsScene(this)); }
+  openShop(id, resume) { this.engine.push(new ShopScene(this, id, resume)); }
+  openForge(resume) { this.engine.push(new ForgeScene(this, resume)); }
+  openMoltShrine(shrine) { this.engine.push(new MoltShrineScene(this, shrine)); }
+  startIntro() {
+    const panels = [
+      { art: 'ocean', title: 'MOLTBORN', text: 'Long ago, before the sea had a king, the Mother Tide dreamed the ocean alive. Her dream had a single rule: everything may grow.', music: 'title' },
+      { art: 'throne', text: "Then one of her children outgrew all the others, and took a spear, and a crown, and a promise: 'Only I can hold the dark below. Only I.'" },
+      { art: 'seal', text: 'The sea has been quiet since. Quiet like a held breath. Every spawning, the Court takes its Tithe: a tenth of every clutch, given to the Deep. A privilege, and a duty.' },
+      { art: 'eggs', text: 'On the shore of the reef a clutch of crab-eggs hatched, one spawning-night. Ten hatchlings, ten small shells.' },
+      { art: 'empty', text: 'By dawn, nine were gone. One had a shell too soft to be worth counting. That one is you.' },
+    ];
+    this.engine.push(new CutsceneScene(this, panels, () => { this.systems.quests.check(); this.audio.music.play(this.world.biome.music); }));
+  }
+  questMarker(npcId) {
+    const map = { tessa: ['sq_tessa'], fenwick: ['sq_choir', 'sq_atlas'], glimmer: ['sq_lantern'], hobb: ['sq_hobb'], inkwell: ['sq_inkwell'], ruby: ['sq_ledger'], pip: ['sq_tyrant'], thessaly: ['sq_siblings'], old_brine: ['mq1'] };
+    const qs = map[npcId]; if (!qs) return null; const q = this.systems.quests;
+    if (npcId === 'old_brine' && !this.flag('met_brine')) return '!';
+    if (npcId === 'old_brine') return null;
+    if (qs.some((id) => !q.log[id])) return '!'; return null;
+  }
   update(dt) { this.state.playtime += dt; }
 }

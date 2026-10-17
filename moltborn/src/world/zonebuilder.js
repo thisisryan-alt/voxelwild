@@ -71,11 +71,11 @@ export class ZoneBuilder {
   keep(x, y, w, h) { this.protect.push([x, y, w, h]); return this; }
   isProtected(x, y) { return this.protect.some(([a, b, w, h]) => x >= a && y >= b && x < a + w && y < b + h); }
   // convert exposed upward faces to the surface material (sand etc.)
-  surface(t = this.surfaceMat, depth = 2) {
+  surface(t = this.surfaceMat, depth = 1) {
     const g = this.grid;
     for (let x = 0; x < this.w; x++) for (let y = 0; y < this.h; y++) {
       if (g.get(x, y) !== T.ROCK) continue;
-      if (g.get(x, y - 1) === T.AIR) { for (let d = 0; d < depth + (x * 7 + y) % 2 && g.get(x, y + d) === T.ROCK; d++) g.set(x, y + d, t); }
+      if (g.get(x, y - 1) === T.AIR) { for (let d = 0; d < depth && g.get(x, y + d) === T.ROCK; d++) g.set(x, y + d, t); }
     }
     return this;
   }

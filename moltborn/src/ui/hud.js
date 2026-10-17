@@ -48,13 +48,13 @@ export class Hud {
     }
     { const x = x0 + nS * 24, ready = p.fury >= 100; panel(ctx, x, y0, 22, 22, { alpha: 0.8, border: ready ? COL.gold : '#2a3a58' }); ctx.globalAlpha = ready ? 1 : 0.4; ctx.drawImage(abilityIcon('ult'), x + 4, y0 + 4); ctx.globalAlpha = 1; text(ctx, 'Q', x + 2, y0 + 13, ready ? COL.gold : '#6a7a98', { shadow: '#000' }); if (ready) { ctx.globalAlpha = 0.3 + 0.3 * Math.sin(this.t * 8); ctx.fillStyle = '#ffd84a'; ctx.fillRect(x + 1, y0 + 1, 20, 20); ctx.globalAlpha = 1; } }
     // --- boss bar ---
-    const b = w.boss; if (b && b.alive && b.engaged) {
-      const bw = 260, bx = 110, by = 226 - 24;
-      panel(ctx, bx - 4, by - 14, bw + 8, 30, { alpha: 0.85, border: '#a02030' });
-      text(ctx, b.displayName, 240 - textWidth(b.displayName) / 2, by - 11, '#ffd8c0');
-      bar(ctx, bx, by + 1, bw, 8, Math.max(0, b.hp) / b.maxHp, '#c02838', '#ff7a6a', '#2a0a14');
-      if (b.armorBar > 0) bar(ctx, bx, by + 11, bw, 2, b.poiseShown ?? 0, '#ffd84a', '#fff', '#2a2008');
-      for (const m of b.phaseMarks || []) { ctx.fillStyle = '#ffffff'; ctx.fillRect(bx + Math.round(bw * m), by, 1, 10); }
+    const b = w.boss; if (b && b.alive && b.engaged && !b.dying) {
+      const bw = 190, bx = 145, by = 15;
+      panel(ctx, bx - 5, by - 12, bw + 10, 28, { alpha: 0.85, border: '#a02030' });
+      text(ctx, b.displayName, 240 - textWidth(b.displayName) / 2, by - 9, '#ffd8c0');
+      bar(ctx, bx, by + 1, bw, 7, Math.max(0, b.hp) / b.maxHp, '#c02838', '#ff7a6a', '#2a0a14');
+      if (b.armorBar > 0) bar(ctx, bx, by + 10, bw, 2, Math.max(0, b.poiseShown ?? 0), '#ffd84a', '#fff', '#2a2008');
+      for (const m of b.phaseMarks || []) { ctx.fillStyle = '#ffffff'; ctx.fillRect(bx + Math.round(bw * m), by, 1, 8); }
     }
     // --- interact prompt ---
     if (w.near) {

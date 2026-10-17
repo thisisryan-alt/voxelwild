@@ -7,6 +7,9 @@ export const ITEMS = {
   // materials
   pearl: { name: 'Sea Pearl', type: 'material', price: 0, desc: 'A clean white pearl. The Pearl-Smith reforges gear with these.' },
   black_pearl: { name: 'Black Pearl', type: 'material', price: 0, desc: 'Deep-sea pearl. Needed for the finest reforging.' },
+  crew_token: { name: 'Crew Token', type: 'key', desc: 'A brass crew tag, green with age. Hobb wants it back.' },
+  map_fragment: { name: 'Map Fragment', type: 'key', desc: 'A torn piece of Fenwick\'s atlas of the forest.' },
+  tithe_ledger: { name: "Vael's Tithe Ledger", type: 'key', desc: 'Names, dates, and a running tally of the Seal.' },
   // evolution catalysts
   brine_core: { name: 'Brine Core', type: 'evo', desc: 'The crystallised pride of the Reef. Needed for the Hardshell Molt.' },
   abyssal_core: { name: 'Abyssal Core', type: 'evo', desc: 'Dense as a dying star. Needed for the Deep Molt.' },

@@ -148,7 +148,7 @@ export class World {
         if (hb.multi && hb.hits.size && hb.t % (hb.interval || 0.1) < dt) hb.hits.clear();
         for (const e of this.enemies) {
           if (!e.alive || hb.hits.has(e) || !e.canBeHit()) continue;
-          const b = e.hurtBox(); if (!rectsOverlap(hb, b)) continue;
+          const boxes = e.hurtBoxes ? e.hurtBoxes() : [e.hurtBox()]; if (!boxes.some((b) => rectsOverlap(hb, b))) continue;
           hb.hits.add(e);
           let dmg = hb.dmg, crit = false;
           if (hb.crit && rand() < S.crit) { crit = true; dmg *= S.critMult; }

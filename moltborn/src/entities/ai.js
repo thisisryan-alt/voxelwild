@@ -34,6 +34,7 @@ const sees = (e, pl, range) => {
 };
 
 export const AI = {
+  noop: { init(e) { e.a = {}; e.setState('idle'); }, update() {} },
   // --- ground crab: patrols, telegraphs, charges ---------------------------------------
   patrolCharge: {
     init(e) { e.a = { dir: rand() < 0.5 ? -1 : 1, homeX: e.x, cd: 1 }; e.setState('patrol'); },

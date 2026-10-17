@@ -1,0 +1,34 @@
+// Static zone metadata for the map: placement (grid), name, biome and links. Kept separate from builders so the map
+// never has to construct a zone.
+export const ZONE_INFO = {
+  reef_nursery: { name: 'Shoreline Nursery', biome: 'reef', map: { x: 0, y: 0 } },
+  reef_garden: { name: 'Coral Garden', biome: 'reef', map: { x: 1, y: 0 } },
+  reef_hollow: { name: 'Kelp Hollow', biome: 'reef', map: { x: 2, y: 0 } },
+  reef_arena: { name: "Grumbold's Den", biome: 'reef', map: { x: 3, y: 0 }, boss: 'grumbold', molt: true },
+  forest_edge: { name: 'Kelp Canopy', biome: 'forest', map: { x: 4, y: 0 } },
+  forest_roots: { name: 'The Rootmaze', biome: 'forest', map: { x: 5, y: 0 } },
+  forest_heart: { name: 'Mangrove Heart', biome: 'forest', map: { x: 6, y: 0 }, boss: 'mother_moray' },
+  kingdom_gate: { name: 'Gate Plaza', biome: 'kingdom', map: { x: 6, y: 1 } },
+  kingdom_spires: { name: 'Throne Spires', biome: 'kingdom', map: { x: 7, y: 1 } },
+  kingdom_court: { name: 'Court of Pearls', biome: 'kingdom', map: { x: 8, y: 1 }, boss: 'aurelia' },
+  grave_shallows: { name: 'Wreck Shallows', biome: 'graveyard', map: { x: 8, y: 2 } },
+  grave_galleon: { name: 'The Gannet', biome: 'graveyard', map: { x: 7, y: 2 } },
+  grave_captain: { name: "Captain's Bridge", biome: 'graveyard', map: { x: 6, y: 2 }, boss: 'captain_rust', molt: true },
+  abyss_descent: { name: 'Twilight Descent', biome: 'abyss', map: { x: 6, y: 3 } },
+  abyss_lanterns: { name: 'Lantern Caverns', biome: 'abyss', map: { x: 5, y: 3 } },
+  abyss_throat: { name: 'Abyssal Throat', biome: 'abyss', map: { x: 4, y: 3 }, boss: 'lurelord' },
+  trench_bones: { name: 'Bone Fields', biome: 'trench', map: { x: 4, y: 4 } },
+  trench_temple: { name: 'Temple of the Old Gods', biome: 'trench', map: { x: 3, y: 4 } },
+  trench_titan: { name: "Krael's Chain", biome: 'trench', map: { x: 2, y: 4 }, boss: 'krael', molt: true },
+  trench_sanctum: { name: 'Undertow Sanctum', biome: 'trench', map: { x: 1, y: 4 }, boss: 'hollow_maw', secret: true },
+  domain_gate: { name: 'Gate of Tides', biome: 'domain', map: { x: 2, y: 5 } },
+  domain_halls: { name: 'Hall of Guardians', biome: 'domain', map: { x: 3, y: 5 }, boss: 'kyros' },
+  domain_shrine: { name: 'Apotheosis Shrine', biome: 'domain', map: { x: 4, y: 5 }, molt: true },
+  domain_throne: { name: 'Throne of Tides', biome: 'domain', map: { x: 5, y: 5 }, boss: 'poseidon' },
+};
+export const ZONE_LINKS = [
+  ['reef_nursery', 'reef_garden'], ['reef_garden', 'reef_hollow'], ['reef_hollow', 'reef_arena'], ['reef_arena', 'forest_edge'], ['forest_edge', 'forest_roots'], ['forest_roots', 'forest_heart'],
+  ['forest_heart', 'kingdom_gate'], ['kingdom_gate', 'kingdom_spires'], ['kingdom_spires', 'kingdom_court'], ['kingdom_court', 'grave_shallows'], ['grave_shallows', 'grave_galleon'], ['grave_galleon', 'grave_captain'],
+  ['grave_captain', 'abyss_descent'], ['abyss_descent', 'abyss_lanterns'], ['abyss_lanterns', 'abyss_throat'], ['abyss_throat', 'trench_bones'], ['trench_bones', 'trench_temple'], ['trench_temple', 'trench_titan'],
+  ['trench_titan', 'trench_sanctum'], ['trench_titan', 'domain_gate'], ['domain_gate', 'domain_halls'], ['domain_halls', 'domain_shrine'], ['domain_shrine', 'domain_throne'],
+];

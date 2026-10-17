@@ -79,7 +79,9 @@ export class TileLayer {
       const i = y * W + x;
       if (!vis[i]) continue;
       const px = ox + x, py = oy + y;
-      const mat = g.get(Math.floor(px / TS), Math.floor(py / TS));
+      const tx = Math.floor(px / TS), ty = Math.floor(py / TS);
+      let mat = g.get(tx, ty);
+      if (mat === T.ROCK && g.get(tx, ty - 1) === T.GROUND) { const dpt = py - ty * TS; if (dpt < 8 && hash2(px >> 1, py, seed + 31) < (1 - dpt / 8) * 0.92) mat = T.GROUND; }
       const rp = this.ramp(mat), c = rp.c;
       let u = 4, d = 4, l = 4, r = 4;
       if (near[i]) {
@@ -127,10 +129,10 @@ export class TileLayer {
         return pick(s * 0.75 + n * 0.25, 1, 3, 0.45);
       }
       case T.ROCK: case T.CRACKED: {
-        const n = fbm(px / 6, py / 6, seed + 3, 3);
-        let col = pick(n, 1, 3, 0.6);
-        const crack = Math.abs(vnoise(px / 9, py / 9, seed + 11) - 0.5);
-        if (crack < 0.018) col = c[0];
+        const n = fbm(px / 7, py / 7, seed + 3, 3);
+        let col = pick(n * 0.9 + 0.05, 1, 3, 0.45);
+        const crack = Math.abs(vnoise(px / 11, py / 11, seed + 11) - 0.5);
+        if (crack < 0.011) col = c[0];
         if (mat === T.CRACKED) { const k = Math.abs(vnoise(px / 5, py / 5, seed + 21) - 0.5); if (k < 0.045) return color('#fff0c0'); if (k < 0.07) return color('#d08a4a'); }
         return col;
       }
