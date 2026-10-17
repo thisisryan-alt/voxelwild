@@ -10,3 +10,4 @@ import './maw.js';
 import './tyrant.js';
 import './poseidon.js';
 import './hermitking.js';
+import './sporemother.js';

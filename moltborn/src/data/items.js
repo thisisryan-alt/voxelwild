@@ -11,6 +11,7 @@ export const ITEMS = {
   map_fragment: { name: 'Map Fragment', type: 'key', desc: 'A torn piece of Fenwick\'s atlas of the forest.' },
   tithe_ledger: { name: "Vael's Tithe Ledger", type: 'key', desc: 'Names, dates, and a running tally of the Seal.' },
   tide_barnacle: { name: 'Tide Barnacle', type: 'key', desc: 'A fat pearl-barnacle from the Tidepools. Brack counts these.' },
+  glowcap_sample: { name: 'Glowcap Sample', type: 'key', desc: 'A jar-worthy toadstool cap, faintly warm. Dr. Morel will want it.' },
   // evolution catalysts
   brine_core: { name: 'Brine Core', type: 'evo', desc: 'The crystallised pride of the Reef. Needed for the Hardshell Molt.' },
   abyssal_core: { name: 'Abyssal Core', type: 'evo', desc: 'Dense as a dying star. Needed for the Deep Molt.' },
@@ -51,6 +52,7 @@ export const ITEMS = {
   charm_lantern: { name: 'Lantern Charm', type: 'equip', slot: 'charm', desc: 'A steady glow lights the dark around you.', fx: { light: 40 } },
   charm_tideglass: { name: 'Tideglass Locket', type: 'equip', slot: 'charm', desc: '+25% Tide regen.', fx: { tideRegen: 0.25 } },
   charm_ghostcoin: { name: "Ghostcoin", type: 'equip', slot: 'charm', desc: 'Pay the toll: +30% coin from enemies.', fx: { coinBonus: 0.3 } },
+  charm_spore: { name: 'Spore Sachet', type: 'equip', slot: 'charm', desc: 'Poison harms you half as much, and you recover a little with every kill.', fx: { poisonResist: 0.5, lifeOnKill: 2 } },
   charm_kingsigil: { name: "Regent's Signet", type: 'equip', slot: 'charm', desc: 'Court favour: shops are 20% cheaper.', fx: { discount: 0.2 } },
   // mutations (passive traits)
   mut_barbed: { name: 'Barbed Shell', type: 'mutation', desc: 'Spines grow through the plating. Attackers that hit you take damage.', fx: { thorns: 0.12 } },
@@ -65,6 +67,7 @@ export const ITEMS = {
   mut_tidememory: { name: 'Tide Memory', type: 'mutation', desc: 'Abilities cost 20% less Tide.', fx: { tideCost: -0.2 } },
   mut_coralarmor: { name: 'Coral Armor', type: 'mutation', desc: '+3 defence; sluggish.', fx: { def: 3, speed: -0.04 } },
   mut_census: { name: 'Census Eye', type: 'mutation', desc: 'You notice what others miss: secrets shimmer, +15% coins from foes.', fx: { sense: 1, coinBonus: 0.15 } },
+  mut_sporeheart: { name: 'Spore Heart', type: 'mutation', desc: 'A heart that blooms: kills heal 4, your strikes carry poison, and spores cannot poison you.', fx: { lifeOnKill: 4, poison: 1, poisonResist: 0.6 } },
   mut_venom: { name: 'Venom Blood', type: 'mutation', desc: 'Your strikes carry poison.', fx: { poison: 1 } },
   // dyes
   dye_albino: { name: 'Albino Mutation', type: 'dye', desc: 'A pale, ghostly shell colour.' },

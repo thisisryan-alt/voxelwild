@@ -34,3 +34,35 @@ export function reef_tidepools() {
   b.decorate(TIDE_DECOR, 0.3);
   return b.finish();
 }
+
+// ---- Glowcap Grotto (forest, off the Rootmaze): a tall dark cavern lit by toadstools, climbed on cap-shelves to the Sporemother's hall ------
+const GROTTO_DECOR = { floor: [['glowcap', 5, 1], ['kelp', 2, 3], ['seaweed', 2, 3], ['rocks', 1.2, 2], ['anemone', 1, 3]], ceil: [['vine', 3, 3], ['stalactite', 2, 3]] };
+export function forest_grotto() {
+  const b = new ZoneBuilder({ id: 'forest_grotto', name: 'Glowcap Grotto', biome: 'forest', w: 92, h: 76, seed: 23, music: 'forest', title: 'Glowcap Grotto', dark: 0.36 });
+  b.fill(T.ROCK);
+  b.carve(28, 60, 36, 10); b.carve(24, 24, 44, 40);             // entry chamber and the tall cavern
+  b.carve(8, 4, 76, 14);                                         // the spore hall
+  b.smooth(2);
+  b.floorLine(24, 68, 70); b.rect(8, 18, 76, 3, T.ROCK); b.carve(44, 18, 5, 6);   // chamber floor, hall floor, and the hole between
+  b.ladder(46, 63, 26, 9, 6, 4);
+  b.rect(24, 50, 9, 3, T.ROCK); b.rect(59, 43, 9, 3, T.ROCK); b.rect(24, 36, 9, 3, T.ROCK); b.rect(59, 31, 9, 3, T.ROCK);
+  b.carve(69, 38, 11, 6); b.breakable(68, 40, 1, 3); b.keep(66, 36, 16, 9);     // cache behind a cracked wall off the east shelf
+  b.surface(T.GROUND, 1);
+  b.carve(2, 64, 24, 5); b.exitW(64, 68, 'forest_roots', 'grotto'); b.entryFloor('door', 6, { facing: 1, from: 60 });
+  b.shrine('rest', 56, { from: 55 });
+  b.npc('morel', 36, { from: 55 });
+  b.sign(44, 'Do not eat the blue ones. Do not eat the red ones. If it glows and it is pleasant, DEFINITELY do not eat it. - Dr. M.', { from: 55, speaker: 'Field Note' });
+  b.mural(52, 'mural_grotto', { from: 55 });
+  b.itemAt(28, 47, 'glowcap_sample'); b.itemAt(63, 40, 'glowcap_sample'); b.itemAt(28, 33, 'glowcap_sample');
+  b.chest(74, { item: 'charm_spore', coins: [50, 70] }, { from: 37, tint: 1, secret: true, key: 'grotto_cache' });
+  b.chest(62, { coins: [40, 60], items: { brine_tonic: 2 } }, { from: 28 });
+  b.light(46, 64, 70, '#9affc0', 0.5); b.light(30, 46, 46, '#c8ff90', 0.5); b.light(62, 38, 46, '#ff90d0', 0.5); b.light(46, 28, 56, '#9affc0', 0.5); b.light(30, 32, 40, '#ffe080', 0.4);
+  b.coins(30, 46, 4); b.coins(60, 40, 4); b.coins(30, 32, 4); b.coins(62, 28, 4);
+  b.spawn('splitjelly', 40, 54, { count: 1 }); b.spawn('splitjelly', 56, 48); b.spawn('splitjelly', 44, 38); b.spawn('splitjelly', 52, 30);
+  b.spawnFloor('mantis', 28, 40); b.spawnFloor('fumecap', 29, 44); b.spawnFloor('mender', 31, 44); b.spawnFloor('fumecap', 63, 38); b.spawnFloor('mantis', 65, 38); b.spawnFloor('fumecap', 62, 26); b.spawnFloor('fumecap', 28, 30);
+  b.spawnFloor('sporepod', 36, 55); b.spawnFloor('sporepod', 58, 55); b.spawnFloor('mender', 64, 26);
+  b.spawns.push({ boss: 'sporemother', floor: true, x: 62 * 16, y: 18 * 16, arena: { x: 8, y: 3, w: 76, h: 15 }, trigger: { x: 14, y: 6, w: 64, h: 12 }, barriers: [{ x: 44, y: 18, w: 5, h: 1 }] });
+  b.coins(20, 16, 4); b.coins(70, 16, 4);
+  b.decorate(GROTTO_DECOR, 0.35);
+  return b.finish();
+}

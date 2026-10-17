@@ -47,10 +47,13 @@ export function forest_roots() {
   // lower detours: a map-fragment cave and a gap for a Memory-free secret
   b.path([[26, 48], [30, 56], [44, 56], [56, 54]], 2.8, { wobble: 0.7 }); b.ellipse(50, 55, 6, 3.5);
   b.path([[90, 46], [96, 38], [100, 28], [96, 20], [86, 16]], 3, { wobble: 0.9 }); b.ellipse(84, 16, 7, 5);
+  b.path([[90, 16], [104, 14], [110, 8], [112, 2]], 2.8, { wobble: 0.5 });                       // east of the map-fragment chamber: a passage that ends in rock
   b.floorLine(4, 30, 54); b.platform(36, 34, 5); b.platform(60, 24, 5); b.platform(44, 22, 4);
   b.surface(T.GROUND, 1); b.smooth(1);
   b.exitW(49, 53, 'forest_edge', 'east'); b.entryFloor('west', 5, { facing: 1, from: 40 });
   b.exitE(48, 52, 'forest_heart', 'west'); b.entryFloor('east', 118, { facing: -1, from: 40 });
+  b.rect(98, 11, 2, 7, T.CRACKED); b.exitN(110, 114, 'forest_grotto', 'door'); b.platform(109, 4, 6); b.entry('grotto', 112, 3); b.keep(96, 0, 22, 20);
+  b.sign(94, 'The air tastes of mushrooms past the crack in the wall. Someone left a lamp here, a long time ago.', { from: 8 });
   b.shrine('rest', 54, { from: 20 });
   // bulbs in the upper loop (low, high, middle)
   b.prop('bulb', 18, 18, { tone: 0 }); b.prop('bulb', 56, 12, { tone: 1 }); b.prop('bulb', 14, 29, { tone: 2 });

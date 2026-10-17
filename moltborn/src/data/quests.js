@@ -71,5 +71,10 @@ export const QUESTS = {
     { text: 'Deal with the self-crowned Hermit King at the end of the pools.', done: boss('hermit_king') },
     { text: 'Report back to Brack.', done: f('census_done') },
   ], desc: 'Brack has counted the pools every spring. A king moved in and ate the census. Not the barnacles. The census.' },
+  sq_spores: { name: 'Glowcap Samples', type: 'side', giver: 'morel', steps: [
+    { text: 'Collect 3 Glowcap Samples from the shelves of the Glowcap Grotto.', done: (g) => g.itemCount('glowcap_sample') >= 3 || g.flag('spores_done') },
+    { text: 'Quiet the thing that hums at the top of the grotto.', done: boss('sporemother') },
+    { text: 'Show Dr. Morel what you found.', done: f('spores_done') },
+  ], desc: 'Dr. Morel has catalogued every toadstool in the grotto but the three on the high shelves. The ones that glow. The ones that hum back.' },
   sq_tyrant: { name: 'The Pearl Tyrant', type: 'side', giver: 'pip', steps: [{ text: 'Defeat the Pearl Tyrant, the giant clam beneath the garden.', done: boss('pearl_tyrant') }], desc: 'Pip’s pearl was swallowed by something enormous.' },
 };

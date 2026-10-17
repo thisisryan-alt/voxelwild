@@ -76,6 +76,33 @@ export const DIALOGUE = {
     yield c.say("The pools are quiet. I like it. The barnacles are... countable again.");
   },
 
+  *morel(c) {
+    if (!c.flag('met_morel')) {
+      c.set('met_morel');
+      yield c.say("Ah! Don't — don't touch the walls. Don't breathe through your mouth. Good. Dr. Morel, mycologist, formerly of the Court's Faculty of Things That Grow. You are, I think, a crab. Fascinating posture.");
+      yield c.say("This grotto is the finest fungal garden in the sea. Four hundred species. I have catalogued them all but three: the ones on the high shelves. They glow. They hum back. I am, regrettably, afraid of heights.");
+    }
+    if (!c.qActive('sq_spores') && !c.qDone('sq_spores')) {
+      const i = yield c.ask("Three glowcap samples, if you would? I'll make it worth your while.", ['Gladly.', 'What hums?', 'Not now.']);
+      if (i === 2) { yield c.say("Of course. Of course. I will be here, being cautious."); return; }
+      if (i === 1) yield c.say("The mother of the garden, at the top. She keeps the little ones asleep. It is — I want to stress this — a very *kind* hum. But she is eleven times my size and does not like visitors.");
+      yield c.say("Climb the cap-shelves. Mind the clouds: they are lovely and they are poison. The three samples are on the side ledges; the hall at the top is hers.");
+      c.quest('sq_spores'); return;
+    }
+    if (c.qActive('sq_spores')) {
+      if (c.count('glowcap_sample') >= 3 && c.boss('sporemother') && !c.flag('spores_done')) {
+        c.take('glowcap_sample', 3); c.set('spores_done'); c.gain(140); c.give('charm_spore');
+        yield c.say("Three! And you went up — and came back — and it has gone quiet. Oh. Oh, I do hope that was kind. I do hope it was kind.");
+        yield c.say("Here. A sachet of the garden's own spores. They will not poison you now; they have decided you are family. It is the highest honour I can bestow. It is also a sachet.");
+        return;
+      }
+      if (c.boss('sporemother')) { yield c.say("It has gone so quiet. Bring me the samples, and I will not need to be brave."); return; }
+      yield c.say("Three samples. Then, if you are feeling heroic, the mother at the top. Stay out of the clouds, and do not step on the little ones.");
+      return;
+    }
+    yield c.say("The garden is peaceful now. I have started naming the small ones. This one is Gerald.");
+  },
+
   *cowrie(c) {
     if (!c.flag('met_cowrie')) { c.set('met_cowrie'); yield c.say("Darling! A customer! Or a thief — but you've the face for honest trade. Madame Cowrie, purveyor of the finest and the nearly finest."); }
     while (true) {

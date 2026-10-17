@@ -317,13 +317,15 @@ export class World {
     for (const l of this.lightList()) {
       const x = Math.round(l.x - cam.x), y = Math.round(l.y - cam.y), R = l.r * flick;
       if (x < -R || x > 480 + R || y < -R || y > 270 + R) continue;
-      for (let s = 0; s < 5; s++) { g.globalAlpha = 0.2 * (l.a ?? 1); g.beginPath(); g.arc(x, y, R * (1 - s * 0.17), 0, 6.3); g.fill(); }
+      const a = l.a ?? 1, gr = g.createRadialGradient(x, y, R * 0.08, x, y, R); // smooth falloff: solid core, long soft edge
+      gr.addColorStop(0, `rgba(0,0,0,${0.95 * a})`); gr.addColorStop(0.45, `rgba(0,0,0,${0.62 * a})`); gr.addColorStop(0.8, `rgba(0,0,0,${0.2 * a})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(x, y, R, 0, 6.3); g.fill();
     }
     g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
     ctx.drawImage(this.lightCv, 0, 0);
     // coloured halo around lights for the glow feel
     ctx.globalCompositeOperation = 'lighter';
-    for (const l of this.lightList()) if (l.color) { const x = Math.round(l.x - cam.x), y = Math.round(l.y - cam.y); ctx.globalAlpha = 0.12; ctx.fillStyle = l.color; ctx.beginPath(); ctx.arc(x, y, l.r * 0.5, 0, 6.3); ctx.fill(); }
+    for (const l of this.lightList()) if (l.color) { const x = Math.round(l.x - cam.x), y = Math.round(l.y - cam.y), R = l.r * 0.75; if (x < -R || x > 480 + R || y < -R || y > 270 + R) continue; const gr = ctx.createRadialGradient(x, y, 0, x, y, R); gr.addColorStop(0, l.color); gr.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = 0.2; ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, R, 0, 6.3); ctx.fill(); }
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     this.drawVignette(ctx, 0.3);
   }
