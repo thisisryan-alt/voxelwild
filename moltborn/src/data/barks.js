@@ -4,6 +4,9 @@ const boss = (k) => (g) => !!g.state.bosses[k];
 const done = (q) => (g) => !!g.state.quests[q] && g.state.quests[q].state === 'done';
 const form = (n) => (g) => ({ shore: 1, warrior: 2, abyssal: 3, leviathan: 4, mythic: 5, primordial: 6 })[g.state.form] >= n;
 const rifts = (n) => (g) => (g.state.records?.rifts || 0) >= n;
+const night = (g) => g.systems.clock?.phase.id === 'night';
+const dusk = (g) => g.systems.clock?.phase.id === 'dusk';
+const fished = (n) => (g) => (g.state.records?.fished || 0) >= n;
 const low = (g) => g.world?.player && g.world.player.hp < g.world.player.stats.maxHp * 0.4;
 
 export const BARKS = {
@@ -11,11 +14,13 @@ export const BARKS = {
     { when: boss('poseidon'), text: 'I saw the tide go still, little one. I never thought I would live to.' },
     { when: form(3), text: 'You have grown past anything I could teach. Come visit anyway.' },
     { when: low, text: 'You look half drowned. Sit, breathe, then go back out there.' },
+    { when: night, text: 'The plankton are up. When I was your size we called that "the lamps being lit".' },
     'The shore is kind to the young. The sea is not. Remember both.', 'Shells are only borrowed. Remember that.', 'My knees say storm. My knees are never wrong.',
   ],
   pip: [
     { when: rifts(1), text: 'I heard you went down a rift and came back! Was it scary? Tell me it was scary!' },
     { when: form(2), text: 'You got BIGGER. Can I touch the shell? No? Okay.' },
+    { when: night, text: 'It is DARK. It is dark and it is GLOWING. I love night. Do not tell my mum I am up.' },
     'Did you see the whale? I saw the whale. Nobody believes me.', 'I am going to be a hero one day. I have a stick.', 'Hello! Hello! Are you going to fight something?',
   ],
   cowrie: [
@@ -73,9 +78,17 @@ export const BARKS = {
     'Lights out down there. Take a lantern.', 'You can follow a glow into a lot of trouble.',
   ],
   marlin: [
+    { when: (g) => (g.state.bounties?.claimed || 0) >= 10, text: 'Ten bounties! The board and I are speechless. Well, it always was.' },
     { when: done('sq_board'), text: 'The board looks so well used now. I could weep. Eight ways.' },
     { when: rifts(1), text: 'A rift cleared! Pin it up! Oh, there is no space. There is never any space.' },
     'Dares for the daring! Rifts for the restless!', 'Read the board. Read it. It is lonely.', 'Three orders a day. Somebody is always hungry.',
+  ],
+  tunny: [
+    { when: done('sq_catch'), text: 'You have the lure. Do not thank me. Catch something enormous and lie about it.' },
+    { when: night, text: 'Night is for the careful fish. And the stubborn old crabs who wait for them.' },
+    { when: dusk, text: 'Dusk. The light goes gold and the fish forget their manners. Cast now.' },
+    { when: fished(10), text: 'Ten fish and still smiling. Either you have the gift or no sense. Both is fine.' },
+    'Float down, line out, mind blank. That is all of it.', 'A fish will teach you patience. Then it will eat the lesson.', 'Sunfish by day. Eels by night. The rest, whenever they like.',
   ],
   thessaly: [
     { when: boss('poseidon'), text: 'It is finished. And it is not. It never is.' },

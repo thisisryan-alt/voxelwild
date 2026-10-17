@@ -6,6 +6,7 @@ import { enemyFrame } from './sprites_enemies.js';
 import { propSprite } from './sprites_world.js';
 import './sprites_bosses.js';
 import './sprites_bosses2.js';
+import './sprites_rift.js';
 import './sprites_hero.js';
 import { morayHead, moraySeg } from './sprites_bosses.js';
 import { Painter, Ramp } from './painter.js';
@@ -384,6 +385,7 @@ const BOSS_ART = {
   sporemother: { sp: { plan: 'sporemother', w: 140, h: 104, ax: 70, ay: 100, frames: 4 }, z: 2, y: 212, bg: ['#1a6a4a', '#041a10'], aura: '#c8ff90' },
   brass_colossus: { sp: { plan: 'colossus', w: 120, h: 128, ax: 60, ay: 120, frames: 4 }, z: 2, y: 224, bg: ['#4a3a98', '#12104a'], aura: '#ffe890' },
   magmaw: { sp: { plan: 'magmaw', w: 80, h: 64, ax: 40, ay: 32, frames: 1 }, z: 4, y: 150, bg: ['#5a1a0a', '#0a0202'], aura: '#ff9a3a' },
+  rift_warden: { sp: { plan: 'riftwarden', w: 120, h: 120, ax: 60, ay: 58, frames: 4 }, z: 2, y: 150, bg: ['#241048', '#05020f'], aura: '#b890ff' },
   hollow_maw: { sp: { plan: 'maw', w: 180, h: 150, ax: 88, ay: 70, frames: 4 }, z: 1, y: 130, bg: ['#12041c', '#010003'], aura: '#c070ff' },
 };
 function bossScene(ctx, key, t) {
@@ -459,6 +461,25 @@ Object.assign(SCENES, {
     for (let i = 0; i < 7; i++) { const f = (i * 0.37 + t * 1.2) % 1; ctx.fillStyle = f < 0.5 ? '#ffd070' : '#ff7a3a'; ctx.fillRect(210 + i * 10 + Math.round(Math.sin(t * 5 + i) * 2), 222 - Math.round(f * 14), 4, 6); }
     const r = rng(3); ctx.save(); for (let i = 0; i < 18; i++) { const f = (r() + t * 0.18) % 1, x = 240 + (r() - 0.5) * 60 + Math.sin(f * 6 + i) * 8, y = 156 - f * 120; ctx.globalAlpha = 0.28 * (1 - f); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, 3 + f * 8, 0, TAU); ctx.fill(); } ctx.restore();
     motes(ctx, t, { n: 20, color: '#ffb070', a: 0.4, speed: 6, seed: 8 }); vignette(ctx, 0.65);
+  },
+  // dusk over a fishing post: one float on a still, gold-lit sea, the first stars above
+  angler(ctx, t) {
+    grad(ctx, [[0, '#2a2a6a'], [0.45, '#d8708a'], [0.62, '#ffb070'], [0.63, '#1a4a78'], [1, '#04122a']]);
+    glow(ctx, 330, 168, 120, '#ffb070', 0.3); const r = rng(14); for (let i = 0; i < 30; i++) { ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.3 + 0.6 * Math.abs(Math.sin(t * 0.8 + i)); ctx.fillRect(Math.round(r() * W), Math.round(r() * 80), 1, 1); } ctx.globalAlpha = 1;
+    for (let i = 0; i < 9; i++) { const y = 172 + i * 10, w = 40 + i * 14 + Math.sin(t * 1.4 + i) * 6; ctx.fillStyle = `rgba(255,190,120,${0.28 - i * 0.025})`; ctx.fillRect(Math.round(330 - w / 2 + Math.sin(t + i) * 5), y, Math.round(w), 2); }
+    ctx.fillStyle = '#05030a'; ctx.fillRect(98, 118, 8, 120); ctx.fillStyle = '#6a4a2a'; ctx.fillRect(100, 118, 4, 120); ctx.fillRect(100, 118, 54, 5);
+    ctx.fillStyle = '#d8f4ff'; ctx.fillRect(153, 120, 1, 70); const by = 190 + Math.round(Math.sin(t * 2) * 1.5); ctx.fillStyle = '#05030a'; ctx.fillRect(150, by - 3, 8, 8); ctx.fillStyle = '#ff4a3a'; ctx.fillRect(151, by - 2, 6, 6); ctx.fillStyle = '#ffffff'; ctx.fillRect(151, by - 2, 6, 2);
+    const k = (t * 0.6) % 1; ctx.strokeStyle = `rgba(216,244,255,${0.6 * (1 - k)})`; ctx.strokeRect(154 - k * 24, by + 3 - k * 4, k * 48, k * 8);
+    motes(ctx, t, { n: 24, color: '#ffd8a8', a: 0.5, speed: 5, seed: 22 }); vignette(ctx, 0.6);
+  },
+  // the reef at night: a moon on the surface, a drift of glowing plankton, kelp in silhouette
+  moonlit(ctx, t) {
+    grad(ctx, [[0, '#0a1450'], [0.5, '#081a48'], [1, '#02060f']]);
+    ctx.fillStyle = '#e8eeff'; ctx.beginPath(); ctx.arc(330, 40, 22, 0, TAU); ctx.fill(); ctx.fillStyle = '#0c1654'; ctx.beginPath(); ctx.arc(341, 34, 19.5, 0, TAU); ctx.fill(); glow(ctx, 330, 40, 160, '#aab8ff', 0.4);
+    rays(ctx, t, { n: 5, color: '#aabcff', a: 0.12, seed: 8 });
+    ctx.fillStyle = '#02050c'; for (let i = 0; i < 12; i++) { const x = 20 + i * 40, h = 50 + (i * 37) % 70, sway = Math.sin(t * 0.8 + i) * 6; ctx.beginPath(); ctx.moveTo(x, 270); ctx.quadraticCurveTo(x + sway, 270 - h * 0.6, x + sway * 1.6, 270 - h); ctx.lineTo(x + sway * 1.6 + 5, 270 - h); ctx.quadraticCurveTo(x + sway + 6, 270 - h * 0.6, x + 9, 270); ctx.fill(); }
+    const r = rng(9); ctx.save(); ctx.globalCompositeOperation = 'lighter'; for (let i = 0; i < 70; i++) { const x = (r() * W + t * 6 * (0.4 + r())) % W, y = (r() * H + Math.sin(t + i) * 6) % H; ctx.globalAlpha = 0.3 + 0.6 * Math.abs(Math.sin(t * 1.6 + i)); ctx.fillStyle = i % 3 ? '#7ae8ff' : '#9affc0'; ctx.fillRect(Math.round(x), Math.round(y), 2, 2); } ctx.restore();
+    motes(ctx, t, { n: 24, color: '#c8d4ff', a: 0.4, speed: 4, seed: 33 }); vignette(ctx, 0.55);
   },
   // a speckled egg on warm sand, a crack of light running down it, a small claw pushing through
   hatch(ctx, t) {

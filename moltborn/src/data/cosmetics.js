@@ -29,6 +29,16 @@ export const TITLES = {
   another:     { name: 'of Another Tide', by: 'another_tide' },
   shutterbug:  { name: 'the Shutterbug', by: 'shutterbug' },
   completionist: { name: 'the Completionist', by: 'completionist' },
+  angler:      { name: 'the Angler', by: 'angler' },
+  fishlog:     { name: 'Keeper of the Fish Log', by: 'fish_log' },
+  legendfish:  { name: 'Teller of Tall Tales', by: 'legend_fish' },
+  fishmonger:  { name: 'Fishmonger', by: 'fishmonger' },
+  wardenslayer: { name: 'Warden-Slayer', by: 'warden_slain' },
+  wardenhunter: { name: 'Keeper of Keepers', by: 'warden_hunter' },
+  seamless:    { name: 'the Seamless', by: 'warden_untouched' },
+  bountyhand:  { name: 'Odd-Job Crab', by: 'bounty_hand' },
+  bountyhunter: { name: 'Bounty Hunter', by: 'bounty_hunter' },
+  regular:     { name: 'the Regular', by: 'bounty_streak' },
 };
 
 // wake styles. colors are cycled; `kind` is a particle kind from gfx/particles.js; `rate` is seconds between puffs
@@ -40,5 +50,8 @@ export const TRAILS = {
   ink:     { name: 'Ink', by: 'red_tide', colors: ['#2a1450', '#4a2490', '#150a2a'], kind: 'rect', rate: 0.05, rise: 4, size: 2 },
   rift:    { name: 'Rift Motes', by: 'rift_walker', colors: ['#c07aff', '#7af0ff', '#ffffff'], kind: 'rect', rate: 0.05, rise: -18 },
   pearl:   { name: 'Pearlescent', by: 'pearl_diver', colors: ['#ffffff', '#ffd8f0', '#d0f0ff'], kind: 'bubble', rate: 0.07 },
+  scales:  { name: 'Silverscale', by: 'angler', colors: ['#ffffff', '#c8d4e4', '#9ab8d8'], kind: 'rect', rate: 0.06, rise: -8 },
+  moon:    { name: 'Moonwake', by: 'legend_fish', colors: ['#e8eeff', '#aab8ff', '#7a8ae0'], kind: 'star', rate: 0.05, rise: -12 },
+  shards:  { name: 'Glass Shards', by: 'warden_slain', colors: ['#e0ccff', '#8a60d8', '#b890ff'], kind: 'rect', rate: 0.045, rise: -14, size: 2 },
   prism:   { name: 'Prism', by: 'completionist', colors: ['#ff6a6a', '#ffd84a', '#7aff9a', '#6ab0ff', '#d89aff'], kind: 'star', rate: 0.04, rise: -8 },
 };

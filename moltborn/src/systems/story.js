@@ -1,9 +1,10 @@
 // Story cutscenes: illustrated panels that play once per save when the player enters a new realm, defeats a boss,
 // molts into a new body or reaches the Throne. They are queued by game events and shown the next time play is calm.
 import { CutsceneScene } from '../ui/screens.js';
+import { FISH_BY_ID } from '../data/fish.js';
 
 const BIOME_STORY = { forest: 'enter_forest', kingdom: 'enter_kingdom', graveyard: 'enter_graveyard', abyss: 'enter_abyss', trench: 'enter_trench', domain: 'enter_domain' };
-const BOSS_STORY = { grumbold: 'won_grumbold', mother_moray: 'won_moray', aurelia: 'won_aurelia', captain_rust: 'won_captain', lurelord: 'won_lurelord', krael: 'won_krael', kyros: 'won_kyros', hollow_maw: 'won_maw', hermit_king: 'won_brun', sporemother: 'won_sporemother', brass_colossus: 'won_colossus', magmaw: 'won_magmaw' };
+const BOSS_STORY = { rift_warden: 'won_warden', grumbold: 'won_grumbold', mother_moray: 'won_moray', aurelia: 'won_aurelia', captain_rust: 'won_captain', lurelord: 'won_lurelord', krael: 'won_krael', kyros: 'won_kyros', hollow_maw: 'won_maw', hermit_king: 'won_brun', sporemother: 'won_sporemother', brass_colossus: 'won_colossus', magmaw: 'won_magmaw' };
 const ZONE_STORY = { reef_tidepools: 'enter_tidepools', forest_grotto: 'enter_grotto', kingdom_vaults: 'enter_vaults', abyss_vents: 'enter_vents' };
 
 // music: undefined = a calm theme, null = keep what is playing
@@ -43,6 +44,14 @@ export const STORIES = {
   first_gauntlet: { music: null, delay: 1, panels: [{ art: 'gauntlet', title: 'THE PEARL GAUNTLET', text: 'The Court held games here once, for pearls and honour. The honour has gone. The pearls are still on the floor.' }] },
   first_cook: { delay: 1.5, panels: [{ art: 'kitchen', title: 'A HOT MEAL', text: 'The first dish is always a little wrong. By the tenth, the sea starts to taste like something you made on purpose.' }] },
   hatch: { delay: 1.2, panels: [{ art: 'hatch', title: 'SOMETHING TAPS BACK', text: 'The shell splits, and a very small crab looks up at you as though you were the sea itself. It has already decided to follow you.' }] },
+  won_warden: { delay: 2, panels: [
+    { art: 'boss:rift_warden', title: 'THE RIFT WARDEN', text: 'It comes apart the way a held breath does: all at once, and without a sound. The tear it guarded does not close. It simply stops being anyone\'s job.' },
+    { art: 'rift', text: 'Somewhere else, a very old door that has been leaning on its frame for ten thousand years takes a long, relieved breath. Then the next tear opens. They always do.' },
+  ] },
+  first_catch: { delay: 1.2, panels: [{ art: 'angler', title: 'A LINE IN THE WATER', text: 'There is a kind of waiting that has nothing to do with being afraid. You stand at the edge of the deep with one float and one thought, and the sea, for once, takes its time.' }] },
+  first_night: { music: null, delay: 1, panels: [{ art: 'moonlit', title: 'THE REEF AT NIGHT', text: 'The light leaves the way a tide does: slowly, and then all at once. In its place the plankton wake, and the water learns to glow by itself.' }] },
+  first_bounty: { delay: 1.2, panels: [{ art: 'gauntlet', title: 'PAID IN FULL', text: 'Nobody gives you a medal. They give you a handful of coins and a look that says they expected you to come back. It is the nicest thing anyone has done for you all week.' }] },
+  legend_catch: { delay: 1.5, panels: [{ art: 'moonlit', title: 'THE ONE THAT DID NOT GET AWAY', text: 'It is heavier than the sea. It is lighter than a story. You will tell people about this one, and every time you do, it will be a little bigger, and a little more true.' }] },
   ng_plus: { music: 'title', delay: 1, panels: [
     { art: 'ocean', title: 'THE TIDE TURNS AGAIN', text: 'You wake in the shallows with the shape you earned and nothing else. The sea has the same names, and it has been practising.' },
     { art: 'stars', text: 'Everything you fought is waiting where you left it, stronger, and a little glad to see you.' },
@@ -122,6 +131,9 @@ export class Story {
     game.events.on('arena', (what) => { if (what === 'enter') this.add('first_gauntlet'); });
     game.events.on('crafted', () => this.add('first_cook'));
     game.events.on('companion', (what) => { if (what === 'adopt') this.add('hatch'); });
+    game.events.on('fish', (id, len, o) => { this.add('first_catch'); if (FISH_BY_ID[id]?.rarity === 'legendary') this.add('legend_catch'); });
+    game.events.on('phase', (id) => { if (id === 'night') this.add('first_night'); });
+    game.events.on('bounty', () => this.add('first_bounty'));
   }
   seen(id) { return !!this.g.state.flags['cs_' + id]; }
   add(id) { if (!STORIES[id] || this.seen(id) || this.queue.some((q) => q.id === id)) return; this.queue.push({ id, wait: STORIES[id].delay ?? 0.8 }); }
