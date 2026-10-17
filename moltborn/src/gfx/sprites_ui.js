@@ -17,6 +17,7 @@ const ICONS = {
   key: (p, c) => { p.ellipse(5, 5, 3, 3, c, {}); p.px(5, 5, '#170d1c'); p.capsule(7, 7, 13, 13, 1.1, 1.1, c, {}); p.rect(11, 12, 3, 1.5, c, { outline: false, flat: 3 }); },
   gem: (p, c) => { p.shape(c, { dither: 0.3 }, (s) => s.poly([[8, 2], [14, 6], [11, 14], [5, 14], [2, 6]])); p.line(2, 6, 14, 6, c.c[4]); p.px(7, 4, '#fff'); },
   rune: (p, c) => { p.shape(R.rock, {}, (s) => s.rect(3, 2, 10, 12)); p.line(8, 4, 8, 12, c.c[4]); p.line(5, 7, 11, 7, c.c[4]); p.line(5, 10, 11, 5, c.c[3]); },
+  fish: (p, c) => { p.shape(c, { dither: 0.35 }, (s) => { s.ellipse(7, 8, 5.5, 3.6); s.poly([[11, 8], [15, 4], [15, 12]]); }); p.poly([[5, 5], [8, 2], [9, 5]], c.tint(0, 1, 0.8), {}); p.px(4, 7, '#ffffff'); p.px(4, 8, '#05030a'); p.line(7, 6, 7, 10, c.c[1]); },
   drop: (p, c) => { p.shape(c, { dither: 0.3 }, (s) => { s.poly([[8, 1], [13, 10], [8, 15], [3, 10]]); s.ellipse(8, 10, 5, 4.5); }); p.px(6, 9, '#fff'); },
   heart: (p) => { p.shape(R.fishRed, { dither: 0.3 }, (s) => { s.ellipse(5, 6, 3.6, 3.6); s.ellipse(11, 6, 3.6, 3.6); s.poly([[2, 8], [14, 8], [8, 14]]); }); p.px(4, 4, '#fff'); },
   scroll: (p, c) => { p.shape(R.sand, {}, (s) => s.rect(3, 3, 10, 10)); p.line(5, 6, 11, 6, '#6a3a06'); p.line(5, 8, 11, 8, '#6a3a06'); p.line(5, 10, 9, 10, '#6a3a06'); },

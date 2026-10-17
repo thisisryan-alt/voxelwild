@@ -15,6 +15,8 @@ export const RECIPES = [
   { id: 'pearl_elixir', out: 'pearl_elixir', n: 1, needs: { pearl: 1, jelly_gel: 2 }, note: 'A pearl is a lot to spend on a drink.' },
   { id: 'salve', out: 'salve', n: 2, needs: { jelly_gel: 1, glow_spore: 1 }, note: 'Cools what burns. Two jars from one batch.' },
 ];
+import { FISH_RECIPES } from './items_fish.js';
+RECIPES.push(...FISH_RECIPES);
 export const RECIPE_BY_ID = Object.fromEntries(RECIPES.map((r) => [r.id, r]));
 
 // creature -> [ingredient, chance]. Chances are per kill; elites and bosses are not listed.

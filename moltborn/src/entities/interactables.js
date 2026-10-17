@@ -188,6 +188,27 @@ export class ForagePatch extends Interactable {
 }
 INTERACTABLES.forage = ForagePatch;
 
+// A fishing spot: a post at the edge of deep water. Interact to cast a line; spots take a while to recover.
+export class FishSpot extends Interactable {
+  constructor(world, o) { super(world, o, 20, 26); this.range = 24; this.t = Math.random() * 6; this.seed = Math.floor(hash2(Math.round(o.x), Math.round(o.y), 11) * 1e6); }
+  get ready() { return this.world.game.systems.fishing.ready(this.zs, this.key); }
+  prompt() { return this.ready ? 'Cast a line' : 'The water is still'; }
+  canInteract(pl) { return this.ready && super.canInteract(pl); }
+  interact(game) { import('../ui/fishing_scene.js').then(({ FishingScene }) => game.engine.push(new FishingScene(game, this))); }
+  draw(ctx, cam) {
+    this.t += 1 / 60;
+    const x = Math.round(this.x - cam.x), y = Math.round(this.y - cam.y), ready = this.ready;
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(x - 8, y - 1, 16, 2);
+    ctx.fillStyle = '#05030a'; ctx.fillRect(x - 2, y - 21, 4, 21); ctx.fillStyle = '#8a6a44'; ctx.fillRect(x - 1, y - 20, 2, 20); ctx.fillStyle = '#c8a070'; ctx.fillRect(x - 1, y - 20, 1, 20);
+    ctx.fillStyle = '#05030a'; ctx.fillRect(x - 1, y - 24, 12, 4); ctx.fillStyle = '#8a6a44'; ctx.fillRect(x, y - 23, 10, 2);
+    const sway = Math.round(Math.sin(this.t * 1.7) * (ready ? 1.5 : 0.5));
+    ctx.fillStyle = ready ? '#d8f4ff' : '#6a7a90'; ctx.fillRect(x + 10, y - 22, 1, 12 + sway);
+    ctx.fillStyle = '#05030a'; ctx.fillRect(x + 8, y - 10 + sway, 5, 5); ctx.fillStyle = ready ? '#ff4a3a' : '#7a5a5a'; ctx.fillRect(x + 9, y - 9 + sway, 3, 3); ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 9, y - 9 + sway, 3, 1);
+    if (ready) { const r = (this.t * 6) % 8; ctx.globalAlpha = 0.5 * (1 - r / 8); ctx.strokeStyle = '#d8f4ff'; ctx.strokeRect(x + 10.5 - r, y - 4.5 - r * 0.3, r * 2, r * 0.6 + 1); ctx.globalAlpha = 1; }
+  }
+}
+INTERACTABLES.fishspot = FishSpot;
+
 // Treasure vault relic stand: takes an epic relic and wakes the vault (handled by systems/rifts.js)
 export class RelicStand extends Interactable {
   constructor(world, o) { super(world, o, 18, 24); this.range = 24; this.taken = false; this.t = 0; }

@@ -15,6 +15,7 @@ import { AFFIXES, AFFIX_IDS, ELITE_BASE } from '../../src/data/affixes.js';
 import { SETS, SET_OF, activeSets } from '../../src/data/sets.js';
 import { BARKS } from '../../src/data/barks.js';
 import { FORAGE, ROUNDS, YIELD_BY_HITS } from '../../src/data/forage.js';
+import { FISH } from '../../src/data/fish.js';
 import { STATUS } from '../../src/systems/status.js';
 import { computeStats, newState } from '../../src/systems/progression.js';
 
@@ -29,7 +30,7 @@ test('every recipe output and ingredient exists', () => { for (const r of RECIPE
 test('recipe ids are unique', () => { eq(new Set(RECIPES.map((r) => r.id)).size, RECIPES.length); });
 test('dish effects reference real statuses', () => { for (const id of DISH_IDS) for (const b of ITEMS[id].use.buffs || []) ok(STATUS[b.id], `${id}:${b.id}`); });
 test('drop tables name real creatures and ingredients', () => { for (const [e, list] of Object.entries(DROPS)) { ok(ENEMIES[e], e); for (const [id, ch] of list) { ok(ITEMS[id], id); ok(ch > 0 && ch <= 1, `${e}:${id}`); } } });
-test('every ingredient can be obtained from a drop or a forage patch', () => { const got = new Set(); for (const l of Object.values(DROPS)) for (const [id] of l) got.add(id); for (const ks of Object.values(FORAGE)) for (const k of ks) for (const [id] of k.yield) got.add(id); for (const id of INGREDIENT_IDS) ok(got.has(id), id + ' has no source'); });
+test('every ingredient can be obtained from a drop, a forage patch or a fishing spot', () => { const got = new Set(); for (const f of FISH) got.add('fish_' + f.id); for (const l of Object.values(DROPS)) for (const [id] of l) got.add(id); for (const ks of Object.values(FORAGE)) for (const k of ks) for (const [id] of k.yield) got.add(id); for (const id of INGREDIENT_IDS) ok(got.has(id), id + ' has no source'); });
 test('forage kinds have unique ids, yields and colours', () => { const ids = []; for (const [b, ks] of Object.entries(FORAGE)) { ok(ZONE_INFO && ks.length >= 2, b); for (const k of ks) { ids.push(k.id); ok(k.color && k.yield.length, k.id); for (const [id] of k.yield) ok(ITEMS[id], id); } } eq(new Set(ids).size, ids.length); });
 test('forage rounds get harder and yields rise with hits', () => { for (let i = 1; i < ROUNDS.length; i++) { ok(ROUNDS[i].zone < ROUNDS[i - 1].zone); ok(ROUNDS[i].speed > ROUNDS[i - 1].speed); } for (let i = 1; i < YIELD_BY_HITS.length; i++) ok(YIELD_BY_HITS[i] >= YIELD_BY_HITS[i - 1]); });
 

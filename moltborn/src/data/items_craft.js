@@ -29,5 +29,9 @@ export const CRAFT_ITEMS = {
   salve:       { name: 'Glow Salve', type: 'dish', icon: ['potion', 'orange'], desc: 'A cooling paste that draws out burns, chills and bleeding.', use: { cleanse: 4, buffs: [{ id: 'regen', dur: 12 }] } },
 };
 
+// fish and the dishes cooked from them
+import { FISH_INGREDIENTS, FISH_DISHES } from './items_fish.js';
+Object.assign(CRAFT_ITEMS, FISH_INGREDIENTS, FISH_DISHES);
+
 export const INGREDIENT_IDS = Object.keys(CRAFT_ITEMS).filter((k) => CRAFT_ITEMS[k].type === 'ingredient');
 export const DISH_IDS = Object.keys(CRAFT_ITEMS).filter((k) => CRAFT_ITEMS[k].type === 'dish');
