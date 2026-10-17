@@ -83,3 +83,16 @@ export function buySkill(state, id) {
   if (n.ability && !state.abilities.includes(n.ability)) { state.abilities.push(n.ability); const i = state.slots.indexOf(null); if (i >= 0 && i < FORMS[state.form].abilitySlots) state.slots[i] = n.ability; }
   return true;
 }
+
+// ---- respec: give the skill points back, for a price ---------------------------------------------------------------------------------
+export const respecCost = (state) => (state.level < 6 ? 0 : 40 + state.level * 12);
+export function respec(state) {
+  const spent = Object.keys(state.skills).reduce((n, id) => n + (SKILLS[id]?.cost || 0), 0); if (!spent) return false;
+  const cost = respecCost(state); if (state.coins < cost) return false;
+  const branchAbilities = new Set(Object.values(state.branches).map((b) => BRANCHES[b]?.ability).filter(Boolean));
+  for (const id of Object.keys(state.skills)) {
+    const a = SKILLS[id]?.ability; if (!a || branchAbilities.has(a)) continue;
+    state.abilities = state.abilities.filter((x) => x !== a); state.slots = state.slots.map((x) => (x === a ? null : x));
+  }
+  state.sp += spent; state.skills = {}; state.coins -= cost; return true;
+}

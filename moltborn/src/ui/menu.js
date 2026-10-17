@@ -82,6 +82,7 @@ export class MenuScene {
   // ===================== SKILLS =====================
   u_SKILLS(inp, s) {
     const keys = Object.keys(SKILL_BRANCHES), g = this.g;
+    if (this.respecNav(inp, s)) return;
     if (inp.pressed('left')) { s.i = (s.i + 7) % 8; g.audio.sfx('tick'); } if (inp.pressed('right')) { s.i = (s.i + 1) % 8; g.audio.sfx('tick'); }
     if (inp.pressed('up')) { s.j = (s.j + 4) % 5; g.audio.sfx('tick'); } if (inp.pressed('down')) { s.j = (s.j + 1) % 5; g.audio.sfx('tick'); }
     if (inp.pressed('confirm')) {
@@ -92,7 +93,7 @@ export class MenuScene {
   nodeAt(s) { const b = Object.keys(SKILL_BRANCHES)[s.i >> 1], col = s.i & 1; return Object.keys(SKILLS).find((k) => SKILLS[k].branch === b && SKILLS[k].col === col && SKILLS[k].row === s.j); }
   d_SKILLS(ctx, s) {
     const st = this.g.state; const bs = Object.keys(SKILL_BRANCHES);
-    text(ctx, `Skill Points: ${st.sp}`, 10, 20, '#9ad8ff'); text(ctx, 'Earned by levelling (1/level) and by defeating bosses.', 120, 20, COL.dim);
+    text(ctx, `Skill Points: ${st.sp}`, 10, 20, '#9ad8ff'); text(ctx, 'Earned by levelling and bosses.', 100, 20, COL.dim); this.drawRespec(ctx, s);
     bs.forEach((b, bi) => {
       const x0 = 8 + bi * 116, B = SKILL_BRANCHES[b];
       panel(ctx, x0, 32, 112, 150, { border: B.color }); text(ctx, B.name + ' — ' + B.desc, x0 + 6, 36, B.color);
@@ -215,7 +216,7 @@ export class MenuScene {
       if (cnt) text(ctx, cnt, 234 - textWidth(cnt), y + 1, eq ? COL.gold : COL.dim);
     });
     panel(ctx, 246, 38, 226, 154);
-    const id = list[s.i]; if (id) { const it = ITEMS[id]; ctx.drawImage(itemIcon(id), 252, 44); text(ctx, it.name, 272, 48, COL.gold); wrapText(it.desc, 214).forEach((l, i) => text(ctx, l, 252, 66 + i * 10, COL.text)); if (it.type === 'consumable' || it.type === 'dish') text(ctx, 'ENTER: use', 252, 176, COL.green); else if (it.type === 'ingredient') text(ctx, 'Cook it in the CRAFT tab', 252, 176, COL.dim); else if (it.type === 'equip') text(ctx, st.equip[it.slot] === id ? 'ENTER: unequip' : 'ENTER: equip', 252, 176, COL.green); else if (it.type === 'mutation') text(ctx, st.mutations.includes(id) ? 'ENTER: remove' : 'ENTER: activate', 252, 176, COL.green); if (st.upgrades[id]) text(ctx, 'Reforged +' + st.upgrades[id], 252, 164, '#ffd8a0'); if (it.type === 'equip') this.drawSetInfo(ctx, id, 252, 126); }
+    const id = list[s.i]; if (id) { const it = ITEMS[id]; ctx.drawImage(itemIcon(id), 252, 44); text(ctx, it.name, 272, 48, COL.gold); wrapText(it.desc, 214).forEach((l, i) => text(ctx, l, 252, 66 + i * 10, COL.text)); if (it.type === 'consumable' || it.type === 'dish') text(ctx, 'ENTER: use', 252, 176, COL.green); else if (it.type === 'ingredient') text(ctx, 'Cook it in the CRAFT tab', 252, 176, COL.dim); else if (it.type === 'equip') text(ctx, st.equip[it.slot] === id ? 'ENTER: unequip' : 'ENTER: equip', 252, 176, COL.green); else if (it.type === 'mutation') text(ctx, st.mutations.includes(id) ? 'ENTER: remove' : 'ENTER: activate', 252, 176, COL.green); if (st.upgrades[id]) text(ctx, 'Reforged +' + st.upgrades[id], 252, 164, '#ffd8a0'); if (it.type === 'equip') { const n = this.drawCompare(ctx, id, 252, 104); this.drawSetInfo(ctx, id, 252, 104 + n * 10 + (n ? 4 : 0)); } }
     panel(ctx, 8, 196, 464, 54);
     ['shell', 'claw', 'charm'].forEach((sl, i) => { const x = 14 + i * 76, id = st.equip[sl]; panel(ctx, x, 202, 24, 24, { border: id ? COL.gold : '#2a3a58' }); if (id) ctx.drawImage(itemIcon(id), x + 4, 206); text(ctx, sl.toUpperCase(), x + 28, 205, COL.dim); text(ctx, id ? ITEMS[id].name.slice(0, 11) : 'empty', x + 28, 215, id ? COL.text : '#506080'); });
     text(ctx, `Mutation slots`, 250, 203, COL.dim);

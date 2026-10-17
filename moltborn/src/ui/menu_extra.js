@@ -15,6 +15,9 @@ import { drawFrame } from '../entities/entity.js';
 import { drawTrophyGlyph } from '../systems/achievements.js';
 import { clamp } from '../core/util.js';
 import { SETS, SET_OF } from '../data/sets.js';
+import { computeStats, respec, respecCost } from '../systems/progression.js';
+import { buildZone } from '../data/zones.js';
+import { BIOMES } from '../data/biomes.js';
 
 export const EXTRA_TABS = ['BEAST', 'TROPHY', 'CRAFT'];
 export const EXTRA_LABELS = { BEAST: 'BEAST', TROPHY: 'TROPHY', CRAFT: 'CRAFT' };
@@ -200,29 +203,45 @@ const craft = {
   },
 };
 
-// ======================================================= SHRINE TRAVEL (map tab) =========================================
-const travel = {
+// ======================================================= MAP: completion and shrine travel =============================================
+const zoneCache = {};
+function zoneTotals(id) {
+  if (zoneCache[id]) return zoneCache[id];
+  const z = buildZone(id), chests = z.props.filter((p) => p.type === 'chest' && !p.small), murals = z.props.filter((p) => p.type === 'mural'), forage = z.props.filter((p) => p.type === 'forage');
+  return (zoneCache[id] = { chests: chests.map((p) => p.key || `${id}:chest:${Math.round(p.x)}:${Math.round(p.y)}`), murals: murals.map((p) => p.codex), forage: forage.length, boss: ZONE_INFO[id].boss || null });
+}
+const mapx = {
+  mapList() { return Object.keys(ZONE_INFO).filter((id) => this.g.state.visited[id]).sort((a, b) => ZONE_INFO[a].map.x - ZONE_INFO[b].map.x || ZONE_INFO[a].map.y - ZONE_INFO[b].map.y); },
   travelNav(inp, s) {
-    const g = this.g, T = g.systems.travel, list = T.list(); if (!list.length) return;
+    const g = this.g, T = g.systems.travel, list = this.mapList(); if (!list.length) return;
     s.i = clamp(s.i ?? 0, 0, list.length - 1);
     if (inp.pressed('left') || inp.pressed('up')) { s.i = (s.i + list.length - 1) % list.length; g.audio.sfx('tick'); }
     if (inp.pressed('right') || inp.pressed('down')) { s.i = (s.i + 1) % list.length; g.audio.sfx('tick'); }
-    if (inp.pressed('confirm')) { const why = T.blocked(); if (why) { g.audio.sfx('deny'); this.say(why); } else T.go(list[s.i]); }
+    if (inp.pressed('confirm')) { const id = list[s.i]; if (!T.shrines[id]) { g.audio.sfx('deny'); this.say('No shrine known here yet'); return; } const why = T.blocked(); if (why) { g.audio.sfx('deny'); this.say(why); } else T.go(id); }
+  },
+  zoneCompletion(id) {
+    const g = this.g, tot = zoneTotals(id), zs = g.state.zones[id] || {}, opened = zs.opened || {};
+    const fog = typeof zs.fog === 'string' ? zs.fog : '', seen = fog ? fog.split('').filter((c) => c === '1').length / fog.length : 0;
+    return { chests: [tot.chests.filter((k) => opened[k]).length, tot.chests.length], murals: [tot.murals.filter((c) => g.state.codex[c]).length, tot.murals.length], forage: tot.forage, boss: tot.boss, bossDown: tot.boss ? !!g.state.bosses[tot.boss] : false, explored: seen };
   },
   drawTravel(ctx, s) {
-    const g = this.g, T = g.systems.travel, list = T.list(), cur = g.world.zone.id;
+    const g = this.g, T = g.systems.travel, list = this.mapList(), cur = g.world.zone.id;
     text(ctx, 'Red = boss   Pink = shrine   Flashing = you', 14, 238, COL.dim);
-    if (!list.length) { text(ctx, 'Rest at a shrine to add it to the travel map.', 14, 226, '#7a90b0'); return; }
+    if (!list.length) return;
     const cw = 46, ch = 24, gx = 22, gy = 20;
-    list.forEach((id, i) => {
-      const m = ZONE_INFO[id].map, x = 28 + m.x * (cw + gx), y = 40 + m.y * (ch + gy), sel = i === s.i;
+    for (const id of Object.keys(T.shrines)) {
+      if (!ZONE_INFO[id]) continue; const m = ZONE_INFO[id].map, x = 28 + m.x * (cw + gx), y = 40 + m.y * (ch + gy);
       ctx.fillStyle = '#ff9ad8'; ctx.fillRect(x + cw - 7, y + 2, 5, 5); ctx.fillStyle = '#05030a'; ctx.fillRect(x + cw - 6, y + 3, 3, 3); ctx.fillStyle = '#ffd8f0'; ctx.fillRect(x + cw - 5, y + 4, 1, 1);
-      if (sel) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.strokeRect(x - 2.5, y - 2.5, cw + 5, ch + 5); }
-    });
-    const id = list[s.i], why = T.blocked(), here = id === cur;
-    const label = `${ZONE_INFO[id].name}${here ? '  (here)' : ''}`;
-    text(ctx, label, 14, 214, here ? COL.dim : '#ffffff');
-    text(ctx, why ? why : here ? 'You are already here' : 'ENTER: swim to this shrine', 14, 226, why || here ? '#7a90b0' : COL.green);
+    }
+    const id = list[s.i = clamp(s.i ?? 0, 0, list.length - 1)], m = ZONE_INFO[id].map, x = 28 + m.x * (cw + gx), y = 40 + m.y * (ch + gy);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.strokeRect(x - 2.5, y - 2.5, cw + 5, ch + 5);
+    // detail strip: what is left to find here
+    const c = this.zoneCompletion(id), here = id === cur, why = T.blocked(), shrine = !!T.shrines[id];
+    panel(ctx, 8, 198, 464, 36, { alpha: 0.85 });
+    text(ctx, `${ZONE_INFO[id].name}${here ? '  (here)' : ''}`, 14, 202, '#ffffff'); text(ctx, BIOMES[ZONE_INFO[id].biome].name, 14, 212, COL.dim);
+    const bits = [`Explored ${Math.round(c.explored * 100)}%`, `Chests ${c.chests[0]}/${c.chests[1]}`, `Murals ${c.murals[0]}/${c.murals[1]}`]; if (c.forage) bits.push(`Forage ${c.forage}`); if (c.boss) bits.push(c.bossDown ? 'Guardian defeated' : 'Guardian waits');
+    bits.forEach((b, i) => text(ctx, b, 150 + (i % 3) * 100, 202 + Math.floor(i / 3) * 10, b.startsWith('Guardian w') ? '#ff8a7a' : b.endsWith('defeated') ? COL.green : (b.includes('/') && b.split(' ')[1].split('/')[0] === b.split('/')[1]) ? COL.green : COL.text));
+    text(ctx, shrine ? (here ? 'You are at this shrine zone' : why ? why : 'ENTER: swim to this shrine') : 'No shrine known here', 14, 224, shrine && !why && !here ? COL.green : '#7a90b0');
   },
 };
 
@@ -237,4 +256,37 @@ const sets = {
   },
 };
 
-export function installMenuExtras(Menu) { Object.assign(Menu.prototype, beast, trophy, craft, travel, sets); }
+// ======================================================= EXTRAS: equipment comparison and skill reset ===================================
+const CMP = [['maxHp', 'Health', 1], ['atk', 'Attack', 1], ['def', 'Defence', 1], ['speed', 'Speed', 100], ['crit', 'Crit %', 100], ['tideRegen', 'Tide regen', 10], ['maxTide', 'Tide', 1], ['coinBonus', 'Coins %', 100], ['magnet', 'Reach', 1], ['heatResist', 'Heat %', 100]];
+const extras = {
+  // how the selected piece of gear would change the swimmer's numbers; returns the number of lines drawn
+  drawCompare(ctx, id, x, y) {
+    const it = ITEMS[id]; if (!it || it.type !== 'equip') return 0;
+    const st = this.g.state; if (st.equip[it.slot] === id) return 0;
+    const cur = computeStats(st), nxt = computeStats({ ...st, equip: { ...st.equip, [it.slot]: id } });
+    let n = 0;
+    for (const [k, label, mul] of CMP) {
+      const d = (nxt[k] - cur[k]) * mul; if (Math.abs(d) < 0.05) continue;
+      const s = `${label} ${d > 0 ? '+' : ''}${Math.abs(d) < 10 ? d.toFixed(1) : Math.round(d)}`; text(ctx, s, x + (n % 2) * 100, y + Math.floor(n / 2) * 10, d > 0 ? COL.green : COL.red); n++; if (n >= 8) break;
+    }
+    return Math.ceil(n / 2);
+  },
+  // R in the skills tab: reset skills for a fee
+  respecNav(inp, s) {
+    const g = this.g, st = g.state;
+    if (s.confirmRespec) {
+      if (inp.pressed('confirm')) { s.confirmRespec = false; if (respec(st)) { g.world.player.recalc(); g.audio.sfx('revive'); this.say('Skills reset'); } else { g.audio.sfx('deny'); this.say('Not enough coins'); } }
+      else if (inp.rawPressed('KeyN')) { s.confirmRespec = false; g.audio.sfx('back'); }
+      return true;
+    }
+    if (inp.rawPressed('KeyR')) { if (!Object.keys(st.skills).length) { g.audio.sfx('deny'); this.say('No skills to reset'); } else { s.confirmRespec = true; g.audio.sfx('select'); } return true; }
+    return false;
+  },
+  drawRespec(ctx, s) {
+    const st = this.g.state, cost = respecCost(st);
+    text(ctx, cost ? `R: reset skills (${cost} coins)` : 'R: reset skills (free for now)', 472 - textWidth(cost ? `R: reset skills (${cost} coins)` : 'R: reset skills (free for now)'), 20, '#7a90b0');
+    if (s.confirmRespec) { panel(ctx, 110, 112, 260, 44, { border: '#ffb070' }); text(ctx, `Refund all skill points for ${cost} coins?`, 120, 120, '#ffd8a0'); text(ctx, 'ENTER = yes    N = no', 120, 136, COL.dim); }
+  },
+};
+
+export function installMenuExtras(Menu) { Object.assign(Menu.prototype, beast, trophy, craft, mapx, sets, extras); }
