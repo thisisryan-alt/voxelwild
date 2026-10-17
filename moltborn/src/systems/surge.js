@@ -73,20 +73,20 @@ export class Surge {
 
   begin() {
     const g = this.g, w = g.world; this.state = 'warn'; this.t = 0; this.dir = this.r() < 0.5 ? -1 : 1;
-    g.toast('The water draws back... a surge is coming.', '#9ad8ff'); g.audio.sfx('rift'); w.shake(2); w.fx.ring(w.player.x, w.player.y, 6, 70, 0.8, '#9ad8ff', 2);
+    g.toast('The water draws back... a surge is coming.', '#9ad8ff'); w.shake(2); w.fx.ring(w.player.x, w.player.y, 6, 70, 0.8, '#9ad8ff', 2);
     g.events.emit('surge', 'warn');
   }
   rush() {
     const g = this.g, w = g.world, z = w.zone; this.state = 'rush'; this.t = 0;
     this.area = { kind: 'current', x: 0, y: 0, w: z.w * TS, h: z.h * TS, vx: this.dir * SURGE.force, vy: 0, ttl: SURGE.length + 0.5 };
-    z.areas.push(this.area); g.audio.sfx('whirl'); w.shake(3); w.sky?.force('surge', { dir: this.dir });
+    z.areas.push(this.area); w.shake(3); w.sky?.force('surge', { dir: this.dir });
     g.toast(this.dir > 0 ? 'The surge pours east.' : 'The surge pours west.', '#cfeeff'); g.events.emit('surge', 'rush');
   }
   calm() {
     const g = this.g, w = g.world; this.state = 'wake'; this.t = 0;
     const i = w.zone.areas.indexOf(this.area); if (i >= 0) w.zone.areas.splice(i, 1); this.area = null;
     const n = Math.round(inRange(SURGE.flotsam, this.r())), pieces = rollFlotsam(this.r, w.zone.biome, n);
-    this.leave(pieces); g.toast('The surge passes. Flotsam litters the floor.', '#ffe9a8'); g.audio.sfx('wave_clear'); g.events.emit('surge', 'calm');
+    this.leave(pieces); g.toast('The surge passes. Flotsam litters the floor.', '#ffe9a8'); g.events.emit('surge', 'calm');
     if (g.state.records) g.state.records.surges = (g.state.records.surges || 0) + 1;
   }
 

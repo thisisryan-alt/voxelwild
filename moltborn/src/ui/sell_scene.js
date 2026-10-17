@@ -18,9 +18,9 @@ export class SellScene {
     const n = this.list.length; if (!n) return;
     if (inp.pressed('up')) { this.sel = (this.sel + n - 1) % n; g.audio.sfx('tick'); } if (inp.pressed('down')) { this.sel = (this.sel + 1) % n; g.audio.sfx('tick'); }
     const e = this.list[this.sel];
-    if (inp.pressed('confirm')) { const c = M.sell(this.buyer, e.id, 1); this.earned += c; g.audio.sfx('coin'); this.say(`Sold ${ITEMS[e.id].name} for ${c}`); this.refresh(); }
-    else if (inp.pressed('right')) { const c = M.sell(this.buyer, e.id, e.n); this.earned += c; g.audio.sfx('coin'); this.say(`Sold ${e.n} for ${c}`); this.refresh(); }
-    else if (inp.pressed('ab1') || inp.pressed('heal')) { const c = M.sellAll(this.buyer); this.earned += c; g.audio.sfx('coin'); this.say(`Sold everything for ${c}`); this.refresh(); }
+    if (inp.pressed('confirm')) { const c = M.sell(this.buyer, e.id, 1); this.earned += c; this.say(`Sold ${ITEMS[e.id].name} for ${c}`); this.refresh(); }
+    else if (inp.pressed('right')) { const c = M.sell(this.buyer, e.id, e.n); this.earned += c; this.say(`Sold ${e.n} for ${c}`); this.refresh(); }
+    else if (inp.pressed('ab1') || inp.pressed('heal')) { const c = M.sellAll(this.buyer); this.earned += c; this.say(`Sold everything for ${c}`); this.refresh(); }
   }
   draw(ctx) {
     const g = this.g, B = BUYERS[this.buyer];

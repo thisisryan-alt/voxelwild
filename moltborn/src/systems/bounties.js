@@ -63,7 +63,7 @@ export class Bounties {
     const g = this.g, st = this.state; if (b.claimed || !this.complete(b)) return false;
     b.claimed = true; st.claimed++; g.state.coins += b.coins; g.state.stats.coinsEarned += b.coins; g.giveXp(b.xp, g.world.player.x, g.world.player.y);
     if (b.pearl) g.grantItem('pearl', b.pearl, true);
-    g.audio.sfx('coin'); g.toast(`Bounty paid: ${b.coins} coins`, '#ffd84a'); g.events.emit('bounty', b);
+    g.toast(`Bounty paid: ${b.coins} coins`, '#ffd84a'); g.events.emit('bounty', b);
     if (st.list.every((x) => x.claimed) && st.lastFull !== st.day) {
       st.lastFull = st.day; st.streak++; st.best = Math.max(st.best || 0, st.streak); const bonus = this.streakBonus(); g.events.emit('bountyboard', st.streak);
       if (bonus) { g.grantItem('pearl', bonus, true); g.toast(`Board cleared! ${st.streak}-day streak: +${bonus} pearl${bonus > 1 ? 's' : ''}`, '#ff9ad8'); } else g.toast(`Board cleared! ${st.streak}-day streak`, '#ff9ad8');

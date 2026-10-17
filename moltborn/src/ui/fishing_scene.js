@@ -13,7 +13,7 @@ export class FishingScene {
     this.F = game.systems.fishing; this.r = rng(Math.floor(game.state.playtime * 9) + spot.seed);
     this.wait = (WAIT[0] + this.r() * (WAIT[1] - WAIT[0])) * (1 - biteSpeedup(game.state.companion?.level || 0)); this.catchInfo = null; this.reel = null; this.msg = ''; this.result = null; this.bite = 0; this.bob = 0; this.ripples = [];
   }
-  onEnter() { this.g.audio.sfx('select'); this.g.audio.setMuffle?.(0.3); }
+  onEnter() { this.g.audio.sfx('cast'); this.g.audio.setMuffle?.(0.3); }
   onExit() { this.g.audio.setMuffle?.(0); }
 
   leave(cooled = 0) { if (cooled) this.F.cool(this.spot.zs, this.spot.key, cooled); this.g.engine.pop(); }
@@ -24,17 +24,18 @@ export class FishingScene {
       if (inp.pressed('cancel')) { g.audio.sfx('back'); this.leave(); return; }
       this.cast += dt; if (this.cast > this.wait) {
         this.catchInfo = F.pick(this.spot, Math.floor(this.t * 10)); if (!this.catchInfo) { this.state = 'empty'; this.t = 0; return; }
-        this.state = 'bite'; this.bite = 0; g.audio.sfx('alert'); this.ripples.push({ t: 0 }, { t: -0.2 });
+        this.state = 'bite'; this.bite = 0; g.audio.sfx('bite'); this.ripples.push({ t: 0 }, { t: -0.2 });
       }
     } else if (this.state === 'bite') {
-      this.bite += dt; if (this.bite % 0.35 < dt) this.ripples.push({ t: 0 });
+      this.bite += dt; if (this.bite % 0.35 < dt) { this.ripples.push({ t: 0 }); g.audio.sfx('nibble'); }
       if (inp.pressed('confirm') || inp.pressed('attack')) { this.state = 'reel'; this.reel = new Reel(this.catchInfo.fish, F.skill(), this.catchInfo.seed); g.audio.sfx('select'); }
       else if (this.bite > HOOK_WINDOW) { this.state = 'away'; this.t = 0; this.msg = 'It slipped the hook.'; g.audio.sfx('deny'); F.cool(this.spot.zs, this.spot.key, 0.3); }
       else if (inp.pressed('cancel')) { this.leave(); }
     } else if (this.state === 'reel') {
       const st = this.reel.step(dt, inp.isDown('confirm') || inp.isDown('attack') || inp.isDown('jump'));
-      if (st === 'won') { this.result = F.landed(this.catchInfo); this.state = 'caught'; this.t = 0; g.audio.sfx('wave_clear'); this.spot && F.cool(this.spot.zs, this.spot.key, 1); }
-      else if (st === 'lost') { this.state = 'away'; this.t = 0; this.msg = 'The line goes slack. It is gone.'; g.audio.sfx('deny'); F.cool(this.spot.zs, this.spot.key, 0.5); }
+      this.tickT = (this.tickT || 0) - dt; if (this.tickT <= 0 && this.reel.inside) { this.tickT = 0.16; g.audio.sfx('reel_tick', { k: this.reel.progress }); }
+      if (st === 'won') { this.result = F.landed(this.catchInfo); this.state = 'caught'; this.t = 0; this.spot && F.cool(this.spot.zs, this.spot.key, 1); }
+      else if (st === 'lost') { this.state = 'away'; this.t = 0; this.msg = 'The line goes slack. It is gone.'; g.audio.sfx('line_snap'); F.cool(this.spot.zs, this.spot.key, 0.5); }
       else if (inp.pressed('cancel')) { this.state = 'away'; this.t = 0; this.msg = 'You let it go.'; F.cool(this.spot.zs, this.spot.key, 0.5); }
     } else if (this.state === 'caught' || this.state === 'away' || this.state === 'empty') {
       if (this.t > 0.5 && (inp.pressed('confirm') || inp.pressed('cancel'))) this.leave();
