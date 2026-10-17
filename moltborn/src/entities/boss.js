@@ -15,7 +15,7 @@ export class Boss extends Enemy {
   constructor(world, x, y, spawn = {}) {
     const def = new.target.def; ENEMIES[def.key] = { noop: true, ai: 'noop', boss: true, dmg: def.contact ?? 0, anchor: 'center', fps: 6, coins: null, ...def, sprite: def.sprite || { plan: 'wisp', w: 8, h: 8, ax: 4, ay: 4, frames: 1, o: {} } };
     super(world, def.key, x, y, { facing: -1 });
-    this.def = ENEMIES[def.key]; this.key = def.key; this.displayName = def.name; this.maxHp = this.hp = Math.round(def.hp * (spawn.hpMult || 1)); this.spawn = spawn;
+    this.def = ENEMIES[def.key]; this.key = def.key; this.displayName = def.name; this.maxHp = this.hp = Math.round(def.hp * (spawn.hpMult || 1) * (world.game.systems.difficulty?.scale().hp ?? 1)); this.spawn = spawn;
     this.arena = spawn.arena; this.trigger = spawn.trigger || spawn.arena; this.barriers = spawn.barriers || []; this.engaged = false; this.phaseIdx = 0; this.teles = [];
     this.armorMax = def.armor ?? 60; this.armor = this.armorMax; this.armorBar = this.armorMax > 0 ? 1 : 0; this.poiseShown = 1; this.staggerT = 0; this.invuln = true; this.transT = 0; this.script = null; this.deathScript = null;
     this.phases = def.phases; this.phaseMarks = this.phases.slice(1).map((p) => p.at); this.rage = 0; this.lastAtk = ''; this.restMul = 1; this.noKnock = true; this.dying = false; this.finished = false; this.dmgMult = 1; this.facing = -1; this.home = { x, y };

@@ -21,14 +21,14 @@ export class Input {
     this.pad = { held: {}, axisX: 0, axisY: 0 };
     this.frame = 0;
     this.lastDevice = 'keyboard';
-    this.reverse = new Map();
-    for (const [a, ks] of Object.entries(KEYMAP)) for (const k of ks) { if (!this.reverse.has(k)) this.reverse.set(k, []); this.reverse.get(k).push(a); }
+    this.reverse = new Map(); this.codeEdge = new Set(); this.lastCode = null;
+    this.rebuild();
     for (const a of Object.keys(KEYMAP)) { this.held[a] = false; this.edge[a] = false; this.ago[a] = 999; }
     if (typeof window !== 'undefined') {
       window.addEventListener('keydown', (e) => {
         if (PREVENT.has(e.code)) e.preventDefault();
         if (e.repeat) return;
-        this.keys.add(e.code); this.lastDevice = 'keyboard';
+        this.keys.add(e.code); this.lastDevice = 'keyboard'; this.codeEdge.add(e.code); this.lastCode = e.code;
         for (const a of this.reverse.get(e.code) || []) { this.edge[a] = true; this.ago[a] = 0; }
       });
       window.addEventListener('keyup', (e) => {
@@ -38,6 +38,13 @@ export class Input {
       window.addEventListener('blur', () => this.keys.clear());
     }
   }
+  // rebuild the key -> actions lookup after KEYMAP has been edited (rebinding)
+  rebuild() {
+    this.reverse.clear();
+    for (const [a, ks] of Object.entries(KEYMAP)) for (const k of ks) { if (!this.reverse.has(k)) this.reverse.set(k, []); this.reverse.get(k).push(a); }
+  }
+  // was this raw key code pressed since the last frame? (used by the controls screen)
+  rawPressed(code) { return this.codeEdge.has(code); }
   // call once at start of each fixed update
   poll() {
     this.frame++;
@@ -51,6 +58,7 @@ export class Input {
   // call once at end of each fixed update
   endFrame() {
     for (const a of Object.keys(this.held)) { this.edge[a] = false; this.released[a] = false; if (this.ago[a] < 999) this.ago[a]++; }
+    this.codeEdge.clear();
   }
   isDown(a) { return !!this.held[a]; }
   pressed(a) { return !!this.edge[a]; }

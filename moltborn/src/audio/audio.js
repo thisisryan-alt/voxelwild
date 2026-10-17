@@ -166,3 +166,6 @@ R('bosswarn', (a, o) => { a.tone({ f: 70, f2: 50, dur: 1.4, v: 0.7, type: 'sawto
 R('roar', (a, o) => { a.tone({ f: 110, f2: 55, dur: 1.1, v: 0.6, type: 'sawtooth', filter: 'lowpass', ff: 600, rev: 0.7 }); a.noise({ dur: 1.1, f1: 300, f2: 120, v: 0.5, q: 0.5 }); });
 R('thunder', (a, o) => { a.noise({ dur: 1.4, f1: 700, f2: 60, v: 0.9, attack: 0.02 }); a.tone({ f: 60, f2: 25, dur: 1.2, v: 0.8 }); });
 R('gong', (a, o) => { a.tone({ f: 110, dur: 3, v: 0.5, fm: 80, fmr: 1.41, rev: 0.8 }); a.tone({ f: 220, dur: 2.5, v: 0.25, rev: 0.8 }); });
+
+// extension point for audio/feel.js and other modules that add sounds
+export const addRecipe = (name, fn) => { RECIPES[name] = fn; };

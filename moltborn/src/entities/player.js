@@ -293,7 +293,7 @@ export class Player extends Entity {
       w.fx.text(this.x, this.y - this.h / 2 - 8, this.aegis ? 'AEGIS' : 'AEGIS BREAKS', '#c8f0ff', true); this.sfx('clang'); this.game.hitstop(3); if (!this.aegis) this.aegisT = 0;
       return 'blocked';
     }
-    let dmg = src.dmg * this.status.mult('dmgIn'), blocked = false;
+    let dmg = src.dmg * this.status.mult('dmgIn') * (src.thorn ? 1 : this.game.systems.difficulty?.scale().dmg ?? 1), blocked = false;
     if (src.vent) dmg *= this.status.mult('heat');
     if (src.vent && S.heatResist) dmg *= 1 - S.heatResist;
     if (this.state === 'block' && !src.unblockable && !src.thorn) {

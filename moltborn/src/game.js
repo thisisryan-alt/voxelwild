@@ -33,6 +33,10 @@ import { PostFX } from './gfx/post.js';
 import { BodyReactions } from './entities/fx_body.js';
 import { Minimap } from './ui/minimap.js';
 import { Crafting } from './systems/crafting.js';
+import { Difficulty } from './systems/difficulty.js';
+import { AudioFeel } from './audio/feel.js';
+import { Haptics } from './core/haptics.js';
+import { applyKeymap } from './core/keymap.js';
 
 const rand = rng(8080);
 
@@ -44,10 +48,11 @@ export class Game {
     this.state = newState();
     const saved = Save.settings(); if (saved) Object.assign(this.state.settings, saved);
     ensureSettings(this.state.settings);
+    applyKeymap(this.input, this.state.settings.keymap);
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -73,6 +78,14 @@ export class Game {
     this.state.meta = { started: Date.now() }; ensureRecords(this.state);
     return this.enterWorld('reef_nursery', 'start', { newGame: true });
   }
+  // a new voyage that keeps the character (level, form, skills, gear, codex, trophies) but resets the world
+  newGamePlus(slot) {
+    const d = Save.read(slot); if (!d) return false;
+    this.slot = slot; this.state = newState(); this.state.settings = ensureSettings(Object.assign(this.state.settings, d.state.settings, Save.settings() || {}));
+    this.systems.difficulty.carry(d.state, this.state); ensureRecords(this.state);
+    this.audio.settings = this.state.settings; this.state.meta = { started: Date.now(), ng: this.state.ng };
+    return this.enterWorld('reef_nursery', 'start', { newGame: true });
+  }
   loadGame(slot) {
     const d = Save.read(slot); if (!d) return false;
     this.slot = slot; this.state = Object.assign(newState(), d.state); this.state.stats = Object.assign(newState().stats, d.state.stats); this.state.settings = ensureSettings(Object.assign(newState().settings, d.state.settings, Save.settings() || {}));
@@ -82,7 +95,7 @@ export class Game {
   saveGame(quiet) {
     const s = this.state, p = this.world?.player;
     if (p) { s.hp = p.hp; s.tide = p.tide; }
-    s.meta = { ...(s.meta || {}), zone: ZONE_INFO[this.world?.zone.id]?.name || this.world?.zone.name || '', level: s.level, form: s.form, playtime: Math.round(s.playtime), savedAt: Date.now(), coins: s.coins };
+    s.meta = { ...(s.meta || {}), zone: ZONE_INFO[this.world?.zone.id]?.name || this.world?.zone.name || '', level: s.level, form: s.form, playtime: Math.round(s.playtime), savedAt: Date.now(), coins: s.coins, ng: s.ng || 0 };
     this.systems.minimap?.flush();
     Save.write(this.slot, { v: 1, meta: s.meta, state: s });
     if (!quiet) { this.toast('Game saved', '#9ad8ff'); this.audio.sfx('save'); }
@@ -191,8 +204,9 @@ export class Game {
   onEnemyKilled(e, hit) {
     const w = this.world, p = w.player, d = e.def, s = this.state;
     s.stats.kills++;
-    this.giveXp(Math.round((d.xp || 1) * (e.xpMult || 1)), e.x, e.y);
-    const coins = d.coins ? Math.round(d.coins[0] + rand() * (d.coins[1] - d.coins[0])) : 0;
+    const D = this.systems.difficulty.scale();
+    this.giveXp(Math.round((d.xp || 1) * (e.xpMult || 1) * D.xp), e.x, e.y);
+    const coins = d.coins ? Math.round((d.coins[0] + rand() * (d.coins[1] - d.coins[0])) * D.coin * p.status.mult('coin')) : 0;
     if (coins) this.grantLoot({ coins }, e.x, e.y, false);
     const r = rand();
     if (r < 0.12) w.pickups.push(new Pickup(w, { kind: 'orb', id: 'hp', value: Math.max(6, Math.round(p.stats.maxHp * 0.08)), x: e.x, y: e.y, delay: 0.3 }));
@@ -231,5 +245,5 @@ export class Game {
     if (npcId === 'old_brine') return null;
     if (qs.some((id) => !q.log[id])) return '!'; return null;
   }
-  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); this.systems.minimap?.update(dt); }
+  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); this.systems.minimap?.update(dt); this.systems.audiofeel?.update(dt); }
 }

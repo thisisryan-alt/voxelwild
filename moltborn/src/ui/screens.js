@@ -2,6 +2,7 @@
 import { drawScene } from '../gfx/cutscene_art.js';
 import { panel, text, button, COL, drawText, textWidth, wrapText } from './ui.js';
 import { Save } from '../core/save.js';
+import { ControlsScene } from './controls_scene.js';
 import { ITEMS, SHOP } from '../data/items.js';
 import { FORMS, BRANCHES, EVOLUTIONS } from '../data/forms.js';
 import { itemIcon, formIcon } from '../gfx/sprites_ui.js';
@@ -21,7 +22,7 @@ export class TitleScene {
   onEnter() { this.g.audio.music.play('title'); this.g.audio.ambience('shallows'); }
   items() {
     const has = Save.list().some((s) => s.meta);
-    const l = []; if (has) l.push('CONTINUE'); l.push('NEW GAME'); if (has) l.push('LOAD GAME'); l.push('OPTIONS', 'CONTROLS', 'CREDITS'); return l;
+    const l = []; if (has) l.push('CONTINUE'); l.push('NEW GAME'); if (has && this.g.systems.difficulty?.available()) l.push('NEW GAME+'); if (has) l.push('LOAD GAME'); l.push('OPTIONS', 'CONTROLS', 'CREDITS'); return l;
   }
   update(dt) {
     const g = this.g, inp = g.input; this.t += dt;
@@ -32,9 +33,15 @@ export class TitleScene {
         g.audio.sfx('select'); const it = items[this.sel];
         if (it === 'CONTINUE') { const last = Save.list().filter((s) => s.meta).sort((a, b) => b.meta.savedAt - a.meta.savedAt)[0]; this.start('load', last.slot); }
         else if (it === 'NEW GAME') { this.mode = 'new'; this.slotSel = 0; }
+        else if (it === 'NEW GAME+') { this.mode = 'ngp'; this.slotSel = 0; }
         else if (it === 'LOAD GAME') { this.mode = 'load'; this.slotSel = 0; }
-        else if (it === 'OPTIONS') { g.openOptions?.(); } else if (it === 'CONTROLS') this.mode = 'controls'; else if (it === 'CREDITS') this.mode = 'credits';
+        else if (it === 'OPTIONS') { g.openOptions?.(); } else if (it === 'CONTROLS') g.engine.push(new ControlsScene(g)); else if (it === 'CREDITS') this.mode = 'credits';
       }
+    } else if (this.mode === 'ngp') {
+      const slots = Save.list();
+      if (inp.pressed('up')) { this.slotSel = (this.slotSel + 2) % 3; g.audio.sfx('tick'); } if (inp.pressed('down')) { this.slotSel = (this.slotSel + 1) % 3; g.audio.sfx('tick'); }
+      if (inp.pressed('cancel')) { this.mode = 'main'; g.audio.sfx('back'); }
+      if (inp.pressed('confirm')) { const s = slots[this.slotSel]; if (s.meta) { g.audio.sfx('select'); g.audio.unlock(); g.newGamePlus(s.slot); } else g.audio.sfx('deny'); }
     } else if (this.mode === 'load' || this.mode === 'new') {
       const slots = Save.list();
       if (inp.pressed('up')) { this.slotSel = (this.slotSel + 2) % 3; g.audio.sfx('tick'); } if (inp.pressed('down')) { this.slotSel = (this.slotSel + 1) % 3; g.audio.sfx('tick'); }
@@ -74,11 +81,12 @@ export class TitleScene {
     if (this.mode === 'main') {
       const items = this.items(); items.forEach((it, i) => { const y = 110 + i * 16, sel = i === this.sel; if (sel) { ctx.fillStyle = 'rgba(10,40,90,0.7)'; ctx.fillRect(176, y - 2, 128, 14); drawText(ctx, '▶', 182, y + 1, { color: '#ffd84a' }); } drawText(ctx, it, 240, y + 1, { color: sel ? '#ffffff' : '#a8c8e8', align: 'center', shadow: '#05204a' }); });
       const en = (this.g.state.settings.endings || []).length; drawText(ctx, 'Arrows + ENTER' + (en ? `     Endings ${en}/4` : ''), 240, 258, { color: '#6a9ad0', align: 'center' });
-    } else if (this.mode === 'load' || this.mode === 'new') {
-      panel(ctx, 60, 100, 360, 130, { alpha: 0.92 }); text(ctx, this.mode === 'new' ? 'NEW GAME — choose a slot' : 'LOAD GAME', 70, 106, COL.gold);
-      Save.list().forEach((s, i) => { const y = 120 + i * 32, sel = i === this.slotSel; panel(ctx, 68, y, 344, 28, { fill: sel ? '#1e4a7a' : '#0c1830', border: sel ? COL.borderLit : COL.border }); if (s.meta) { text(ctx, `Slot ${i + 1}  Lv ${s.meta.level}  ${FORMS[s.meta.form]?.name || ''}`, 76, y + 4, COL.text); text(ctx, `${s.meta.zone}   ${fmtTime(s.meta.playtime || 0)}   ${s.meta.coins ?? 0} coins`, 76, y + 15, COL.dim); } else text(ctx, `Slot ${i + 1}  —  empty`, 76, y + 10, '#6a8ab0'); });
+    } else if (this.mode === 'load' || this.mode === 'new' || this.mode === 'ngp') {
+      panel(ctx, 60, 100, 360, 130, { alpha: 0.92 }); text(ctx, this.mode === 'new' ? 'NEW GAME — choose a slot' : this.mode === 'ngp' ? 'NEW GAME+ — carry a character into a new voyage' : 'LOAD GAME', 70, 106, COL.gold);
+      Save.list().forEach((s, i) => { const y = 120 + i * 32, sel = i === this.slotSel; panel(ctx, 68, y, 344, 28, { fill: sel ? '#1e4a7a' : '#0c1830', border: sel ? COL.borderLit : COL.border }); if (s.meta) { text(ctx, `Slot ${i + 1}  Lv ${s.meta.level}  ${FORMS[s.meta.form]?.name || ''}${s.meta.ng ? '  NG+' + s.meta.ng : ''}`, 76, y + 4, COL.text); text(ctx, `${s.meta.zone}   ${fmtTime(s.meta.playtime || 0)}   ${s.meta.coins ?? 0} coins`, 76, y + 15, COL.dim); } else text(ctx, `Slot ${i + 1}  —  empty`, 76, y + 10, '#6a8ab0'); });
       if (this.confirm) { panel(ctx, 120, 150, 240, 44, { border: '#ff5a4a' }); text(ctx, 'Overwrite this save? ENTER = yes, ESC = no', 126, 166, '#ff9a7a'); }
       if (this.mode === 'load') text(ctx, 'K: delete slot', 70, 236, COL.dim);
+      if (this.mode === 'ngp') text(ctx, 'Keeps level, form, skills, gear and codex. The sea and its guardians return, stronger.', 70, 236, COL.dim);
     } else if (this.mode === 'controls') drawControls(ctx);
     else if (this.mode === 'credits') drawCredits(ctx);
   }
@@ -111,7 +119,7 @@ export class PauseScene {
       if (inp.pressed('pause') || inp.pressed('cancel')) { g.audio.sfx('back'); g.engine.pop(); return; }
       if (inp.pressed('confirm')) {
         const k = it[this.sel]; g.audio.sfx('select');
-        if (k === 'RESUME') g.engine.pop(); else if (k === 'SAVE GAME') { g.saveGame(); } else if (k === 'OPTIONS') { this.mode = 'options'; this.os = 0; } else if (k === 'CONTROLS') this.mode = 'controls';
+        if (k === 'RESUME') g.engine.pop(); else if (k === 'SAVE GAME') { g.saveGame(); } else if (k === 'OPTIONS') { this.mode = 'options'; this.os = 0; } else if (k === 'CONTROLS') g.engine.push(new ControlsScene(g));
         else if (k === 'QUIT TO TITLE') { g.saveGame(true); g.audio.music.stop?.(); g.world = null; g.engine.replace(new TitleScene(g)); }
       }
     } else if (this.mode === 'options') updateOptions(this, g, inp, () => { this.mode = 'main'; });
@@ -122,6 +130,7 @@ export class PauseScene {
     if (this.mode === 'main') {
       panel(ctx, 170, 70, 140, 120); drawText(ctx, 'PAUSED', 240, 78, { color: COL.gold, align: 'center', shadow: '#000' });
       this.items().forEach((k, i) => button(ctx, k, 180, 94 + i * 18, 120, 15, i === this.sel));
+      const dl = this.g.systems.difficulty?.label(); if (dl) drawText(ctx, dl, 240, 180, { color: COL.dim, align: 'center', shadow: '#000' });
     } else if (this.mode === 'options') drawOptions(ctx, this); else drawControls(ctx);
   }
 }

@@ -18,7 +18,7 @@ export class Enemy extends Entity {
     if (!def) throw new Error('unknown enemy ' + type);
     super(world, x, y, def.w, def.h);
     this.type = type; this.def = def; this.p = { ...def.p, ...(o.p || {}) };
-    this.maxHp = Math.round(def.hp * (o.hpMult || 1)); this.hp = this.maxHp;
+    this.maxHp = Math.round(def.hp * (o.hpMult || 1) * (def.friendly ? 1 : world.game.systems.difficulty?.scale().hp ?? 1)); this.hp = this.maxHp;
     this.maxPoise = def.poise ?? 8; this.poise = this.maxPoise;
     this.state = ''; this.st = 0; this.pose = 'move'; this.flash = 0; this.stunT = 0; this.invuln = false; this.scale = 1;
     this.contactMult = 1; this.contactCd = 0; this.losT = 0; this.los = false; this.a = null; this.phased = false; this.disguised = false;

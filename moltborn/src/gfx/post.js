@@ -30,19 +30,24 @@ export class PostFX {
     this.t = 0; this.chroma = 0; this.pulse = 0; this.lowHp = 0; this.beat = 0; this.ripples = []; this.heat = 0;
     this.frame = canvas(W, H); this.small = canvas(W / 4, H / 4); this.tiny = canvas(W / 8, H / 8);
     this.chan = null; this.vignette = null; this.scan = null; this.hurtVig = null;
-    this.lite = false; this.slowFor = 0; this.fastFor = 0;
+    this.lite = false; this.slowFor = 0; this.fastFor = 0; this.zoom = 0; this.zoomV = 0;
     this.stats = { bloom: false, bands: 0, chroma: false, haze: 0, ripples: 0 };
     const ev = game.events;
     ev.on('hurt', (n, src, blocked) => { const m = game.world?.player?.stats?.maxHp || 100; this.kick(blocked ? 0.4 : Math.min(3, 0.8 + (n / m) * 10)); });
-    ev.on('hitdealt', (e, dmg, crit) => { if (crit) this.kick(0.7); });
-    ev.on('bigshake', (x, y, a) => this.ripple(x, y, Math.min(3.5, a * 0.45)));
-    ev.on('boss', () => { this.kick(2.2); });
-    ev.on('playerdied', () => { this.kick(3); });
+    ev.on('hitdealt', (e, dmg, crit, hb) => { if (crit) this.kick(0.7); if (crit || hb?.heavy) this.punch(hb?.heavy ? 0.022 : 0.012); });
+    ev.on('bigshake', (x, y, a) => { this.ripple(x, y, Math.min(3.5, a * 0.45)); this.punch(Math.min(0.045, a * 0.005)); });
+    ev.on('boss', () => { this.kick(2.2); this.punch(0.05); });
+    ev.on('playerdied', () => { this.kick(3); this.punch(0.06); });
     ev.on('zone', () => { this.ripples.length = 0; this.chroma = 0; });
   }
 
   // ---- triggers -------------------------------------------------------------------------------------------------------
   kick(amount) { this.chroma = Math.max(this.chroma, amount * (setting(this.g, 'reduceFlashes') ? 0.25 : 1)); this.pulse = Math.max(this.pulse, amount); }
+  // a quick push-in of the whole picture that settles back: the camera "flinching" at a big moment
+  punch(amount) {
+    const k = setting(this.g, 'cameraPunch'); if (!k || setting(this.g, 'reduceMotion')) return;
+    this.zoomV += amount * k * 22;
+  }
   ripple(x, y, amp) {
     if (setting(this.g, 'reduceMotion') || setting(this.g, 'wobble') <= 0) return;
     if (this.ripples.length < 4) this.ripples.push({ x, y, t: 0, life: 0.7, amp, r0: 6 });
@@ -52,6 +57,7 @@ export class PostFX {
     this.t += dt;
     this.chroma = Math.max(0, this.chroma - dt * 7); this.pulse = Math.max(0, this.pulse - dt * 4);
     for (const r of this.ripples) r.t += dt;
+    this.zoomV += (-this.zoom * 260 - this.zoomV * 20) * dt; this.zoom = clamp(this.zoom + this.zoomV * dt, -0.02, 0.09);
     this.ripples = this.ripples.filter((r) => r.t < r.life);
     const p = this.g.world?.player;
     const want = p && p.alive ? clamp((0.38 - p.hp / p.stats.maxHp) / 0.3, 0, 1) : 0;
@@ -81,6 +87,7 @@ export class PostFX {
       if (this.chroma > 0.05) this.aberrate(ctx);
     }
     if (this.lowHp > 0.03) this.hurtLook(ctx);
+    if (this.zoom > 0.004 || this.zoom < -0.004) this.applyZoom(ctx, world, cam);
     if (setting(g, 'scanlines')) this.scanlines(ctx);
   }
 
@@ -196,6 +203,15 @@ export class PostFX {
     }
     const beat = calm ? 0.5 : 0.5 + 0.5 * Math.sin(this.beat * Math.PI * 2 - 1.2) ** 3;
     ctx.globalAlpha = k * (0.25 + 0.45 * beat); ctx.drawImage(this.hurtVig, 0, 0); ctx.globalAlpha = 1;
+  }
+
+  // scale the finished picture about the swimmer; the frame buffer is refreshed so earlier passes are included
+  applyZoom(ctx, world, cam) {
+    const f = this.frame.getContext('2d'); f.globalCompositeOperation = 'copy'; f.drawImage(ctx.canvas, 0, 0); f.globalCompositeOperation = 'source-over';
+    const k = 1 + this.zoom, p = world.player, ax = clamp(p.x - cam.x, 60, W - 60), ay = clamp(p.y - cam.y, 40, H - 40);
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.frame, 0, 0, W, H, Math.round(ax - ax * k), Math.round(ay - ay * k), Math.round(W * k), Math.round(H * k));
+    ctx.restore();
   }
 
   scanlines(ctx) {
