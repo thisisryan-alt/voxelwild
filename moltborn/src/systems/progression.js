@@ -2,6 +2,8 @@
 import { FORMS, BRANCHES, xpToNext, LEVEL_CAP } from '../data/forms.js';
 import { SKILLS } from '../data/skills.js';
 import { ITEMS } from '../data/items.js';
+import { defaults as settingDefaults } from './settings.js';
+import { newRecords } from './stats.js';
 
 export function newState() {
   return {
@@ -14,8 +16,8 @@ export function newState() {
     flags: {}, quests: {}, codex: {}, zones: {}, visited: {}, bosses: {},
     checkpoint: { zone: 'reef_nursery', entry: 'start' }, purse: null,
     stats: { kills: 0, deaths: 0, coinsEarned: 0, secrets: 0, parries: 0 },
-    settings: { music: 0.7, sfx: 0.8, shake: 1, ui: 1 },
-    upgrades: {},
+    settings: settingDefaults(),
+    upgrades: {}, records: newRecords(), trophies: {},
   };
 }
 
@@ -31,7 +33,7 @@ export function computeStats(state) {
     maxHp: base.hp + (state.level - 1) * 4, maxTide: base.tide + (state.level - 1) * 1.2, atk: base.atk + (state.level - 1) * 0.5, def: base.def,
     crit: 0.05, critMult: 1.6, speed: 1, dmg: 0, heavyDmg: 0, abilityDmg: 0, comboWindow: 0, atkSpeed: 0, chargeSpeed: 0, execute: 0, furyGain: 0, reach: 0,
     thorns: 0, parryWindow: 0, parryTide: 0, poise: base.poise, secondWind: 0, dashDist: 0, dashCd: 0, strokes: 0, iframes: 0, currentResist: 0,
-    tideRegen: 0, cooldown: 0, ultCharge: 0, tideCost: 0, pressure: base.pressure, light: 0, magnet: 40, coinBonus: 0, discount: 0, lifeOnKill: 0, poison: 0, poisonResist: 0, sense: 0, crit2: 0, regen: 0, killRush: 0, dashStrike: 0, abKillTide: 0, heatResist: 0,
+    tideRegen: 0, cooldown: 0, ultCharge: 0, tideCost: 0, pressure: base.pressure, light: 0, magnet: 40, coinBonus: 0, discount: 0, lifeOnKill: 0, poison: 0, poisonResist: 0, sense: 0, crit2: 0, regen: 0, killRush: 0, dashStrike: 0, abKillTide: 0, heatResist: 0, hitBurn: 0, hitChill: 0, hitBleed: 0,
   };
   const mult = { hp: 1, atk: 1, def: 1, tide: 1, speed: 1 };
   // branches earned so far all contribute

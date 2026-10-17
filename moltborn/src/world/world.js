@@ -13,6 +13,7 @@ import { BIOMES } from '../data/biomes.js';
 import { ENEMIES } from '../data/enemies.js';
 import { createBoss } from '../entities/bosses.js';
 import { clamp, rng, rectsOverlap } from '../core/util.js';
+import { bodyBlocked } from './physics.js';
 
 const rand = rng(2024);
 
@@ -30,7 +31,18 @@ export class World {
     const entry = zone.entries[entryName] || Object.values(zone.entries)[0];
     this.player = new Player(this, entry.x, entry.y - 6, game);
     this.player.y = entry.y - this.player.h / 2 - 0.5; this.player.facing = entry.facing || 1;
+    this.clearSpawn(this.player);
     this.snapCamera();
+  }
+  // a broad form can arrive wedged against a rock lip beside a narrow entry: slide it to the nearest spot that fits
+  clearSpawn(b) {
+    if (!bodyBlocked(this.grid, b)) return;
+    const ox = b.x, oy = b.y; let best = null, bd = Infinity;
+    for (let dy = 0; dy <= 48; dy += 4) for (let dx = -64; dx <= 64; dx += 4) {
+      b.x = ox + dx; b.y = oy - dy;
+      const d = Math.hypot(dx, dy * 1.5); if (d < bd && !bodyBlocked(this.grid, b)) { bd = d; best = [b.x, b.y]; }
+    }
+    if (best) { b.x = best[0]; b.y = best[1]; } else { b.x = ox; b.y = oy; }
   }
   zs() { return this.game.zoneState(this.zone.id); }
   applyBroken() { const zs = this.zs(); for (const k of Object.keys(zs.broken || {})) { const [x, y] = k.split(',').map(Number); this.grid.set(x, y, T.AIR); } }
@@ -159,7 +171,7 @@ export class World {
           if (!e.alive || hb.hits.has(e) || !e.canBeHit()) continue;
           const boxes = e.hurtBoxes ? e.hurtBoxes() : [e.hurtBox()]; if (!boxes.some((b) => rectsOverlap(hb, b))) continue;
           hb.hits.add(e);
-          let dmg = hb.dmg, crit = false;
+          let dmg = hb.dmg * pl.status.mult('dmgOut'), crit = false;
           if (hb.crit && rand() < S.crit) { crit = true; dmg *= S.critMult; }
           if (hb.crit && S.execute && e.hp / e.maxHp < 0.3) dmg *= 1 + S.execute;
           if (pl.stats.dmg && !hb.crit) dmg *= 1 + 0;

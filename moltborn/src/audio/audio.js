@@ -35,7 +35,7 @@ export class AudioSys {
     const s = this.settings, t = this.ctx.currentTime;
     this.sfxBus.gain.setTargetAtTime(this.muted ? 0 : (s.sfx ?? 0.8) * 0.9, t, 0.05);
     this.musicBus.gain.setTargetAtTime(this.muted ? 0 : (s.music ?? 0.7) * 0.9, t, 0.05);
-    this.ambBus.gain.setTargetAtTime(this.muted ? 0 : (s.sfx ?? 0.8) * 0.5, t, 0.05);
+    this.ambBus.gain.setTargetAtTime(this.muted ? 0 : (s.ambience ?? 0.6) * 0.8 * (s.sfx ?? 0.8), t, 0.05);
   }
   impulse(sec, decay) {
     const c = this.ctx, n = Math.floor(c.sampleRate * sec), b = c.createBuffer(2, n, c.sampleRate);
@@ -152,6 +152,7 @@ R('rockbreak', (a, o) => { a.noise({ dur: 0.45, f1: 1400, f2: 120, v: 0.8 }); a.
 R('coin', (a, o) => { a.tone({ f: 1318, dur: 0.1, v: 0.25, type: 'square', filter: 'lowpass', ff: 3000 }); a.tone({ f: 1760, dur: 0.2, v: 0.25, type: 'square', filter: 'lowpass', ff: 3000, delay: 0.07 }); });
 R('pickup', (a, o) => a.arp([660, 880], { step: 0.06, dur: 0.2, v: 0.3 }));
 R('item', (a, o) => a.arp([523, 659, 784, 1047, 1319], { step: 0.07, dur: 0.5, v: 0.3, rev: 0.6 }));
+R('trophy', (a, o) => { a.arp([523, 659, 784, 1047, 1319], { step: 0.09, dur: 0.9, v: 0.28, rev: 0.8, type: 'triangle' }); a.arp([262, 330], { step: 0.2, dur: 1.2, v: 0.12, rev: 0.9, type: 'sine' }); });
 R('levelup', (a, o) => { a.arp([392, 494, 587, 784, 988, 1175], { step: 0.07, dur: 0.6, v: 0.3, rev: 0.7 }); });
 R('tick', (a, o) => a.tone({ f: 1000, dur: 0.03, v: 0.18, type: 'square', filter: 'lowpass', ff: 3000 }));
 R('select', (a, o) => { a.tone({ f: 700, dur: 0.06, v: 0.25, type: 'square', filter: 'lowpass', ff: 3000 }); a.tone({ f: 1050, dur: 0.1, v: 0.25, type: 'square', filter: 'lowpass', ff: 3000, delay: 0.05 }); });

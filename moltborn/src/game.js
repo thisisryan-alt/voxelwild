@@ -26,6 +26,9 @@ import { Story } from './systems/story.js';
 import { MenuScene } from './ui/menu.js';
 import { PauseScene, OptionsScene, ShopScene, ForgeScene, MoltShrineScene, CutsceneScene, TitleScene } from './ui/screens.js';
 import { rng } from './core/util.js';
+import { ensureSettings } from './systems/settings.js';
+import { Stats, ensureRecords } from './systems/stats.js';
+import { Achievements } from './systems/achievements.js';
 
 const rand = rng(8080);
 
@@ -36,10 +39,11 @@ export class Game {
     this.events = new Events();
     this.state = newState();
     const saved = Save.settings(); if (saved) Object.assign(this.state.settings, saved);
+    ensureSettings(this.state.settings);
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -61,14 +65,14 @@ export class Game {
 
   // ---- lifecycle -----------------------------------------------------------------------------------
   newGame(slot = 0) {
-    this.slot = slot; this.state = newState(); Object.assign(this.state.settings, Save.settings() || {}); this.audio.settings = this.state.settings;
-    this.state.meta = { started: Date.now() };
+    this.slot = slot; this.state = newState(); Object.assign(this.state.settings, Save.settings() || {}); ensureSettings(this.state.settings); this.audio.settings = this.state.settings;
+    this.state.meta = { started: Date.now() }; ensureRecords(this.state);
     return this.enterWorld('reef_nursery', 'start', { newGame: true });
   }
   loadGame(slot) {
     const d = Save.read(slot); if (!d) return false;
-    this.slot = slot; this.state = Object.assign(newState(), d.state); this.state.stats = Object.assign(newState().stats, d.state.stats); this.state.settings = Object.assign(newState().settings, d.state.settings, Save.settings() || {});
-    this.audio.settings = this.state.settings;
+    this.slot = slot; this.state = Object.assign(newState(), d.state); this.state.stats = Object.assign(newState().stats, d.state.stats); this.state.settings = ensureSettings(Object.assign(newState().settings, d.state.settings, Save.settings() || {}));
+    this.audio.settings = this.state.settings; ensureRecords(this.state); this.state.records.sessions++;
     const c = this.state.checkpoint; this.enterWorld(c.zone, c.entry, { loaded: true }); return true;
   }
   saveGame(quiet) {
@@ -222,5 +226,5 @@ export class Game {
     if (npcId === 'old_brine') return null;
     if (qs.some((id) => !q.log[id])) return '!'; return null;
   }
-  update(dt) { this.state.playtime += dt; }
+  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); }
 }

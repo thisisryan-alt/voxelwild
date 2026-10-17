@@ -2,6 +2,7 @@
 // A boss class sets static `def` and implements attack generators (*name) listed per phase.
 import { Enemy } from './enemy.js';
 import { drawFrame } from './entity.js';
+import { applyHitStatuses } from '../systems/status.js';
 import { ENEMIES } from '../data/enemies.js';
 import { Script, clamp, rng } from '../core/util.js';
 import { moveBody } from '../world/physics.js';
@@ -83,7 +84,7 @@ export class Boss extends Enemy {
   takeHit(hit, player) {
     if (!this.canBeHit()) return false;
     const w = this.world, dir = hit.dir ?? 1;
-    let dmg = hit.dmg * (this.staggerT > 0 ? 1.35 : 1) * (this.phase.dmgTaken ?? 1); dmg = Math.max(1, Math.round(dmg));
+    let dmg = hit.dmg * (this.staggerT > 0 ? 1.35 : 1) * (this.phase.dmgTaken ?? 1) * this.status.mult('dmgIn'); dmg = Math.max(1, Math.round(dmg));
     this.hp -= dmg; this.flash = 0.08;
     w.fx.text(this.x + (rand() - 0.5) * 20, this.y - this.h / 2 + (rand() - 0.5) * 12, dmg, hit.crit ? '#ffd84a' : '#ffffff', !!hit.crit);
     w.fx.burst(this.x + (rand() - 0.5) * this.w * 0.6, this.y + (rand() - 0.5) * this.h * 0.5, hit.crit ? ['#fff6a8', '#fff'] : ['#ffffff', '#ffe0c0', '#ff9a6a'], 60, 0.3, 2);
@@ -91,6 +92,7 @@ export class Boss extends Enemy {
     this.sfx(hit.heavy ? 'heavyhit' : hit.crit ? 'crit' : 'hit');
     if (this.armorMax > 0 && this.staggerT <= 0 && !this.transT) { this.armor -= (hit.poise || 0) * (this.def.poiseMult ?? 0.4) + (hit.guardBreak ? this.armorMax * 0.2 : 0); this.armorRegenT = 2.5; if (this.armor <= 0) this.breakArmor(); }
     if (hit.status?.poison) this.applyStatus({ poison: Math.max(1, Math.round(hit.status.poison * 0.5)) });
+    if (hit.status) applyHitStatuses(this.status, hit.status);
     if (this.hp <= 0) { this.hp = 0; this.die(false, hit); } else this.checkPhase();
     return true;
   }
@@ -128,6 +130,7 @@ export class Boss extends Enemy {
     this.t += dt; this.st += dt; this.flash = Math.max(0, this.flash - dt);
     if (this.dying) { this.deathScript?.step(dt / Math.max(0.0001, this.world.slowT > 0 ? this.world.slowFactor : 1)); return; }
     if (!this.engaged) { this.checkEngage(); this.idleAnim?.(dt); return; }
+    this.status.update(dt); if (this.dying) return;
     const w = this.world, pl = this.player;
     if (this.statuses.poison) { const ps = this.statuses.poison; ps.t -= dt; ps.acc = (ps.acc || 0) + dt; if (ps.acc >= 0.5) { ps.acc = 0; this.hp -= ps.dps; w.fx.text(this.x, this.y - 20, ps.dps, '#8aff8a'); if (this.hp <= 0) { this.die(); return; } } if (ps.t <= 0) delete this.statuses.poison; }
     if (this.transT) { this.transT += dt; if (this.transT > (this.phase.transTime ?? 1.6)) { this.transT = 0; this.invuln = false; this.startBrain(); } }

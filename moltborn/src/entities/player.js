@@ -7,6 +7,7 @@ import { computeStats } from '../systems/progression.js';
 import { ABILITIES, ULTS } from '../combat/abilities.js';
 import { playerFrame, ANIMS, variantFor } from '../gfx/sprites_player.js';
 import { clamp, approach, rng } from '../core/util.js';
+import { StatusSet, applyHitStatuses } from '../systems/status.js';
 
 const rand = rng(555);
 
@@ -19,6 +20,7 @@ export class Player extends Entity {
     this.cool = {}; this.ultCd = 0; this.surge = 0; this.aegis = 0; this.aegisT = 0; this.rushT = 0; this.spin = null; this.dashAttack = null; this.locked = false; this.deathT = 0; this.respawnT = 0;
     this.images = []; this.imgT = 0; this.lastAttackAt = 0; this.pressureT = 0; this.fear = 0; this.interactT = 0; this.collectT = 0; this.castT = 0; this.stepT = 0; this.mood = '';
     this.alive = true; this.combatT = 0; this.evolveGlow = 0; this.hideSprite = false;
+    this.status = new StatusSet(this);
     this.recalc(true);
     if (this.st.hp == null) this.st.hp = this.stats.maxHp; if (this.st.tide == null) this.st.tide = this.stats.maxTide;
     this.hp = this.st.hp; this.tide = this.st.tide;
@@ -35,7 +37,8 @@ export class Player extends Entity {
   setForm(id) { this.st.form = id; const keep = this.hp / this.stats.maxHp; this.recalc(); this.hp = this.stats.maxHp; this.tide = this.stats.maxTide; this.st.hp = this.hp; this.st.tide = this.tide; this.y -= 2; }
   sfx(n) { this.game.audio.sfx(n, { x: this.x, y: this.y }); }
   hurtBox() { return { x: this.x - this.w / 2 + 1, y: this.y - this.h / 2 + 1, w: this.w - 2, h: this.h - 2 }; }
-  abDmg(m) { return Math.round(this.stats.atk * m * (1 + this.stats.abilityDmg) * (this.surge > 0 ? 1.3 : 1)); }
+  abDmg(m) { return Math.round(this.stats.atk * m * (1 + this.stats.abilityDmg) * (this.surge > 0 ? 1.3 : 1) * this.status.mult('dmgOut')); }
+  onStatusApplied(id, s) { this.game.events.emit('statusapplied', this, id, s); }
   heal(n) { if (n <= 0) return; const before = this.hp; this.hp = Math.min(this.stats.maxHp, this.hp + n); if (this.hp > before) this.world.fx.text(this.x, this.y - this.h / 2 - 6, '+' + Math.round(this.hp - before), '#7aff9a'); }
   addTide(n) { this.tide = clamp(this.tide + n, 0, this.stats.maxTide); }
   addFury(n) { this.fury += n * (1 + this.stats.furyGain) * (this.stats.ultCharge ? 1 + this.stats.ultCharge : 1); }
@@ -56,8 +59,9 @@ export class Player extends Entity {
     this.coyote -= dt; this.ultCd -= dt; this.evolveGlow = Math.max(0, this.evolveGlow - dt);
     for (const k in this.cool) this.cool[k] -= dt;
     if (!this.alive) return this.updateDead(dt);
+    this.status.update(dt);
     // regen
-    this.tide = Math.min(S.maxTide, this.tide + S.tideRegen * dt * (this.inCombat ? 0.6 : 1));
+    this.tide = Math.min(S.maxTide, this.tide + S.tideRegen * this.status.mult('tideRegen') * dt * (this.inCombat ? 0.6 : 1));
     if (S.regen) this.hp = Math.min(S.maxHp, this.hp + S.regen * dt);
     if (this.onGround) { this.strokesLeft = S.strokes; this.coyote = 0.08; }
     // fields (currents, whirlpools) and pressure
@@ -92,6 +96,14 @@ export class Player extends Entity {
     this.st.hp = this.hp; this.st.tide = this.tide;
   }
 
+  // damage that ignores invulnerability frames: burning, bleeding
+  hurtDot(n, id, color = '#ff8a3a') {
+    if (!this.alive || this.world.cinematic) return;
+    this.hp -= n; this.world.fx.text(this.x + (rand() - 0.5) * 6, this.y - this.h / 2 - 2, n, color);
+    this.game.events.emit('dot', id, n);
+    if (this.hp <= 0) this.die();
+  }
+
   pressureTick(dt) {
     const need = this.world.pressureAt(this.x, this.y), have = this.stats.pressure;
     if (need > have && this.alive && this.state !== 'locked') {
@@ -103,7 +115,7 @@ export class Player extends Entity {
 
   // ---- water physics --------------------------------------------------------------------------
   applyWater(dt, ax, ay) {
-    const M = this.form.move, sp = this.stats.speed;
+    const M = this.form.move, sp = this.stats.speed * this.status.mult('speed');
     if (this.free) {
       const target = M.swim * sp;
       if (ax || ay) {
@@ -126,7 +138,7 @@ export class Player extends Entity {
     if (this.onGround || this.coyote > 0) { this.vy = M.stroke.vy * 1.08; this.coyote = 0; this.strokeT = 0.25; this.afterStroke(); return; }
     if (this.strokesLeft > 0 && this.strokeT <= -M.stroke.cd + 0.0) { this.strokesLeft--; this.vy = M.stroke.vy; this.strokeT = 0.25; this.afterStroke(); }
   }
-  afterStroke() { this.world.fx.bubble(this.x, this.bottom - 2, 5, 8, -30); this.sfx('stroke'); this.animT = 0; this.strokeFlag = 0.25; this.game.input.consume('jump'); }
+  afterStroke() { this.game.events.emit('stroke'); this.world.fx.bubble(this.x, this.bottom - 2, 5, 8, -30); this.sfx('stroke'); this.animT = 0; this.strokeFlag = 0.25; this.game.input.consume('jump'); }
 
   updateFree(dt, ok) {
     const inp = this.game.input, M = this.form.move, F = this.form;
@@ -167,7 +179,7 @@ export class Player extends Entity {
     this.atk = { def, t: 0, i: -1, hit: false, fired: false, heavy: true, mult, full: chargeRatio >= 0.98 }; this.setState('attack'); this.queued = false; this.animT = 0;
   }
   fxColor() { const v = variantFor(this.st); return v.glow || v.ramp.hex[4] || '#fff0c8'; }
-  attackSpeed() { return 1 + this.stats.atkSpeed + (this.rushT > 0 ? 0.3 : 0); }
+  attackSpeed() { return (1 + this.stats.atkSpeed + (this.rushT > 0 ? 0.3 : 0)) * this.status.mult('atkSpeed'); }
   updateAttack(dt, ok) {
     const a = this.atk, d = a.def, w = this.world, inp = this.game.input, sp = this.attackSpeed();
     a.t += dt * sp;
@@ -245,8 +257,8 @@ export class Player extends Entity {
     if (!M.dash.any && !this.free) dy = 0;
     const n = Math.hypot(dx, dy) || 1; this.dashDir = [dx / n, dy / n]; if (dx) this.face(Math.sign(dx));
     this.setState('dash'); this.dashT = M.dash.time * (1 + S.dashDist) * distMult; this.dashI = M.dash.iframes * (1 + S.iframes);
-    this.dashCd = M.dash.cd * (1 + S.dashCd); this.dashSpeed = M.dash.speed * (attack ? 1.15 : 1) * S.speed; this.animT = 0;
-    this.sfx('dash'); this.world.fx.foam(this.x - this.dashDir[0] * 6, this.y, -this.dashDir[0] || -this.facing, 6);
+    this.dashCd = M.dash.cd * (1 + S.dashCd); this.dashSpeed = M.dash.speed * (attack ? 1.15 : 1) * S.speed * this.status.mult('speed'); this.animT = 0;
+    this.game.events.emit('dash', attack); this.sfx('dash'); this.world.fx.foam(this.x - this.dashDir[0] * 6, this.y, -this.dashDir[0] || -this.facing, 6);
     this.dashHit = new Set();
     if (S.dashStrike && !this.dashAttack) this.dashAttack = { dmg: S.atk * 0.8, t: this.dashT };
   }
@@ -279,7 +291,8 @@ export class Player extends Entity {
       w.fx.text(this.x, this.y - this.h / 2 - 8, this.aegis ? 'AEGIS' : 'AEGIS BREAKS', '#c8f0ff', true); this.sfx('clang'); this.game.hitstop(3); if (!this.aegis) this.aegisT = 0;
       return 'blocked';
     }
-    let dmg = src.dmg, blocked = false;
+    let dmg = src.dmg * this.status.mult('dmgIn'), blocked = false;
+    if (src.vent) dmg *= this.status.mult('heat');
     if (src.vent && S.heatResist) dmg *= 1 - S.heatResist;
     if (this.state === 'block' && !src.unblockable && !src.thorn) {
       const frontal = ((src.x ?? this.x) - this.x) * this.facing >= -3;
@@ -292,7 +305,7 @@ export class Player extends Entity {
     const red = S.def / (S.def + 25);
     let final = Math.max(1, Math.round(dmg * (1 - red)));
     if (src.status?.poison && S.poisonResist) src.status = { ...src.status, poison: Math.max(1, Math.round(src.status.poison * (1 - S.poisonResist))) };
-    this.hp -= final;
+    this.hp -= final; this.lastHurtBy = { type: src.source?.type || src.source?.key || (src.vent ? 'vent' : src.thorn ? 'thorns' : src.field ? 'cloud' : src.kind || null) }; this.game.events.emit('hurt', final, src, blocked);
     w.fx.text(this.x, this.y - this.h / 2 - 4, final, '#ff5a4a', true);
     w.fx.burst(this.x, this.y, ['#ff7a6a', '#ffd0a0', '#ffffff'], 70, 0.35, 2);
     if (!blocked) { // chips of shell fly off the way the blow came from
@@ -305,6 +318,7 @@ export class Player extends Entity {
     this.game.hitstop(blocked ? 3 : 5); w.shake(blocked ? 1 : (final > this.stats.maxHp * 0.2 ? 5 : 3)); w.hurtFlash = 0.25; this.sfx(blocked ? 'clang' : 'hurt');
     if (S.thorns && src.source) { src.source.takeHit({ dmg: Math.max(1, Math.round(final * S.thorns * 3)), dir: this.x < src.source.x ? 1 : -1, kb: 20, poise: 0, ranged: true }, this); }
     if (src.status?.poison) { this.poisonT = 3; this.poisonDps = src.status.poison; }
+    applyHitStatuses(this.status, src.status, src.source);
     const kx = Math.sign(this.x - (src.x ?? this.x - 1)) || -this.facing;
     if (!blocked && !(F.stage >= 4 && this.state === 'attack' && this.atk?.heavy && F.heavy.armor)) { this.vx = kx * (src.kb || 80) * (F.stage >= 4 ? 0.5 : 1); this.vy = -30; if (!this.free) this.vy = -50; this.atk = null; this.charge = 0; this.setState('hurt'); this.animT = 0; }
     if (this.hp <= 0) {
@@ -339,6 +353,13 @@ export class Player extends Entity {
   }
   onBlockedHit(enemy, hit) { this.vx -= this.facing * 70; this.atk = null; this.setState('free'); this.comboT = 0; this.addFury(1); }
   onHitLanded(enemy, hb, dmg, crit) {
+    const S = this.stats, st = enemy.status;
+    if (st) { // weapon procs: burn, chill and bleed chances from gear and mutations
+      if (S.hitBurn && rand() < S.hitBurn) st.apply('burn', { power: 1 + S.hitBurn });
+      if (S.hitChill && rand() < S.hitChill) st.apply('chill');
+      if (S.hitBleed && rand() < S.hitBleed * (hb.heavy ? 1.6 : 1)) st.apply('bleed');
+    }
+    this.game.events.emit('hitdealt', enemy, dmg, crit, hb);
     this.combo = (this.combo || 0) + 1; this.comboLife = 2.4; this.comboBest = Math.max(this.comboBest || 0, this.combo); this.comboPop = 1;
     if (this.combo > 0 && this.combo % 10 === 0) { this.addFury(8); this.world.fx.text(this.x, this.y - this.h / 2 - 16, `${this.combo} HITS`, '#ffe08a', true, { life: 1 }); this.sfx('charged'); }
     this.combatT = 4; this.addFury((hb.heavy ? 6 : 3) + (crit ? 2 : 0)); this.addTide(hb.heavy ? 2.5 : 1.2);
@@ -349,7 +370,7 @@ export class Player extends Entity {
     this.hp = 0; this.alive = false; this.state = 'dead'; this.deathT = 0; this.vx *= 0.3; this.atk = null; this.spin = null;
     this.sfx('death'); this.world.fx.burst(this.x, this.y, ['#ff7a6a', '#ffffff', '#ffd0a0'], 200, 0.7, 3); this.world.fx.ring(this.x, this.y, 4, 60, 0.6, '#ff7a6a', 2);
     this.game.hitstop(12); this.world.shake(6);
-    this.st.stats.deaths++; this.animT = 0;
+    this.st.stats.deaths++; this.animT = 0; this.game.events.emit('playerdied', this.lastHurtBy || null);
   }
   updateDead(dt) {
     this.deathT += dt; this.vx *= Math.exp(-4 * dt); this.vy = Math.min(this.vy + (this.free ? 12 : 160) * dt, 80);

@@ -7,6 +7,7 @@ import { ENEMIES } from '../data/enemies.js';
 import { enemyFrame } from '../gfx/sprites_enemies.js';
 import { rng, clamp } from '../core/util.js';
 import { chestFrame } from '../gfx/sprites_ui.js';
+import { StatusSet, applyHitStatuses } from '../systems/status.js';
 
 const rand = rng(31337);
 
@@ -23,6 +24,7 @@ export class Enemy extends Entity {
     this.guardFront = false; this.guardAll = false; this.tuckT = 0; this.statuses = {}; this.ghost = !!def.ghost; this.slowT = 0; this.weakT = 0;
     this.xpMult = o.xpMult || 1; this.dmgMult = o.dmgMult || 1; this.spawnId = o.spawnId; this.persistKey = o.persistKey; this.group = o.group;
     this.behaviour = AI[def.ai];
+    this.status = new StatusSet(this);
     this.facing = o.facing || (rand() < 0.5 ? -1 : 1);
     this.alpha = 1; this.deathT = 0; this.dying = false;
     if (def.anchor !== 'center' && o.floor !== false) { /* feet-anchored: y given as feet */ }
@@ -34,7 +36,7 @@ export class Enemy extends Entity {
   stun(t) { this.stunT = Math.max(this.stunT, t); }
   canBeHit() { return this.alive && !this.dying && !this.invuln && !this.def.friendly && !this.phased && this.state !== 'hidden' && !this.disguised; }
   hurtBox() { const s = this.scale; return { x: this.x - this.w * s / 2, y: this.y - this.h * s / 2, w: this.w * s, h: this.h * s }; }
-  dmgNow() { return Math.round(this.def.dmg * (this.dmgMult || 1) * (1 + (this.world.difficulty || 0) * 0)); }
+  dmgNow() { return Math.round(this.def.dmg * (this.dmgMult || 1) * this.status.mult('dmgOut')); }
   strike(rel, dmg, life = 0.12, o = {}) { this.world.spawnHitbox({ team: 'enemy', x: this.x + rel.x - rel.w / 2, y: this.y + rel.y - rel.h / 2, w: rel.w, h: rel.h, dmg, life, kb: o.kb ?? 100, poise: 8, owner: this, follow: this, status: o.status || this.def.status, unblockable: o.unblockable }); }
   shoot() {
     const sh = this.def.shoot; if (!sh) return;
@@ -74,6 +76,7 @@ export class Enemy extends Entity {
     let dmg = hit.dmg;
     if (this.weakT > 0) dmg *= 1.25;
     if (this.tuckT > 0 || this.guardAll) dmg *= 0.25;
+    dmg *= this.status.mult('dmgIn');
     dmg = Math.max(1, Math.round(dmg));
     this.hp -= dmg; this.flash = 0.09;
     w.fx.text(this.x + (rand() - 0.5) * 6, this.y - this.h / 2 - 4, dmg, hit.crit ? '#ffd84a' : '#ffffff', !!hit.crit);
@@ -99,6 +102,16 @@ export class Enemy extends Entity {
     if (s.slow) this.slowT = Math.max(this.slowT, s.slow);
     if (s.weak) this.weakT = Math.max(this.weakT, s.weak);
     if (s.stun) this.stun(s.stun);
+    applyHitStatuses(this.status, s);
+  }
+  // effects are weaker on elites and shrugged off by bosses
+  statusResist(id) { return this.def.boss ? 0.35 : this.def.elite ? 0.6 : 1; }
+  immune(id) { return !!this.def.immune?.includes(id); }
+  onStatusApplied(id, s) { this.world.game.events.emit('statusapplied', this, id, s); }
+  hurtDot(n, id, color = '#ff8a3a') {
+    if (!this.alive || this.dying) return;
+    this.hp -= n; this.world.fx.text(this.x + (rand() - 0.5) * 8, this.y - this.h / 2, n, color);
+    if (this.hp <= 0) this.die(false, { dot: id });
   }
   die(silent, hit) {
     if (this.dying) return; this.dying = true; this.alive = false;
@@ -119,6 +132,7 @@ export class Enemy extends Entity {
     this.t += dt; this.st += dt; this.losT -= dt; this.flash = Math.max(0, this.flash - dt); this.contactCd -= dt;
     const w = this.world, pl = w.player;
     if (this.slowT > 0) this.slowT -= dt; if (this.weakT > 0) this.weakT -= dt;
+    this.status.update(dt); if (this.dying) return;
     if (this.statuses.poison) { const ps = this.statuses.poison; ps.t -= dt; ps.acc = (ps.acc || 0) + dt; if (ps.acc >= 0.5) { ps.acc = 0; this.hp -= ps.dps; w.fx.text(this.x, this.y - this.h / 2, ps.dps, '#8aff8a'); if (this.hp <= 0) { this.die(false, { poison: true }); return; } } if (ps.t <= 0) delete this.statuses.poison; }
     if (this.stunT > 0) {
       this.stunT -= dt; this.vx *= Math.exp(-6 * dt); this.vy = this.def.flying ? this.vy * Math.exp(-4 * dt) : Math.min(this.vy + 230 * dt, 140);
@@ -126,7 +140,7 @@ export class Enemy extends Entity {
     }
     // far-away enemies sleep (cheap)
     if (pl && Math.abs(pl.x - this.x) > 420 && Math.abs(pl.y - this.y) > 300) return;
-    const slow = this.slowT > 0 ? 0.5 : 1;
+    const slow = (this.slowT > 0 ? 0.5 : 1) * this.status.mult('speed');
     this.behaviour.update(this, dt * slow, w);
     moveBody(w.grid, this, dt * slow, { ghost: this.ghost, step: !this.def.flying && this.def.ai !== 'mimic' });
     if (this.facing === 0) this.facing = 1;

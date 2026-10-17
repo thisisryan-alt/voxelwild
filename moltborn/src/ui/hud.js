@@ -79,6 +79,7 @@ export class Hud {
     // --- toasts ---
     g.toasts.forEach((t, i) => { const a = Math.min(1, (3.2 - t.t) * 2, t.t * 5), tw = textWidth(t.msg) + 12, y = 78 + i * 15 - Math.max(0, 1 - t.t * 6) * 6; ctx.globalAlpha = a; panel(ctx, 240 - tw / 2, y, tw, 13, { alpha: 0.85 }); text(ctx, t.msg, 240 - tw / 2 + 6, y + 3, t.color); ctx.globalAlpha = 1; });
     // --- zone banner ---
+    g.systems.achievements?.drawBanner(ctx);
     const bn = g.bannerState; if (bn) { const a = Math.min(1, bn.t * 2, (2.8 - bn.t) * 1.5); ctx.globalAlpha = a * 0.92; drawText(ctx, bn.title, 240, 44, { color: '#ffffff', scale: 2, align: 'center', shadow: '#05204a', outline: '#05204a' }); if (bn.sub) drawText(ctx, bn.sub, 240, 64, { color: '#9ad8ff', align: 'center', shadow: '#05204a' }); ctx.globalAlpha = 1; }
     // --- low health pulse ---
     if (p.hp / S.maxHp < 0.25 && p.alive) { ctx.globalAlpha = 0.18 + 0.12 * Math.sin(this.t * 6); ctx.fillStyle = '#c01020'; ctx.fillRect(0, 0, 480, 6); ctx.fillRect(0, 264, 480, 6); ctx.fillRect(0, 0, 6, 270); ctx.fillRect(474, 0, 6, 270); ctx.globalAlpha = 1; }

@@ -1,8 +1,7 @@
 // Title, pause/options, shop, forge, molt-shrine and story-panel screens.
 import { drawScene } from '../gfx/cutscene_art.js';
-import { panel, text, button, bar, COL, drawText, textWidth, wrapText } from './ui.js';
+import { panel, text, button, COL, drawText, textWidth, wrapText } from './ui.js';
 import { Save } from '../core/save.js';
-import { KEYMAP } from '../core/input.js';
 import { ITEMS, SHOP } from '../data/items.js';
 import { FORMS, BRANCHES, EVOLUTIONS } from '../data/forms.js';
 import { itemIcon, formIcon } from '../gfx/sprites_ui.js';
@@ -11,6 +10,7 @@ import { playerFrame, variantFor, flashOf } from '../gfx/sprites_player.js';
 import { drawFrame } from '../entities/entity.js';
 import { rng, TAU } from '../core/util.js';
 import { EvolveScene } from './evolve_scene.js';
+import { updateOptions, drawOptions } from './options_ext.js';
 
 const rand = rng(11);
 const fmtTime = (s) => `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, '0')}m`;
@@ -126,19 +126,7 @@ export class PauseScene {
   }
 }
 
-export function updateOptions(scene, g, inp, back) {
-  const s = g.state.settings, rows = ['music', 'sfx', 'shake', 'mute'];
-  if (inp.pressed('up')) { scene.os = (scene.os + 3) % 4; g.audio.sfx('tick'); } if (inp.pressed('down')) { scene.os = (scene.os + 1) % 4; g.audio.sfx('tick'); }
-  const k = rows[scene.os], d = (inp.pressed('right') ? 1 : 0) - (inp.pressed('left') ? 1 : 0);
-  if (d) { if (k === 'mute') { g.audio.muted = !g.audio.muted; } else s[k] = Math.max(0, Math.min(1, Math.round((s[k] + d * 0.1) * 10) / 10)); g.audio.applyVolumes(); Save.saveSettings(s); g.audio.sfx('tick'); }
-  if (inp.pressed('confirm') && k === 'mute') { g.audio.muted = !g.audio.muted; g.audio.applyVolumes(); }
-  if (inp.pressed('cancel') || inp.pressed('pause')) { Save.saveSettings(s); g.audio.sfx('back'); back(); }
-}
-export function drawOptions(ctx, scene) {
-  const g = scene.g, s = g.state.settings; panel(ctx, 110, 70, 260, 120); drawText(ctx, 'OPTIONS', 240, 78, { color: COL.gold, align: 'center', shadow: '#000' });
-  [['Music volume', s.music], ['Effects volume', s.sfx], ['Screen shake', s.shake], ['Mute all', g.audio.muted ? 1 : 0]].forEach(([n, v], i) => { const y = 96 + i * 20, sel = i === scene.os; if (sel) { ctx.fillStyle = '#1e4a7a'; ctx.fillRect(116, y - 3, 248, 16); } text(ctx, n, 124, y + 1, sel ? '#fff' : COL.dim); if (i < 3) { bar(ctx, 240, y + 2, 100, 5, v, '#3a8ae8', '#8ad0ff', '#0a1a3a'); text(ctx, String(Math.round(v * 100)), 346, y + 1, COL.text); } else text(ctx, v ? 'ON' : 'OFF', 250, y + 1, v ? '#ff9a7a' : COL.green); });
-  text(ctx, '◀ ▶ change     ESC back', 240 - textWidth('◀ ▶ change     ESC back') / 2, 176, COL.dim);
-}
+export { updateOptions, drawOptions };
 export class OptionsScene { constructor(g) { this.g = g; this.os = 0; this.opaque = false; } update() { updateOptions(this, this.g, this.g.input, () => this.g.engine.pop()); } draw(ctx) { ctx.fillStyle = 'rgba(2,8,20,0.7)'; ctx.fillRect(0, 0, 480, 270); drawOptions(ctx, this); } }
 
 // ---------------------------------------------------------------------------------------------------------------
