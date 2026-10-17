@@ -55,7 +55,8 @@ export function kingdom_spires() {
   b.spawnFloor('anemone_c', 30, 20); b.spawnFloor('anemone_c', 90, 20); b.spawnFloor('hermit', 60, 20); b.spawnFloor('brineguard', 66, 20);
   b.coins(40, 62, 4); b.coins(75, 55, 4); b.coins(44, 40, 4); b.coins(78, 22, 4); b.coins(96, 12, 5);
   b.chest(60, { item: 'shell_barnacle' }, { from: 26 }); b.chest(24, { coins: [70, 100], pearl: 2 }, { from: 36 }); b.chest(96, { item: 'claw_coral', coins: [40, 60] }, { from: 12 });
-  b.props.push({ type: 'item', id: 'tithe_ledger', x: 60 * 16, y: 51 * 16, secret: false });
+  b.props.push({ type: 'item', id: 'tithe_ledger', x: 58 * 16, y: 51 * 16, secret: false });
+  b.chest(62, { item: 'mp3', coins: [60, 90] }, { from: 44, tint: 1 });
   b.mural(63, 'aurelia_diary', { from: 44 });
   b.decorate(KING_DECOR, 0.2);
   return b.finish();

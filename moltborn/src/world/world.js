@@ -23,7 +23,7 @@ export class World {
     this.bg = getBackground(zone.biome, zone.seed);
     this.enemies = []; this.projectiles = []; this.pickups = []; this.hitboxes = []; this.interactables = []; this.decor = []; this.fields = []; this.beams = [];
     this.boss = null; this.cinematic = false; this.slowT = 0; this.slowFactor = 1; this.flash = 0; this.hurtFlash = 0; this.shakeAmt = 0; this.camLock = null;
-    this.exitsDisabled = false; this.drawExtra = []; this.lightCv = null; this.exiting = false; this.difficulty = 0;
+    this.exitsDisabled = false; this.drawExtra = []; this.overlayExtra = []; this.extraLights = []; this.lightCv = null; this.exiting = false; this.difficulty = 0;
     this.cam = { x: 0, y: 0, lookX: 0, lookY: 0 };
     this.buildEntities();
     const entry = zone.entries[entryName] || Object.values(zone.entries)[0];
@@ -180,6 +180,11 @@ export class World {
   updateFields(dt) {
     for (const f of this.fields) {
       f.t += dt; f.life -= dt; f.tick -= dt;
+      if (f.team === 'enemy') {
+        const pl = this.player; const dx = f.x - pl.x, dy = f.y - pl.y, d = Math.hypot(dx, dy);
+        if (pl.alive && d < f.r && pl.state !== 'locked') { const k = (1 - d / f.r + 0.2) * f.pull; pl.vx += dx / (d || 1) * k * dt * 5; pl.vy += dy / (d || 1) * k * dt * 5; if (f.tick <= 0) pl.takeHit({ dmg: Math.max(1, Math.round(f.dps)), x: f.x, y: f.y, kb: 0, unblockable: true, field: true }); }
+        if (f.tick <= 0) f.tick = 0.5; continue;
+      }
       for (const e of this.enemies) {
         if (!e.alive || !e.canBeHit()) continue;
         const dx = f.x - e.x, dy = f.y - e.y, d = Math.hypot(dx, dy);
@@ -255,6 +260,7 @@ export class World {
     this.fx.draw(ctx, cam);
     this.drawAtmosphere(ctx, cam);
     this.drawLighting(ctx, cam);
+    for (const fn of this.overlayExtra) fn(ctx, cam);
     if (this.flash > 0) { ctx.globalAlpha = Math.min(0.8, this.flash * 5); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }
     if (this.hurtFlash > 0) { ctx.globalAlpha = Math.min(0.35, this.hurtFlash * 1.4); ctx.fillStyle = '#ff2a2a'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }
     if (this.slowT > 0) { ctx.globalAlpha = 0.12; ctx.fillStyle = '#8ae8ff'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }

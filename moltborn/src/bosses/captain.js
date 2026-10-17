@@ -18,7 +18,7 @@ export class CaptainRust extends Boss {
     ],
     sprite: { plan: 'captain', w: 120, h: 112, ax: 60, ay: 52, frames: 4, o: {} }, fps: 5,
   };
-  constructor(world, x, y, spawn) { super(world, x, y, spawn); this.intro = this.introTalk; world.extraLights = world.extraLights || []; }
+  constructor(world, x, y, spawn) { super(world, x, y, spawn); this.intro = this.introTalk; }
   *introTalk(c) {
     yield c.say('Who goes there? State your ship and your cargo.', 'Captain Rust');
     yield c.say('...No ship. No cargo. Hm. A stowaway. The Gannet does not carry stowaways. Hands to the deck! All hands!', 'Captain Rust');

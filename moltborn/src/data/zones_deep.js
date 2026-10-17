@@ -153,16 +153,18 @@ export function domain_gate() {
   b.seabed(2, 110, (x) => 48); b.ceiling(2, 110, (x) => 7);
   b.rect(30, 38, 4, 10, T.DIVINE); b.rect(78, 38, 4, 10, T.DIVINE); b.rect(26, 36, 12, 2, T.DIVINE); b.rect(74, 36, 12, 2, T.DIVINE);
   b.platform(46, 36, 10); b.platform(56, 26, 10); b.platform(40, 18, 8);
-  b.rect(52, 6, 10, 8, T.DIVINE); b.carve(55, 8, 4, 6);
+  b.rect(80, 6, 10, 9, T.DIVINE);
   // seal at the door into the Domain: the Ancient Molt's tail can break it
   b.seal(104, 38, 4, 10);
   b.surface(T.DIVINE, 1); b.smooth(1);
-  b.exitN(54, 62, 'trench_titan', 'south'); b.carve(54, 0, 9, 8); b.entry('north', 58, 6);
+  b.carve(83, 8, 4, 6); b.seal(83, 14, 4, 1); b.keep(80, 6, 10, 10); b.carve(83, 8, 4, 6);
+  b.exitN(54, 62, 'trench_titan', 'south'); b.carve(54, 0, 9, 9); b.entry('north', 58, 6);
   b.exitE(40, 47, 'domain_halls', 'west'); b.entryFloor('west', 4, { facing: 1, from: 20 }); b.entryFloor('east', 100, { facing: -1, from: 20 });
   b.shrine('rest', 12, { from: 20 });
   b.spawnFloor('guardian', 36, 20); b.spawnFloor('guardian', 76, 20); b.spawn('stormhorse', 50, 28, { count: 2, spread: 24 }); b.spawn('tidewisp', 90, 30); b.spawn('tidewisp', 20, 30); b.spawnFloor('tridentstatue', 64, 20); b.spawnFloor('tridentstatue', 24, 20);
   b.coins(40, 34, 5); b.coins(60, 24, 5); b.coins(90, 44, 6);
   b.chest(44, { coins: [150, 200], black_pearl: 2 }, { from: 8, tint: 1 });
+  b.chest(85, { item: 'mp7', ep: 1 }, { from: 8, tint: 1, secret: true, key: 'mp7_chest' });
   b.mural(18, 'mural_domain1', { from: 20 });
   b.decorate(DOMAIN_DECOR, 0.14);
   return b.finish();

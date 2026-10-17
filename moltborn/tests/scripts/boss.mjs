@@ -12,7 +12,8 @@ export default async (page, H) => {
     s.abilities = ['bubbleShot']; s.slots = ['bubbleShot', null, null]; g.buildWorld(zone, Object.keys(g.world.zone.entries)[0], { silentBanner: true }); const p = g.world.player; p.recalc(); p.hp = p.stats.maxHp; p.tide = p.stats.maxTide;
   }, [zone, form]);
   const info = () => G(() => { const w = window.__game.world, b = w.boss; return b ? { hp: Math.round(b.hp), eng: b.engaged, ph: b.phaseIdx, atk: b.lastAtk, stg: Math.round(b.staggerT * 10) / 10, php: Math.round(w.player.hp), mx: w.player.stats.maxHp, dead: b.dying } : null; });
-  await G(() => { const w = window.__game.world, b = w.boss; const a = b.arena; const p = w.player; p.x = (a.x + 8) * 16; p.y = (a.y + a.h - 6) * 16; w.snapCamera(); });
+  await G(() => { const w = window.__game.world, b = w.boss; const a = b.arena; const p = w.player; const t = b.trigger; p.x = (t.x + t.w * 0.5) * 16; p.y = (t.y + t.h - 3) * 16; w.snapCamera(); });
+  if (process.env.HPFRAC) await G((f) => { const b = window.__game.world.boss; b.engage(); b.hp = b.maxHp * f; b.checkPhase?.(); }, +process.env.HPFRAC);
   let last = '';
   for (let f = 0; f < frames; f += 20) {
     await G(() => {

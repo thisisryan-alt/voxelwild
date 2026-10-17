@@ -34,7 +34,7 @@ export function reef_nursery() {
   b.spawn('minnow', 82, 22, { count: 3 }); b.spawnFloor('pinchling', 85, 0);
   b.coins(26, 29, 4); b.coins(53, 21, 3); b.coins(60, 18, 3); b.coins(68, 15, 3); b.coins(80, 27, 4);
   b.chest(74, { coins: [25, 40], items: { kelp_wrap: 1 } }, { from: 5 });
-  b.chest(5, { coins: [10, 18], items: { brine_tonic: 1 }, ep: 1 }, { from: 27, key: 'crab_hollow' });   // behind the crevice
+  b.chest(5, { coins: [10, 18], item: 'mp1', ep: 1 }, { from: 27, key: 'crab_hollow' });   // behind the crevice
   b.mural(8, 'mural_nursery', { from: 27 });
   b.decorate(REEF_DECOR, 0.3);
   return b.finish();
@@ -61,7 +61,7 @@ export function reef_garden() {
   b.spawnFloor('pinchling', 74, 10, { count: 2, spread: 24 }); b.spawn('minnow', 90, 26, { count: 4 }); b.spawnFloor('hermit', 108, 10);
   b.coins(23, 33, 5); b.coins(58, 24, 3); b.coins(66, 20, 3); b.coins(84, 30, 4);
   b.chest(69, { coins: [30, 50], pearl: 2 }, { from: 8 });
-  b.chest(102, { item: 'mut_barbed' }, { from: 24, tint: 1, key: 'garden_vault', secret: true });
+  b.exit(104, 24, 2, 6, 'reef_clam', 'west'); b.entry('clam', 100, 29);
   b.mural(25, 'mural_garden', { from: 10 });
   b.decorate(REEF_DECOR, 0.3);
   return b.finish();
@@ -117,5 +117,18 @@ export function reef_arena() {
   b.spawns.push({ boss: 'grumbold', floor: true, x: 40 * 16, y: 22 * 16, arena: { x: 12, y: 6, w: 40, h: 18 }, trigger: { x: 15, y: 8, w: 34, h: 13 }, barriers: [{ x: 11, y: 17, w: 1, h: 5 }, { x: 52, y: 17, w: 1, h: 5 }] });
   b.coins(60, 20, 4);
   b.decorate({ floor: [['rocks', 3, 2], ['pebbles', 3, 2], ['seaweed', 1, 3], ['bones', 1, 1]], ceil: [['stalactite', 2, 3]] }, 0.25);
+  return b.finish();
+}
+
+export function reef_clam() {
+  const b = new ZoneBuilder({ id: 'reef_clam', name: 'Pearl Hollow', biome: 'reef', w: 56, h: 30, seed: 15, music: 'reef', title: 'Pearl Hollow' });
+  b.fill(T.ROCK).carve(3, 18, 8, 6); b.carve(10, 6, 40, 18);
+  b.floorLine(2, 54, 24, T.ROCK); b.rect(2, 24, 52, 6, T.ROCK);
+  b.platform(20, 18, 6); b.platform(34, 14, 6);
+  b.surface(T.GROUND, 1);
+  b.exitW(18, 23, 'reef_garden', 'clam'); b.entryFloor('west', 5, { facing: 1, from: 8 });
+  b.spawns.push({ boss: 'pearl_tyrant', floor: true, x: 36 * 16, y: 24 * 16, arena: { x: 10, y: 6, w: 40, h: 20 }, trigger: { x: 14, y: 8, w: 32, h: 16 }, barriers: [{ x: 9, y: 18, w: 1, h: 6 }] });
+  b.coins(16, 22, 5);
+  b.decorate({ floor: [['brain', 2, 3], ['shell', 3, 3], ['pebbles', 2, 2], ['fan', 1, 3]], ceil: [['stalactite', 2, 3]] }, 0.25);
   return b.finish();
 }

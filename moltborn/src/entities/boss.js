@@ -19,6 +19,7 @@ export class Boss extends Enemy {
     this.phases = def.phases; this.phaseMarks = this.phases.slice(1).map((p) => p.at); this.rage = 0; this.lastAtk = ''; this.restMul = 1; this.noKnock = true; this.dying = false; this.finished = false; this.dmgMult = 1; this.facing = -1; this.home = { x, y };
     this.intro = spawn.intro; this.cooldownT = 0; this.alpha = 1;
     this.setState('idle');
+    world.overlayExtra.push((ctx, cam) => { this._ov = true; this.drawTeles(ctx, cam); this._ov = false; });
   }
   get phase() { return this.phases[this.phaseIdx]; }
   get player() { return this.world.player; }
@@ -106,7 +107,7 @@ export class Boss extends Enemy {
     w.lockCamera(null); g.audio.music.play(w.zone.music || w.biome.music);
     const loot = this.def.loot; if (loot) g.grantLoot(loot, this.x, this.y, true);
     g.giveXp(this.def.xp || 100, this.x, this.y); g.events.emit('boss', this.key); g.saveGame(true);
-    this.alive = false; this.finished = true;
+    this.alive = false; this.finished = true; this.onFinished?.();
   }
   *afterDefeat() {}
   // ---- update ---------------------------------------------------------------------------------------------------
@@ -150,10 +151,12 @@ export class Boss extends Enemy {
   *moveTo(tx, ty, speed, maxT = 3, tol = 4) { let t = 0; while (t < maxT) { const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy); if (d < tol) break; this.vx = dx / d * speed; this.vy = dy / d * speed; t += 1 / 60; yield 1 / 60; } this.vx = this.vy = 0; }
   // ---- drawing -------------------------------------------------------------------------------------------------------------
   drawTeles(ctx, cam) {
+    if (!this._ov) return;
     for (const t of this.teles) {
       const k = Math.min(1, t.t / t.dur), pulse = 0.35 + 0.25 * Math.sin(t.t * 30), a = t.t > t.dur ? 0.9 : pulse + k * 0.2;
       ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = t.color; ctx.strokeStyle = '#ffffff';
       if (t.kind === 'rect') { const x = Math.round(t.x - cam.x), y = Math.round(t.y - cam.y); ctx.fillRect(x, y, t.w, t.h); ctx.globalAlpha = 0.9; ctx.strokeRect(x + 0.5, y + 0.5, t.w - 1, t.h - 1); ctx.globalAlpha = 0.5; const fh = Math.round(t.h * k), fw = Math.round(t.w * k); if (t.fill === 'h') { ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, fw, t.h); } else if (t.fill !== false) { ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y + t.h - fh, t.w, fh); } }
+      else if (t.kind === 'line') { ctx.globalAlpha = a; ctx.strokeStyle = t.color; ctx.lineWidth = t.w || 6; ctx.beginPath(); ctx.moveTo(Math.round(t.x - cam.x), Math.round(t.y - cam.y)); ctx.lineTo(Math.round(t.x2 - cam.x), Math.round(t.y2 - cam.y)); ctx.stroke(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke(); }
       else if (t.kind === 'circle') { ctx.beginPath(); ctx.arc(Math.round(t.x - cam.x) + 0.5, Math.round(t.y - cam.y) + 0.5, t.r, 0, 6.3); ctx.fill(); ctx.globalAlpha = 0.9; ctx.stroke(); ctx.globalAlpha = 0.5; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(Math.round(t.x - cam.x) + 0.5, Math.round(t.y - cam.y) + 0.5, t.r * k, 0, 6.3); ctx.fill(); }
       ctx.restore();
     }

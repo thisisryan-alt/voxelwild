@@ -281,3 +281,28 @@ export class CutsceneScene {
     ctx.globalAlpha = Math.max(0, 1 - a); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1;
   }
 }
+
+// Credits / summary shown after an ending, then back to the title
+export class CreditsScene {
+  constructor(game, kind, title) { this.g = game; this.kind = kind; this.title = title; this.opaque = true; this.t = 0; }
+  onEnter() { this.g.audio.music.play?.('credits'); }
+  update(dt) {
+    this.t += dt;
+    if (this.t > 2 && (this.g.input.pressed('confirm') || this.g.input.pressed('pause'))) { this.g.audio.music.stop?.(); this.g.world = null; this.g.engine.replace(new TitleScene(this.g)); }
+  }
+  draw(ctx) {
+    const g = this.g, s = g.state, t = this.t;
+    ART.night(ctx, t, { st: s }); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, 480, 270);
+    const a = Math.min(1, t * 0.6); ctx.globalAlpha = a;
+    drawText(ctx, 'THE END', 240, 20, { color: '#ffe08a', scale: 3, align: 'center', outline: '#3a1008', shadow: '#000' });
+    drawText(ctx, 'Ending: ' + this.title, 240, 56, { color: '#9af0ff', align: 'center', shadow: '#000' });
+    const secrets = g.systems.codex.count() + ' / ' + g.systems.codex.total(); const ends = (s.settings.endings || []).length;
+    const rows = [['Time', fmtTime(s.playtime)], ['Level', s.level], ['Form', FORMS[s.form].name], ['Enemies defeated', s.stats.kills], ['Times fallen', s.stats.deaths], ['Codex entries', secrets], ['Endings found', ends + ' / 4']];
+    rows.forEach((r, i) => { text(ctx, r[0], 150, 86 + i * 14, COL.dim); text(ctx, String(r[1]), 330 - textWidth(String(r[1])) + 0, 86 + i * 14, '#ffffff'); });
+    if (ends < 4) text(ctx, 'There are more ways this tide could have turned.', 240 - textWidth('There are more ways this tide could have turned.') / 2, 200, COL.dim);
+    if (t > 2 && Math.floor(t * 2) % 2) text(ctx, 'ENTER: return to title', 240 - textWidth('ENTER: return to title') / 2, 248, COL.borderLit);
+    ctx.globalAlpha = 1;
+  }
+}
+ART.hands = (ctx, t) => { ART.dawn(ctx, t); ctx.fillStyle = '#05204a'; ctx.beginPath(); ctx.ellipse(190, 150, 46, 14, 0.2, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.ellipse(290, 150, 46, 14, -0.2, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff6c0'; ctx.fillRect(236, 144, 8, 8); };
+ART.stars = (ctx, t) => { ART.night(ctx, t); for (let i = 0; i < 80; i++) { ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.7 * Math.abs(Math.sin(t * 2 + i))})`; ctx.fillRect(240 + Math.cos(i * 2.4 + t * 0.2) * (i * 2.4), 120 + Math.sin(i * 2.4 + t * 0.2) * (i * 1.4), 2, 2); } };
