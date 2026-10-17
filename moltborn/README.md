@@ -63,8 +63,9 @@ Last Tide. Telegraphed attacks, armour-break phases, arena barriers.
 moral choices (spare or slay Krael, redeem Aurelia, free the hatchlings), and these feed four
 endings: Slay, Trident, Mercy, and a secret one.
 
-**Audio.** Twenty-one generative music tracks per biome and boss whose layers fade in with combat
-danger and boss phase; layered ambience; about fifty synthesised effects with positional audio.
+**Audio.** Twenty-one composed tracks (a fixed 16-bar song per area, built from a motif by `src/audio/compose.js`)
+played on synthesised instruments with a ping-pong delay. Layers fade in with combat danger and boss phase, boss
+tracks open with a riser and end on a victory stinger. Layered ambience and about fifty synthesised effects.
 
 ## Layout
 
@@ -91,7 +92,7 @@ tests/                validators and Playwright scenarios
 Validators are plain Node and need nothing installed:
 
 ```
-npm run validate     # zone reachability per form size, exit/entry links, content cross-checks
+npm run validate     # zone reachability per form size, exit/entry links, content cross-checks, composer checks
 npm run economy      # XP / evolution-point pacing report
 ```
 
@@ -102,4 +103,6 @@ Browser tests drive a headless Chromium through `window.__game` and need Playwri
 node tools/run.mjs tests/scripts/smoke.mjs   # loads every zone, random input, save/load round trip
 node tools/run.mjs tests/scripts/ending.mjs  # plays the endings
 node tools/run.mjs tests/scripts/hatch.mjs   # hatchling vault script
+TRACKS=reef,boss1 node tools/run.mjs tests/scripts/music_render.mjs   # offline render: level and band balance per track
+node tools/run.mjs tests/scripts/cuts.mjs    # screenshots of every cutscene scene
 ```
