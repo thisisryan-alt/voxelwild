@@ -9,9 +9,9 @@ export const KEYMAP = {
   menu: ['Tab', 'KeyB'], map: ['KeyM'], pause: ['Escape', 'KeyP'],
   confirm: ['Enter', 'Space', 'KeyJ', 'KeyE'], cancel: ['Escape', 'KeyK', 'Backspace'],
   tabL: ['KeyQ', 'BracketLeft'], tabR: ['KeyE', 'BracketRight'],
-  quicksave: ['F5'], heal: ['KeyF', 'KeyH'], debug: ['Backquote'],
+  quicksave: ['F5'], heal: ['KeyF', 'KeyH'], debug: ['Backquote'], minimap: ['KeyN'], photo: ['F2'],
 };
-const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'F5']);
+const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'F5', 'F2']);
 
 export class Input {
   constructor() {

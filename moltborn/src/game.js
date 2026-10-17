@@ -30,6 +30,9 @@ import { ensureSettings } from './systems/settings.js';
 import { Stats, ensureRecords } from './systems/stats.js';
 import { Achievements } from './systems/achievements.js';
 import { PostFX } from './gfx/post.js';
+import { BodyReactions } from './entities/fx_body.js';
+import { Minimap } from './ui/minimap.js';
+import { Crafting } from './systems/crafting.js';
 
 const rand = rng(8080);
 
@@ -44,7 +47,7 @@ export class Game {
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -80,6 +83,7 @@ export class Game {
     const s = this.state, p = this.world?.player;
     if (p) { s.hp = p.hp; s.tide = p.tide; }
     s.meta = { ...(s.meta || {}), zone: ZONE_INFO[this.world?.zone.id]?.name || this.world?.zone.name || '', level: s.level, form: s.form, playtime: Math.round(s.playtime), savedAt: Date.now(), coins: s.coins };
+    this.systems.minimap?.flush();
     Save.write(this.slot, { v: 1, meta: s.meta, state: s });
     if (!quiet) { this.toast('Game saved', '#9ad8ff'); this.audio.sfx('save'); }
   }
@@ -227,5 +231,5 @@ export class Game {
     if (npcId === 'old_brine') return null;
     if (qs.some((id) => !q.log[id])) return '!'; return null;
   }
-  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); }
+  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); this.systems.minimap?.update(dt); }
 }

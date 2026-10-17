@@ -33,7 +33,8 @@ export function itemIcon(id) {
     const it = ITEMS[id] || {};
     let spec = ITEM_ICON[id];
     if (!spec) {
-      if (id.startsWith('mp')) spec = ['pearl', ['pink', 'green', 'gold', 'rust', 'orange', 'purple', 'cyan'][(+id.slice(2) - 1) % 7]];
+      if (it.icon) spec = it.icon;
+      else if (id.startsWith('mp')) spec = ['pearl', ['pink', 'green', 'gold', 'rust', 'orange', 'purple', 'cyan'][(+id.slice(2) - 1) % 7]];
       else if (it.type === 'equip') spec = [it.slot, it.slot === 'shell' ? 'blue' : it.slot === 'claw' ? 'orange' : 'gold'];
       else if (it.type === 'mutation') spec = ['mutation', 'green'];
       else if (it.type === 'dye') spec = ['drop', 'pink'];

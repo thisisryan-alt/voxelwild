@@ -8,6 +8,8 @@ import { ABILITIES, ULTS } from '../combat/abilities.js';
 import { playerFrame, ANIMS, variantFor } from '../gfx/sprites_player.js';
 import { clamp, approach, rng } from '../core/util.js';
 import { StatusSet, applyHitStatuses } from '../systems/status.js';
+import { BodyFx } from './fx_body.js';
+import { statusOverlay, statusFx } from './fx_status.js';
 
 const rand = rng(555);
 
@@ -20,7 +22,7 @@ export class Player extends Entity {
     this.cool = {}; this.ultCd = 0; this.surge = 0; this.aegis = 0; this.aegisT = 0; this.rushT = 0; this.spin = null; this.dashAttack = null; this.locked = false; this.deathT = 0; this.respawnT = 0;
     this.images = []; this.imgT = 0; this.lastAttackAt = 0; this.pressureT = 0; this.fear = 0; this.interactT = 0; this.collectT = 0; this.castT = 0; this.stepT = 0; this.mood = '';
     this.alive = true; this.combatT = 0; this.evolveGlow = 0; this.hideSprite = false;
-    this.status = new StatusSet(this);
+    this.status = new StatusSet(this); this.bodyFx = new BodyFx(this);
     this.recalc(true);
     if (this.st.hp == null) this.st.hp = this.stats.maxHp; if (this.st.tide == null) this.st.tide = this.stats.maxTide;
     this.hp = this.st.hp; this.tide = this.st.tide;
@@ -59,7 +61,7 @@ export class Player extends Entity {
     this.coyote -= dt; this.ultCd -= dt; this.evolveGlow = Math.max(0, this.evolveGlow - dt);
     for (const k in this.cool) this.cool[k] -= dt;
     if (!this.alive) return this.updateDead(dt);
-    this.status.update(dt);
+    this.status.update(dt); this.bodyFx.update(dt); statusFx(this, dt);
     // regen
     this.tide = Math.min(S.maxTide, this.tide + S.tideRegen * this.status.mult('tideRegen') * dt * (this.inCombat ? 0.6 : 1));
     if (S.regen) this.hp = Math.min(S.maxHp, this.hp + S.regen * dt);
@@ -421,7 +423,12 @@ export class Player extends Entity {
     let alpha = 1; if (this.invulnT > 0 && this.state !== 'dash' && Math.floor(this.invulnT * 16) % 2) alpha = 0.35;
     if (this.state === 'dash') alpha = 0.7;
     if (this.onGround && !this.free && this.alive) blobShadow(ctx, x, this.bottom - cam.y, Math.round(this.w * 0.75));
-    if (this.alive || this.deathT < 1.4) drawFrame(ctx, f, x, y, flip, false, alpha * (this.alive ? 1 : Math.max(0, 1 - Math.max(0, this.deathT - 0.8) / 0.6)));
+    if (this.alive || this.deathT < 1.4) {
+      this.bodyFx.begin(ctx, x, this.free || this.form.stage >= 3 ? this.y - cam.y : this.bottom - cam.y);
+      drawFrame(ctx, f, x, y, flip, false, alpha * (this.alive ? 1 : Math.max(0, 1 - Math.max(0, this.deathT - 0.8) / 0.6)));
+      statusOverlay(ctx, this, f, x, y, flip);
+      this.bodyFx.end(ctx);
+    }
     if (this.aegis > 0) { // a faint shimmering bubble; one pip per blow left
       const bx = Math.round(x), by = Math.round(this.y - cam.y), R = Math.round(Math.max(this.w, this.h) * 0.62) + 5;
       ctx.globalAlpha = 0.5 + Math.sin(this.t * 6) * 0.12; ctx.strokeStyle = '#c8f0ff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(bx + 0.5, by + 0.5, R, R * 0.9, 0, 0, Math.PI * 2); ctx.stroke();

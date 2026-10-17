@@ -4,13 +4,15 @@ import { ABILITIES } from '../combat/abilities.js';
 import { abilityIcon, itemIcon, iconCoin } from '../gfx/sprites_ui.js';
 import { FORMS, xpToNext } from '../data/forms.js';
 import { ITEMS } from '../data/items.js';
+import { HudExtra } from './hud_extra.js';
+import { setting } from '../systems/settings.js';
 
 export class Hud {
-  constructor(game) { this.g = game; this.t = 0; this.lowT = 0; this.hpShown = null; this.ultFlash = 0; }
+  constructor(game) { this.g = game; this.t = 0; this.lowT = 0; this.hpShown = null; this.ultFlash = 0; this.x = new HudExtra(this); }
   update(dt) {
     this.t += dt; const g = this.g, p = g.world?.player; if (!p) return;
     if (this.hpShown === null) this.hpShown = p.hp; this.hpShown += (p.hp - this.hpShown) * Math.min(1, dt * 6);
-    g.systems.tips?.update(dt);
+    g.systems.tips?.update(dt); this.x.update(dt);
     for (const t of g.toasts) t.t += dt; g.toasts = g.toasts.filter((t) => t.t < 2.8);
     for (const t of g.popups) t.t += dt; g.popups = g.popups.filter((t) => t.t < 3.2);
     if (g.bannerState) { g.bannerState.t += dt; if (g.bannerState.t > 2.8) g.bannerState = null; }
@@ -18,7 +20,7 @@ export class Hud {
   draw(ctx) {
     const g = this.g, w = g.world; if (!w) return; const p = w.player, S = p.stats, st = g.state;
     // --- vitals: no backing panel, just the bars ---
-    const F = FORMS[st.form];
+    const big = this.x.beginScale(ctx), F = FORMS[st.form];
     const hpw = 96, hpf = Math.max(0, Math.min(1, p.hp / S.maxHp));
     bar(ctx, 8, 8, hpw, 7, this.hpShown / S.maxHp, '#7a2030', '#a8404a', '#1a0a14');
     ctx.fillStyle = '#e8483c'; ctx.fillRect(8, 8, Math.round(hpw * hpf), 7); ctx.fillStyle = '#ff9a7a'; ctx.fillRect(8, 8, Math.round(hpw * hpf), 2);
@@ -33,6 +35,7 @@ export class Hud {
     text(ctx, `${st.level}`, 108, 8, COL.gold, { shadow: '#000' });
     if (this.t < 6 || g.state.level !== this.lvShown) { this.lvShown = g.state.level; this.nameT = this.t; }
     if (this.t - (this.nameT ?? 0) < 5) { ctx.globalAlpha = Math.min(1, 5 - (this.t - this.nameT)); text(ctx, F.name, 108 + textWidth(String(st.level)) + 5, 8, COL.dim, { shadow: '#000' }); ctx.globalAlpha = 1; }
+    this.x.statusRow(ctx, 8, (p.combo || 0) >= 3 && p.comboLife > 0 ? 47 : 30); this.x.endScale(ctx, big);
     // --- currency: one line; EP / SP only when there is something to spend ---
     const cw = textWidth(String(st.coins)); ctx.drawImage(iconCoin(), 476 - cw - 14, 6); text(ctx, String(st.coins), 476 - cw, 8, COL.gold);
     let ry = 20; const evolvable = this.g.systems.evolution?.readyFor?.();
@@ -58,6 +61,7 @@ export class Hud {
       else if (p.tide < Math.round(ab.cost * (1 + S.tideCost))) { ctx.fillStyle = 'rgba(40,60,160,0.45)'; ctx.fillRect(x + 1, y0 + 1, 20, 20); }
       text(ctx, String(i + 1), x + 2, y0 + 13, '#9ad8ff', { shadow: '#000' });
     });
+    const slotCells = have.map((i, k) => ({ id: slots[i], x: x0 + k * 24, y: y0 })); this.x.cooldownText(ctx, p, slotCells); this.x.abilityFlash(ctx, slotCells);
     if (showUlt) { const x = x0 + have.length * 24, ready = p.fury >= 100; panel(ctx, x, y0, 22, 22, { alpha: 0.7, border: ready ? COL.gold : '#2a3a58' }); ctx.globalAlpha = ready ? 1 : 0.4; ctx.drawImage(abilityIcon('ult'), x + 4, y0 + 4); ctx.globalAlpha = 1; text(ctx, 'Q', x + 2, y0 + 13, ready ? COL.gold : '#6a7a98', { shadow: '#000' }); }
     // --- boss bar ---
     const b = w.boss; if (b && b.alive && b.engaged && !b.dying) {
@@ -67,12 +71,16 @@ export class Hud {
       bar(ctx, bx, by + 1, bw, 7, Math.max(0, b.hp) / b.maxHp, '#c02838', '#ff7a6a', '#2a0a14');
       if (b.armorBar > 0) bar(ctx, bx, by + 10, bw, 2, Math.max(0, b.poiseShown ?? 0), '#ffd84a', '#fff', '#2a2008');
       for (const m of b.phaseMarks || []) { ctx.fillStyle = '#ffffff'; ctx.fillRect(bx + Math.round(bw * m), by, 1, 8); }
+      this.x.bossExtras(ctx, b);
     }
     // --- interact prompt ---
     if (w.near) {
       const i = w.near, cam = w.lastCam || w.cam, x = Math.round(i.x - cam.x), y = Math.round(i.y - i.h / 2 - cam.y) - 20, s = `E  ${i.prompt()}`, tw = textWidth(s) + 8;
       panel(ctx, x - tw / 2, y + Math.round(Math.sin(this.t * 4)), tw, 13, { alpha: 0.9, border: COL.borderLit }); text(ctx, s, x - tw / 2 + 4, y + 3 + Math.round(Math.sin(this.t * 4)), '#ffffff');
     }
+    // --- minimap (bottom left) ---
+    const mm = g.systems.minimap, mode = setting(g, 'minimap');
+    if (mm && mode !== 'off' && !w.cinematic) mm.draw(ctx, 6, mode === 'large' ? 166 : 204);
     // --- loot popups (left) ---
     g.popups.forEach((pp, i) => { const a = Math.min(1, (3.2 - pp.t) * 2, pp.t * 4), y = 84 + i * 20; ctx.globalAlpha = a; panel(ctx, 4, y, 130, 18, { alpha: 0.8, border: '#a08a3a' }); try { ctx.drawImage(pp.icon === 'gem' ? itemIcon('abyssal_core') : itemIcon(pp.icon), 7, y + 1); } catch (e) {} text(ctx, pp.text, 26, y + 5, pp.color); ctx.globalAlpha = 1; });
     g.systems.tips?.draw(ctx, panel, text, textWidth);
@@ -81,8 +89,9 @@ export class Hud {
     // --- zone banner ---
     g.systems.achievements?.drawBanner(ctx);
     const bn = g.bannerState; if (bn) { const a = Math.min(1, bn.t * 2, (2.8 - bn.t) * 1.5); ctx.globalAlpha = a * 0.92; drawText(ctx, bn.title, 240, 44, { color: '#ffffff', scale: 2, align: 'center', shadow: '#05204a', outline: '#05204a' }); if (bn.sub) drawText(ctx, bn.sub, 240, 64, { color: '#9ad8ff', align: 'center', shadow: '#05204a' }); ctx.globalAlpha = 1; }
-    // --- low health pulse ---
-    if (p.hp / S.maxHp < 0.25 && p.alive) { ctx.globalAlpha = 0.18 + 0.12 * Math.sin(this.t * 6); ctx.fillStyle = '#c01020'; ctx.fillRect(0, 0, 480, 6); ctx.fillRect(0, 264, 480, 6); ctx.fillRect(0, 0, 6, 270); ctx.fillRect(474, 0, 6, 270); ctx.globalAlpha = 1; }
+    this.x.hurtArcs(ctx, w.lastCam || w.cam); this.x.xpLine(ctx); this.x.fps(ctx);
+    // --- low health pulse (the post-processing pass paints its own when it is running) ---
+    if (p.hp / S.maxHp < 0.25 && p.alive && (!g.systems.post || g.systems.post.lite)) { ctx.globalAlpha = 0.18 + 0.12 * Math.sin(this.t * 6); ctx.fillStyle = '#c01020'; ctx.fillRect(0, 0, 480, 6); ctx.fillRect(0, 264, 480, 6); ctx.fillRect(0, 0, 6, 270); ctx.fillRect(474, 0, 6, 270); ctx.globalAlpha = 1; }
     // pressure warning
     if (p.fear > 0.05) { ctx.globalAlpha = Math.min(0.5, p.fear * 0.5); ctx.fillStyle = '#2a1a6a'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; if (p.fear > 0.3) text(ctx, 'PRESSURE', 240 - textWidth('PRESSURE') / 2, 70, '#b8a4ff'); }
     if (g.debug) { text(ctx, `${g.engine.fps}fps  x${Math.round(p.x)} y${Math.round(p.y)}  ${p.state}  en:${w.enemies.length}  fx:${w.fx.p.length}`, 6, 258, '#8f8'); }

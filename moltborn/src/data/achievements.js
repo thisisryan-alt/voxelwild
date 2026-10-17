@@ -14,11 +14,11 @@ export const TIERS = {
 };
 
 export const CATS = [
-  { id: 'combat', name: 'Combat', color: '#ff7a6a' },
-  { id: 'explore', name: 'Exploration', color: '#7ad8ff' },
-  { id: 'story', name: 'Story', color: '#ffd84a' },
-  { id: 'collect', name: 'Collection', color: '#a8ff9a' },
-  { id: 'challenge', name: 'Challenge', color: '#d89aff' },
+  { id: 'combat', name: 'Combat', short: 'Combat', color: '#ff7a6a' },
+  { id: 'explore', name: 'Exploration', short: 'Explore', color: '#7ad8ff' },
+  { id: 'story', name: 'Story', short: 'Story', color: '#ffd84a' },
+  { id: 'collect', name: 'Collection', short: 'Collect', color: '#a8ff9a' },
+  { id: 'challenge', name: 'Challenge', short: 'Trials', color: '#d89aff' },
 ];
 
 const BOSSES = ['pearl_tyrant', 'grumbold', 'hermit_king', 'mother_moray', 'sporemother', 'brass_colossus', 'aurelia', 'captain_rust', 'magmaw', 'lurelord', 'krael', 'hollow_maw', 'kyros', 'poseidon'];

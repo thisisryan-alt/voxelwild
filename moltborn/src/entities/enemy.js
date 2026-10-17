@@ -8,6 +8,7 @@ import { enemyFrame } from '../gfx/sprites_enemies.js';
 import { rng, clamp } from '../core/util.js';
 import { chestFrame } from '../gfx/sprites_ui.js';
 import { StatusSet, applyHitStatuses } from '../systems/status.js';
+import { statusOverlay, statusFx, statusPips } from './fx_status.js';
 
 const rand = rng(31337);
 
@@ -132,7 +133,7 @@ export class Enemy extends Entity {
     this.t += dt; this.st += dt; this.losT -= dt; this.flash = Math.max(0, this.flash - dt); this.contactCd -= dt;
     const w = this.world, pl = w.player;
     if (this.slowT > 0) this.slowT -= dt; if (this.weakT > 0) this.weakT -= dt;
-    this.status.update(dt); if (this.dying) return;
+    this.status.update(dt); if (this.dying) return; statusFx(this, dt);
     if (this.statuses.poison) { const ps = this.statuses.poison; ps.t -= dt; ps.acc = (ps.acc || 0) + dt; if (ps.acc >= 0.5) { ps.acc = 0; this.hp -= ps.dps; w.fx.text(this.x, this.y - this.h / 2, ps.dps, '#8aff8a'); if (this.hp <= 0) { this.die(false, { poison: true }); return; } } if (ps.t <= 0) delete this.statuses.poison; }
     if (this.stunT > 0) {
       this.stunT -= dt; this.vx *= Math.exp(-6 * dt); this.vy = this.def.flying ? this.vy * Math.exp(-4 * dt) : Math.min(this.vy + 230 * dt, 140);
@@ -168,8 +169,9 @@ export class Enemy extends Entity {
     if (feet && this.onGround && this.alive !== false) blobShadow(ctx, x, y, Math.round(this.w * 0.7), 0.24);
     const flash = this.flash > 0 || (this.state === 'windup' && Math.floor(this.st * 14) % 2 === 0 && this.def.dmg > 0 && !d.noBlink);
     let alpha = this.phased ? 0.38 : 1; if (this.stunT > 0 && Math.floor(this.t * 20) % 2) alpha *= 0.85;
-    if (this.scale !== 1) { ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(this.scale, this.scale); drawFrame(ctx, frame, 0, 0, this.facing < 0 !== (sp.flip === true), this.flash > 0, alpha); ctx.restore(); }
-    else drawFrame(ctx, frame, x, y, this.facing < 0 !== (sp.flip === true), flash && this.flash > 0 ? true : false, alpha);
+    const flipv = this.facing < 0 !== (sp.flip === true);
+    if (this.scale !== 1) { ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(this.scale, this.scale); drawFrame(ctx, frame, 0, 0, flipv, this.flash > 0, alpha); statusOverlay(ctx, this, frame, 0, 0, flipv); ctx.restore(); }
+    else { drawFrame(ctx, frame, x, y, flipv, flash && this.flash > 0 ? true : false, alpha); statusOverlay(ctx, this, frame, x, y, flipv); }
     if (this.state === 'windup' && !d.noBlink && this.def.dmg > 0) { // red telegraph pip
       ctx.fillStyle = Math.floor(this.st * 12) % 2 ? '#ff4a3a' : '#ffd0a0'; ctx.fillRect(Math.round(this.x - cam.x) - 1, Math.round(this.y - this.h / 2 - cam.y) - 7, 3, 3);
     }
@@ -179,5 +181,6 @@ export class Enemy extends Entity {
       ctx.fillStyle = '#170d1c'; ctx.fillRect(bx - 1, by - 1, bw + 2, 4); ctx.fillStyle = '#5a1020'; ctx.fillRect(bx, by, bw, 2);
       ctx.fillStyle = '#ff5a4a'; ctx.fillRect(bx, by, Math.round(bw * clamp(this.hp / this.maxHp, 0, 1)), 2);
     }
+    if (this.status.size && !d.boss) statusPips(ctx, this, cam, Math.round(this.y - this.h / 2 - cam.y) - 5 - (d.barLift || 0));
   }
 }

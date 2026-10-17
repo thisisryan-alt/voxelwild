@@ -13,7 +13,10 @@ import { abilityIcon, itemIcon, formIcon } from '../gfx/sprites_ui.js';
 import { playerFrame, variantFor } from '../gfx/sprites_player.js';
 import { drawFrame } from '../entities/entity.js';
 
-const TABS = ['STATUS', 'SKILLS', 'ABILITIES', 'EVOLUTION', 'ITEMS', 'QUESTS', 'MAP', 'CODEX'];
+import { EXTRA_TABS, installMenuExtras } from './menu_extra.js';
+
+const TABS = ['STATUS', 'SKILLS', 'ABILITIES', 'EVOLUTION', 'ITEMS', 'QUESTS', 'MAP', 'CODEX', ...EXTRA_TABS];
+const TAB_LABEL = { SKILLS: 'SKILL', ABILITIES: 'ABIL', EVOLUTION: 'EVOLVE', QUESTS: 'QUEST' };
 const fmtTime = (s) => `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}`;
 
 export class MenuScene {
@@ -37,8 +40,8 @@ export class MenuScene {
     const g1 = ctx.createLinearGradient(0, 0, 0, 270); g1.addColorStop(0, '#0e2a4a'); g1.addColorStop(1, '#040a18'); ctx.fillStyle = g1; ctx.fillRect(0, 0, 480, 270);
     for (let i = 0; i < 14; i++) { const x = (i * 71 + this.t * 6 * (1 + (i % 3))) % 500 - 10, y = 270 - ((this.t * 14 * (1 + (i % 4) * 0.5) + i * 53) % 290); ctx.fillStyle = 'rgba(160,220,255,0.25)'; ctx.fillRect(Math.round(x), Math.round(y), 2, 2); }
     // tabs
-    const tw = 480 / TABS.length;
-    TABS.forEach((n, i) => { const sel = i === this.tab; ctx.fillStyle = sel ? '#1e4a7a' : '#0c1830'; ctx.fillRect(i * tw, 0, tw - 1, 16); ctx.fillStyle = sel ? COL.borderLit : '#2a3a58'; ctx.fillRect(i * tw, 15, tw - 1, 1); const lb = ({ ABILITIES: 'ABILITY', EVOLUTION: 'EVOLVE' })[n] || n; text(ctx, lb, i * tw + tw / 2 - textWidth(lb) / 2, 4, sel ? '#ffffff' : COL.dim); });
+    const tw = 456 / TABS.length, tx0 = 12;
+    TABS.forEach((n, i) => { const sel = i === this.tab, x = tx0 + i * tw; ctx.fillStyle = sel ? '#1e4a7a' : '#0c1830'; ctx.fillRect(x, 0, tw - 1, 16); ctx.fillStyle = sel ? COL.borderLit : '#2a3a58'; ctx.fillRect(x, 15, tw - 1, 1); const lb = TAB_LABEL[n] || n; text(ctx, lb, x + tw / 2 - textWidth(lb) / 2, 4, sel ? '#ffffff' : COL.dim); });
     text(ctx, 'Q', 3, 4, '#6a9ad0'); text(ctx, 'E', 472, 4, '#6a9ad0');
     this['d_' + TABS[this.tab]](ctx, this.sel[TABS[this.tab]]);
     // footer
@@ -174,7 +177,7 @@ export class MenuScene {
   itemList(sub) {
     const st = this.g.state, inv = st.inv, list = [];
     const owned = Object.keys(inv).filter((id) => ITEMS[id]);
-    if (sub === 0) for (const id of owned) if (['consumable', 'material'].includes(ITEMS[id].type)) list.push(id);
+    if (sub === 0) for (const id of owned) if (['consumable', 'dish', 'ingredient', 'material'].includes(ITEMS[id].type)) list.push(id);
     if (sub === 1) for (const id of owned) if (ITEMS[id].type === 'equip') list.push(id);
     if (sub === 2) for (const id of st.mutOwned) list.push(id);
     if (sub === 3) for (const id of owned) if (['key', 'evo', 'lore'].includes(ITEMS[id].type)) list.push(id);
@@ -187,9 +190,9 @@ export class MenuScene {
     s.i = Math.min(s.i, Math.max(0, list.length - 1));
     if (inp.pressed('confirm') && list[s.i]) {
       const id = list[s.i], it = ITEMS[id], p = g.world.player;
-      if (it.type === 'consumable') {
-        if (it.use.heal && p.hp >= p.stats.maxHp) { this.say('Already at full health'); return; }
-        g.addItem(id, -1); if (it.use.heal) p.heal(Math.round(p.stats.maxHp * it.use.heal)); if (it.use.tide) p.addTide(p.stats.maxTide * it.use.tide); if (it.use.fury) p.addFury(it.use.fury); g.audio.sfx('pickup'); this.say('Used ' + it.name);
+      if (it.type === 'consumable' || it.type === 'dish') {
+        const why = g.systems.crafting.use(id); if (why) { g.audio.sfx('deny'); this.say(why); return; }
+        this.say((it.type === 'dish' ? 'Ate ' : 'Used ') + it.name);
       } else if (it.type === 'equip') { st.equip[it.slot] = st.equip[it.slot] === id ? null : id; p.recalc(); g.audio.sfx('select'); this.say(st.equip[it.slot] ? 'Equipped ' + it.name : 'Unequipped'); }
       else if (it.type === 'mutation') {
         const i = st.mutations.indexOf(id); if (i >= 0) st.mutations.splice(i, 1); else if (st.mutations.length < FORMS[st.form].mutationSlots) st.mutations.push(id); else { this.say('No free mutation slot'); g.audio.sfx('deny'); return; }
@@ -212,7 +215,7 @@ export class MenuScene {
       if (cnt) text(ctx, cnt, 234 - textWidth(cnt), y + 1, eq ? COL.gold : COL.dim);
     });
     panel(ctx, 246, 38, 226, 154);
-    const id = list[s.i]; if (id) { const it = ITEMS[id]; ctx.drawImage(itemIcon(id), 252, 44); text(ctx, it.name, 272, 48, COL.gold); wrapText(it.desc, 214).forEach((l, i) => text(ctx, l, 252, 66 + i * 10, COL.text)); if (it.type === 'consumable') text(ctx, 'ENTER: use', 252, 176, COL.green); else if (it.type === 'equip') text(ctx, st.equip[it.slot] === id ? 'ENTER: unequip' : 'ENTER: equip', 252, 176, COL.green); else if (it.type === 'mutation') text(ctx, st.mutations.includes(id) ? 'ENTER: remove' : 'ENTER: activate', 252, 176, COL.green); if (st.upgrades[id]) text(ctx, 'Reforged +' + st.upgrades[id], 252, 164, '#ffd8a0'); }
+    const id = list[s.i]; if (id) { const it = ITEMS[id]; ctx.drawImage(itemIcon(id), 252, 44); text(ctx, it.name, 272, 48, COL.gold); wrapText(it.desc, 214).forEach((l, i) => text(ctx, l, 252, 66 + i * 10, COL.text)); if (it.type === 'consumable' || it.type === 'dish') text(ctx, 'ENTER: use', 252, 176, COL.green); else if (it.type === 'ingredient') text(ctx, 'Cook it in the CRAFT tab', 252, 176, COL.dim); else if (it.type === 'equip') text(ctx, st.equip[it.slot] === id ? 'ENTER: unequip' : 'ENTER: equip', 252, 176, COL.green); else if (it.type === 'mutation') text(ctx, st.mutations.includes(id) ? 'ENTER: remove' : 'ENTER: activate', 252, 176, COL.green); if (st.upgrades[id]) text(ctx, 'Reforged +' + st.upgrades[id], 252, 164, '#ffd8a0'); }
     panel(ctx, 8, 196, 464, 54);
     ['shell', 'claw', 'charm'].forEach((sl, i) => { const x = 14 + i * 76, id = st.equip[sl]; panel(ctx, x, 202, 24, 24, { border: id ? COL.gold : '#2a3a58' }); if (id) ctx.drawImage(itemIcon(id), x + 4, 206); text(ctx, sl.toUpperCase(), x + 28, 205, COL.dim); text(ctx, id ? ITEMS[id].name.slice(0, 11) : 'empty', x + 28, 215, id ? COL.text : '#506080'); });
     text(ctx, `Mutation slots`, 250, 203, COL.dim);
@@ -270,4 +273,5 @@ export class MenuScene {
     text(ctx, `${Object.keys(st).length}/${list.length}`, 190 - textWidth(`${Object.keys(st).length}/${list.length}`) + 8, 238, COL.dim);
   }
 }
+installMenuExtras(MenuScene);
 export { TABS };

@@ -31,6 +31,7 @@ export class PlayScene {
       if (inp.pressed('quicksave')) g.saveGame();
       if (inp.pressed('heal') && pl.alive) { if (g.hasItem('kelp_wrap') && pl.hp < pl.stats.maxHp) { g.addItem('kelp_wrap', -1); pl.heal(Math.round(pl.stats.maxHp * 0.4)); g.audio.sfx('pickup'); } else if (g.hasItem('brine_tonic') && pl.tide < pl.stats.maxTide * 0.7) { g.addItem('brine_tonic', -1); pl.addTide(pl.stats.maxTide * 0.5); g.audio.sfx('pickup'); } else g.audio.sfx('deny'); }
       if (inp.pressed('debug')) g.debug = !g.debug;
+      if (inp.pressed('minimap')) g.systems.minimap?.cycle();
       if (inp.pressed('interact') && w.near && pl.alive) { pl.interactT = 0.25; g.audio.sfx('select'); w.near.interact(g); inp.consume('interact'); }
     }
     if (g.freeze > 0) { g.freeze--; w.fx.update(dt * 0.3); w.shakeAmt *= 0.9; g.audio.music.update?.(dt, w); return; }

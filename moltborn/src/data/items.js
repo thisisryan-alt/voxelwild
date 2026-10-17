@@ -96,3 +96,7 @@ export const DYES = {
   ember: { item: 'dye_ember', hue: -0.04, sat: 1.1, light: 0.85 },
   spectral: { item: 'dye_spectral', hue: 0.45, sat: 0.5, light: 1.25 },
 };
+
+// ingredients and dishes live in their own data file and join the item table here
+import { CRAFT_ITEMS } from './items_craft.js';
+Object.assign(ITEMS, CRAFT_ITEMS);
