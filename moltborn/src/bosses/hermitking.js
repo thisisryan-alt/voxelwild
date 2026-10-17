@@ -35,6 +35,7 @@ export class HermitKing extends Boss {
   *clawSmash() {
     const n = this.phaseIdx ? 2 : 1;
     for (let k = 0; k < n; k++) {
+      yield* this.approach(70, 150);
       this.faceTo(this.player.x); this.pose = 'windup'; const d = this.facing, x = d > 0 ? this.x + 8 : this.x - 8 - 84;
       this.teleRect(x, this.y - 28, 84, 56, 0.7); yield 0.7;
       this.pose = 'smash'; this.strikeBox(x, this.y - 28, 84, 56, 14, 0.2, { kb: 210 }); this.sfx('heavy'); this.world.shake(4); this.world.fx.groundWave(this.x + d * 46, this.floorY, 10, 90);

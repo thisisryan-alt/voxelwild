@@ -161,6 +161,8 @@ export class Boss extends Enemy {
   // run a dialogue generator and wait for it (use with yield*)
   *talk(fn, npc = null) { let done = false; this.world.player.locked = true; this.world.game.systems.dialogue.run(fn, npc, null, () => { done = true; }); while (!done) yield 0.1; this.world.player.locked = false; }
   faceTo(x) { this.facing = x >= this.x ? 1 : -1; }
+  // walk toward the player until within `range` (grounded bosses): keeps melee attacks relevant instead of swinging at empty water
+  *approach(range = 80, speed = 130, maxT = 1.6) { let t = 0; this.pose = 'walk'; while (t < maxT && Math.abs(this.player.x - this.x) > range) { this.faceTo(this.player.x); this.vx = this.facing * speed; if (this.hitX) break; t += 1 / 60; yield 1 / 60; } this.vx = 0; this.pose = 'idle'; }
   *moveTo(tx, ty, speed, maxT = 3, tol = 4) { let t = 0; while (t < maxT) { const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy); if (d < tol) break; this.vx = dx / d * speed; this.vy = dy / d * speed; t += 1 / 60; yield 1 / 60; } this.vx = this.vy = 0; }
   // ---- drawing -------------------------------------------------------------------------------------------------------------
   drawTeles(ctx, cam) {

@@ -216,7 +216,7 @@ export class Game {
     this.engine.push(new CutsceneScene(this, panels, () => { this.systems.quests.check(); this.audio.music.play(this.world.biome.music); }));
   }
   questMarker(npcId) {
-    const map = { tessa: ['sq_tessa'], fenwick: ['sq_choir', 'sq_atlas'], glimmer: ['sq_lantern'], hobb: ['sq_hobb'], inkwell: ['sq_inkwell'], ruby: ['sq_ledger'], pip: ['sq_tyrant'], brack: ['sq_census'], morel: ['sq_spores'], thessaly: ['sq_siblings'], old_brine: ['mq1'] };
+    const map = { tessa: ['sq_tessa'], fenwick: ['sq_choir', 'sq_atlas'], glimmer: ['sq_lantern'], hobb: ['sq_hobb'], inkwell: ['sq_inkwell'], ruby: ['sq_ledger'], pip: ['sq_tyrant'], brack: ['sq_census'], morel: ['sq_spores'], tallow: ['sq_vaults'], thessaly: ['sq_siblings'], old_brine: ['mq1'] };
     const qs = map[npcId]; if (!qs) return null; const q = this.systems.quests;
     if (npcId === 'old_brine' && !this.flag('met_brine')) return '!';
     if (npcId === 'old_brine') return null;

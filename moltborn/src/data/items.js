@@ -12,6 +12,7 @@ export const ITEMS = {
   tithe_ledger: { name: "Vael's Tithe Ledger", type: 'key', desc: 'Names, dates, and a running tally of the Seal.' },
   tide_barnacle: { name: 'Tide Barnacle', type: 'key', desc: 'A fat pearl-barnacle from the Tidepools. Brack counts these.' },
   glowcap_sample: { name: 'Glowcap Sample', type: 'key', desc: 'A jar-worthy toadstool cap, faintly warm. Dr. Morel will want it.' },
+  vault_key: { name: 'Vault Key', type: 'key', desc: 'Brass, heavy, stamped with the Court\'s seal. It opens the strongroom door.' },
   // evolution catalysts
   brine_core: { name: 'Brine Core', type: 'evo', desc: 'The crystallised pride of the Reef. Needed for the Hardshell Molt.' },
   abyssal_core: { name: 'Abyssal Core', type: 'evo', desc: 'Dense as a dying star. Needed for the Deep Molt.' },
@@ -39,6 +40,7 @@ export const ITEMS = {
   shell_pearl: { name: 'Pearl-Lined Shell', type: 'equip', slot: 'shell', desc: '+6 Def, +10% max HP.', fx: { def: 6, hp: 0.1 } },
   shell_ironhull: { name: 'Ironhull Plating', type: 'equip', slot: 'shell', desc: 'Salvaged ship iron. +9 Def, -5% speed.', fx: { def: 9, speed: -0.05 } },
   shell_hermitking: { name: "Hermit King's Carapace", type: 'equip', slot: 'shell', desc: '+8 Def, +12% max HP, 10% thorns. It hums a lullaby.', fx: { def: 8, hp: 0.12, thorns: 0.1 } },
+  shell_brass: { name: 'Brass Plating', type: 'equip', slot: 'shell', desc: 'Gilded vault-guardian plate. +10 Def, 8% thorns, -6% speed.', fx: { def: 10, thorns: 0.08, speed: -0.06 } },
   shell_tidewoven: { name: 'Tidewoven Carapace', type: 'equip', slot: 'shell', desc: '+8 Def, +15% Tide.', fx: { def: 8, tide: 0.15 } },
   // equipment — claw
   claw_rusty: { name: 'Rusty Pincer-Cap', type: 'equip', slot: 'claw', price: 90, desc: '+2 Atk.', fx: { atk: 2 } },
@@ -46,6 +48,7 @@ export const ITEMS = {
   claw_coral: { name: 'Coral Edge', type: 'equip', slot: 'claw', desc: '+7 Atk, +8% crit.', fx: { atk: 7, crit: 0.08 } },
   claw_anchor: { name: 'Anchor-Fluke Claw', type: 'equip', slot: 'claw', desc: '+10 Atk, heavy hits +20%.', fx: { atk: 10, heavyDmg: 0.2 } },
   claw_hermit: { name: "Hermit's Pincer", type: 'equip', slot: 'claw', desc: '+8 Atk, parry window 30% longer.', fx: { atk: 8, parryWindow: 0.3 } },
+  claw_trident: { name: 'Gilded Trident-Claw', type: 'equip', slot: 'claw', desc: '+11 Atk, +10% crit, +10% ability damage.', fx: { atk: 11, crit: 0.1, abilityDmg: 0.1 } },
   claw_lumen: { name: 'Lumen Fang', type: 'equip', slot: 'claw', desc: '+9 Atk, +20% ability damage.', fx: { atk: 9, abilityDmg: 0.2 } },
   // equipment — charm / relic
   charm_pearlstring: { name: 'Pearl String', type: 'equip', slot: 'charm', price: 150, desc: 'Coins and pearls are drawn to you from farther away.', fx: { magnet: 60 } },
@@ -53,6 +56,7 @@ export const ITEMS = {
   charm_tideglass: { name: 'Tideglass Locket', type: 'equip', slot: 'charm', desc: '+25% Tide regen.', fx: { tideRegen: 0.25 } },
   charm_ghostcoin: { name: "Ghostcoin", type: 'equip', slot: 'charm', desc: 'Pay the toll: +30% coin from enemies.', fx: { coinBonus: 0.3 } },
   charm_spore: { name: 'Spore Sachet', type: 'equip', slot: 'charm', desc: 'Poison harms you half as much, and you recover a little with every kill.', fx: { poisonResist: 0.5, lifeOnKill: 2 } },
+  charm_archivist: { name: "Archivist's Loupe", type: 'equip', slot: 'charm', desc: 'Coins and pearls come from farther away, hidden things shimmer, and foes drop 20% more coin.', fx: { magnet: 50, sense: 1, coinBonus: 0.2 } },
   charm_kingsigil: { name: "Regent's Signet", type: 'equip', slot: 'charm', desc: 'Court favour: shops are 20% cheaper.', fx: { discount: 0.2 } },
   // mutations (passive traits)
   mut_barbed: { name: 'Barbed Shell', type: 'mutation', desc: 'Spines grow through the plating. Attackers that hit you take damage.', fx: { thorns: 0.12 } },

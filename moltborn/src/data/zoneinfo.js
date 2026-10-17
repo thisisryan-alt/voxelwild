@@ -12,6 +12,7 @@ export const ZONE_INFO = {
   forest_heart: { name: 'Mangrove Heart', biome: 'forest', map: { x: 6, y: 0 }, boss: 'mother_moray' },
   forest_grotto: { name: 'Glowcap Grotto', biome: 'forest', map: { x: 5, y: 1 }, boss: 'sporemother', secret: true },
   kingdom_gate: { name: 'Gate Plaza', biome: 'kingdom', map: { x: 6, y: 1 } },
+  kingdom_vaults: { name: 'Pearl Vaults', biome: 'kingdom', map: { x: 7, y: 0 }, boss: 'brass_colossus', secret: true },
   kingdom_spires: { name: 'Throne Spires', biome: 'kingdom', map: { x: 7, y: 1 } },
   kingdom_court: { name: 'Court of Pearls', biome: 'kingdom', map: { x: 8, y: 1 }, boss: 'aurelia' },
   grave_shallows: { name: 'Wreck Shallows', biome: 'graveyard', map: { x: 8, y: 2 } },
@@ -30,7 +31,7 @@ export const ZONE_INFO = {
   domain_throne: { name: 'Throne of Tides', biome: 'domain', map: { x: 5, y: 5 }, boss: 'poseidon' },
 };
 export const ZONE_LINKS = [
-  ['reef_garden', 'reef_clam'], ['reef_hollow', 'reef_tidepools'], ['forest_roots', 'forest_grotto'],
+  ['reef_garden', 'reef_clam'], ['reef_hollow', 'reef_tidepools'], ['forest_roots', 'forest_grotto'], ['kingdom_gate', 'kingdom_vaults'],
   ['reef_nursery', 'reef_garden'], ['reef_garden', 'reef_hollow'], ['reef_hollow', 'reef_arena'], ['reef_arena', 'forest_edge'], ['forest_edge', 'forest_roots'], ['forest_roots', 'forest_heart'],
   ['forest_heart', 'kingdom_gate'], ['kingdom_gate', 'kingdom_spires'], ['kingdom_spires', 'kingdom_court'], ['kingdom_court', 'grave_shallows'], ['grave_shallows', 'grave_galleon'], ['grave_galleon', 'grave_captain'],
   ['grave_captain', 'abyss_descent'], ['abyss_descent', 'abyss_lanterns'], ['abyss_lanterns', 'abyss_throat'], ['abyss_throat', 'trench_bones'], ['trench_bones', 'trench_temple'], ['trench_temple', 'trench_titan'],

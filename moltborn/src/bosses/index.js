@@ -11,3 +11,4 @@ import './tyrant.js';
 import './poseidon.js';
 import './hermitking.js';
 import './sporemother.js';
+import './colossus.js';

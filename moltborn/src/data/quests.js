@@ -76,5 +76,10 @@ export const QUESTS = {
     { text: 'Quiet the thing that hums at the top of the grotto.', done: boss('sporemother') },
     { text: 'Show Dr. Morel what you found.', done: f('spores_done') },
   ], desc: 'Dr. Morel has catalogued every toadstool in the grotto but the three on the high shelves. The ones that glow. The ones that hum back.' },
+  sq_vaults: { name: 'The Last Drawer', type: 'side', giver: 'tallow', steps: [
+    { text: 'Find the vault key in the upper room of the Pearl Vaults.', done: (g) => g.hasItem('vault_key') || g.flag('vaults_done') || g.boss('brass_colossus') },
+    { text: 'Open the strongroom and stop its guardian.', done: boss('brass_colossus') },
+    { text: 'Tell Tallow the last drawer is open.', done: f('vaults_done') },
+  ], desc: 'Tallow catalogued the Court\'s strongroom for sixty years. He has not been allowed to see the last drawer. He would like to, before he is too old to read it.' },
   sq_tyrant: { name: 'The Pearl Tyrant', type: 'side', giver: 'pip', steps: [{ text: 'Defeat the Pearl Tyrant, the giant clam beneath the garden.', done: boss('pearl_tyrant') }], desc: 'Pip’s pearl was swallowed by something enormous.' },
 };

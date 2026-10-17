@@ -66,3 +66,40 @@ export function forest_grotto() {
   b.decorate(GROTTO_DECOR, 0.35);
   return b.finish();
 }
+
+// ---- Pearl Vaults (kingdom, under the Gate Plaza dais): the Court's strongroom. A key hunt, a hidden treasury and a brass guardian ----------
+const VAULT_DECOR = { floor: [['pillar', 1.5, 3], ['fan', 2, 3], ['branch', 2, 4], ['shell', 1.5, 3], ['pebbles', 1, 2], ['statue', 0.6, 1]], ceil: [['chainhang', 2, 3], ['stalactite', 1, 3]] };
+export function kingdom_vaults() {
+  const b = new ZoneBuilder({ id: 'kingdom_vaults', name: 'Pearl Vaults', biome: 'kingdom', w: 124, h: 64, seed: 34, music: 'kingdom', title: 'Pearl Vaults', dark: 0.12 });
+  b.fill(T.ROCK);
+  b.carve(3, 28, 30, 18); b.carve(33, 36, 58, 10);               // entry hall and the long gallery
+  b.carve(36, 14, 26, 14); b.carve(44, 28, 6, 8);                // key room above, with a shaft down to the gallery
+  b.carve(64, 16, 15, 12);                                       // the treasury east of the key room
+  b.carve(89, 38, 5, 8); b.carve(93, 16, 28, 30);                // doorway and the guardian's hall
+  b.floorLine(2, 122, 46, T.RUIN); b.rect(36, 28, 26, 2, T.RUIN); b.rect(64, 28, 15, 2, T.RUIN);
+  b.carve(44, 28, 6, 2);                                         // reopen the shaft through the key-room slab
+  b.ladder(46, 45, 28, 3, 4, 4);
+  b.platform(8, 38, 6); b.platform(20, 34, 6); b.rect(54, 36, 2, 3, T.RUIN); b.rect(72, 36, 2, 3, T.RUIN); b.rect(84, 36, 2, 3, T.RUIN);
+  b.platform(98, 36, 6); b.platform(112, 36, 6); b.platform(105, 28, 6); b.rect(96, 16, 3, 4, T.RUIN); b.rect(116, 16, 3, 4, T.RUIN);
+  b.breakable(62, 24, 2, 4); b.keep(60, 22, 8, 8);               // cracked wall from the key room into the treasury
+  b.surface(T.GROUND, 1);
+  b.exitW(40, 45, 'kingdom_gate', 'cellar'); b.entryFloor('stair', 5, { facing: 1, from: 30 });
+  b.shrine('rest', 14, { from: 30 });
+  b.npc('tallow', 24, { from: 30 });
+  b.sign(30, 'VAULT INVENTORY - LEVEL ONE. Please do not touch the exhibits. The exhibits will touch you.', { from: 30, speaker: 'Brass Plaque' });
+  b.mural(40, 'mural_vaults', { from: 36 });
+  b.chest(56, { item: 'vault_key' }, { from: 14, tint: 1, key: 'vault_key_chest' });
+  b.chest(68, { coins: [90, 130], items: { dye_gilded: 1 } }, { from: 16, tint: 1, secret: true, key: 'vault_treasury_a' });
+  b.chest(74, { item: 'claw_trident', coins: [60, 90] }, { from: 16, tint: 1, secret: true, key: 'vault_treasury_b' });
+  b.chest(76, { black_pearl: 2, items: { brine_tonic: 2 } }, { from: 16, secret: true, key: 'vault_treasury_c' });
+  b.chest(28, { coins: [60, 80], items: { kelp_wrap: 2 } }, { from: 30 });
+  b.lockdoor(90, 38, 2, 8, 'vault_key', { lockText: 'A brass door the height of the gallery. It wants a vault key.' });
+  b.coins(12, 36, 4); b.coins(40, 42, 5); b.coins(60, 42, 4); b.coins(80, 42, 4); b.coins(40, 22, 4); b.coins(104, 26, 4);
+  b.spawnFloor('tridentstatue', 48, 36); b.spawnFloor('tridentstatue', 66, 36); b.spawnFloor('tridentstatue', 82, 36);
+  b.spawnFloor('spawncoral', 40, 30); b.spawnFloor('mantis', 52, 16); b.spawnFloor('mender', 58, 16); b.spawnFloor('mantis', 38, 18);
+  b.spawnFloor('brineguard', 38, 36); b.spawnFloor('brineguard', 74, 36, { count: 1 }); b.spawn('archerfish', 56, 40, { count: 2, spread: 24 }); b.spawn('puffer', 70, 40);
+  b.spawnFloor('hermit', 70, 20); b.spawnFloor('mender', 72, 20);
+  b.spawns.push({ boss: 'brass_colossus', floor: true, x: 108 * 16, y: 46 * 16, arena: { x: 93, y: 15, w: 28, h: 31 }, trigger: { x: 98, y: 20, w: 20, h: 25 }, barriers: [{ x: 93, y: 38, w: 1, h: 8 }] });
+  b.decorate(VAULT_DECOR, 0.22);
+  return b.finish();
+}

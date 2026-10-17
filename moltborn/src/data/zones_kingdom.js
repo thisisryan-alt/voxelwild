@@ -18,6 +18,8 @@ export function kingdom_gate() {
   b.surface(T.GROUND, 1); b.smooth(1); b.carve(106, 37, 4, 5);
   b.keep(104, 36, 8, 8);
   b.lockdoor(106, 37, 2, 5, 'brineguard_key', { lockText: "The Brineguard's postern is locked. Only Court-issue keys open it." });
+  b.carve(33, 39, 8, 3); b.rect(41, 39, 3, 3, T.CRACKED); b.exit(33, 39, 4, 3, 'kingdom_vaults', 'stair'); b.entry('cellar', 39, 41); b.keep(30, 37, 15, 6);   // a stair down, hidden in the dais
+  b.sign(36, 'The stone steps spiral down. A brass plaque: VAULTS - AUTHORISED PERSONNEL. (Somebody has crossed out AUTHORISED.)', { from: 39 });
   b.exitN(14, 24, 'forest_heart', 'south'); b.entry('north', 18, 8); b.carve(14, 0, 11, 8);
   b.exitE(37, 41, 'kingdom_spires', 'west'); b.entryFloor('east', 100, { facing: -1, from: 20 });
   b.shrine('rest', 26, { from: 28 });

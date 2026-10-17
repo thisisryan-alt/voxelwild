@@ -103,6 +103,32 @@ export const DIALOGUE = {
     yield c.say("The garden is peaceful now. I have started naming the small ones. This one is Gerald.");
   },
 
+  *tallow(c) {
+    if (!c.flag('met_tallow')) {
+      c.set('met_tallow');
+      yield c.say("Mind the plaque. Mind the floor. Mind, if you can manage it, the thing at the end of the gallery. Tallow, Archivist of the Counting House, sixty-one years in post and forty of them unsupervised.");
+      yield c.say("I catalogued every drawer in these vaults. Every drawer but the last. The Colossus will not let me past, and the key is in the upper room, and the stairs in the upper room are very steep, and I am a seahorse.");
+    }
+    if (!c.qActive('sq_vaults') && !c.qDone('sq_vaults')) {
+      const i = yield c.ask("Would you open the last drawer for me? I would so like to see what it is I have been protecting.", ['I will.', 'What is in it?', 'Not now.']);
+      if (i === 2) { yield c.say("Of course. Of course. The drawers are not going anywhere. Sixty-one years, you know. They are the most patient things I have ever met."); return; }
+      if (i === 1) yield c.say("I do not know. That is the entire difficulty. The ledger says only: 'Last drawer: the balance.' It does not say whose.");
+      yield c.say("The key is in the upper room, up the shaft in the gallery. Then the brass door at the east end. The Colossus will be on the other side, and he is — he is not rude, exactly. He is simply very, very thorough.");
+      c.quest('sq_vaults'); return;
+    }
+    if (c.qActive('sq_vaults')) {
+      if (c.boss('brass_colossus') && !c.flag('vaults_done')) {
+        c.set('vaults_done'); c.gain(200); c.give('charm_archivist');
+        yield c.say("It is — you say it is open? And he said it was — oh. Oh, my. The balance. The balance is... it is a list. Of the names. Every hatchling the Court ever took, and every pearl they were traded for, and at the bottom, in the Queen's own hand: 'Not worth it.'");
+        yield c.say("I am going to sit down now. I am going to sit with it a while. Take the loupe. It has helped me read things I would rather not have read. May it do the same for you.");
+        return;
+      }
+      yield c.say("The key is in the upper room, up the shaft. The door is at the east end. The thorough gentleman is on the other side.");
+      return;
+    }
+    yield c.say("I have the last drawer's ledger now. I have been reading it very slowly, so that it lasts.");
+  },
+
   *cowrie(c) {
     if (!c.flag('met_cowrie')) { c.set('met_cowrie'); yield c.say("Darling! A customer! Or a thief — but you've the face for honest trade. Madame Cowrie, purveyor of the finest and the nearly finest."); }
     while (true) {
