@@ -1,0 +1,185 @@
+// Game: owns persistent state, services (input, audio, saves) and the current World; routes zone changes,
+// rewards, deaths and the story flags that systems (quests, dialogue, bosses) hang off.
+import { Engine } from './core/engine.js';
+import { Input } from './core/input.js';
+import { Events } from './core/util.js';
+import { Save } from './core/save.js';
+import { AudioSys } from './audio/audio.js';
+import { newState, grantXp } from './systems/progression.js';
+import { World } from './world/world.js';
+import { buildZone, ZONE_INFO } from './data/zones.js';
+import { ITEMS } from './data/items.js';
+import { FORMS, xpToNext } from './data/forms.js';
+import { PlayScene } from './ui/playscene.js';
+import { Pickup } from './entities/entity.js';
+import { rng } from './core/util.js';
+
+const rand = rng(8080);
+
+export class Game {
+  constructor(canvas) {
+    this.engine = new Engine(canvas);
+    this.input = new Input();
+    this.events = new Events();
+    this.state = newState();
+    const saved = Save.settings(); if (saved) Object.assign(this.state.settings, saved);
+    this.audio = new AudioSys(this.state.settings);
+    this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
+    this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
+    window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
+  }
+  start(scene) { this.engine.push(scene); this.engine.start(); }
+  // deterministic stepping for tests: advance n fixed frames without rendering
+  advance(n = 1) { for (let i = 0; i < n; i++) this.engine.step(1 / 60); this.engine.render(); }
+
+  // ---- state helpers ----------------------------------------------------------------------------
+  zoneState(id) { return (this.state.zones[id] ||= { opened: {}, broken: {}, killed: {}, collected: {} }); }
+  flag(f) { return !!this.state.flags[f]; }
+  setFlag(f, v = true) { if (this.state.flags[f] === v) return; this.state.flags[f] = v; this.events.emit('flag', f, v); }
+  hasItem(id) { return (this.state.inv[id] || 0) > 0; }
+  itemCount(id) { return this.state.inv[id] || 0; }
+  addItem(id, n = 1) { this.state.inv[id] = (this.state.inv[id] || 0) + n; if (this.state.inv[id] <= 0) delete this.state.inv[id]; this.events.emit('item', id, n); }
+  hitstop(n) { this.freeze = Math.max(this.freeze, n); }
+  toast(msg, color = '#ffffff') { this.toasts.push({ msg, color, t: 0 }); if (this.toasts.length > 4) this.toasts.shift(); }
+  popup(icon, text, color = '#ffffff') { this.popups.push({ icon, text, color, t: 0 }); }
+  banner(title, sub) { this.bannerState = { title, sub, t: 0 }; }
+  say(speaker, text) { this.playScene?.dialogue.say(speaker, text); }
+
+  // ---- lifecycle -----------------------------------------------------------------------------------
+  newGame(slot = 0) {
+    this.slot = slot; this.state = newState(); Object.assign(this.state.settings, Save.settings() || {}); this.audio.settings = this.state.settings;
+    this.state.meta = { started: Date.now() };
+    return this.enterWorld('reef_nursery', 'start', { newGame: true });
+  }
+  loadGame(slot) {
+    const d = Save.read(slot); if (!d) return false;
+    this.slot = slot; this.state = Object.assign(newState(), d.state); this.state.stats = Object.assign(newState().stats, d.state.stats); this.state.settings = Object.assign(newState().settings, d.state.settings, Save.settings() || {});
+    this.audio.settings = this.state.settings;
+    const c = this.state.checkpoint; this.enterWorld(c.zone, c.entry, { loaded: true }); return true;
+  }
+  saveGame(quiet) {
+    const s = this.state, p = this.world?.player;
+    if (p) { s.hp = p.hp; s.tide = p.tide; }
+    s.meta = { ...(s.meta || {}), zone: ZONE_INFO[this.world?.zone.id]?.name || this.world?.zone.name || '', level: s.level, form: s.form, playtime: Math.round(s.playtime), savedAt: Date.now(), coins: s.coins };
+    Save.write(this.slot, { v: 1, meta: s.meta, state: s });
+    if (!quiet) { this.toast('Game saved', '#9ad8ff'); this.audio.sfx('save'); }
+  }
+  enterWorld(zoneId, entry, o = {}) {
+    const scene = new PlayScene(this);
+    this.playScene = scene;
+    this.engine.replace(scene);
+    this.buildWorld(zoneId, entry, o);
+    return scene;
+  }
+  buildWorld(zoneId, entry, o = {}) {
+    const z = buildZone(zoneId);
+    this.world = new World(this, z, entry);
+    this.state.visited[zoneId] = true;
+    this.zoneMeta(zoneId);
+    const p = this.world.player;
+    if (this.state.hp != null && o.keepHp !== false && !o.respawn) { p.hp = Math.min(this.state.hp, p.stats.maxHp); p.tide = Math.min(this.state.tide ?? p.stats.maxTide, p.stats.maxTide); }
+    if (o.respawn) { p.hp = p.stats.maxHp; p.tide = p.stats.maxTide; p.invulnT = 1.5; p.animT = 0; }
+    this.audio.ambience(this.world.biome.amb); this.audio.music.play(z.music || this.world.biome.music);
+    // spirit purse (coins lost on death)
+    const pu = this.state.purse; if (pu && pu.zone === zoneId) this.world.pickups.push(new Pickup(this.world, { kind: 'coin', value: pu.amount, x: pu.x, y: pu.y, fixed: true, delay: 0, life: 1e9, id: 'purse' })), this.world.pickups[this.world.pickups.length - 1].purse = true;
+    this.events.emit('zone', zoneId);
+    this.systems.quests?.onZone?.(zoneId);
+    if (!o.silentBanner) this.banner(z.title || z.name, this.world.biome.name);
+    return this.world;
+  }
+  zoneMeta(id) {}
+  changeZone(to, entry, ex) {
+    const ps = this.playScene; if (!ps) return;
+    ps.fadeOut(0.3, () => {
+      this.state.checkpoint.last = { zone: to, entry };
+      const hp = this.world.player.hp, tide = this.world.player.tide; this.state.hp = hp; this.state.tide = tide;
+      this.buildWorld(to, entry, { silentBanner: false });
+      this.saveGame(true);
+      ps.fadeIn(0.4);
+    });
+  }
+  rest(shrine) {
+    const w = this.world, p = w.player, s = this.state;
+    s.checkpoint = { zone: w.zone.id, entry: shrine.o.entry || 'rest', shrine: shrine.key };
+    p.hp = p.stats.maxHp; p.tide = p.stats.maxTide; p.fury = Math.max(p.fury, 0); s.flags.secondWindUsed = false;
+    this.audio.sfx('rest'); w.fx.ring(shrine.x, shrine.y - 6, 4, 70, 0.7, '#a0f0ff', 2); w.fx.burst(shrine.x, shrine.y - 10, ['#a0f0ff', '#ffffff', '#ffd8f0'], 80, 0.8, 2);
+    this.toast('Rested. The tide remembers this place.', '#9ad8ff'); this.saveGame(true);
+    // enemies respawn
+    this.playScene.fadeOut(0.35, () => { this.buildWorld(w.zone.id, shrine.o.entry || 'rest', { silentBanner: true, keepHp: false }); const np = this.world.player; np.hp = np.stats.maxHp; np.tide = np.stats.maxTide; this.world.player.interactT = 0.5; this.playScene.fadeIn(0.4); this.events.emit('rest'); });
+  }
+  onPlayerDeath() {
+    const s = this.state, w = this.world, p = w.player;
+    const lose = Math.floor(s.coins * 0.25);
+    s.purse = lose > 0 ? { zone: w.zone.id, x: p.x, y: p.y, amount: lose } : null; s.coins -= lose;
+    this.playScene.fadeOut(0.9, () => {
+      const c = s.checkpoint; s.fury = 0;
+      this.buildWorld(c.zone, c.entry, { respawn: true });
+      if (lose > 0) this.toast(`Lost ${lose} coins — find your spirit purse where you fell`, '#ffb070');
+      this.playScene.fadeIn(0.8); this.world.player.setState('free');
+    });
+  }
+
+  // ---- rewards ------------------------------------------------------------------------------------------
+  collect(pk) {
+    const w = this.world, p = w.player, s = this.state, a = this.audio;
+    if (pk.kind === 'coin') {
+      const v = Math.round(pk.value * (1 + p.stats.coinBonus)); s.coins += v; s.stats.coinsEarned += v; a.sfx('coin');
+      w.fx.text(pk.x, pk.y - 6, '+' + v, '#ffd84a'); if (pk.purse) { s.purse = null; this.toast('Spirit purse recovered', '#ffd84a'); }
+    } else if (pk.kind === 'pearl') { this.addItem(pk.id || 'pearl', pk.value || 1); a.sfx('pickup'); w.fx.text(pk.x, pk.y - 6, '+' + (pk.id === 'black_pearl' ? 'Black Pearl' : 'Pearl'), '#d0dcf8'); }
+    else if (pk.kind === 'orb') {
+      if (pk.id === 'tide') p.addTide(pk.value); else if (pk.id === 'fury') p.addFury(pk.value); else p.heal(pk.value); a.sfx('pickup'); w.fx.sparkle(pk.x, pk.y);
+    } else if (pk.kind === 'item') { this.grantItem(pk.id, pk.value || 1, true); p.collectT = 0.25; }
+    this.events.emit('pickup', pk);
+  }
+  grantItem(id, n = 1, announce = true) {
+    const it = ITEMS[id]; if (!it) return;
+    if (it.type === 'mutation') { if (!this.state.mutOwned.includes(id)) this.state.mutOwned.push(id); if (this.state.mutations.length < FORMS[this.state.form].mutationSlots) { this.state.mutations.push(id); this.world?.player.recalc(); } }
+    else if (it.type === 'dye') { if (!this.state.dyes) this.state.dyes = {}; this.state.dyes[id] = true; this.addItem(id, 1); }
+    else this.addItem(id, n);
+    if (announce) { this.popup(id, it.name + (n > 1 ? ' x' + n : ''), '#fff6a8'); this.audio.sfx('item'); }
+    this.events.emit('gotitem', id);
+  }
+  grantLoot(loot, x, y, announce) {
+    const w = this.world, s = this.state;
+    if (loot.coins) { const n = Array.isArray(loot.coins) ? Math.round(loot.coins[0] + rand() * (loot.coins[1] - loot.coins[0])) : loot.coins; let rem = n, i = 0; while (rem > 0) { const v = rem >= 5 && rand() < 0.4 ? 5 : 1; rem -= v; w.pickups.push(new Pickup(w, { kind: 'coin', value: v, x, y, vx: (rand() - 0.5) * 90, vy: -50 - rand() * 50, delay: 0.3 + i * 0.02 })); if (++i > 30) { w.pickups.push(new Pickup(w, { kind: 'coin', value: rem, x, y, vx: 0, vy: -60, delay: 0.5 })); break; } } }
+    if (loot.pearl) this.grantItem('pearl', loot.pearl, announce);
+    if (loot.black_pearl) this.grantItem('black_pearl', loot.black_pearl, announce);
+    if (loot.items) for (const [id, n] of Object.entries(loot.items)) this.grantItem(id, n, announce);
+    if (loot.item) this.grantItem(loot.item, 1, announce);
+    if (loot.ep) { s.ep += loot.ep; this.popup('gem', `+${loot.ep} Evolution Point${loot.ep > 1 ? 's' : ''}`, '#ff9ad8'); this.audio.sfx('item'); }
+    if (loot.sp) { s.sp += loot.sp; this.popup('gem', `+${loot.sp} Skill Point${loot.sp > 1 ? 's' : ''}`, '#9ad8ff'); }
+    if (loot.xp) this.giveXp(loot.xp, x, y);
+    if (loot.flag) this.setFlag(loot.flag);
+    if (loot.text) this.toast(loot.text);
+  }
+  giveXp(n, x, y) {
+    const w = this.world, p = w.player, r = grantXp(this.state, n);
+    if (r.levels) {
+      p.recalc(); p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * 0.25); this.audio.sfx('levelup');
+      w.fx.ring(p.x, p.y, 4, 50, 0.6, '#ffd84a', 2); w.fx.text(p.x, p.y - 20, 'LEVEL UP', '#ffd84a', true, { life: 1.2 });
+      this.toast(`Level ${this.state.level}! +${r.levels} skill point${r.levels > 1 ? 's' : ''}`, '#ffd84a'); this.events.emit('levelup', this.state.level);
+    }
+    if (x !== undefined && n > 0) w.fx.text(x, y - 8, '+' + n + ' xp', '#9ad8ff');
+  }
+  onEnemyKilled(e, hit) {
+    const w = this.world, p = w.player, d = e.def, s = this.state;
+    s.stats.kills++;
+    this.giveXp(Math.round((d.xp || 1) * (e.xpMult || 1)), e.x, e.y);
+    const coins = d.coins ? Math.round(d.coins[0] + rand() * (d.coins[1] - d.coins[0])) : 0;
+    if (coins) this.grantLoot({ coins }, e.x, e.y, false);
+    const r = rand();
+    if (r < 0.12) w.pickups.push(new Pickup(w, { kind: 'orb', id: 'hp', value: Math.max(6, Math.round(p.stats.maxHp * 0.08)), x: e.x, y: e.y, delay: 0.3 }));
+    else if (r < 0.2) w.pickups.push(new Pickup(w, { kind: 'orb', id: 'tide', value: 10, x: e.x, y: e.y, delay: 0.3 }));
+    if (d.ep) { s.ep += d.ep; this.popup('gem', `+${d.ep} Evolution Point`, '#ff9ad8'); }
+    if (d.drops) for (const [id, ch] of d.drops) if (rand() < ch) this.grantItem(id, 1, true);
+    if (p.stats.lifeOnKill) p.heal(p.stats.lifeOnKill);
+    p.addFury(4); p.addTide(3);
+    if (e.unique || e.persistKey && d.elite) this.zoneState(w.zone.id).killed[e.persistKey] = true;
+    this.events.emit('kill', e.type, e);
+  }
+  bossDefeated(key) { this.state.bosses[key] = true; this.events.emit('boss', key); this.saveGame(true); }
+  questMarker() { return null; }
+  readLore(id, src) { this.systems.codex?.read(id); }
+  openMoltShrine(shrine) {}
+  update(dt) { this.state.playtime += dt; }
+}

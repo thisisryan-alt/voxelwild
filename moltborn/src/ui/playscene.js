@@ -1,0 +1,46 @@
+// The in-world scene: ticks the World + HUD, routes menu/pause keys, runs fades and dialogue freezes.
+import { Hud } from './hud.js';
+import { DialogueBox } from './dialogue_ui.js';
+
+export class PlayScene {
+  constructor(game) {
+    this.g = game; this.opaque = true; this.hud = new Hud(game); this.dialogue = new DialogueBox(game);
+    this.fade = { a: 1, target: 0, speed: 2.5, cb: null }; this.lock = 0; this.letterbox = 0; this.letterTarget = 0;
+    game.playScene = this;
+  }
+  fadeOut(sec, cb) { this.fade.target = 1; this.fade.speed = 1 / sec; this.fade.cb = cb || null; this.lock++; }
+  fadeIn(sec) { this.fade.target = 0; this.fade.speed = 1 / sec; this.fade.cb = null; this.lock = Math.max(0, this.lock - 1); }
+  get busy() { return this.fade.a > 0.05 || this.dialogue.active; }
+  update(dt) {
+    const g = this.g, inp = g.input, w = g.world; if (!w) return;
+    g.update(dt);
+    // fade
+    const f = this.fade;
+    if (f.a !== f.target) { f.a += Math.sign(f.target - f.a) * f.speed * dt; if (Math.abs(f.a - f.target) < f.speed * dt) { f.a = f.target; if (f.target === 1 && f.cb) { const cb = f.cb; f.cb = null; cb(); } } }
+    this.letterbox += (this.letterTarget - this.letterbox) * Math.min(1, dt * 4);
+    this.hud.update(dt);
+    const pl = w.player;
+    pl.locked = this.dialogue.active || this.lock > 0 || !!w.cinematic;
+    if (this.dialogue.active) { this.dialogue.update(dt); w.fx.update(dt); w.updateCamera(dt); g.audio.setListener(pl.x, pl.y); return; }
+    if (!pl.locked) {
+      if (inp.pressed('pause')) { g.openPause?.(); return; }
+      if (inp.pressed('menu')) { g.openMenu?.(0); return; }
+      if (inp.pressed('map')) { g.openMenu?.('map'); return; }
+      if (inp.pressed('quicksave')) g.saveGame();
+      if (inp.pressed('debug')) g.debug = !g.debug;
+      if (inp.pressed('interact') && w.near && pl.alive) { pl.interactT = 0.25; g.audio.sfx('select'); w.near.interact(g); inp.consume('interact'); }
+    }
+    if (g.freeze > 0) { g.freeze--; w.fx.update(dt * 0.3); w.shakeAmt *= 0.9; g.audio.music.update?.(dt, w); return; }
+    w.update(dt);
+    g.audio.setListener(pl.x, pl.y); g.audio.music.update?.(dt, w);
+    if (this.g.cinematicHook) this.g.cinematicHook(dt);
+  }
+  draw(ctx) {
+    const g = this.g, w = g.world; if (!w) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 480, 270); return; }
+    w.draw(ctx);
+    if (this.letterbox > 0.5) { const h = Math.round(this.letterbox); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 480, h); ctx.fillRect(0, 270 - h, 480, h); }
+    if (this.letterbox < 6) this.hud.draw(ctx);
+    this.dialogue.draw(ctx);
+    if (this.fade.a > 0.001) { ctx.globalAlpha = Math.min(1, this.fade.a); ctx.fillStyle = '#02050c'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }
+  }
+}
