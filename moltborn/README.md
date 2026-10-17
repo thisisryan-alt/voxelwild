@@ -59,7 +59,8 @@ breakable walls hide secrets.
 hidden Maw, the optional Pearl Tyrant, and Poseidon in four phases: Judgment, Wrath, Drowned God,
 Last Tide. Telegraphed attacks, armour-break phases, arena barriers.
 
-**Story.** Told through murals, memory pearls, NPCs and boss dialogue. Several quests end in
+**Story.** Told through murals, memory pearls, NPCs and boss dialogue, plus twenty illustrated story
+cutscenes (`src/systems/story.js`): the intro, each realm's first entry, every boss's fall, each molt and the Throne. Several quests end in
 moral choices (spare or slay Krael, redeem Aurelia, free the hatchlings), and these feed four
 endings: Slay, Trident, Mercy, and a secret one.
 
@@ -74,7 +75,7 @@ index.html            canvas shell
 src/main.js           boot
 src/game.js           Game: owns systems, zone changes, save/load
 src/core/             engine + scene stack, input, save, utils
-src/gfx/              procedural Painter, sprite painters per category, tiles/bg/particles/font
+src/gfx/              procedural Painter, crab kit + hero forms, boss/enemy/NPC painters, cutscene scenes, tiles/bg/particles/font
 src/world/            zone builder DSL, tile baking, physics, world update/draw/lighting
 src/entities/         player, enemies, AI library, boss base, interactables
 src/bosses/           one file per boss + registry
@@ -105,4 +106,7 @@ node tools/run.mjs tests/scripts/ending.mjs  # plays the endings
 node tools/run.mjs tests/scripts/hatch.mjs   # hatchling vault script
 TRACKS=reef,boss1 node tools/run.mjs tests/scripts/music_render.mjs   # offline render: level and band balance per track
 node tools/run.mjs tests/scripts/cuts.mjs    # screenshots of every cutscene scene
+node tools/run.mjs tests/scripts/fuzz.mjs    # random-input fuzz of all 25 zones (exceptions, NaN, runaway entities)
+node tools/run.mjs tests/scripts/aiprobe.mjs # how each enemy type behaves against a standing player
+node tools/run.mjs tests/scripts/models.mjs  # contact sheets of every model (also heroes.mjs, bossview.mjs)
 ```

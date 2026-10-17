@@ -7,7 +7,7 @@ import { ITEMS, SHOP } from '../data/items.js';
 import { FORMS, BRANCHES, EVOLUTIONS } from '../data/forms.js';
 import { itemIcon, formIcon } from '../gfx/sprites_ui.js';
 import { getBackground } from '../gfx/background.js';
-import { playerFrame, variantFor } from '../gfx/sprites_player.js';
+import { playerFrame, variantFor, flashOf } from '../gfx/sprites_player.js';
 import { drawFrame } from '../entities/entity.js';
 import { rng, TAU } from '../core/util.js';
 import { EvolveScene } from './evolve_scene.js';
@@ -60,7 +60,10 @@ export class TitleScene {
     // seabed
     ctx.fillStyle = '#c89c5e'; ctx.fillRect(0, 232, 480, 40); ctx.fillStyle = '#eecb94'; ctx.fillRect(0, 232, 480, 3); ctx.fillStyle = '#dcb27a'; for (let x = 0; x < 480; x += 17) ctx.fillRect(x, 240 + (x * 7) % 12, 9, 1);
     // hero crab on the sand
-    const f = playerFrame('shore', variantFor({ form: 'shore', branches: {}, dye: 'default' }), 'idle', Math.floor(t * 4) % 4); drawFrame(ctx, f, 108, 238);
+    // a looming silhouette of what the crab will become, and the crab itself wandering the shore
+    { const big = playerFrame('mythic', variantFor({ form: 'mythic', branches: { leviathan: 'tideweaver' }, dye: 'default' }), 'idle', Math.floor(t * 4) % 4); ctx.globalAlpha = 0.32 + 0.06 * Math.sin(t * 0.8); ctx.drawImage(flashOf(big, '#0a2a52'), Math.round(372 - big.ax), Math.round(206 + Math.sin(t * 0.6) * 3 - big.ay)); ctx.globalAlpha = 1; }
+    const wx = 150 + Math.sin(t * 0.25) * 70, moving = Math.cos(t * 0.25) !== 0, face = Math.cos(t * 0.25) < 0;
+    const f = playerFrame('shore', variantFor({ form: 'shore', branches: {}, dye: 'default' }), 'walk', Math.floor(t * 8) % 6); drawFrame(ctx, f, wx, 238, face);
     const fe = Math.floor(t * 0.7) % 3; // little crab looks around
     for (const m of this.motes) { ctx.globalAlpha = 0.3 + 0.4 * m.z; ctx.fillStyle = '#d8f4ff'; ctx.fillRect(Math.round((m.x + Math.sin(t * 0.5 + m.y) * 6) % 480), Math.round(((m.y - t * m.s) % 280 + 280) % 280), m.z > 0.7 ? 2 : 1, m.z > 0.7 ? 2 : 1); } ctx.globalAlpha = 1;
     // title
