@@ -6,7 +6,7 @@ else if (q.has('gallery')) { const { gallery } = await import('./dev/gallery.js'
 else {
   const canvas = document.getElementById('game');
   const game = new Game(canvas);
-  window.__game = game;
+  window.__game = game; game.devMode = q.has('dev');
   // direct boot while the title screen is built: ?zone=reef_nursery
   const z = q.get('zone') || 'reef_nursery';
   if (q.has('quick')) game.newGame(0); else game.engine.push(new TitleScene(game));

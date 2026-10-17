@@ -3,6 +3,7 @@ import { drawScene } from '../gfx/cutscene_art.js';
 import { panel, text, button, COL, drawText, textWidth, wrapText } from './ui.js';
 import { Save } from '../core/save.js';
 import { ControlsScene } from './controls_scene.js';
+import { SaveToolsScene } from './savetools.js';
 import { ITEMS, SHOP } from '../data/items.js';
 import { FORMS, BRANCHES, EVOLUTIONS } from '../data/forms.js';
 import { itemIcon, formIcon } from '../gfx/sprites_ui.js';
@@ -22,7 +23,7 @@ export class TitleScene {
   onEnter() { this.g.audio.music.play('title'); this.g.audio.ambience('shallows'); }
   items() {
     const has = Save.list().some((s) => s.meta);
-    const l = []; if (has) l.push('CONTINUE'); l.push('NEW GAME'); if (has && this.g.systems.difficulty?.available()) l.push('NEW GAME+'); if (has) l.push('LOAD GAME'); l.push('OPTIONS', 'CONTROLS', 'CREDITS'); return l;
+    const l = []; if (has) l.push('CONTINUE'); l.push('NEW GAME'); if (has && this.g.systems.difficulty?.available()) l.push('NEW GAME+'); if (has) l.push('LOAD GAME'); l.push('OPTIONS', 'CONTROLS', 'SAVE TOOLS', 'CREDITS'); return l;
   }
   update(dt) {
     const g = this.g, inp = g.input; this.t += dt;
@@ -35,7 +36,7 @@ export class TitleScene {
         else if (it === 'NEW GAME') { this.mode = 'new'; this.slotSel = 0; }
         else if (it === 'NEW GAME+') { this.mode = 'ngp'; this.slotSel = 0; }
         else if (it === 'LOAD GAME') { this.mode = 'load'; this.slotSel = 0; }
-        else if (it === 'OPTIONS') { g.openOptions?.(); } else if (it === 'CONTROLS') g.engine.push(new ControlsScene(g)); else if (it === 'CREDITS') this.mode = 'credits';
+        else if (it === 'OPTIONS') { g.openOptions?.(); } else if (it === 'CONTROLS') g.engine.push(new ControlsScene(g)); else if (it === 'SAVE TOOLS') g.engine.push(new SaveToolsScene(g)); else if (it === 'CREDITS') this.mode = 'credits';
       }
     } else if (this.mode === 'ngp') {
       const slots = Save.list();

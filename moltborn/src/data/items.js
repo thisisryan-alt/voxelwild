@@ -4,6 +4,7 @@ export const ITEMS = {
   kelp_wrap: { name: 'Kelp Wrap', type: 'consumable', price: 30, desc: 'Restores 40% of your health. Tastes of salt and regret.', use: { heal: 0.4 } },
   brine_tonic: { name: 'Brine Tonic', type: 'consumable', price: 25, desc: 'Restores half your Tide.', use: { tide: 0.5 } },
   fury_ink: { name: 'Fury Ink', type: 'consumable', price: 60, desc: 'Fills 50 Fury at once. Smells like thunder.', use: { fury: 50 } },
+  hatchling_egg: { name: 'Hatchling Egg', type: 'consumable', price: 350, icon: ['gem', 'pink'], desc: 'A warm, speckled egg. Something inside taps back. Use it and a companion will follow you.', use: { pet: 'crab' } },
   // materials
   pearl: { name: 'Sea Pearl', type: 'material', price: 0, desc: 'A clean white pearl. The Pearl-Smith reforges gear with these.' },
   black_pearl: { name: 'Black Pearl', type: 'material', price: 0, desc: 'Deep-sea pearl. Needed for the finest reforging.' },
@@ -85,7 +86,7 @@ export const ITEMS = {
   dye_spectral: { name: 'Spectral Mutation', type: 'dye', desc: 'You look half a memory.' },
 };
 export const SHOP = {
-  cowrie: ['kelp_wrap', 'brine_tonic', 'shell_driftwood', 'claw_rusty', 'charm_pearlstring', 'shell_barnacle', 'claw_urchin'],
+  cowrie: ['hatchling_egg', 'kelp_wrap', 'brine_tonic', 'shell_driftwood', 'claw_rusty', 'charm_pearlstring', 'shell_barnacle', 'claw_urchin'],
   smuggler: ['fury_ink', 'kelp_wrap', 'brine_tonic'],
 };
 export const DYES = {

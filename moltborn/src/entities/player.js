@@ -61,7 +61,7 @@ export class Player extends Entity {
     this.coyote -= dt; this.ultCd -= dt; this.evolveGlow = Math.max(0, this.evolveGlow - dt);
     for (const k in this.cool) this.cool[k] -= dt;
     if (!this.alive) return this.updateDead(dt);
-    this.status.update(dt); this.bodyFx.update(dt); statusFx(this, dt);
+    this.status.update(dt); this.bodyFx.update(dt); statusFx(this, dt); if (this.game.god) this.invulnT = Math.max(this.invulnT, 1);
     // regen
     this.tide = Math.min(S.maxTide, this.tide + S.tideRegen * this.status.mult('tideRegen') * dt * (this.inCombat ? 0.6 : 1));
     if (S.regen) this.hp = Math.min(S.maxHp, this.hp + S.regen * dt);

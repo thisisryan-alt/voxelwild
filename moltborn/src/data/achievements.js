@@ -5,6 +5,8 @@ import { ZONE_INFO } from './zoneinfo.js';
 import { ITEMS } from './items.js';
 import { ENEMIES } from './enemies.js';
 import { LORE } from './lore.js';
+import { SET_IDS } from './sets.js';
+import { AFFIX_IDS } from './affixes.js';
 
 export const TIERS = {
   bronze: { name: 'Bronze', color: '#d08850', pts: 5 },
@@ -123,6 +125,19 @@ export const ACHIEVEMENTS = [
   { id: 'maelstrom_survivor', name: 'Maelstrom Survivor', desc: 'Defeat a boss on Maelstrom difficulty.', cat: 'challenge', tier: 'mythic', goal: 4, get: (c) => c.r.hardest + 1 },
   { id: 'another_tide', name: 'Another Tide', desc: 'Begin a New Game+ voyage.', cat: 'challenge', tier: 'gold', goal: 1, get: (c) => c.s.ng || 0 },
   { id: 'globetrotter', name: 'Globetrotter', desc: 'Use shrine travel 10 times.', cat: 'challenge', tier: 'bronze', goal: 10, get: (c) => c.r.travels },
+  { id: 'forager', name: 'Forager', desc: 'Harvest 10 forage patches.', cat: 'collect', tier: 'bronze', goal: 10, get: (c) => c.r.forage },
+  { id: 'master_forager', name: 'Master Forager', desc: 'Harvest 50 forage patches.', cat: 'collect', tier: 'silver', goal: 50, get: (c) => c.r.forage },
+  { id: 'regular', name: 'The Regular', desc: 'Deliver 5 kitchen orders.', cat: 'collect', tier: 'bronze', goal: 5, get: (c) => c.r.ordersDone },
+  { id: 'house_special', name: 'House Special', desc: 'Deliver 25 kitchen orders.', cat: 'collect', tier: 'gold', goal: 25, get: (c) => c.r.ordersDone },
+  { id: 'dressed_for_it', name: 'Dressed for It', desc: 'Wear a complete three-piece set.', cat: 'collect', tier: 'silver', goal: 1, get: (c) => Object.keys(c.r.setsSeen).length },
+  { id: 'full_wardrobe', name: 'Full Wardrobe', desc: 'Wear every equipment set complete.', cat: 'collect', tier: 'gold', goal: SET_IDS.length, get: (c) => Object.keys(c.r.setsSeen).length },
+  { id: 'best_friend', name: 'Best Friend', desc: 'Adopt a hatchling companion.', cat: 'collect', tier: 'bronze', goal: 1, get: (c) => (c.s.companion ? 1 : 0) },
+  { id: 'grown_up', name: 'All Grown Up', desc: 'Raise your companion to level 5.', cat: 'collect', tier: 'silver', goal: 5, get: (c) => c.s.companion?.level || 0 },
+  { id: 'elite_hunter', name: 'Elite Hunter', desc: 'Defeat 25 elite creatures.', cat: 'combat', tier: 'silver', goal: 25, get: (c) => c.r.elites },
+  { id: 'affix_scholar', name: 'Affix Scholar', desc: 'Defeat an elite carrying each kind of affix.', cat: 'combat', tier: 'gold', goal: AFFIX_IDS.length, get: (c) => Object.keys(c.r.affixKills).length },
+  { id: 'champion_slayer', name: 'Champion Slayer', desc: 'Defeat 3 rift champions.', cat: 'challenge', tier: 'gold', goal: 3, get: (c) => c.r.champions },
+  { id: 'relic_hoarder', name: 'Relic Hoarder', desc: 'Hold five relics at once in a single run.', cat: 'challenge', tier: 'silver', goal: 5, get: (c) => c.r.relicPeak },
+  { id: 'ng_deeper', name: 'Deeper Voyage', desc: 'Begin a third New Game+ voyage.', cat: 'challenge', tier: 'mythic', goal: 3, hidden: true, get: (c) => c.s.ng || 0 },
   { id: 'completionist', name: 'Completionist', desc: 'Earn every other trophy.', cat: 'challenge', tier: 'mythic', goal: 1, hidden: true, get: (c) => (c.others >= c.totalOthers ? 1 : 0) },
 ];
 

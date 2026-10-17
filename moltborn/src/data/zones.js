@@ -12,11 +12,12 @@ import { EXTRA } from './roster.js';
 const REG = { ...reef, ...forest, ...kingdom, ...grave, ...deep, ...expansion };
 export { ZONE_INFO } from './zoneinfo.js';
 import { buildRift, buildArena } from '../world/rift_gen.js';
+import { placeForage } from '../world/forage_place.js';
 export function buildZone(id) {
   if (id.startsWith('rift:')) return buildRift(id);
   if (id.startsWith('arena:')) return buildArena(id);
   const f = REG[id]; if (!f) throw new Error('unknown zone ' + id);
-  const z = f(); const extra = EXTRA[id]; return extra ? scatter(z, extra) : z;
+  const z = f(); const extra = EXTRA[id]; return placeForage(extra ? scatter(z, extra) : z);
 }
 import { ZONE_INFO as _Z } from './zoneinfo.js';
 export const ZONE_IDS = Object.keys(_Z);

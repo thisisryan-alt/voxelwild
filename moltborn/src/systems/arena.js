@@ -101,7 +101,7 @@ export class Arena {
     if (!choices.length) { this.after(1, () => this.nextWave()); return; }
     run.picking = true;
     this.g.engine.push(new RelicScene(this.g, choices, (id) => {
-      this.g.state.riftRelics.push(id); this.g.world.player.recalc(); this.g.audio.sfx('relic'); this.g.toast(RELICS[id].name + ': ' + RELICS[id].desc, RARITY[RELICS[id].rarity].color);
+      this.g.state.riftRelics.push(id); this.g.world.player.recalc(); this.g.audio.sfx('relic'); this.g.events.emit('relic', id); this.g.toast(RELICS[id].name + ': ' + RELICS[id].desc, RARITY[RELICS[id].rarity].color);
       run.picking = false; this.after(1.5, () => this.nextWave());
     }));
   }

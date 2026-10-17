@@ -14,6 +14,7 @@ import { itemIcon } from '../gfx/sprites_ui.js';
 import { drawFrame } from '../entities/entity.js';
 import { drawTrophyGlyph } from '../systems/achievements.js';
 import { clamp } from '../core/util.js';
+import { SETS, SET_OF } from '../data/sets.js';
 
 export const EXTRA_TABS = ['BEAST', 'TROPHY', 'CRAFT'];
 export const EXTRA_LABELS = { BEAST: 'BEAST', TROPHY: 'TROPHY', CRAFT: 'CRAFT' };
@@ -225,4 +226,15 @@ const travel = {
   },
 };
 
-export function installMenuExtras(Menu) { Object.assign(Menu.prototype, beast, trophy, craft, travel); }
+// ======================================================= EQUIPMENT SETS (items tab) ==================================
+const sets = {
+  // the set a piece belongs to: pieces worn, and what the two bonuses are
+  drawSetInfo(ctx, id, x, y) {
+    const sid = SET_OF[id]; if (!sid) return;
+    const S = SETS[sid], worn = Object.values(this.g.state.equip), n = S.pieces.filter((p) => worn.includes(p)).length;
+    text(ctx, `${S.name} set  ${n}/3`, x, y, n >= 2 ? COL.gold : COL.dim);
+    text(ctx, `2: ${S.two.text}`, x, y + 10, n >= 2 ? COL.green : '#506080'); text(ctx, `3: ${S.three.text}`, x, y + 20, n >= 3 ? COL.green : '#506080');
+  },
+};
+
+export function installMenuExtras(Menu) { Object.assign(Menu.prototype, beast, trophy, craft, travel, sets); }

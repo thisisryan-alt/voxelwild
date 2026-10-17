@@ -122,7 +122,8 @@ export class Pickup extends Entity {
     }
     if (pl && pl.alive && this.delay <= 0) {
       const dx = pl.x - this.x, dy = pl.y - this.y, d = Math.hypot(dx, dy), mg = pl.stats ? pl.stats.magnet : 40;
-      if (this.kind !== 'item' && d < mg) { const s = 180 * (1 - d / (mg + 20)) + 60; this.x += (dx / d) * s * dt; this.y += (dy / d) * s * dt; this.fixed = true; }
+      const fetch = this.kind !== 'item' && d >= mg && this.world.companion?.near(this.x, this.y);
+      if (this.kind !== 'item' && (d < mg || fetch)) { const s = fetch ? 120 : 180 * (1 - d / (mg + 20)) + 60; this.x += (dx / d) * s * dt; this.y += (dy / d) * s * dt; this.fixed = true; }
       if (d < 11 + pl.w / 4) { this.world.collect(this); this.alive = false; }
     }
     if (!this.fixed) { this.life -= dt; if (this.life <= 0) this.alive = false; }

@@ -61,6 +61,7 @@ export class Crafting {
   use(id) {
     const g = this.g, it = ITEMS[id], p = g.world?.player; if (!it || !it.use || !p) return 'Cannot use that';
     const u = it.use;
+    if (u.pet) { const why = g.systems.companion.adopt(); if (why) return why; g.addItem(id, -1); return null; }
     const wasteful = !(u.tide && p.tide < p.stats.maxTide) && !(u.fury) && !(u.buffs?.length) && !(u.cleanse && p.status.size) && !(u.heal && p.hp < p.stats.maxHp);
     if (wasteful) return u.heal ? 'Already at full health' : 'No need right now';
     g.addItem(id, -1);

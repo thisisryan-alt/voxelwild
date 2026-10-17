@@ -172,11 +172,12 @@ export class Boss extends Enemy {
     if (!this._ov) return;
     for (const t of this.teles) {
       const k = Math.min(1, t.t / t.dur), pulse = 0.1 + 0.05 * Math.sin(t.t * 30), a = t.t > t.dur ? 0.5 : pulse + k * 0.16;
-      ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = t.color; ctx.strokeStyle = '#ffffff';
+      const acc = this.world.game.systems.access, tcol = acc ? acc.tele(t.color) : t.color;
+      ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = tcol; ctx.strokeStyle = '#ffffff';
       if (t.kind === 'rect') { const x = Math.round(t.x - cam.x), y = Math.round(t.y - cam.y); ctx.fillRect(x, y, t.w, t.h); ctx.globalAlpha = 0.9; ctx.strokeRect(x + 0.5, y + 0.5, t.w - 1, t.h - 1); ctx.globalAlpha = 0.5; const fh = Math.round(t.h * k), fw = Math.round(t.w * k); if (t.fill === 'h') { ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, fw, t.h); } else if (t.fill !== false) { ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y + t.h - fh, t.w, fh); } }
-      else if (t.kind === 'line') { ctx.globalAlpha = a; ctx.strokeStyle = t.color; ctx.lineWidth = t.w || 6; ctx.beginPath(); ctx.moveTo(Math.round(t.x - cam.x), Math.round(t.y - cam.y)); ctx.lineTo(Math.round(t.x2 - cam.x), Math.round(t.y2 - cam.y)); ctx.stroke(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke(); }
+      else if (t.kind === 'line') { ctx.globalAlpha = a; ctx.strokeStyle = tcol; ctx.lineWidth = t.w || 6; ctx.beginPath(); ctx.moveTo(Math.round(t.x - cam.x), Math.round(t.y - cam.y)); ctx.lineTo(Math.round(t.x2 - cam.x), Math.round(t.y2 - cam.y)); ctx.stroke(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke(); }
       else if (t.kind === 'circle') { ctx.beginPath(); ctx.arc(Math.round(t.x - cam.x) + 0.5, Math.round(t.y - cam.y) + 0.5, t.r, 0, 6.3); ctx.fill(); ctx.globalAlpha = 0.9; ctx.stroke(); ctx.globalAlpha = 0.5; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(Math.round(t.x - cam.x) + 0.5, Math.round(t.y - cam.y) + 0.5, t.r * k, 0, 6.3); ctx.fill(); }
-      ctx.restore();
+      ctx.restore(); acc?.outline(ctx, t, cam);
     }
   }
 }

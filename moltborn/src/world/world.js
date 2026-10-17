@@ -31,6 +31,7 @@ export class World {
     this.buildEntities(); game.systems.elites?.roll(this);
     const entry = zone.entries[entryName] || Object.values(zone.entries)[0];
     this.player = new Player(this, entry.x, entry.y - 6, game);
+    this.companion = game.systems.companion?.make(this) || null;
     this.player.y = entry.y - this.player.h / 2 - 0.5; this.player.facing = entry.facing || 1;
     this.clearSpawn(this.player);
     this.snapCamera();
@@ -140,7 +141,7 @@ export class World {
     const pl = this.player;
     const edt = this.slowT > 0 ? dt * this.slowFactor : dt;
     if (this.slowT > 0) this.slowT -= dt;
-    pl.update(dt);
+    pl.update(dt); this.companion?.update(dt);
     for (const e of this.enemies) e.update(edt);
     for (const i of this.interactables) i.update?.(dt);
     for (const p of this.projectiles) p.update(edt);
@@ -181,7 +182,7 @@ export class World {
           if (hb.crit && S.execute && e.hp / e.maxHp < 0.3) dmg *= 1 + S.execute;
           if (pl.stats.dmg && !hb.crit) dmg *= 1 + 0;
           const res = e.takeHit({ dmg: Math.max(1, Math.round(dmg)), dir: Math.sign(e.x - pl.x) || pl.facing, kb: hb.kb, poise: hb.poise, stop: hb.stop, shake: hb.shake, guardBreak: hb.guardBreak, heavy: hb.heavy, status: hb.status, crit, stun: hb.stun, fromAbility: !!hb.ability, x: pl.x, y: pl.y }, pl);
-          if (res === true) pl.onHitLanded(e, hb, dmg, crit);
+          if (res === true && !hb.companion) pl.onHitLanded(e, hb, dmg, crit);
         }
         if (hb.breaks || hb.seals || hb.gates) this.hitBreakables(hb);
         for (const i of this.interactables) if (i.onHit && rectsOverlap(hb, i.box()) && !hb.hits.has(i)) { hb.hits.add(i); i.onHit(hb); }
@@ -282,6 +283,7 @@ export class World {
     for (const f of this.fields) this.drawField(ctx, cam, f);
     for (const p of this.projectiles) p.draw(ctx, cam);
     this.player.draw(ctx, cam);
+    this.companion?.draw(ctx, cam);
     for (const b of this.beams) { const k = 1 - b.t / b.life; ctx.globalAlpha = k; ctx.fillStyle = b.color; const x = b.dir > 0 ? b.x : b.x - b.len; ctx.fillRect(Math.round(x - cam.x), Math.round(b.y - cam.y) - 4 * k - 1, b.len, Math.max(2, Math.round(8 * k))); ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(x - cam.x), Math.round(b.y - cam.y) - 1, b.len, 2); ctx.globalAlpha = 1; }
     for (const fn of this.drawExtra) fn(ctx, cam);
     drawDecor('front');

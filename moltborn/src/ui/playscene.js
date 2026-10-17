@@ -32,6 +32,7 @@ export class PlayScene {
       if (inp.pressed('quicksave')) g.saveGame();
       if (inp.pressed('heal') && pl.alive) { if (g.hasItem('kelp_wrap') && pl.hp < pl.stats.maxHp) { g.addItem('kelp_wrap', -1); pl.heal(Math.round(pl.stats.maxHp * 0.4)); g.audio.sfx('pickup'); } else if (g.hasItem('brine_tonic') && pl.tide < pl.stats.maxTide * 0.7) { g.addItem('brine_tonic', -1); pl.addTide(pl.stats.maxTide * 0.5); g.audio.sfx('pickup'); } else g.audio.sfx('deny'); }
       if (inp.pressed('debug')) g.debug = !g.debug;
+      if (g.devMode && inp.rawPressed('F9')) { import('../dev/console.js').then(({ DevConsole }) => g.engine.push(new DevConsole(g))); return; }
       if (inp.pressed('minimap')) g.systems.minimap?.cycle();
       if (inp.pressed('photo') && pl.alive && !w.cinematic) { g.engine.push(new PhotoScene(g)); return; }
       if (inp.pressed('interact') && w.near && pl.alive) { pl.interactT = 0.25; g.audio.sfx('select'); w.near.interact(g); inp.consume('interact'); }

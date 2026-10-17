@@ -157,3 +157,33 @@ export class TideBoard extends Interactable {
   }
 }
 INTERACTABLES.board = TideBoard;
+
+// A forage patch: harvest ingredients with a small timing game (ui/forage_scene.js). Regrows after a while of play time.
+import { FORAGE, REGROW_SECONDS } from '../data/forage.js';
+import { hash2 } from '../core/util.js';
+export class ForagePatch extends Interactable {
+  constructor(world, o) {
+    super(world, o, 22, 14); this.range = 22; this.t = Math.random() * 6;
+    this.kind = (FORAGE[world.zone.biome] || []).find((k) => k.id === o.kind) || Object.values(FORAGE).flat().find((k) => k.id === o.kind);
+    this.seed = Math.floor(hash2(Math.round(o.x), Math.round(o.y), 7) * 1e6);
+  }
+  get readyAt() { return (this.zs.forage || {})[this.key] || 0; }
+  get ready() { return this.world.game.state.playtime >= this.readyAt; }
+  prompt() { return this.ready ? `Forage ${this.kind.name}` : null; }
+  canInteract(pl) { return this.ready && super.canInteract(pl); }
+  interact(game) { import('../ui/forage_scene.js').then(({ ForageScene }) => game.engine.push(new ForageScene(game, this))); }
+  harvested() { const zs = this.zs; (zs.forage ||= {})[this.key] = this.world.game.state.playtime + REGROW_SECONDS; }
+  draw(ctx, cam) {
+    this.t += 1 / 60;
+    const x = Math.round(this.x - cam.x), y = Math.round(this.y + 7 - cam.y), col = this.kind.color, ready = this.ready;
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(x - 9, y - 1, 18, 2);
+    const n = ready ? 9 : 3;
+    for (let i = 0; i < n; i++) {
+      const hx = ((this.seed >> (i * 2)) & 15) - 8, h = ready ? 4 + ((this.seed >> (i + 3)) & 7) : 1 + (i & 1), sway = ready ? Math.round(Math.sin(this.t * 1.6 + i) * 0.8) : 0;
+      ctx.fillStyle = '#05030a'; ctx.fillRect(x + hx - 1, y - h - 1, 3, h + 1);
+      ctx.fillStyle = col; ctx.fillRect(x + hx + sway, y - h, 1, h); ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.5; ctx.fillRect(x + hx + sway, y - h, 1, 1); ctx.globalAlpha = 1;
+    }
+    if (ready) { const tw = Math.sin(this.t * 3); if (tw > 0.7) { ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 3 + Math.round(tw * 3), y - 14, 1, 3); ctx.fillRect(x - 4 + Math.round(tw * 3), y - 13, 3, 1); } }
+  }
+}
+INTERACTABLES.forage = ForagePatch;

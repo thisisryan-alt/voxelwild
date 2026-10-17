@@ -179,7 +179,9 @@ export class Enemy extends Entity {
     if (this.scale !== 1) { ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(this.scale, this.scale); drawFrame(ctx, frame, 0, 0, flipv, this.flash > 0, alpha); statusOverlay(ctx, this, frame, 0, 0, flipv); ctx.restore(); }
     else { drawFrame(ctx, frame, x, y, flipv, flash && this.flash > 0 ? true : false, alpha); statusOverlay(ctx, this, frame, x, y, flipv); }
     if (this.state === 'windup' && !d.noBlink && this.def.dmg > 0) { // red telegraph pip
-      ctx.fillStyle = Math.floor(this.st * 12) % 2 ? '#ff4a3a' : '#ffd0a0'; ctx.fillRect(Math.round(this.x - cam.x) - 1, Math.round(this.y - this.h / 2 - cam.y) - 7, 3, 3);
+      const acc = this.world.game.systems.access, hc = acc?.contrast || (acc && acc.mode !== 'off');
+      ctx.fillStyle = Math.floor(this.st * 12) % 2 ? (hc ? '#ffffff' : '#ff4a3a') : (hc ? '#000000' : '#ffd0a0'); const px = Math.round(this.x - cam.x) - 1, py = Math.round(this.y - this.h / 2 - cam.y) - 7;
+      if (hc) { ctx.fillRect(px - 1, py - 1, 5, 5); ctx.fillStyle = Math.floor(this.st * 12) % 2 ? '#000000' : '#ffffff'; ctx.fillRect(px, py, 3, 3); } else ctx.fillRect(px, py, 3, 3);
     }
     if (this.statuses.poison && Math.floor(this.t * 6) % 2) { ctx.fillStyle = '#8aff8a'; ctx.fillRect(Math.round(this.x - cam.x) - 6, Math.round(this.y - this.h / 2 - cam.y) - 4, 2, 2); }
     if (this.hp < this.maxHp && !d.boss && !this.disguised) { // small health bar

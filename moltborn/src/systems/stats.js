@@ -3,6 +3,7 @@
 // or movement depends on it, so it can never change how the game plays.
 import { ZONE_INFO } from '../data/zoneinfo.js';
 import { DIFFICULTIES } from './settings.js';
+import { activeSets } from '../data/sets.js';
 
 export function newRecords() {
   return {
@@ -12,7 +13,7 @@ export function newRecords() {
     bossStart: null, bossHits: 0, bossBest: {}, flawless: {}, bossTries: {},
     burned: 0, chilled: 0, bled: 0, healed: 0, healsUsed: 0, crafted: 0, craftedBy: {}, eaten: {},
     rifts: 0, riftBest: 0, riftTime: 0, arenaBest: 0, arenaKills: 0, photos: 0, travels: 0, coinsSpent: 0, maxCoins: 0,
-    buffPeak: 0, sessions: 1, hardest: -1,
+    buffPeak: 0, sessions: 1, hardest: -1, forage: 0, ordersDone: 0, elites: 0, champions: 0, affixKills: {}, setsSeen: {}, relicPeak: 0,
   };
 }
 
@@ -43,6 +44,7 @@ export class Stats {
     ev.on('zone', (id) => { this.r.zoneVisits[id] = (this.r.zoneVisits[id] || 0) + 1; this.px = null; });
     ev.on('statusapplied', (e, id) => { if (e === this.g.world?.player) return; if (id === 'burn') this.r.burned++; else if (id === 'chill') this.r.chilled++; else if (id === 'bleed') this.r.bled++; });
     ev.on('gotitem', (id) => { if (id === 'pearl' || id === 'black_pearl') this.r.pearls++; });
+    ev.on('relic', () => { this.r.relicPeak = Math.max(this.r.relicPeak, this.g.state.riftRelics?.length || 0); });
   }
   get r() { return this.g.state.records || ensureRecords(this.g.state); }
 
@@ -58,13 +60,14 @@ export class Stats {
     const z = w.zone.id, b = w.zone.biome;
     r.zoneTime[z] = (r.zoneTime[z] || 0) + dt; r.biomeTime[b] = (r.biomeTime[b] || 0) + dt;
     this.accT += dt;
-    if (this.accT > 1) { this.accT = 0; r.maxCoins = Math.max(r.maxCoins, this.g.state.coins); r.bestCombo = Math.max(r.bestCombo, p.comboBest || 0); r.buffPeak = Math.max(r.buffPeak, p.status.size); }
+    if (this.accT > 1) { this.accT = 0; for (const a of activeSets(this.g.state.equip)) if (a.count >= 3) r.setsSeen[a.id] = true; r.maxCoins = Math.max(r.maxCoins, this.g.state.coins); r.bestCombo = Math.max(r.bestCombo, p.comboBest || 0); r.buffPeak = Math.max(r.buffPeak, p.status.size); }
   }
 
   onKill(type, e) {
     const r = this.r; r.kills[type] = (r.kills[type] || 0) + 1;
     const f = this.g.state.form; r.killsByForm[f] = (r.killsByForm[f] || 0) + 1;
     const arena = this.g.world?.zone?.arena; if (arena) r.arenaKills++;
+    if (e?.affixes) { r.elites++; for (const id of e.affixes) r.affixKills[id] = (r.affixKills[id] || 0) + 1; if (e.champion) r.champions++; }
   }
   onHit(e, dmg, crit) {
     const r = this.r; r.hits++; r.dmgDealt += Math.round(dmg); if (crit) r.crits++; if (dmg > r.bestHit) r.bestHit = Math.round(dmg);

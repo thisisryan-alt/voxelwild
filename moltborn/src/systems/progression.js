@@ -5,6 +5,7 @@ import { ITEMS } from '../data/items.js';
 import { defaults as settingDefaults } from './settings.js';
 import { newRecords } from './stats.js';
 import { RELICS } from '../data/relics.js';
+import { activeSets } from '../data/sets.js';
 
 export function newState() {
   return {
@@ -51,6 +52,7 @@ export function computeStats(state) {
   const apply = (fx) => { for (const [k, v] of Object.entries(fx || {})) { if (k === 'hp' || k === 'tide') mult[k] += v; else if (k === 'atk' || k === 'def') s[k] += v; else if (k === 'speed') s.speed += v; else if (k in s) s[k] += v; } };
   for (const id of Object.keys(state.skills)) apply(SKILLS[id]?.fx);
   for (const slot of ['shell', 'claw', 'charm']) { const id = state.equip[slot]; if (id) { const lv = state.upgrades[id] || 0; const fx = ITEMS[id].fx; apply(fx); if (lv) { if (fx.atk) s.atk += lv * 1.5; if (fx.def) s.def += lv * 1; } } }
+  for (const a of activeSets(state.equip)) for (const fx of a.fx) apply(fx);
   for (const id of state.mutations) apply(ITEMS[id]?.fx);
   for (const id of state.riftRelics || []) apply(RELICS[id]?.fx);
   s.maxHp = Math.round(s.maxHp * mult.hp); s.maxTide = Math.round(s.maxTide * mult.tide);
