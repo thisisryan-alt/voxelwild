@@ -57,7 +57,7 @@ export function reef_garden() {
   b.exitE(33, 39, 'reef_hollow', 'west'); b.entryFloor('east', 114, { facing: -1 });
   b.shrine('rest', 17, { from: 10 });
   b.npc('cowrie', 11, { from: 10 }); b.npc('pip', 49, { from: 10 });
-  b.spawnFloor('pinchling', 28, 10); b.spawnFloor('hermit', 38, 10); b.spawn('minnow', 46, 26, { count: 5 }); b.spawnFloor('urchin', 55, 10); b.spawnFloor('urchin', 57, 10);
+  b.spawnFloor('pinchling', 28, 10); b.spawnFloor('hermit', 38, 10); b.spawn('minnow', 46, 26, { count: 4 }); b.spawnFloor('urchin', 55, 10); b.spawnFloor('urchin', 57, 10);
   b.spawnFloor('pinchling', 74, 10, { count: 2, spread: 24 }); b.spawn('minnow', 90, 26, { count: 4 }); b.spawnFloor('hermit', 108, 10);
   b.coins(23, 33, 5); b.coins(58, 24, 3); b.coins(66, 20, 3); b.coins(84, 30, 4);
   b.chest(69, { coins: [30, 50], pearl: 2 }, { from: 8 });

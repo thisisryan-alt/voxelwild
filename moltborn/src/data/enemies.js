@@ -9,11 +9,11 @@ const fish = (len, hgt, ramp, o = {}) => ({ plan: 'fish', w: len + 22, h: hgt + 
 
 export const ENEMIES = {
   // ---- Starting Reef -----------------------------------------------------------------
-  pinchling: { name: 'Pinchling', hp: 12, dmg: 6, w: 16, h: 11, xp: 5, coins: [1, 3], poise: 6, ai: 'patrolCharge', anchor: 'feet', fps: 10, mass: 1, sprite: crab(rockcrab),
+  pinchling: { name: 'Pinchling', hp: 12, dmg: 6, w: 16, h: 11, xp: 8, coins: [1, 3], poise: 6, ai: 'patrolCharge', anchor: 'feet', fps: 10, mass: 1, sprite: crab(rockcrab),
     p: { speed: 24, range: 56, aggro: 96, wind: 0.5, charge: 130, chargeTime: 0.45, cd: 1.8 } },
-  minnow: { name: 'Reef Minnow', hp: 4, dmg: 3, w: 10, h: 7, xp: 1, coins: [0, 1], poise: 2, ai: 'swarm', fps: 10, flying: true, mass: 0.6, sprite: fish(12, 6, R.fishYellow, { fin: R.fishYellow.tint(0, 1, 0.8), tail: 2, angry: false, belly: R.belly }),
+  minnow: { name: 'Reef Minnow', hp: 4, dmg: 3, w: 10, h: 7, xp: 2, coins: [0, 1], poise: 2, ai: 'swarm', fps: 10, flying: true, mass: 0.6, sprite: fish(12, 6, R.fishYellow, { fin: R.fishYellow.tint(0, 1, 0.8), tail: 2, angry: false, belly: R.belly }),
     p: { speed: 60, aggro: 120, wind: 0.35, dash: 150, cd: 1.6 } },
-  urchin: { name: 'Spine Urchin', hp: 10, dmg: 6, w: 13, h: 13, xp: 3, coins: [1, 2], poise: 99, noStagger: true, ai: 'spiky', anchor: 'center', fps: 2, spiky: true, sprite: { plan: 'urchin', w: 32, h: 32, ax: 16, ay: 16, frames: 2, o: { ramp: R.abyssal.tint(0.08, 1.2, 1.1), r: 6 } }, p: {} },
+  urchin: { name: 'Spine Urchin', hp: 10, dmg: 6, w: 13, h: 13, xp: 4, coins: [1, 2], poise: 99, noStagger: true, ai: 'spiky', anchor: 'center', fps: 2, spiky: true, sprite: { plan: 'urchin', w: 32, h: 32, ax: 16, ay: 16, frames: 2, o: { ramp: R.abyssal.tint(0.08, 1.2, 1.1), r: 6 } }, p: {} },
   hermit: { name: 'Hermit Bruiser', hp: 36, dmg: 9, w: 20, h: 16, xp: 12, coins: [3, 6], poise: 24, ai: 'guard', anchor: 'feet', fps: 8, mass: 1.6, sprite: crab(R.coralPink.tint(0.04, 0.8, 1), { helm: false, shield: true }),
     p: { speed: 20, aggro: 110, strike: 22, wind: 0.5, recover: 0.7, cd: 1.6 } },
   hatchling: { name: 'Hatchling', hp: 99, dmg: 0, w: 10, h: 8, xp: 0, coins: null, poise: 99, ai: 'patrolCharge', anchor: 'feet', fps: 10, friendly: true, contact: false, sprite: { plan: 'crab', w: 42, h: 30, ax: 21, ay: 27, frames: 6, o: { ramp: new Ramp(['#5c2a3a', '#a8506a', '#e88a9a', '#ffc0c8', '#fff0f0']) } }, p: { speed: 14, range: 40, aggro: 0, wind: 9, charge: 0, chargeTime: 0, cd: 99 } },

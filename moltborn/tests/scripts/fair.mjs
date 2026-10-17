@@ -11,7 +11,8 @@ export default async (page, H) => {
       const b = g.world.boss, t = b.trigger; p.x = (t.x + t.w * 0.5) * 16; p.y = (t.y + t.h - 3) * 16; g.world.snapCamera(); window.__t0 = g.engine.time; window.__heal = 0;
     }, [zone, form, lvl]);
     let res = null;
-    for (let f = 0; f < 60 * 240 && !res; f += 6) {
+    for (let f = 0, shot = 0; f < 60 * 240 && !res; f += 6) {
+      if (process.env.SHOTS && r === 0 && f % (+process.env.SHOTS) === 0 && shot < 16) await H.canvas(`/tmp/fair_${String(shot++).padStart(2, '0')}.png`);
       res = await H.eval(() => {
         const g = window.__game, w = g.world, b = w.boss, p = w.player, inp = g.input;
         if (!b || b.dying || !b.alive) return { win: true, t: +(g.engine.time - window.__t0).toFixed(1), hp: Math.round(p.hp), heals: window.__heal };
