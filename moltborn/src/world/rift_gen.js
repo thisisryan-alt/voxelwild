@@ -3,7 +3,7 @@
 // so the same id always yields the same cave. Chambers are broad caverns with a rolling floor, a jagged ceiling,
 // pillars, mounds and platforms, a way in on the left and a way out on the right.
 import { ZoneBuilder } from './zonebuilder.js';
-import { T } from './tiles.js';
+import { T, isSolid } from './tiles.js';
 import { scatter } from './scatter.js';
 import { rng } from '../core/util.js';
 import { ENEMIES } from '../data/enemies.js';
@@ -28,7 +28,7 @@ export const ROOM_KINDS = {
   ambush:   { name: 'Ambush', blurb: 'It is quiet. Too quiet.' },
   treasure: { name: 'Treasure Vault', blurb: 'Chests, and a relic on a stand. Nothing is free.' },
   altar:    { name: 'Altar', blurb: 'A place to rest, to bargain, or to sacrifice.' },
-  boss:     { name: 'Champion', blurb: 'The last chamber.' },
+  boss:     { name: "Warden's Chamber", blurb: 'The last chamber. Something is standing in the current.' },
 };
 export function riftKind(seed, depth, max) {
   if (depth >= max) return 'boss'; if (depth <= 1) return 'combat';
@@ -96,6 +96,16 @@ function flatSpot(b, tx, floorY, taken = [], dir = 0) {
   }
   return tx;
 }
+// the last chamber's boss: the whole cavern is its arena and it wakes when the swimmer is well inside
+function wardenSpawn(z, w, h, floorY, P) {
+  let sx = w - 20, sy = floorY - 14;
+  const roomy = (x, y) => { for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) if (isSolid(z.grid.get(x + i, y + j))) return false; return true; };
+  search: for (let d = 0; d < 24; d++) for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === d && roomy(sx + dx, sy + dy)) { sx += dx; sy += dy; break search; }
+  return {
+    boss: 'rift_warden', repeat: true, x: sx * 16, y: sy * 16,
+    arena: { x: 4, y: 5, w: w - 8, h: h - 10 }, trigger: { x: 14, y: 6, w: w - 26, h: h - 12 }, barriers: [],
+  };
+}
 export function buildRift(id) {
   const P = parseId(id), r = rng(P.seed * 131 + P.depth * 977 + 5), themes = riftThemes(P.seed, currentThemes);
   const key = themes[(P.depth - 1) % themes.length], T0 = THEMES[key];
@@ -122,8 +132,9 @@ export function buildRift(id) {
     const x = flatSpot(b, 16, floorY, [], 1); b.propFloor('altar', x, { from: floorY - 9 }); b.light(x, floorY - 6, 70, '#ffd8f0', 0.9);
   }
   const quiet = kind === 'treasure' || kind === 'altar';
-  const count = quiet ? 0 : kind === 'elite' ? 3 : kind === 'ambush' ? 2 : Math.min(14, 4 + Math.round(P.depth * 1.3) + (last ? 2 : 0));
+  const count = quiet || last ? 0 : kind === 'elite' ? 3 : kind === 'ambush' ? 2 : Math.min(14, 4 + Math.round(P.depth * 1.3));
   const z = b.finish(); z.rift = { depth: P.depth, max: P.max, theme: key, last, kind }; z.points = spawnPoints(w);
+  if (last) z.spawns.push(wardenSpawn(z, w, h, floorY, P));
   return count ? scatter(z, enemyList(T0, P.depth, r, count)) : z;
 }
 

@@ -63,6 +63,7 @@ export const BEASTS = {
   magmaw: { habitat: 'Ember Vents', note: 'A vent-eel in love with warmth. He just wants the dark not to be cold.', tip: 'The floor vents erupt on a rhythm. Learn the rhythm.' },
   lurelord: { habitat: 'Abyssal Throat', note: 'The light at the end of the tunnel. It is not a friendly light.', tip: 'Do not chase the lure. Wait for the eel to open its mouth.' },
   krael: { habitat: "Krael's Chain", note: 'A titan chained to the trench floor for reasons older than the chain.', tip: 'His arms hit hard but his body is slow. Stay inside his reach.' },
+  rift_warden: { habitat: 'Tidal Rifts', note: 'Whoever sealed the first tear stayed to keep it shut, and over the ages became the lock. It does not hate you. You are simply the draught it was made to stop.', tip: 'Tears open where you stand: keep moving. When it vanishes, it returns behind you with a sweep. Dash toward it, not away.' },
   hollow_maw: { habitat: 'Undertow Sanctum', note: 'An undertow with a stomach. It has taken a great many things out of the sea and never given back.', tip: 'It pulls you in. Dash against the current when it opens.' },
   kyros: { habitat: 'Hall of Guardians', note: 'The last guardian of the old gods, loyal past the point of sense.', tip: 'He telegraphs with tridents. Parry the third thrust.' },
   poseidon: { habitat: 'Throne of Tides', note: 'The god of the sea. He has been waiting a very long time for someone to ask him to stop.', tip: 'Each phase changes the rules. Stay patient in the first.' },

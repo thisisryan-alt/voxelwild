@@ -9,6 +9,7 @@ import { Save, validate } from '../../src/core/save.js';
 import { newState, computeStats } from '../../src/systems/progression.js';
 import { rng } from '../../src/core/util.js';
 import { ENEMIES } from '../../src/data/enemies.js';
+import { isSolid } from '../../src/world/tiles.js';
 
 const input = new Input();
 
@@ -35,8 +36,13 @@ test('arena: later waves are tougher on average', () => { const power = (t) => E
 test('rift ids round-trip', () => { const id = riftId(123456, 3, 6); deep(parseId(id), { kind: 'rift', seed: 123456, depth: 3, max: 6 }); deep(parseId(arenaId(42)), { kind: 'arena', seed: 42 }); ok(isProcedural(id) && isProcedural('arena:1') && !isProcedural('reef_garden')); eq(parseId('reef_garden'), null); });
 test('rift themes only include unlocked realms', () => { const t = riftThemes(7, ['reef', 'forest']); deep([...t].sort(), ['forest', 'reef']); deep(riftThemes(7, []), ['reef']); deep(riftThemes(7, THEME_ORDER).length, THEME_ORDER.length); deep(riftThemes(5, THEME_ORDER), riftThemes(5, THEME_ORDER)); });
 test('every theme names real enemies', () => { for (const [k, t] of Object.entries(THEMES)) { ok(ENEMIES[t.tough], k); for (const e of t.pool) ok(ENEMIES[e], `${k}:${e}`); } });
-test('rift chambers are deterministic, sealed until the last depth, and spawn foes', () => { setRiftThemes(THEME_ORDER); for (const d of [1, 2, 3]) { const id = riftId(99, d, 3), a = buildRift(id), b = buildRift(id); eq(a.w, b.w); eq(a.spawns.length, b.spawns.length); ok(a.spawns.length >= 4); eq(a.exits.length, d < 3 ? 1 : 0); ok(a.entries.west && a.entries.east); eq(a.rift.last, d === 3); } });
-test('rift chambers get busier with depth', () => { setRiftThemes(THEME_ORDER); ok(buildRift(riftId(5, 8, 8)).spawns.length > buildRift(riftId(5, 1, 8)).spawns.length); });
+test('rift chambers are deterministic, sealed until the last depth, and spawn foes', () => { setRiftThemes(THEME_ORDER); for (const d of [1, 2, 3]) { const id = riftId(99, d, 3), a = buildRift(id), b = buildRift(id); eq(a.w, b.w); eq(a.spawns.length, b.spawns.length); if (d < 3) ok(a.spawns.length >= 2); eq(a.exits.length, d < 3 ? 1 : 0); ok(a.entries.west && a.entries.east); eq(a.rift.last, d === 3); } });
+test('rift chambers get busier with depth', () => { setRiftThemes(THEME_ORDER); let early = 0, late = 0; for (let seed = 1; seed <= 12; seed++) { early += buildRift(riftId(seed, 1, 8)).spawns.length; late += buildRift(riftId(seed, 7, 8)).spawns.length; } ok(late > early); });
+test('the last chamber holds only the repeatable Rift Warden, inside open water', () => {
+  setRiftThemes(THEME_ORDER);
+  for (const max of [4, 6, 8]) { const z = buildRift(riftId(31, max, max)); eq(z.spawns.length, 1); const s = z.spawns[0]; eq(s.boss, 'rift_warden'); ok(s.repeat); ok(s.arena.w > 50 && s.trigger.x > s.arena.x); ok(!isSolid(z.grid.get(Math.floor(s.x / 16), Math.floor(s.y / 16)))); }
+  for (const d of [1, 2, 3]) ok(!buildRift(riftId(31, d, 4)).spawns.some((s) => s.boss));
+});
 test('the arena has spawn columns and an entry', () => { const z = buildArena(arenaId(9)); ok(z.arena && z.points.length >= 6 && z.entries.start); });
 
 test('save codes round-trip through export and import', () => { const s = newState(); s.level = 17; Save.write(0, { v: 1, meta: { level: 17 }, state: s }); const code = Save.exportCode(0); ok(code.startsWith('MB1.')); const r = Save.importCode(1, code); ok(r.ok); eq(Save.read(1).state.level, 17); });

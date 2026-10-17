@@ -54,7 +54,7 @@ export class World {
     z.spawns.forEach((s, i) => {
       const id = `${z.id}:s${i}`;
       if (s.unique && zs.killed?.[id]) return;
-      if (s.boss) { if (g.state.bosses[s.boss]) return; const b = createBoss(this, s.boss, s.x, s.y, s); if (b) { this.enemies.push(b); this.boss = b; } return; }
+      if (s.boss) { if (g.state.bosses[s.boss] && !s.repeat) return; const b = createBoss(this, s.boss, s.x, s.y, s); if (b) { this.enemies.push(b); this.boss = b; } return; }
       const def = ENEMIES[s.type]; if (!def) return;
       const n = s.count || 1;
       for (let k = 0; k < n; k++) {

@@ -22,7 +22,8 @@ for (let seed = 1; seed <= SEEDS; seed++) {
       if (quiet) { const want = z.rift.kind === 'altar' ? ['altar'] : ['relicstand']; for (const t of want) if (!z.props.some((p) => p.type === t)) fail(id, `missing ${t}`); }
       if (z.rift.kind === 'treasure' && z.props.filter((p) => p.type === 'chest').length < 3) fail(id, 'treasure vault needs its chests');
       const last = depth === max; if (last === !!z.exits.length) fail(id, `exit presence wrong (last=${last})`);
-      for (const s of z.spawns) { spawns++; if (isSolid(z.grid.get(Math.floor(s.x / TS), Math.floor((s.y - (s.floor ? 2 : 0)) / TS)))) fail(id, `spawn ${s.type} inside rock`); }
+      for (const s of z.spawns) { spawns++; if (isSolid(z.grid.get(Math.floor(s.x / TS), Math.floor((s.y - (s.floor ? 2 : 0)) / TS)))) fail(id, `spawn ${s.type || s.boss} inside rock`); }
+      if (last && (z.spawns.length !== 1 || z.spawns[0].boss !== 'rift_warden' || !z.spawns[0].repeat)) fail(id, 'the last chamber should hold only the Rift Warden');
       if (z.exits.length && typeof z.exits[0].cond !== 'function') fail(id, 'exit has no clearing condition');
       const again = buildZone(id); if (again.w !== z.w || again.spawns.length !== z.spawns.length) fail(id, 'not deterministic');
     }

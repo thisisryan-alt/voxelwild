@@ -1,6 +1,6 @@
 // Tidal Rifts: a run of procedurally built chambers reached from a Tide Board. Each depth must be cleared to open the way
 // on; between depths the player chooses a relic that lasts for the run. Foes grow tougher with depth, modifiers ("tides")
-// twist individual depths, and the final chamber holds a champion. A run ends in victory at the last depth or in defeat,
+// twist individual depths, and the final chamber holds the Rift Warden. A run ends in victory at the last depth or in defeat,
 // and either way pays out according to how deep it got.
 import { RELICS, RELIC_IDS, RARITY, RIFT_MODS, RIFT_MOD_IDS, RIFT_TIERS } from '../data/relics.js';
 import { riftId, parseId, setRiftThemes, THEME_ORDER, today } from '../world/rift_gen.js';
@@ -85,7 +85,7 @@ export class Rifts {
     for (const m of mods) { const M = RIFT_MODS[m]; if (M.haste) for (const e of world.enemies) if (!e.def.friendly) e.status.apply('haste', { dur: 1e6, power: 1 }); if (M.dark) world.zone.dark = Math.max(world.zone.dark ?? world.biome.dark, M.dark); }
     const kind = world.zone.rift?.kind || 'combat'; run.kind = kind; run.noOffer = false; run.pending = 0; run.bonusOffer = false; run.stand = null;
     run.ambush = kind === 'ambush' ? { fired: false, x: world.zone.w * 16 * 0.38 } : null;
-    if (world.zone.rift?.last) this.crown(world);
+    if (world.zone.rift?.last) { if (!world.boss) this.crown(world); }
     else if (kind === 'elite') { this.crown(world, { hp: 1.4, scale: 1.15, name: 'Elite Champion' }); run.bonusOffer = true; }
     else if (kind === 'treasure' || kind === 'altar') { run.cleared = true; run.noOffer = true; }
     world.player.recalc?.(); world.player.hp = Math.min(world.player.hp, world.player.stats.maxHp);
@@ -114,9 +114,9 @@ export class Rifts {
     if (run.ambush && !run.ambush.fired && w.player.x > run.ambush.x) this.ambush(w, 3 + run.depth * 2);
     run.checkT -= dt; if (run.cleared || run.checkT > 0) return; run.checkT = 0.4;
     if (run.ambush && !run.ambush.fired) return;                       // the trap has not been sprung yet
-    if (run.pending > 0 || w.enemies.some((e) => e.alive && !e.dying && !e.def.friendly)) return;
+    if (run.pending > 0 || w.enemies.some((e) => e.alive && !e.def.friendly && (!e.dying || e.def.boss))) return;
     run.cleared = true; this.g.audio.sfx('wave_clear'); w.fx.ring(w.player.x, w.player.y, 6, 90, 0.6, '#ffe8a0', 3);
-    if (w.zone.rift.last) { this.g.toast('The champion falls. The rift quiets.', '#ffd84a'); this.after(1.6, () => this.finish(true)); }
+    if (w.zone.rift.last) { this.g.toast('The Warden falls. The rift quiets.', '#ffd84a'); this.after(1.6, () => this.finish(true)); }
     else if (run.noOffer) this.g.toast('The way opens.', '#9ad8ff');
     else { this.g.toast('The way opens.', '#9ad8ff'); this.after(1.1, () => this.offer()); }
   }

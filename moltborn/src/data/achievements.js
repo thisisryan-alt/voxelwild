@@ -119,6 +119,9 @@ export const ACHIEVEMENTS = [
 
   // ---- challenge ----------------------------------------------------------------------------------------------------------
   { id: 'rift_walker', name: 'Rift Walker', desc: 'Complete 5 Tidal Rifts.', cat: 'challenge', tier: 'silver', goal: 5, get: (c) => c.r.rifts },
+  { id: 'warden_slain', name: 'Keeper of Nothing', desc: 'Defeat the Rift Warden at the bottom of a Tidal Rift.', cat: 'challenge', tier: 'silver', goal: 1, get: (c) => c.r.wardens },
+  { id: 'warden_hunter', name: 'Warden Hunter', desc: 'Defeat the Rift Warden 5 times.', cat: 'challenge', tier: 'gold', goal: 5, get: (c) => c.r.wardens },
+  { id: 'warden_untouched', name: 'Seamless', desc: 'Defeat the Rift Warden without taking a hit.', cat: 'challenge', tier: 'gold', goal: 1, get: (c) => (c.r.flawless.rift_warden ? 1 : 0) },
   { id: 'rift_runner', name: 'Rift Runner', desc: 'Reach depth 10 in a Tidal Rift.', cat: 'challenge', tier: 'gold', goal: 10, get: (c) => c.r.riftBest },
   { id: 'gauntlet', name: 'Gauntlet Runner', desc: 'Survive 10 waves of the Pearl Gauntlet.', cat: 'challenge', tier: 'gold', goal: 10, get: (c) => c.r.arenaBest },
   { id: 'rip_current', name: 'Against the Rip', desc: 'Defeat a boss on Rip difficulty or higher.', cat: 'challenge', tier: 'gold', goal: 3, get: (c) => c.r.hardest + 1 },

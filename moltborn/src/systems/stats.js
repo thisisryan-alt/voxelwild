@@ -13,7 +13,7 @@ export function newRecords() {
     bossStart: null, bossHits: 0, bossBest: {}, flawless: {}, bossTries: {},
     burned: 0, chilled: 0, bled: 0, healed: 0, healsUsed: 0, crafted: 0, craftedBy: {}, eaten: {},
     rifts: 0, riftBest: 0, riftTime: 0, arenaBest: 0, arenaKills: 0, photos: 0, travels: 0, coinsSpent: 0, maxCoins: 0,
-    buffPeak: 0, sessions: 1, hardest: -1, forage: 0, ordersDone: 0, elites: 0, champions: 0, affixKills: {}, setsSeen: {}, relicPeak: 0,
+    wardens: 0, buffPeak: 0, sessions: 1, hardest: -1, forage: 0, ordersDone: 0, elites: 0, champions: 0, affixKills: {}, setsSeen: {}, relicPeak: 0,
   };
 }
 
@@ -89,7 +89,7 @@ export class Stats {
     r.bossTries[key] = (r.bossTries[key] || 0) + 1;
   }
   onBossDown(key) {
-    const r = this.r, b = r.bossStart; if (!b || b.key !== key) return;
+    const r = this.r, b = r.bossStart; if (key === 'rift_warden') r.wardens++; if (!b || b.key !== key) return;
     const secs = Math.max(1, Math.round(this.g.state.playtime - b.t));
     if (!r.bossBest[key] || secs < r.bossBest[key]) r.bossBest[key] = secs;
     if (r.bossHits === b.hits) r.flawless[key] = true;

@@ -22,7 +22,7 @@ import { BIOMES } from '../data/biomes.js';
 export const EXTRA_TABS = ['BEAST', 'TROPHY', 'CRAFT'];
 export const EXTRA_LABELS = { BEAST: 'BEAST', TROPHY: 'TROPHY', CRAFT: 'CRAFT' };
 
-const BOSS_KEYS = ['grumbold', 'pearl_tyrant', 'hermit_king', 'mother_moray', 'sporemother', 'brass_colossus', 'aurelia', 'captain_rust', 'magmaw', 'lurelord', 'krael', 'hollow_maw', 'kyros', 'poseidon'];
+const BOSS_KEYS = ['grumbold', 'pearl_tyrant', 'hermit_king', 'mother_moray', 'sporemother', 'brass_colossus', 'aurelia', 'captain_rust', 'magmaw', 'lurelord', 'krael', 'hollow_maw', 'rift_warden', 'kyros', 'poseidon'];
 const CREATURES = Object.keys(ENEMIES).filter((k) => BEASTS[k] && !BOSS_KEYS.includes(k) && !ENEMIES[k].noop);
 const fmtSecs = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const nameOf = (k) => (BOSS_KEYS.includes(k) ? (BOSS_CLASSES[k]?.def?.name || k) : ENEMIES[k]?.name || k);

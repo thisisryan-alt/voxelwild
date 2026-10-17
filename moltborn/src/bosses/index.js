@@ -13,3 +13,4 @@ import './hermitking.js';
 import './sporemother.js';
 import './colossus.js';
 import './magmaw.js';
+import './riftwarden.js';
