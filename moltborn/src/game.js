@@ -47,6 +47,8 @@ import { Bounties } from './systems/bounties.js';
 import { Clock } from './systems/clock.js';
 import { Fishing } from './systems/fishing.js';
 import { History } from './systems/history.js';
+import { Market } from './systems/market.js';
+import { SellScene } from './ui/sell_scene.js';
 import { Access } from './systems/access.js';
 import { CompanionSys } from './systems/companion.js';
 import { Director } from './systems/director.js';
@@ -68,7 +70,7 @@ export class Game {
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this); new Elites(this); new Rifts(this); new Arena(this); new Barks(this); new Travel(this); new Orders(this); new Bounties(this); new Clock(this); new Fishing(this); new History(this); new Access(this); new CompanionSys(this); new Director(this); new Captions(this); new Cosmetics(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this); new Elites(this); new Rifts(this); new Arena(this); new Barks(this); new Travel(this); new Orders(this); new Bounties(this); new Clock(this); new Fishing(this); new History(this); new Market(this); new Access(this); new CompanionSys(this); new Director(this); new Captions(this); new Cosmetics(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -251,6 +253,7 @@ export class Game {
   openMenu(tab) { this.engine.push(new MenuScene(this, tab)); }
   openOptions() { this.engine.push(new OptionsScene(this)); }
   openShop(id, resume) { this.engine.push(new ShopScene(this, id, resume)); }
+  openSell(buyer, resume) { this.engine.push(new SellScene(this, buyer, resume)); }
   openForge(resume) { this.engine.push(new ForgeScene(this, resume)); }
   openMoltShrine(shrine) { this.engine.push(new MoltShrineScene(this, shrine)); }
   startIntro() {

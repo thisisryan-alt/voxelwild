@@ -59,7 +59,7 @@ test('spots recover with play time', () => {
   const g = game(), F = g.systems.fishing, zs = {}; ok(F.ready(zs, 'k')); F.cool(zs, 'k', 1); ok(!F.ready(zs, 'k')); g.state.playtime += 100; ok(!F.ready(zs, 'k')); g.state.playtime += 100; ok(F.ready(zs, 'k'));
   F.cool(zs, 'k', 0.3); g.state.playtime += 60; ok(F.ready(zs, 'k'), 'a missed bite recovers faster');
 });
-test('luck and skill grow with level but stay capped', () => { const lo = game(1).systems.fishing, hi = game(30).systems.fishing; ok(hi.luck() > lo.luck() && hi.skill() > lo.skill()); ok(game(99).systems.fishing.luck() <= 0.4 && game(99).systems.fishing.skill() <= 0.6); });
+test('luck and skill grow with level but stay capped', () => { const lo = game(1).systems.fishing, hi = game(30).systems.fishing; ok(hi.luck() > lo.luck() && hi.skill() > lo.skill()); ok(game(99).systems.fishing.luck() <= 0.55 && game(99).systems.fishing.skill() <= 0.6); });
 test('picking a catch is deterministic for a spot, hour and salt, and returns a legal fish', () => {
   const g = game(), F = g.systems.fishing, spot = { seed: 12345 }; const a = F.pick(spot, 3), b = F.pick(spot, 3); eq(a.fish.id, b.fish.id); eq(a.len, b.len);
   for (let s = 0; s < 40; s++) { const c = F.pick(spot, s); ok(c.fish.biomes.includes('reef') && c.len >= c.fish.len[0] && c.len <= c.fish.len[1]); }

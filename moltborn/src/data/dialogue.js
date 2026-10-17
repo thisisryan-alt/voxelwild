@@ -343,6 +343,40 @@ export const DIALOGUE = {
     yield c.say("Break the old seals, in the vault below. You will need to be very old, and very large, to do it. That is what the Ancient Molt is for.");
   },
 
+  *tunny(c) {
+    if (!c.flag('met_tunny')) {
+      c.set('met_tunny');
+      yield c.say("Forty years I have stood on this ledge, and in forty years the sea has never once asked me how I was. Hello. You have the look of someone with a pack full of things they do not know the price of.");
+      yield c.say("I buy fish. Fresh, mostly. I will take other bits, if you are tactful. And there is a fishing post out on the reef. Press E in front of it, wait for the float to dip, and hold ENTER to keep the fish in the green. It is simple. It has ruined better swimmers than you.");
+      c.quest('sq_catch');
+    }
+    const r = c.g.state.records, species = Object.keys(c.g.state.fish?.species || {}).length;
+    if (c.qActive('sq_catch') && (r.fished || 0) >= 5 && species >= 3 && (r.fishSold || 0) >= 1 && c.has('fish_sunfish') && !c.flag('tunny_sunfish')) {
+      c.set('tunny_sunfish'); c.take('fish_sunfish', 1);
+      yield c.say("A Gilt Sunfish. By day, on the sun side of the reef, too. I have not held one in thirty years. I will not ask how you did it. I will ask you to keep this.");
+      yield c.say("It is a lure. A spoon on a hook, really. It has caught everything I have ever caught, and I would like it to catch something for someone who is still counting.");
+      c.give('charm_lure'); return;
+    }
+    const i = yield c.ask(c.qActive('sq_catch') ? "Well? How is the line?" : "What can I do for you?", ['Sell fish', 'Fishing advice', c.qActive('sq_catch') ? 'About the quest' : 'Just looking']);
+    if (i === 0) { yield c.say("Let us see it, then. Gently. They bruise."); yield c.sell('tunny'); return; }
+    if (i === 1) {
+      const tips = [
+        "Rarer fish fight harder. Some will only bite at certain hours: sunfish by day, eels and pikes at night. Look at the little sun and moon by your coins.",
+        "A missed bite does not cost much. The water forgets quickly. A lost fish costs a bit more. Do not let go of the button in the middle of a fight.",
+        "Every realm has its own fish. The reef is gentle. The kingdom's carp are fat. The abyss has things that fish for you, and sometimes win.",
+        "Cook what you catch. A Glassfin with an urchin spine, a pair of bream in a chowder. A fish is worth more on a plate than in a pack, to some of us.",
+        "There is a koi out there that comes up only on the darkest nights. If you catch it, do not tell me. I could not bear it.",
+      ];
+      yield c.say(tips[Math.floor(Math.random() * tips.length)]); return;
+    }
+    if (c.qActive('sq_catch')) {
+      if ((r.fished || 0) < 5) yield c.say("Five fish, first. Any five. I like to know a person can wait.");
+      else if (species < 3) yield c.say("Five is a start. Now three kinds. Move around the reef: the forest bites differently to the shallows.");
+      else if ((r.fishSold || 0) < 1) yield c.say("Sell me one. It is the only way I know you are serious.");
+      else yield c.say("The last one: a Gilt Sunfish. Daytime, reef or kingdom. They rise when the light is high.");
+    } else yield c.say("Take your time. The sea is not going anywhere. It has, I think, no plans at all.");
+  },
+
   *marlin(c) {
     if (!c.flag('met_marlin')) {
       c.set('met_marlin');

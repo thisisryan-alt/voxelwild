@@ -56,6 +56,7 @@ export const ITEMS = {
   claw_lumen: { name: 'Lumen Fang', type: 'equip', slot: 'claw', desc: '+9 Atk, +20% ability damage.', fx: { atk: 9, abilityDmg: 0.2 } },
   // equipment — charm / relic
   charm_pearlstring: { name: 'Pearl String', type: 'equip', slot: 'charm', price: 150, desc: 'Coins and pearls are drawn to you from farther away.', fx: { magnet: 60 } },
+  charm_lure: { name: "Tunny's Lucky Lure", type: 'equip', slot: 'charm', desc: 'A bent spoon on a hook, polished by forty years of hope. Rarer fish rise to it.', fx: { fishLuck: 0.2 } },
   charm_lantern: { name: 'Lantern Charm', type: 'equip', slot: 'charm', desc: 'A steady glow lights the dark around you.', fx: { light: 40 } },
   charm_tideglass: { name: 'Tideglass Locket', type: 'equip', slot: 'charm', desc: '+25% Tide regen.', fx: { tideRegen: 0.25 } },
   charm_ghostcoin: { name: "Ghostcoin", type: 'equip', slot: 'charm', desc: 'Pay the toll: +30% coin from enemies.', fx: { coinBonus: 0.3 } },
@@ -89,6 +90,7 @@ export const ITEMS = {
 export const SHOP = {
   cowrie: ['hatchling_egg', 'kelp_wrap', 'brine_tonic', 'shell_driftwood', 'claw_rusty', 'charm_pearlstring', 'shell_barnacle', 'claw_urchin'],
   smuggler: ['fury_ink', 'kelp_wrap', 'brine_tonic'],
+  tunny: ['fish_silverfin', 'brine_salt', 'kelp_frond'],
   marlin: ['kelp_frond', 'brine_salt', 'urchin_spine', 'shell_chip', 'glow_spore', 'fin_scale'],
 };
 export const DYES = {

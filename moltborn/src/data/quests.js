@@ -87,6 +87,12 @@ export const QUESTS = {
     { text: 'Bring the cores to Sear.', done: f('vents_done') },
   ], desc: 'Sear forges with vent-glass and has run out. She will make you something nice for three good cores, provided you do not mind her yelling at the eel.' },
   sq_tyrant: { name: 'The Pearl Tyrant', type: 'side', giver: 'pip', steps: [{ text: 'Defeat the Pearl Tyrant, the giant clam beneath the garden.', done: boss('pearl_tyrant') }], desc: 'Pip’s pearl was swallowed by something enormous.' },
+  sq_catch: { name: 'The One That Got Away', type: 'side', giver: 'tunny', steps: [
+    { text: 'Catch five fish at any fishing post.', done: (g) => (g.state.records?.fished || 0) >= 5 },
+    { text: 'Land three different kinds of fish.', done: (g) => Object.keys(g.state.fish?.species || {}).length >= 3 },
+    { text: 'Sell a fish to Old Tunny.', done: (g) => (g.state.records?.fishSold || 0) >= 1 },
+    { text: 'Bring Old Tunny a Gilt Sunfish (it only rises by day).', done: (g) => g.flag('tunny_sunfish') },
+  ], desc: 'Old Tunny has been fishing the reef for forty years and caught everything but the one he wants to talk about. He thinks you might fare better.' },
   sq_board: { name: 'Notices on the Tide', type: 'side', giver: 'marlin', steps: [
     { text: 'Read the Tide Board.', done: f('board_read') },
     { text: 'Clear a Tidal Rift (any depth, all the way down).', done: (g) => (g.state.records?.rifts || 0) >= 1 },

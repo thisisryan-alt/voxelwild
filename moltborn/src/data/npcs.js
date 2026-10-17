@@ -18,6 +18,7 @@ export const NPCS = {
   ostrea: { name: 'Ostrea the Pearl-Smith', color: '#e0e8ff', sprite: { kind: 'fish', k: 'ostrea', o: { ramp: R.pearl, h: 9, belly: R.sand, hat: R.rust } } },
   inkwell: { name: 'Mr. Inkwell', color: '#c8a0ff', sprite: { kind: 'octopus', k: 'inkwell', o: { ramp: R.abyssal.tint(0.1, 1, 1.1), hat: true } } },
   hobb: { name: 'Quartermaster Hobb', color: '#9ae8e8', sprite: { kind: 'ghost', k: 'hobb', o: {} } },
+  tunny: { name: 'Old Tunny the Fishmonger', color: '#ffb87a', sprite: { kind: 'fish', k: 'tunny', o: { ramp: R.fishBlue.tint(0.02, 0.9, 0.95), h: 10, belly: R.sand, hat: R.rust, bag: true } } },
   glimmer: { name: 'Glimmer', color: '#9affff', sprite: { kind: 'angler', k: 'glimmer', o: {} } },
   thessaly: { name: 'Thessaly', color: '#c0f0ff', sprite: { kind: 'elder', k: 'thessaly', o: {} } },
   krael: { name: 'Krael', color: '#c8b8a8', sprite: { kind: 'titan', k: 'krael', o: {} } },

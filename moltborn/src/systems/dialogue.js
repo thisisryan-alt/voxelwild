@@ -22,6 +22,7 @@ export class Dialogue {
       form: () => g.state.form, boss: (k) => !!g.state.bosses[k], visited: (z) => !!g.state.visited[z],
       lore: (id) => g.systems.codex.unlock(id),
       shop: (id) => ({ t: 'async', fn: (resume) => g.openShop(id, resume) }),
+      sell: (id) => ({ t: 'async', fn: (resume) => g.openSell(id, resume) }),
       forge: () => ({ t: 'async', fn: (resume) => g.openForge(resume) }),
     };
     return c;

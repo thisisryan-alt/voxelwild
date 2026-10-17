@@ -6,7 +6,7 @@ const REWARDS = {
   mq1: { xp: 20 }, mq2: { xp: 60, coins: 40 }, mq3: { xp: 40, sp: 1 }, mq4: { xp: 140, coins: 80 }, mq5: { xp: 220, coins: 150 }, mq6: { xp: 320, coins: 200 }, mq7: { xp: 200, sp: 1 },
   mq8: { xp: 400, coins: 300 }, mq9: { xp: 400, sp: 2 }, mq10: { xp: 300, sp: 1 }, mq11: { xp: 600, coins: 400 }, mq12: { xp: 400, sp: 2 }, mq13: { xp: 2000 },
   sq_tessa: { xp: 50, coins: 40 }, sq_choir: { xp: 80, items: { mut_echo: 1 } }, sq_atlas: { xp: 100, coins: 120 }, sq_ledger: { xp: 150 }, sq_inkwell: { xp: 120 },
-  sq_board: { xp: 400, coins: 300, items: { charm_riftshard: 1 } }, sq_hobb: { xp: 140, items: { captain_key: 1 } }, sq_lantern: { xp: 160, items: { charm_lantern: 1 } }, sq_siblings: { xp: 300, sp: 2 }, sq_pearls: { xp: 500, sp: 2 }, sq_tyrant: { xp: 200, black_pearl: 2, items: { dye_albino: 1 } },
+  sq_catch: { xp: 260, coins: 160 }, sq_board: { xp: 400, coins: 300, items: { charm_riftshard: 1 } }, sq_hobb: { xp: 140, items: { captain_key: 1 } }, sq_lantern: { xp: 160, items: { charm_lantern: 1 } }, sq_siblings: { xp: 300, sp: 2 }, sq_pearls: { xp: 500, sp: 2 }, sq_tyrant: { xp: 200, black_pearl: 2, items: { dye_albino: 1 } },
 };
 
 export class Quests {

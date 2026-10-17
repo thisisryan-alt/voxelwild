@@ -48,7 +48,7 @@ export class Reel {
 export class Fishing {
   constructor(game) { this.g = game; game.systems.fishing = this; }
   get log() { const s = this.g.state; return s.fish || (s.fish = { total: 0, species: {} }); }
-  luck() { const g = this.g, st = g.state, rec = st.records; return clamp((st.level || 1) / 60 + Math.min(0.15, (this.log.total || 0) / 400) + (rec?.fishLuck || 0), 0, 0.4); }
+  luck() { const g = this.g, st = g.state; return clamp((st.level || 1) / 60 + Math.min(0.15, (this.log.total || 0) / 400) + (g.world?.player?.stats?.fishLuck || 0), 0, 0.55); }
   skill() { return clamp((this.g.state.level || 1) / 40, 0, 0.6); }
   phase() { return this.g.systems.clock?.phase.id || 'day'; }
 
