@@ -34,7 +34,7 @@ export class Hud {
     }
     text(ctx, `${st.level}`, 108, 8, COL.gold, { shadow: '#000' });
     if (this.t < 6 || g.state.level !== this.lvShown) { this.lvShown = g.state.level; this.nameT = this.t; }
-    if (this.t - (this.nameT ?? 0) < 5) { ctx.globalAlpha = Math.min(1, 5 - (this.t - this.nameT)); text(ctx, F.name, 108 + textWidth(String(st.level)) + 5, 8, COL.dim, { shadow: '#000' }); ctx.globalAlpha = 1; }
+    if (this.t - (this.nameT ?? 0) < 5) { ctx.globalAlpha = Math.min(1, 5 - (this.t - this.nameT)); const tt = g.systems.cosmetics?.titleText(); text(ctx, F.name + (tt ? '  ' + tt : ''), 108 + textWidth(String(st.level)) + 5, 8, COL.dim, { shadow: '#000' }); ctx.globalAlpha = 1; }
     this.x.statusRow(ctx, 8, (p.combo || 0) >= 3 && p.comboLife > 0 ? 47 : 30); this.x.endScale(ctx, big);
     // --- currency: one line; EP / SP only when there is something to spend ---
     const cw = textWidth(String(st.coins)); ctx.drawImage(iconCoin(), 476 - cw - 14, 6); text(ctx, String(st.coins), 476 - cw, 8, COL.gold);
@@ -89,7 +89,7 @@ export class Hud {
     // --- zone banner ---
     g.systems.achievements?.drawBanner(ctx);
     const bn = g.bannerState; if (bn) { const a = Math.min(1, bn.t * 2, (2.8 - bn.t) * 1.5); ctx.globalAlpha = a * 0.92; drawText(ctx, bn.title, 240, 44, { color: '#ffffff', scale: 2, align: 'center', shadow: '#05204a', outline: '#05204a' }); if (bn.sub) drawText(ctx, bn.sub, 240, 64, { color: '#9ad8ff', align: 'center', shadow: '#05204a' }); ctx.globalAlpha = 1; }
-    this.x.hurtArcs(ctx, w.lastCam || w.cam); this.x.xpLine(ctx); this.x.fps(ctx);
+    this.x.hurtArcs(ctx, w.lastCam || w.cam); this.x.xpLine(ctx); this.x.fps(ctx); this.x.dps(ctx); g.systems.captions?.draw(ctx);
     // --- low health pulse (the post-processing pass paints its own when it is running) ---
     if (p.hp / S.maxHp < 0.25 && p.alive && (!g.systems.post || g.systems.post.lite)) { ctx.globalAlpha = 0.18 + 0.12 * Math.sin(this.t * 6); ctx.fillStyle = '#c01020'; ctx.fillRect(0, 0, 480, 6); ctx.fillRect(0, 264, 480, 6); ctx.fillRect(0, 0, 6, 270); ctx.fillRect(474, 0, 6, 270); ctx.globalAlpha = 1; }
     // pressure warning

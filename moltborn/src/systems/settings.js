@@ -24,10 +24,12 @@ export const SCHEMA = [
   { group: 'Gameplay', key: 'shake', label: 'Screen shake', type: 'slider', min: 0, max: 1, step: 0.1, def: 1 },
   { group: 'Gameplay', key: 'damageNumbers', label: 'Damage numbers', type: 'cycle', options: ['off', 'small', 'normal'], def: 'normal' },
   { group: 'Gameplay', key: 'minimap', label: 'Minimap', type: 'cycle', options: ['off', 'small', 'large'], def: 'small', hint: 'Press N in game to cycle it.' },
+  { group: 'Gameplay', key: 'showDps', label: 'Damage meter', type: 'toggle', def: 0, hint: 'Shows your damage per second over the last few seconds.' },
   { group: 'Gameplay', key: 'tips', label: 'Hints', type: 'toggle', def: 1 },
   { group: 'Gameplay', key: 'comboCounter', label: 'Combo counter', type: 'toggle', def: 1 },
   { group: 'Gameplay', key: 'cameraPunch', label: 'Camera punch', type: 'slider', min: 0, max: 1, step: 0.1, def: 0.7, hint: 'Small zooms and nudges on big hits.' },
 
+  { group: 'Access', key: 'captions', label: 'Sound captions', type: 'toggle', def: 0, hint: 'Describes important sounds in text, with arrows for direction.' },
   { group: 'Access', key: 'reduceFlashes', label: 'Reduce flashes', type: 'toggle', def: 0, hint: 'Softens full-screen flashes and chromatic pulses.' },
   { group: 'Access', key: 'reduceMotion', label: 'Reduce motion', type: 'toggle', def: 0, hint: 'Turns off refraction, camera punch and screen shake.' },
   { group: 'Access', key: 'highContrast', label: 'High-contrast telegraphs', type: 'toggle', def: 0, hint: 'Bolder outlines around dangerous attacks.' },

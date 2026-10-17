@@ -3,16 +3,17 @@
 // readout and the large-HUD scaling option. Each piece is a method so the base HUD stays readable.
 import { STATUS, statusIcon } from '../systems/status.js';
 import { xpToNext } from '../data/forms.js';
-import { text, textWidth, panel } from './ui.js';
+import { text, textWidth, panel, COL } from './ui.js';
 import { setting } from '../systems/settings.js';
 import { clamp } from '../core/util.js';
 
 export class HudExtra {
   constructor(hud) {
-    this.hud = hud; this.g = hud.g; this.arcs = []; this.flashes = {}; this.prevCd = {}; this.xpShown = null; this.xpT = 0; this.lastXp = null; this.hover = 0;
+    this.hud = hud; this.g = hud.g; this.arcs = []; this.flashes = {}; this.prevCd = {}; this.xpShown = null; this.xpT = 0; this.lastXp = null; this.hover = 0; this.hits = [];
     const ev = this.g.events;
     ev.on('hurt', (n, src, blocked) => this.onHurt(n, src, blocked));
-    ev.on('zone', () => { this.arcs.length = 0; this.xpShown = null; });
+    ev.on('zone', () => { this.arcs.length = 0; this.xpShown = null; this.hits.length = 0; });
+    ev.on('hitdealt', (e, dmg) => { this.hits.push({ t: performance.now() / 1000, d: dmg }); if (this.hits.length > 400) this.hits.shift(); });
   }
 
   update(dt) {
@@ -92,6 +93,13 @@ export class HudExtra {
     const ph = b.phase?.name; if (ph) text(ctx, ph, 335 - textWidth(ph), 31, '#c88a8a');
     const list = b.status?.entries().filter((s) => STATUS[s.id].harmful).slice(0, 5) || [];
     list.forEach((s, i) => { ctx.drawImage(statusIcon(s.id, 1), 148 + i * 11, 31); ctx.fillStyle = STATUS[s.id].color; ctx.fillRect(149 + i * 11, 41, Math.max(1, Math.round(8 * clamp(s.t / s.max, 0, 1))), 1); });
+  }
+
+  // damage per second over the last five seconds, with the best burst of the fight
+  dps(ctx) {
+    if (!setting(this.g, 'showDps')) return; const now = performance.now() / 1000; this.hits = this.hits.filter((h) => now - h.t < 5);
+    const sum = this.hits.reduce((n, h) => n + h.d, 0), v = this.hits.length ? Math.round(sum / Math.max(2, now - this.hits[0].t)) : 0; this.peak = Math.max(v, (this.peak || 0) * 0.999);
+    const s = `DPS ${v}   best ${Math.round(this.peak)}`, w = textWidth(s) + 10; panel(ctx, 476 - w, 252, w, 13, { alpha: 0.6, border: '#2a3a58' }); text(ctx, s, 481 - w, 255, v ? COL.gold : COL.dim);
   }
 
   fps(ctx) {

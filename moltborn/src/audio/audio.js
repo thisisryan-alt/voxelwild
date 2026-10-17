@@ -82,6 +82,7 @@ export class AudioSys {
 
   // ---- the sound library ---------------------------------------------------------------------
   sfx(name, o = {}) {
+    this.onSfx?.(name, o);
     if (!this.ready || this.muted) return;
     const now = this.ctx.currentTime, minGap = { hit: 0.04, claw: 0.04, coin: 0.03, die: 0.05, stroke: 0.1 }[name] ?? 0.03;
     if (this.last[name] && now - this.last[name] < minGap) return; this.last[name] = now;

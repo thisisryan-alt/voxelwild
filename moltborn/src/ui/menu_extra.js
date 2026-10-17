@@ -101,19 +101,22 @@ const beast = {
 };
 
 // ======================================================= TROPHIES =====================================================
-const PAGES = [...CATS.map((c) => c.id), 'records'];
+const PAGES = [...CATS.map((c) => c.id), 'style', 'records'];
 const trophy = {
   u_TROPHY(inp, s) {
     const g = this.g;
     if (inp.pressed('left')) { s.sub = (s.sub + PAGES.length - 1) % PAGES.length; s.i = 0; g.audio.sfx('tick'); }
     if (inp.pressed('right')) { s.sub = (s.sub + 1) % PAGES.length; s.i = 0; g.audio.sfx('tick'); }
-    const page = PAGES[s.sub]; if (page !== 'records') listNav(this, inp, s, ACHIEVEMENTS.filter((a) => a.cat === page).length);
+    const page = PAGES[s.sub];
+    if (page === 'style') return this.styleNav(inp, s);
+    if (page !== 'records') listNav(this, inp, s, ACHIEVEMENTS.filter((a) => a.cat === page).length);
   },
   d_TROPHY(ctx, s) {
     const g = this.g, A = g.systems.achievements, page = PAGES[s.sub];
-    PAGES.forEach((p, i) => { const c = CATS.find((x) => x.id === p); button(ctx, c ? c.short : 'Records', 8 + i * 77, 20, 75, 14, i === s.sub); });
+    PAGES.forEach((p, i) => { const c = CATS.find((x) => x.id === p); button(ctx, c ? c.short : p === 'style' ? 'Style' : 'Records', 8 + i * 64, 20, 62, 14, i === s.sub); });
     const pts = `${A.count()}/${A.total()}   ${A.points()} pts`; text(ctx, pts, 472 - textWidth(pts), 38, COL.gold);
     if (page === 'records') return this.drawRecords(ctx);
+    if (page === 'style') return this.drawStyle(ctx, s);
     const list = ACHIEVEMENTS.filter((a) => a.cat === page), cx = A.context();
     panel(ctx, 8, 46, 230, 204); panel(ctx, 244, 46, 228, 204);
     listRows(ctx, 10, 52, 226, list, s.i, 14, 14, (a, i, y, on) => {
@@ -130,6 +133,24 @@ const trophy = {
     const y = 90 + wrapText(d.desc, 214).length * 10 + 10;
     if (d.got) { const at = g.state.trophies[a.id]?.at; text(ctx, 'EARNED' + (at ? `  at ${fmtSecs(Math.floor(at / 60))} played` : ''), 252, y, COL.green); }
     else if (!(a.hidden)) { bar(ctx, 252, y + 2, 140, 5, d.frac, '#3a8ae8', '#8ad0ff', '#0a1a3a'); text(ctx, `${d.now} / ${a.goal}`, 398, y, COL.dim); }
+  },
+  styleRows() { const C = this.g.systems.cosmetics; return [...C.titles().map((t) => ({ kind: 'title', ...t })), ...C.trails().map((t) => ({ kind: 'trail', ...t }))]; },
+  styleNav(inp, s) {
+    const g = this.g, rows = this.styleRows(); listNav(this, inp, s, rows.length);
+    if (inp.pressed('confirm')) { const r = rows[s.i]; if (!r.owned) { g.audio.sfx('deny'); this.say('Locked: earn the trophy first'); } else { g.systems.cosmetics.equip(r.kind, r.id); g.audio.sfx('select'); this.say(`${r.kind === 'title' ? 'Title' : 'Wake'}: ${r.name}`); } }
+  },
+  drawStyle(ctx, s) {
+    const g = this.g, C = g.systems.cosmetics, rows = this.styleRows(), pick = C.pick, n = C.counts();
+    panel(ctx, 8, 46, 230, 204); panel(ctx, 244, 46, 228, 204);
+    listRows(ctx, 10, 52, 226, rows, s.i, 14, 14, (r, i, y, on) => {
+      const cur = pick[r.kind] === r.id; text(ctx, (r.kind === 'title' ? 'T ' : 'W ') + r.name, 16, y + 1, on ? '#ffffff' : r.owned ? COL.text : '#506080');
+      if (cur) text(ctx, 'ON', 232 - textWidth('ON'), y + 1, COL.green); else if (!r.owned) text(ctx, 'locked', 232 - textWidth('locked'), y + 1, '#506080');
+    });
+    const r = rows[s.i]; text(ctx, r.kind === 'title' ? 'TITLE' : 'WAKE', 252, 52, COL.gold); text(ctx, r.name, 252, 64, '#ffffff');
+    if (r.by) { const a = ACHIEVEMENTS.find((x) => x.id === r.by); text(ctx, r.owned ? 'Unlocked by:' : 'Earned by:', 252, 82, COL.dim); text(ctx, a ? a.name : r.by, 252, 92, r.owned ? COL.green : COL.text); if (a) wrapText(a.hidden && !r.owned ? 'A hidden trophy.' : a.desc, 214).forEach((l, i) => text(ctx, l, 252, 104 + i * 10, COL.dim)); }
+    else text(ctx, 'Always available.', 252, 82, COL.dim);
+    if (r.kind === 'trail') { const T = r; for (let i = 0; i < 18; i++) { const c = T.colors[i % T.colors.length]; ctx.fillStyle = c; const t = (this.t * 30 + i * 11) % 120; ctx.globalAlpha = 1 - t / 120; ctx.fillRect(260 + t, 170 + Math.round(Math.sin(i * 1.7 + this.t * 3) * 6), T.size || 2, T.size || 2); } ctx.globalAlpha = 1; }
+    const l = `Titles ${n.titles[0]}/${n.titles[1]}   Wakes ${n.trails[0]}/${n.trails[1]}`; text(ctx, l, 252, 232, COL.dim);
   },
   drawRecords(ctx) {
     const g = this.g, st = g.systems.stats, rec = g.state.records;

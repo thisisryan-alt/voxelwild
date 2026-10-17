@@ -44,7 +44,12 @@ export class BodyFx {
     }
     // a wake of bubbles behind a fast swimmer
     if ((p.free || !p.onGround) && speed > 90 && !p.world.cinematic) {
-      this.wakeT -= dt; if (this.wakeT <= 0) { this.wakeT = 0.1; w.fx.bubble(p.x - Math.sign(p.vx || p.facing) * p.w * 0.45, p.y + (Math.random() - 0.5) * 6, 1, 4, -10); }
+      const T = p.game.systems.cosmetics?.trail(); this.wakeT -= dt;
+      if (this.wakeT <= 0) {
+        this.wakeT = T ? T.rate : 0.1; const x = p.x - Math.sign(p.vx || p.facing) * p.w * 0.45, y = p.y + (Math.random() - 0.5) * 6;
+        if (!T || T.kind === 'bubble' && T.colors.length === 2) w.fx.bubble(x, y, 1, 4, -10);
+        else w.fx.add({ x, y, vx: -(p.vx || 0) * 0.1 + (Math.random() - 0.5) * 10, vy: (T.rise ?? -10) + (Math.random() - 0.5) * 8, life: 0.5 + Math.random() * 0.4, size: T.size || (Math.random() < 0.3 ? 2 : 1), color: T.colors[(Math.random() * T.colors.length) | 0], kind: T.kind, drag: 1.5, shrink: T.kind === 'rect', wob: Math.random() * 6 });
+      }
     }
     // wounds: dark drops fall from a badly hurt swimmer
     if (p.hp < p.stats.maxHp * 0.3) {
