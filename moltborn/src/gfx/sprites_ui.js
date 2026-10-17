@@ -28,10 +28,10 @@ const ITEM_ICON = {
   brine_core: ['gem', 'pink'], abyssal_core: ['gem', 'purple'], titan_heart: ['heart'], tide_sigil: ['gem', 'cyan'],
   brineguard_key: ['key', 'gold'], captain_key: ['key', 'rust'], lantern_stone: ['gem', 'orange'], trench_gate_rune: ['rune', 'cyan'], spiral_shell: ['shell', 'pink'], ledger: ['scroll'], stolen_regalia: ['charm', 'gold'],
 };
-export function itemIcon(id) {
+export function itemIcon(id, forced) {
   return mk('item:' + id, 16, 16, (p) => {
     const it = ITEMS[id] || {};
-    let spec = ITEM_ICON[id];
+    let spec = forced || ITEM_ICON[id];
     if (!spec) {
       if (it.icon) spec = it.icon;
       else if (id.startsWith('mp')) spec = ['pearl', ['pink', 'green', 'gold', 'rust', 'orange', 'purple', 'cyan'][(+id.slice(2) - 1) % 7]];

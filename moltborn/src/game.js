@@ -37,6 +37,9 @@ import { Difficulty } from './systems/difficulty.js';
 import { AudioFeel } from './audio/feel.js';
 import { Haptics } from './core/haptics.js';
 import { applyKeymap } from './core/keymap.js';
+import { Elites } from './systems/affixes.js';
+import { Rifts } from './systems/rifts.js';
+import { isProcedural } from './world/rift_gen.js';
 
 const rand = rng(8080);
 
@@ -52,7 +55,7 @@ export class Game {
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this); new Elites(this); new Rifts(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -60,7 +63,10 @@ export class Game {
   advance(n = 1) { for (let i = 0; i < n; i++) this.engine.step(1 / 60); this.engine.render(); }
 
   // ---- state helpers ----------------------------------------------------------------------------
-  zoneState(id) { return (this.state.zones[id] ||= { opened: {}, broken: {}, killed: {}, collected: {} }); }
+  zoneState(id) {
+    if (isProcedural(id)) { this.tempZones = this.tempZones || new Map(); if (!this.tempZones.has(id)) this.tempZones.set(id, { opened: {}, broken: {}, killed: {}, collected: {} }); return this.tempZones.get(id); }
+    return (this.state.zones[id] ||= { opened: {}, broken: {}, killed: {}, collected: {} });
+  }
   flag(f) { return !!this.state.flags[f]; }
   setFlag(f, v = true) { if (this.state.flags[f] === v) return; this.state.flags[f] = v; this.events.emit('flag', f, v); }
   hasItem(id) { return (this.state.inv[id] || 0) > 0; }
@@ -75,7 +81,7 @@ export class Game {
   // ---- lifecycle -----------------------------------------------------------------------------------
   newGame(slot = 0) {
     this.slot = slot; this.state = newState(); Object.assign(this.state.settings, Save.settings() || {}); ensureSettings(this.state.settings); this.audio.settings = this.state.settings;
-    this.state.meta = { started: Date.now() }; ensureRecords(this.state);
+    this.state.meta = { started: Date.now() }; ensureRecords(this.state); this.state.riftRelics = [];
     return this.enterWorld('reef_nursery', 'start', { newGame: true });
   }
   // a new voyage that keeps the character (level, form, skills, gear, codex, trophies) but resets the world
@@ -89,7 +95,7 @@ export class Game {
   loadGame(slot) {
     const d = Save.read(slot); if (!d) return false;
     this.slot = slot; this.state = Object.assign(newState(), d.state); this.state.stats = Object.assign(newState().stats, d.state.stats); this.state.settings = ensureSettings(Object.assign(newState().settings, d.state.settings, Save.settings() || {}));
-    this.audio.settings = this.state.settings; ensureRecords(this.state); this.state.records.sessions++;
+    this.audio.settings = this.state.settings; ensureRecords(this.state); this.state.records.sessions++; this.state.riftRelics = [];
     const c = this.state.checkpoint; this.enterWorld(c.zone, c.entry, { loaded: true }); return true;
   }
   saveGame(quiet) {
@@ -110,7 +116,7 @@ export class Game {
   buildWorld(zoneId, entry, o = {}) {
     const z = buildZone(zoneId);
     this.world = new World(this, z, entry);
-    this.state.visited[zoneId] = true;
+    if (!isProcedural(zoneId)) this.state.visited[zoneId] = true;
     this.zoneMeta(zoneId);
     const p = this.world.player;
     if (this.state.hp != null && o.keepHp !== false && !o.respawn) { p.hp = Math.min(this.state.hp, p.stats.maxHp); p.tide = Math.min(this.state.tide ?? p.stats.maxTide, p.stats.maxTide); }
@@ -118,6 +124,7 @@ export class Game {
     this.audio.ambience(this.world.biome.amb); this.audio.music.play(z.music || this.world.biome.music);
     // spirit purse (coins lost on death)
     const pu = this.state.purse; if (pu && pu.zone === zoneId) this.world.pickups.push(new Pickup(this.world, { kind: 'coin', value: pu.amount, x: pu.x, y: pu.y, fixed: true, delay: 0, life: 1e9, id: 'purse' })), this.world.pickups[this.world.pickups.length - 1].purse = true;
+    this.systems.rifts?.onWorld(this.world);
     this.events.emit('zone', zoneId);
     this.systems.quests?.onZone?.(zoneId);
     if (!o.silentBanner) this.banner(z.title || z.name, this.world.biome.name);
@@ -127,8 +134,9 @@ export class Game {
   changeZone(to, entry, ex) {
     const ps = this.playScene; if (!ps) return;
     ps.fadeOut(0.3, () => {
-      this.state.checkpoint.last = { zone: to, entry };
       const hp = this.world.player.hp, tide = this.world.player.tide; this.state.hp = hp; this.state.tide = tide;
+      if (isProcedural(to)) { this.systems.rifts?.enter(to); this.buildWorld(to, entry, { silentBanner: true }); ps.fadeIn(0.4); return; }
+      this.state.checkpoint.last = { zone: to, entry };
       this.buildWorld(to, entry, { silentBanner: false });
       this.saveGame(true);
       ps.fadeIn(0.4);
@@ -144,6 +152,7 @@ export class Game {
     this.playScene.fadeOut(0.35, () => { this.buildWorld(w.zone.id, shrine.o.entry || 'rest', { silentBanner: true, keepHp: false }); const np = this.world.player; np.hp = np.stats.maxHp; np.tide = np.stats.maxTide; this.world.player.interactT = 0.5; this.playScene.fadeIn(0.4); this.events.emit('rest'); });
   }
   onPlayerDeath() {
+    if (this.systems.rifts?.active) return this.systems.rifts.onDeath();
     const s = this.state, w = this.world, p = w.player;
     const lose = Math.floor(s.coins * 0.25);
     s.purse = lose > 0 ? { zone: w.zone.id, x: p.x, y: p.y, amount: lose } : null; s.coins -= lose;
@@ -204,9 +213,10 @@ export class Game {
   onEnemyKilled(e, hit) {
     const w = this.world, p = w.player, d = e.def, s = this.state;
     s.stats.kills++;
-    const D = this.systems.difficulty.scale();
+    const D = this.systems.difficulty.scale(), R = e.affixes ? { coin: 2, pearl: 0.25 } : null;
     this.giveXp(Math.round((d.xp || 1) * (e.xpMult || 1) * D.xp), e.x, e.y);
-    const coins = d.coins ? Math.round((d.coins[0] + rand() * (d.coins[1] - d.coins[0])) * D.coin * p.status.mult('coin')) : 0;
+    const coins = d.coins ? Math.round((d.coins[0] + rand() * (d.coins[1] - d.coins[0])) * D.coin * p.status.mult('coin') * (R ? R.coin : 1)) : 0;
+    if (R && rand() < R.pearl) this.grantLoot({ pearl: 1 }, e.x, e.y, true);
     if (coins) this.grantLoot({ coins }, e.x, e.y, false);
     const r = rand();
     if (r < 0.12) w.pickups.push(new Pickup(w, { kind: 'orb', id: 'hp', value: Math.max(6, Math.round(p.stats.maxHp * 0.08)), x: e.x, y: e.y, delay: 0.3 }));
@@ -245,5 +255,5 @@ export class Game {
     if (npcId === 'old_brine') return null;
     if (qs.some((id) => !q.log[id])) return '!'; return null;
   }
-  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); this.systems.minimap?.update(dt); this.systems.audiofeel?.update(dt); }
+  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); this.systems.minimap?.update(dt); this.systems.audiofeel?.update(dt); this.systems.rifts?.update(dt); }
 }

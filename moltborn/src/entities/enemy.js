@@ -9,6 +9,7 @@ import { rng, clamp } from '../core/util.js';
 import { chestFrame } from '../gfx/sprites_ui.js';
 import { StatusSet, applyHitStatuses } from '../systems/status.js';
 import { statusOverlay, statusFx, statusPips } from './fx_status.js';
+import { Affix } from '../systems/affixes.js';
 
 const rand = rng(31337);
 
@@ -78,6 +79,7 @@ export class Enemy extends Entity {
     if (this.weakT > 0) dmg *= 1.25;
     if (this.tuckT > 0 || this.guardAll) dmg *= 0.25;
     dmg *= this.status.mult('dmgIn');
+    if (this.affixes) { const r = Affix.beforeHit(this, hit, dmg); if (r === false) return true; dmg = r; }
     dmg = Math.max(1, Math.round(dmg));
     this.hp -= dmg; this.flash = 0.09;
     w.fx.text(this.x + (rand() - 0.5) * 6, this.y - this.h / 2 - 4, dmg, hit.crit ? '#ffd84a' : '#ffffff', !!hit.crit);
@@ -95,9 +97,12 @@ export class Enemy extends Entity {
     if (hit.status) this.applyStatus(hit.status);
     if (this.behaviour.onHurt) this.behaviour.onHurt(this, hit);
     if (this.def.spiky && !hit.ranged && player && !hit.fromAbility) player.takeHit({ dmg: 3, x: this.x, y: this.y, kb: 60, thorn: true });
+    if (this.affixes) Affix.afterHit(this, hit, player, dmg);
     if (this.hp <= 0) this.die(false, hit);
     return true;
   }
+  heal(n) { this.hp = Math.min(this.maxHp, this.hp + n); }
+  onHitPlayer(player, final) { if (this.affixes) Affix.onHitPlayer(this, player, final); }
   applyStatus(s) {
     if (s.poison) this.statuses.poison = { t: 4, dps: s.poison };
     if (s.slow) this.slowT = Math.max(this.slowT, s.slow);
@@ -125,6 +130,7 @@ export class Enemy extends Entity {
       w.fx.debris(f, this.x, feet ? this.y + this.h / 2 : this.y, this.facing < 0 !== (d.sprite.flip === true), clamp(Math.round(f.w * f.h / 60), 14, 46), 70, { vx: (hit?.dir || 0) * 30 });
     }
     this.sfx(d.boss ? 'bossdie' : 'die');
+    if (this.affixes && !silent) Affix.onDeath(this);
     if (d.splits && !silent) for (let i = 0; i < d.splits.n; i++) { const dx = (i - (d.splits.n - 1) / 2) * 2; w.spawnMinion(d.splits.type, this.x + dx * 4, this.y, { vx: dx * 60, vy: -40 }); }
     if (silent && !d.dropOnBurst) return;
     g.onEnemyKilled(this, hit);
@@ -181,6 +187,7 @@ export class Enemy extends Entity {
       ctx.fillStyle = '#170d1c'; ctx.fillRect(bx - 1, by - 1, bw + 2, 4); ctx.fillStyle = '#5a1020'; ctx.fillRect(bx, by, bw, 2);
       ctx.fillStyle = '#ff5a4a'; ctx.fillRect(bx, by, Math.round(bw * clamp(this.hp / this.maxHp, 0, 1)), 2);
     }
+    if (this.affixes) Affix.draw(ctx, this, cam);
     if (this.status.size && !d.boss) statusPips(ctx, this, cam, Math.round(this.y - this.h / 2 - cam.y) - 5 - (d.barLift || 0));
   }
 }

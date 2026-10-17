@@ -11,7 +11,10 @@ import { EXTRA } from './roster.js';
 
 const REG = { ...reef, ...forest, ...kingdom, ...grave, ...deep, ...expansion };
 export { ZONE_INFO } from './zoneinfo.js';
+import { buildRift, buildArena } from '../world/rift_gen.js';
 export function buildZone(id) {
+  if (id.startsWith('rift:')) return buildRift(id);
+  if (id.startsWith('arena:')) return buildArena(id);
   const f = REG[id]; if (!f) throw new Error('unknown zone ' + id);
   const z = f(); const extra = EXTRA[id]; return extra ? scatter(z, extra) : z;
 }

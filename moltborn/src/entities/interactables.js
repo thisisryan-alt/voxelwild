@@ -138,3 +138,22 @@ export class Brazier extends Interactable {
   get glowing() { return this.lit; }
 }
 export const INTERACTABLES = { bulb: Bulb, brazier: Brazier, chest: Chest, shrine: Shrine, mural: Mural, sign: Sign, lockdoor: LockDoor, npc: NpcEntity };
+
+// The Tide Board: a notice board of dares. Reading it opens the rift / gauntlet menu (ui/board_scene.js).
+export class TideBoard extends Interactable {
+  constructor(world, o) { super(world, o, 26, 28); this.range = 30; this.t = 0; }
+  prompt() { return 'Read the Tide Board'; }
+  interact(game) { import('../ui/board_scene.js').then(({ BoardScene }) => game.engine.push(new BoardScene(game))); }
+  get glowing() { return true; }
+  draw(ctx, cam) {
+    this.t += 1 / 60;
+    const x = Math.round(this.x - cam.x), y = Math.round(this.y + 14 - cam.y), glow = 0.5 + 0.5 * Math.sin(this.t * 2.2);
+    ctx.fillStyle = '#170d1c'; ctx.fillRect(x - 12, y - 28, 25, 20); ctx.fillRect(x - 10, y - 9, 3, 9); ctx.fillRect(x + 7, y - 9, 3, 9);
+    ctx.fillStyle = '#7a4c2a'; ctx.fillRect(x - 11, y - 27, 23, 18); ctx.fillStyle = '#a8703c'; ctx.fillRect(x - 11, y - 27, 23, 2); ctx.fillStyle = '#946034'; ctx.fillRect(x - 9, y - 8, 1, 8); ctx.fillRect(x + 8, y - 8, 1, 8);
+    ctx.fillStyle = '#e8dcc0'; ctx.fillRect(x - 9, y - 24, 7, 8); ctx.fillRect(x + 1, y - 22, 8, 10); ctx.fillStyle = '#c0b090'; ctx.fillRect(x - 9, y - 24, 7, 1); ctx.fillRect(x + 1, y - 22, 8, 1);
+    ctx.fillStyle = '#6a8ab0'; for (let i = 0; i < 3; i++) { ctx.fillRect(x - 8, y - 21 + i * 2, 5, 1); ctx.fillRect(x + 2, y - 19 + i * 2, 6, 1); }
+    ctx.fillStyle = '#c03a3a'; ctx.fillRect(x - 6, y - 25, 2, 2); ctx.fillRect(x + 4, y - 23, 2, 2);
+    ctx.globalAlpha = 0.25 + glow * 0.3; ctx.fillStyle = '#9af0ff'; ctx.fillRect(x - 2, y - 30, 4, 2); ctx.fillRect(x - 1, y - 33, 2, 3); ctx.globalAlpha = 1;
+  }
+}
+INTERACTABLES.board = TideBoard;

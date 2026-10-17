@@ -22,7 +22,7 @@ export function kingdom_gate() {
   b.sign(36, 'The stone steps spiral down. A brass plaque: VAULTS - AUTHORISED PERSONNEL. (Somebody has crossed out AUTHORISED.)', { from: 39 });
   b.exitN(14, 24, 'forest_heart', 'south'); b.entry('north', 18, 8); b.carve(14, 0, 11, 8);
   b.exitE(37, 41, 'kingdom_spires', 'west'); b.entryFloor('east', 100, { facing: -1, from: 20 });
-  b.shrine('rest', 26, { from: 28 });
+  b.shrine('rest', 26, { from: 28 }); b.propFloor('board', 32, { from: 28 });
   b.npc('vael', 46, { from: 20 }); b.npc('ruby', 60, { from: 20 }); b.npc('ostrea', 74, { from: 20 });
   b.spawnFloor('brineguard', 36, 20); b.spawnFloor('brineguard', 68, 20); b.spawn('archerfish', 40, 28); b.spawn('archerfish', 86, 22); b.spawn('puffer', 56, 30); b.spawn('puffer', 96, 20);
   b.spawnFloor('anemone_c', 20, 20); b.spawnFloor('anemone_c', 92, 20); b.spawnFloor('hermit', 100, 20);

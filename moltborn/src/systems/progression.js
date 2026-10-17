@@ -4,6 +4,7 @@ import { SKILLS } from '../data/skills.js';
 import { ITEMS } from '../data/items.js';
 import { defaults as settingDefaults } from './settings.js';
 import { newRecords } from './stats.js';
+import { RELICS } from '../data/relics.js';
 
 export function newState() {
   return {
@@ -51,6 +52,7 @@ export function computeStats(state) {
   for (const id of Object.keys(state.skills)) apply(SKILLS[id]?.fx);
   for (const slot of ['shell', 'claw', 'charm']) { const id = state.equip[slot]; if (id) { const lv = state.upgrades[id] || 0; const fx = ITEMS[id].fx; apply(fx); if (lv) { if (fx.atk) s.atk += lv * 1.5; if (fx.def) s.def += lv * 1; } } }
   for (const id of state.mutations) apply(ITEMS[id]?.fx);
+  for (const id of state.riftRelics || []) apply(RELICS[id]?.fx);
   s.maxHp = Math.round(s.maxHp * mult.hp); s.maxTide = Math.round(s.maxTide * mult.tide);
   s.atk = s.atk * mult.atk * (1 + s.dmg); s.def = s.def * mult.def; s.speed = s.speed * mult.speed;
   s.strokes = F.move.stroke.max + s.strokes;

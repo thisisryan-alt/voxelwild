@@ -28,7 +28,7 @@ export class World {
     this.boss = null; this.cinematic = false; this.slowT = 0; this.slowFactor = 1; this.flash = 0; this.hurtFlash = 0; this.shakeAmt = 0; this.kickX = 0; this.kickY = 0; this.camLock = null;
     this.exitsDisabled = false; this.drawExtra = []; this.overlayExtra = []; this.extraLights = []; this.lightCv = null; this.exiting = false; this.difficulty = 0;
     this.cam = { x: 0, y: 0, lookX: 0, lookY: 0 };
-    this.buildEntities();
+    this.buildEntities(); game.systems.elites?.roll(this);
     const entry = zone.entries[entryName] || Object.values(zone.entries)[0];
     this.player = new Player(this, entry.x, entry.y - 6, game);
     this.player.y = entry.y - this.player.h / 2 - 0.5; this.player.facing = entry.facing || 1;

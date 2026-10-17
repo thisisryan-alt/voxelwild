@@ -108,7 +108,7 @@ export class Story {
   seen(id) { return !!this.g.state.flags['cs_' + id]; }
   add(id) { if (!STORIES[id] || this.seen(id) || this.queue.some((q) => q.id === id)) return; this.queue.push({ id, wait: STORIES[id].delay ?? 0.8 }); }
   onZone(zoneId) {
-    const w = this.g.world; if (!w) return;
+    const w = this.g.world; if (!w || String(zoneId).includes(':')) return;   // rifts and the gauntlet never trigger story scenes
     const b = BIOME_STORY[w.zone.biome]; if (b) this.add(b);
     if (zoneId === 'domain_throne') this.add('throne');
     if (ZONE_STORY[zoneId]) this.add(ZONE_STORY[zoneId]);

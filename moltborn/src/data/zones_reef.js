@@ -62,7 +62,7 @@ export function reef_garden() {
   b.coins(23, 33, 5); b.coins(58, 24, 3); b.coins(66, 20, 3); b.coins(84, 30, 4);
   b.chest(69, { coins: [30, 50], pearl: 2 }, { from: 8 });
   b.exit(104, 24, 2, 6, 'reef_clam', 'west'); b.entry('clam', 100, 29);
-  b.mural(25, 'mural_garden', { from: 10 });
+  b.mural(25, 'mural_garden', { from: 10 }); b.propFloor('board', 21, { from: 10 });
   b.decorate(REEF_DECOR, 0.3);
   return b.finish();
 }

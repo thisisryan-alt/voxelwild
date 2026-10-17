@@ -321,6 +321,7 @@ export class Player extends Entity {
     if (S.thorns && src.source) { src.source.takeHit({ dmg: Math.max(1, Math.round(final * S.thorns * 3)), dir: this.x < src.source.x ? 1 : -1, kb: 20, poise: 0, ranged: true }, this); }
     if (src.status?.poison) { this.poisonT = 3; this.poisonDps = src.status.poison; }
     applyHitStatuses(this.status, src.status, src.source);
+    src.source?.onHitPlayer?.(this, final);
     const kx = Math.sign(this.x - (src.x ?? this.x - 1)) || -this.facing;
     if (!blocked && !(F.stage >= 4 && this.state === 'attack' && this.atk?.heavy && F.heavy.armor)) { this.vx = kx * (src.kb || 80) * (F.stage >= 4 ? 0.5 : 1); this.vy = -30; if (!this.free) this.vy = -50; this.atk = null; this.charge = 0; this.setState('hurt'); this.animT = 0; }
     if (this.hp <= 0) {
