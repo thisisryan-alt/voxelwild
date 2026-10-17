@@ -22,7 +22,7 @@ export class World {
     this.layer = new TileLayer(zone); this.applyBroken(); this.layer.renderAll();
     this.bg = getBackground(zone.biome, zone.seed);
     this.enemies = []; this.projectiles = []; this.pickups = []; this.hitboxes = []; this.interactables = []; this.decor = []; this.fields = []; this.beams = [];
-    this.boss = null; this.cinematic = false; this.slowT = 0; this.slowFactor = 1; this.flash = 0; this.hurtFlash = 0; this.shakeAmt = 0; this.camLock = null;
+    this.boss = null; this.cinematic = false; this.slowT = 0; this.slowFactor = 1; this.flash = 0; this.hurtFlash = 0; this.shakeAmt = 0; this.kickX = 0; this.kickY = 0; this.camLock = null;
     this.exitsDisabled = false; this.drawExtra = []; this.overlayExtra = []; this.extraLights = []; this.lightCv = null; this.exiting = false; this.difficulty = 0;
     this.cam = { x: 0, y: 0, lookX: 0, lookY: 0 };
     this.buildEntities();
@@ -74,6 +74,8 @@ export class World {
   addBeam(o) { this.beams.push({ t: 0, ...o }); }
   addPickup(o) { this.pickups.push(new Pickup(this, o)); }
   shake(a) { this.shakeAmt = Math.max(this.shakeAmt, a * (this.game.state.settings.shake ?? 1)); }
+  // A one-direction camera shove that eases back: gives a heavy blow a sense of weight that random shake cannot.
+  kickCam(dx, dy = 0) { const k = this.game.state.settings.shake ?? 1; this.kickX = clamp(this.kickX + dx * k, -6, 6); this.kickY = clamp(this.kickY + dy * k, -6, 6); }
   nearestEnemy(x, y, r) { let best = null, bd = r * r; for (const e of this.enemies) { if (!e.alive || !e.canBeHit()) continue; const d = (e.x - x) ** 2 + (e.y - y) ** 2; if (d < bd) { bd = d; best = e; } } return best; }
   currentAt(x, y) { for (const a of this.zone.areas) if (a.kind === 'current' && x > a.x && x < a.x + a.w && y > a.y && y < a.y + a.h) return a; return null; }
   pressureAt(x, y) { let p = this.zone.pressure || 0; for (const a of this.zone.areas) if (a.kind === 'pressure' && x > a.x && x < a.x + a.w && y > a.y && y < a.y + a.h) p = a.level; return p; }
@@ -132,6 +134,7 @@ export class World {
     this.beams = this.beams.filter((b) => (b.t += dt) < b.life);
     this.fx.update(dt);
     this.flash = Math.max(0, this.flash - dt); this.hurtFlash = Math.max(0, this.hurtFlash - dt); this.shakeAmt *= Math.exp(-9 * dt);
+    this.kickX *= Math.exp(-11 * dt); this.kickY *= Math.exp(-11 * dt);
     this.ambientFx(dt);
     this.updateCamera(dt);
     // nearest interactable
@@ -233,7 +236,7 @@ export class World {
   draw(ctx) {
     const c = this.cam; let sx = 0, sy = 0;
     if (this.shakeAmt > 0.3) { sx = Math.round((rand() - 0.5) * this.shakeAmt * 2); sy = Math.round((rand() - 0.5) * this.shakeAmt * 2); }
-    const cam = { x: Math.round(c.x) + sx, y: Math.round(c.y) + sy };
+    const cam = { x: Math.round(c.x + this.kickX) + sx, y: Math.round(c.y + this.kickY) + sy };
     this.bg.draw(ctx, cam, this.zone, this.t);
     // tiles
     const cvw = this.layer.canvas.width, cvh = this.layer.canvas.height;

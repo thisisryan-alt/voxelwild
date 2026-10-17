@@ -50,6 +50,7 @@ export class Player extends Entity {
   update(dt) {
     const g = this.game, inp = g.input, F = this.form, M = F.move, S = this.stats, w = this.world;
     this.t += dt; this.stateT += dt; this.animT += dt;
+    if (this.comboLife > 0) { this.comboLife -= dt; if (this.comboLife <= 0) this.combo = 0; } this.comboPop = Math.max(0, (this.comboPop || 0) - dt * 6);
     this.dashCd -= dt; this.invulnT -= dt; this.counterT -= dt; this.blockCd -= dt; this.comboT -= dt; this.combatT -= dt; this.strokeT -= dt; this.surge -= dt;
     this.coyote -= dt; this.ultCd -= dt; this.evolveGlow = Math.max(0, this.evolveGlow - dt);
     for (const k in this.cool) this.cool[k] -= dt;
@@ -164,6 +165,7 @@ export class Player extends Entity {
     const def = this.form.heavy; const mult = 0.75 + 0.5 * chargeRatio;
     this.atk = { def, t: 0, i: -1, hit: false, fired: false, heavy: true, mult, full: chargeRatio >= 0.98 }; this.setState('attack'); this.queued = false; this.animT = 0;
   }
+  fxColor() { const v = variantFor(this.st); return v.glow || v.ramp.hex[4] || '#fff0c8'; }
   attackSpeed() { return 1 + this.stats.atkSpeed; }
   updateAttack(dt, ok) {
     const a = this.atk, d = a.def, w = this.world, inp = this.game.input, sp = this.attackSpeed();
@@ -182,6 +184,12 @@ export class Player extends Entity {
       this.world.spawnHitbox({ team: 'player', owner: this, follow: this, ox, oy: d.hb[1], w: hw, h: d.hb[3], dmg, life: act, kb: d.kb, poise: d.poise * (a.heavy ? 1 : 1), stop: d.stop, shake: d.shake || 0, guardBreak: !!d.guardBreak, heavy: a.heavy, breaks: !!d.breaks, seals: !!d.seals, gates: !!d.gates, pierce: !!d.pierce, crit: true, form: this.form.id, multi: false, status: this.stats.poison ? { poison: 1 + Math.floor(this.stats.atk / 10) } : null });
       if (a.heavy && d.shock) { this.world.fx.ring(this.x + this.facing * 14, this.y + 4, 4, 50 + (d.hb[2] * 0.4), 0.3, '#ffe0b0', 2); this.world.fx.foam(this.x + this.facing * 14, this.y + 4, this.facing, 10); if (a.full && this.form.stage >= 2) this.world.fx.burst(this.x + this.facing * 18, this.y, ['#ffe0b0', '#fff'], 120, 0.4, 3); }
       this.sfx(a.heavy ? 'heavy' : 'claw'); this.world.fx.foam(this.x + this.facing * 12, this.y, this.facing, 4);
+      { // the claw leaves a crescent in the water; combo steps alternate the sweep, heavy strikes carve a wide arc
+        const col = this.fxColor(), R = Math.max(16, Math.min(52, (hbx + hw) * 0.95)) * (a.heavy ? 1.2 : 1), i = a.heavy ? 3 : a.i;
+        this.world.fx.slash(this.x + this.facing * 2, this.y + d.hb[1] + d.hb[3] / 2, this.facing, R, col, { sweep: i % 2 ? -1 : 1, tilt: [-0.32, 0.32, -0.5, 0][i] ?? 0, th: a.heavy ? 9 : 5 + (i === 2 ? 1 : 0), arc: a.heavy ? 1.3 : 1.0, life: a.heavy ? 0.24 : 0.17, rim: a.heavy ? '#ffffff' : '#fff8e8' });
+        if (a.heavy && this.onGround) this.world.fx.groundWave(this.x + this.facing * 12, this.bottom, 12, 80);
+        this.world.kickCam(this.facing * (a.heavy ? 3 : 1.2), 0);
+      }
       this.lastAttackAt = this.t; this.combatT = 3;
       // heavy attacks with the Ancient Molt carry super armour
     }
@@ -279,6 +287,12 @@ export class Player extends Entity {
     this.hp -= final;
     w.fx.text(this.x, this.y - this.h / 2 - 4, final, '#ff5a4a', true);
     w.fx.burst(this.x, this.y, ['#ff7a6a', '#ffd0a0', '#ffffff'], 70, 0.35, 2);
+    if (!blocked) { // chips of shell fly off the way the blow came from
+      const kd = Math.sign(this.x - (src.x ?? this.x - 1)) || -this.facing, sh = this.fxColor();
+      w.fx.impact(this.x - kd * this.w * 0.35, this.y - 2, -kd, { color: '#ffb0a0', size: 8, sparks: 8 });
+      for (let i = 0; i < 6; i++) w.fx.add({ x: this.x, y: this.y - 3, vx: kd * (40 + rand() * 80), vy: -30 - rand() * 50, life: 0.6 + rand() * 0.4, size: rand() < 0.3 ? 2 : 1, color: i % 2 ? sh : '#ffd0a0', grav: 160, drag: 0.6, fade: true });
+      this.combo = 0; this.comboLife = 0;
+    }
     this.invulnT = blocked ? 0.35 : 1.0; this.combatT = 4; this.fury += blocked ? 0 : 3;
     this.game.hitstop(blocked ? 3 : 5); w.shake(blocked ? 1 : (final > this.stats.maxHp * 0.2 ? 5 : 3)); w.hurtFlash = 0.25; this.sfx(blocked ? 'clang' : 'hurt');
     if (S.thorns && src.source) { src.source.takeHit({ dmg: Math.max(1, Math.round(final * S.thorns * 3)), dir: this.x < src.source.x ? 1 : -1, kb: 20, poise: 0, ranged: true }, this); }
@@ -300,7 +314,8 @@ export class Player extends Entity {
     const w = this.world, S = this.stats; this.st.stats.parries++;
     this.invulnT = 0.5; this.blockT = 99; this.addFury(18); this.addTide(8 + S.parryTide); this.combatT = 3;
     w.fx.ring(this.x + this.facing * 12, this.y, 2, 34, 0.25, '#ffffff', 2); w.fx.burst(this.x + this.facing * 12, this.y, ['#ffffff', '#ffe890', '#a8d8ff'], 120, 0.3, 2);
-    w.fx.text(this.x, this.y - this.h / 2 - 8, 'PARRY!', '#ffe890', true); this.sfx('parry'); this.game.hitstop(9); w.flash = 0.12;
+    w.fx.impact(this.x + this.facing * 14, this.y, this.facing, { crit: true, color: '#ffffff', size: 13, spikes: 12, sparks: 16 });
+    w.fx.text(this.x, this.y - this.h / 2 - 8, 'PARRY!', '#ffe890', true); this.sfx('parry'); this.game.hitstop(9); w.flash = 0.12; w.kickCam(-this.facing * 2.5, 0);
     if (src.proj && src.proj.reflectable) src.proj.reflect();
     else if (src.source) { src.source.stun?.(0.9); src.source.poise = 0; if (src.source.takeParried) src.source.takeParried(); }
     else if (src.owner) { src.owner.stun?.(0.9); if (src.owner.takeParried) src.owner.takeParried(); }
@@ -310,11 +325,14 @@ export class Player extends Entity {
   riposte(src) {
     const w = this.world, tgt = src.source || src.owner;
     w.fx.ring(this.x, this.y, 4, 40, 0.3, '#ff90a8', 2); this.sfx('riposte');
+    if (tgt) w.fx.slash(tgt.x, tgt.y, Math.sign(tgt.x - this.x) || 1, 30, '#ffb0c0', { life: 0.24, tilt: -0.5, th: 8 });
     if (tgt && tgt.alive) { this.x = tgt.x - Math.sign(tgt.x - this.x) * (tgt.w / 2 + this.w / 2 + 4); this.y = tgt.y; this.face(Math.sign(tgt.x - this.x)); tgt.takeHit({ dmg: this.abDmg(3.2), dir: this.facing, kb: 180, poise: 80, stop: 8, shake: 4, crit: true, guardBreak: true }, this); }
     this.game.hitstop(8);
   }
   onBlockedHit(enemy, hit) { this.vx -= this.facing * 70; this.atk = null; this.setState('free'); this.comboT = 0; this.addFury(1); }
   onHitLanded(enemy, hb, dmg, crit) {
+    this.combo = (this.combo || 0) + 1; this.comboLife = 2.4; this.comboBest = Math.max(this.comboBest || 0, this.combo); this.comboPop = 1;
+    if (this.combo > 0 && this.combo % 10 === 0) { this.addFury(8); this.world.fx.text(this.x, this.y - this.h / 2 - 16, `${this.combo} HITS`, '#ffe08a', true, { life: 1 }); this.sfx('charged'); }
     this.combatT = 4; this.addFury((hb.heavy ? 6 : 3) + (crit ? 2 : 0)); this.addTide(hb.heavy ? 2.5 : 1.2);
     if (this.form.stage >= 5 && this.surge > 0) this.hp = Math.min(this.stats.maxHp, this.hp + 0.5);
   }

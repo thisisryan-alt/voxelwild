@@ -9,6 +9,7 @@ const rand = rng(4242);
 
 export function drawFrame(ctx, f, x, y, flip = false, flash = false, alpha = 1) {
   x = Math.round(x); y = Math.round(y);
+  if (drawFrame.rec) drawFrame.rec.push({ f, x, y, flip });
   const src = flash ? flashOf(f) : f.canvas;
   if (alpha < 1) ctx.globalAlpha = alpha;
   if (flip) { ctx.save(); ctx.translate(x, y); ctx.scale(-1, 1); ctx.drawImage(src, -f.ax, -f.ay); ctx.restore(); }

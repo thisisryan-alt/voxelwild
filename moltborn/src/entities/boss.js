@@ -1,6 +1,7 @@
 // Boss framework: arena lock, phases, scripted attack generators, telegraphs, armour/stagger, defeat sequence.
 // A boss class sets static `def` and implements attack generators (*name) listed per phase.
 import { Enemy } from './enemy.js';
+import { drawFrame } from './entity.js';
 import { ENEMIES } from '../data/enemies.js';
 import { Script, clamp, rng } from '../core/util.js';
 import { moveBody } from '../world/physics.js';
@@ -101,7 +102,7 @@ export class Boss extends Enemy {
   *defeat() {
     const w = this.world, g = w.game; w.slowT = 3.2; w.slowFactor = 0.25; w.flash = 0.25; this.sfx('bossdie'); w.shake(10); this.pose = 'stagger';
     for (let i = 0; i < 14; i++) { w.fx.burst(this.x + (rand() - 0.5) * this.w, this.y + (rand() - 0.5) * this.h, ['#ffffff', '#ffd84a', '#ff9a6a'], 100, 0.8, 3); w.fx.ring(this.x + (rand() - 0.5) * this.w * 0.6, this.y + (rand() - 0.5) * this.h * 0.6, 4, 40, 0.5, '#ffffff', 2); yield 0.16; }
-    w.flash = 0.8; yield 0.3; this.alpha = 0;
+    this.shatter(); w.flash = 0.42; w.kickCam(0, -3); yield 0.3; this.alpha = 0;
     yield* this.afterDefeat();
     g.state.bosses[this.key] = true; g.setFlag('boss_' + this.key);
     w.lockCamera(null); g.audio.music.play(w.zone.music || w.biome.music);
@@ -110,6 +111,18 @@ export class Boss extends Enemy {
     this.alive = false; this.finished = true; this.onFinished?.();
   }
   *afterDefeat() {}
+  // Replays the current draw into a scratch canvas to learn which sprite frames make up the body, then scatters their pixels.
+  shatter() {
+    const w = this.world, cv = document.createElement('canvas'); cv.width = cv.height = 8;
+    drawFrame.rec = []; const at = this.alpha;
+    try { this.draw(cv.getContext('2d'), { x: 0, y: 0 }); } catch (e) { /* a boss with an odd draw just skips the shatter */ }
+    const parts = drawFrame.rec; drawFrame.rec = null; this.alpha = at;
+    for (const q of parts.sort((a, b) => b.f.w * b.f.h - a.f.w * a.f.h).slice(0, 4)) {
+      const n = clamp(Math.round(q.f.w * q.f.h / 60), 24, 110);
+      w.fx.debris(q.f, q.x, q.y, q.flip, n, 90, { grav: 60, life: 2, big: 0.6 });
+    }
+    w.fx.groundWave(this.x, this.y + this.h / 2, 18, 140);
+  }
   // ---- update ---------------------------------------------------------------------------------------------------
   update(dt) {
     this.t += dt; this.st += dt; this.flash = Math.max(0, this.flash - dt);

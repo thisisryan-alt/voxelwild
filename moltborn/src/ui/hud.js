@@ -25,6 +25,11 @@ export class Hud {
     text(ctx, `${Math.ceil(p.hp)}`, 11, 8, '#ffffff', { shadow: '#3a0a14' });
     bar(ctx, 8, 18, 64, 3, p.tide / S.maxTide, '#3a8ae8', '#8ad0ff', '#0a1a3a');
     if (p.fury > 2) bar(ctx, 8, 24, 48, 2, p.fury / 100, p.fury >= 100 ? '#ffd84a' : '#ff8a3a', '#ffe0a0', '#2a1408');
+    if ((p.combo || 0) >= 3 && p.comboLife > 0) { // combo counter: a number that kicks on every hit and a bar that drains
+      const c = p.combo, col = c >= 30 ? '#ff7ad0' : c >= 15 ? '#ffd84a' : c >= 8 ? '#ffe9a8' : '#ffffff', a = Math.min(1, p.comboLife * 3);
+      ctx.globalAlpha = a; text(ctx, `${c} HITS`, 8, 31 - Math.round((p.comboPop || 0) * 2), col, { shadow: '#2a1408' });
+      ctx.fillStyle = '#2a1408'; ctx.fillRect(8, 41, 34, 2); ctx.fillStyle = col; ctx.fillRect(8, 41, Math.round(34 * Math.min(1, p.comboLife / 2.4)), 2); ctx.globalAlpha = 1;
+    }
     text(ctx, `${st.level}`, 108, 8, COL.gold, { shadow: '#000' });
     if (this.t < 6 || g.state.level !== this.lvShown) { this.lvShown = g.state.level; this.nameT = this.t; }
     if (this.t - (this.nameT ?? 0) < 5) { ctx.globalAlpha = Math.min(1, 5 - (this.t - this.nameT)); text(ctx, F.name, 108 + textWidth(String(st.level)) + 5, 8, COL.dim, { shadow: '#000' }); ctx.globalAlpha = 1; }

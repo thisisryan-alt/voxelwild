@@ -78,6 +78,7 @@ export class Enemy extends Entity {
     this.hp -= dmg; this.flash = 0.09;
     w.fx.text(this.x + (rand() - 0.5) * 6, this.y - this.h / 2 - 4, dmg, hit.crit ? '#ffd84a' : '#ffffff', !!hit.crit);
     w.fx.burst(this.x, this.y, hit.crit ? ['#fff6a8', '#ffffff'] : ['#ffffff', '#ffe0c0', '#ff9a6a'], hit.crit ? 80 : 50, 0.3, 2);
+    w.fx.impact(this.x - dir * this.w * 0.4, this.y + (rand() - 0.5) * this.h * 0.4, -dir, { crit: !!hit.crit, size: hit.heavy ? 10 : undefined, sparks: hit.heavy ? 11 : undefined });
     w.fx.foam(this.x - dir * this.w / 2, this.y, -dir, 3);
     if (hit.stop) w.game.hitstop(hit.stop);
     if (hit.shake) w.shake(hit.shake);
@@ -105,6 +106,10 @@ export class Enemy extends Entity {
     w.fx.burst(this.x, this.y, ['#ffffff', '#ffd0a0', this.def.sprite.o?.ramp?.hex?.[3] || '#ff9a6a'], 160, 0.55, 3);
     w.fx.ring(this.x, this.y, 3, 28, 0.3, '#ffffff', 1);
     for (let i = 0; i < 4; i++) w.fx.bubble(this.x, this.y, 1, 10, -30);
+    if (!d.boss && !this.disguised && this.state !== 'hidden') { // the body breaks into its own pixels
+      const f = enemyFrame(this.type, d.sprite, this.pose, Math.floor(this.t * (d.fps || 8))), feet = d.anchor !== 'center';
+      w.fx.debris(f, this.x, feet ? this.y + this.h / 2 : this.y, this.facing < 0 !== (d.sprite.flip === true), clamp(Math.round(f.w * f.h / 60), 14, 46), 70, { vx: (hit?.dir || 0) * 30 });
+    }
     this.sfx(d.boss ? 'bossdie' : 'die');
     if (silent && !d.dropOnBurst) return;
     g.onEnemyKilled(this, hit);
