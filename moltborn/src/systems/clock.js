@@ -27,7 +27,7 @@ export class Clock {
   // an exit condition for passages that only open at night; says why, but not too often
   gate(message) {
     if (!this.on || this.phase.id === 'night' || this.phase.id === 'dusk' && this.nightness() > 0.4) return true;
-    if (!this.gateT || this.g.state.playtime - this.gateT > 3) { this.gateT = this.g.state.playtime; this.g.toast(message, '#9ab0ff'); this.g.audio.sfx('deny'); }
+    if (this.gateT === undefined || this.g.state.playtime - this.gateT > 3) { this.gateT = this.g.state.playtime; this.g.toast(message, '#9ab0ff'); this.g.audio.sfx('deny'); }
     return false;
   }
 
