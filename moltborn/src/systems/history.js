@@ -9,7 +9,7 @@ export class History {
 
   // s is the summary shown at the end of a run (see systems/rifts.js and arena.js)
   add(s) {
-    const g = this.g, e = { at: Date.now(), day: Math.floor(Date.now() / 86400000), kind: s.kind || (s.daily ? 'daily' : 'rift'), tier: s.tier || 'Rift', depth: s.depth | 0, max: s.max | 0, success: !!s.success, secs: s.secs | 0, kills: s.kills | 0, relics: (s.relics || []).length, coins: s.rw?.coins | 0 };
+    const g = this.g, e = { at: Date.now(), day: Math.floor(Date.now() / 86400000), kind: s.kind || (s.daily ? 'daily' : 'rift'), tier: s.tier || 'Rift', depth: s.depth | 0, max: s.max | 0, success: !!s.success, secs: s.secs | 0, kills: s.kills | 0, relics: (s.relics || []).length, coins: s.rw?.coins | 0, oaths: (s.oaths || []).length };
     const L = this.log; L.push(e); while (L.length > KEEP) L.shift();
     if (e.success && e.secs > 0 && e.kind !== 'arena') { const b = this.best; if (!b[e.tier] || e.secs < b[e.tier]) b[e.tier] = e.secs; }
     g.events.emit('runlogged', e); return e;

@@ -7,6 +7,7 @@ Newest first. Version numbers are not used; each entry is one push of the game.
 ### New ways to play
 * **The Rift Warden**, a repeatable boss at the bottom of every Tidal Rift (three phases, eight attacks, fought again on every
   run), with its own sprite, bestiary entry, trophies and a cutscene.
+* **Oaths** before a rift: optional handicaps for a bigger payout, with trophies and titles.
 * **Trial rooms** in the rifts: hold out for forty seconds against waves that grow, then choose from a better pool of relics.
 * **Four rift creatures** with their own behaviours: Shardlings that blink and fire, Latchleeches that cling until you dash
   or strike them twice, Tidecallers that raise a gust, Glass Golems that slam and shatter into Shardlings.
@@ -29,7 +30,7 @@ Newest first. Version numbers are not used; each entry is one push of the game.
 
 ### Look and feel
 * Post-processing, per-tile detail, squash-and-stretch, status-effect visuals, new sounds for fishing, trade, the hour and
-  surges.
+  surges, and three new music tracks (Moonpool Cove, rift chambers, trial rooms).
 
 ### Engineering
 * Timed areas (`ttl`) expire by themselves; the Warden's pull and the Tidecaller's gust use them, which fixed a pull that

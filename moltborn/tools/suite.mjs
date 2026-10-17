@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 
 const DEFAULT = [
-  'smoke', 'rifts', 'riftrooms', 'trial', 'warden', 'riftfoes', 'arena', 'bounties', 'fishing', 'market', 'moonpool', 'surge', 'clock',
+  'smoke', 'rifts', 'riftrooms', 'trial', 'oaths', 'warden', 'riftfoes', 'arena', 'bounties', 'fishing', 'market', 'moonpool', 'surge', 'clock',
   'helphall', 'tricks', 'audio3', 'newcuts2', 'companion', 'extras', 'forage', 'savetools', 'devconsole', 'director', 'affixes', 'ngplus', 'feel',
 ];
 const TIMEOUT = 280000;

@@ -39,6 +39,9 @@ Abyssal needs Krael). Each chamber is a procedurally built cave of one of the se
   the Sacrificial Vow curse an altar can offer.
 * **Tides.** Each chamber may carry modifiers (Thick Hide, Sharp Tide, Swift Tide, Rich Tide, Murk, Glass Tide, Gilded,
   Frenzy) that fold into the multipliers or give foes haste.
+* **Oaths.** Before a run the swimmer may swear up to three oaths (`data/oaths.js`): Iron (+25% foe health), Fury (+20% foe
+  damage), Haste (every foe hasted), Fog (dark chambers), Frailty (-25% own health). Each adds 10-20% to the coins and
+  experience paid at the end, whether the run is won or lost; pearls are unchanged. Oaths last only for the run.
 * **The Rift Warden.** The last chamber holds a single boss: shard fans, tears that open under the swimmer, a phase-step
   that reappears behind them, a gravity pull, summoned wisps, falling columns of light, and a closing nova in the last
   phase. It is fought again on every run.

@@ -39,6 +39,8 @@ export const TITLES = {
   bountyhand:  { name: 'Odd-Job Crab', by: 'bounty_hand' },
   bountyhunter: { name: 'Bounty Hunter', by: 'bounty_hunter' },
   regular:     { name: 'the Regular', by: 'bounty_streak' },
+  oathbound:   { name: 'the Oathbound', by: 'oathbound' },
+  oathbreaker: { name: 'Bearer of Three Oaths', by: 'oath_breaker' },
 };
 
 // wake styles. colors are cycled; `kind` is a particle kind from gfx/particles.js; `rate` is seconds between puffs

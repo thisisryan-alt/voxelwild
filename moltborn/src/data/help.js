@@ -35,6 +35,8 @@ export const PAGES = [
     { t: 'Tidal Rifts', x: ['Choose a rift at the Tide Board. Each chamber must be cleared to open the way; between chambers you pick one relic that lasts the run. The last chamber holds the Rift Warden.'] },
     { t: 'Rooms', x: ['Elite dens hold a champion and better relics. Ambush rooms spring a trap. Treasure vaults hold chests and a relic on a stand. Altars let you heal, gamble or sacrifice.'] },
     { t: 'Tides', x: ['Each chamber may carry a tide that twists the rules: hasty foes, darkness, richer coins. They are listed when you enter.'] },
+    { t: 'Oaths', x: ['Before a rift you may swear up to three oaths: foes tougher, faster or angrier, the water darker, or yourself frailer. Each adds to the coins and experience you are paid when the run ends. Oaths last only for that run.'] },
+    { t: 'Trials', x: ['From depth 3 a chamber may be a trial: it starts empty, waves drop in on a forty-second clock, and when the tide turns and the last foe falls you choose from a better pool of relics.'] },
     { t: 'Pearl Gauntlet', x: ['Endless waves in a sealed arena. How many can you survive? Your best wave is kept.'] },
     { t: 'Daily rift', x: ['Everyone gets the same seed on the same day. The first clear each day pays a bonus.'] },
   ] },

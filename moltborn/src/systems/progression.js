@@ -5,6 +5,7 @@ import { ITEMS } from '../data/items.js';
 import { defaults as settingDefaults } from './settings.js';
 import { newRecords } from './stats.js';
 import { RELICS } from '../data/relics.js';
+import { OATHS } from '../data/oaths.js';
 import { activeSets } from '../data/sets.js';
 
 export function newState() {
@@ -55,6 +56,7 @@ export function computeStats(state) {
   for (const a of activeSets(state.equip)) for (const fx of a.fx) apply(fx);
   for (const id of state.mutations) apply(ITEMS[id]?.fx);
   for (const id of state.riftRelics || []) apply(RELICS[id]?.fx);
+  for (const id of state.riftOaths || []) apply(OATHS[id]?.fx);
   s.maxHp = Math.round(s.maxHp * mult.hp); s.maxTide = Math.round(s.maxTide * mult.tide);
   s.atk = s.atk * mult.atk * (1 + s.dmg); s.def = s.def * mult.def; s.speed = s.speed * mult.speed;
   s.strokes = F.move.stroke.max + s.strokes;

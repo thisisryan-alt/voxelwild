@@ -8,6 +8,8 @@ import { today } from '../world/rift_gen.js';
 import { OrdersScene } from './orders_scene.js';
 import { BountyScene } from './bounty_scene.js';
 import { HallScene } from './hall_scene.js';
+import { OathScene } from './oath_scene.js';
+import { OATHS } from '../data/oaths.js';
 
 const bossName = (k) => BOSS_CLASSES[k]?.def?.name || k;
 const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -41,7 +43,7 @@ export class BoardScene {
       if (e.kind === 'bounties') { g.audio.sfx('select'); g.engine.push(new BountyScene(g)); return; }
       g.engine.pop(); g.audio.sfx('select');
       if (e.kind === 'arena') g.systems.arena.start();
-      else g.systems.rifts.start({ tier: e.tier.id, daily: e.kind === 'daily', seed: e.kind === 'daily' ? today() : undefined });
+      else g.engine.push(new OathScene(g, `${e.name}: ${e.tier.depths} depths`, (oaths) => g.systems.rifts.start({ tier: e.tier.id, daily: e.kind === 'daily', seed: e.kind === 'daily' ? today() : undefined, oaths })));
     }
   }
   draw(ctx) {
@@ -97,6 +99,7 @@ export class RiftSummary {
     rows.forEach(([k, v], i) => { text(ctx, k, 110, 70 + i * 12, COL.dim); const t = String(v); text(ctx, t, 370 - textWidth(t), 70 + i * 12, COL.text); });
     const items = Object.entries(rw.items || {}); let y = 70 + rows.length * 12 + 6;
     if (items.length) { text(ctx, 'INGREDIENTS', 110, y, COL.gold); y += 12; items.forEach(([id, n], i) => { const x = 110 + (i % 2) * 130, yy = y + Math.floor(i / 2) * 14; ctx.drawImage(itemIcon(id), x, yy - 3, 12, 12); text(ctx, `${ITEMS[id].name} x${n}`, x + 15, yy, COL.text); }); y += Math.ceil(items.length / 2) * 14 + 4; }
+    if (s.oaths?.length) { text(ctx, 'OATHS', 110, y, COL.gold); y += 11; s.oaths.forEach((o, i) => text(ctx, OATHS[o].name.replace('Oath of ', ''), 110 + (i % 3) * 86, y, OATHS[o].color)); y += 13; }
     if (s.relics?.length) { text(ctx, 'RELICS', 110, y, COL.gold); y += 11; s.relics.forEach((r, i) => text(ctx, RELICS[r].name, 110 + (i % 2) * 130, y + Math.floor(i / 2) * 11, RARITY[RELICS[r].rarity].color)); }
     text(ctx, 'ENTER continue', 240 - textWidth('ENTER continue') / 2, 232, '#9ad8ff');
   }

@@ -13,7 +13,7 @@ export function newRecords() {
     bossStart: null, bossHits: 0, bossBest: {}, flawless: {}, bossTries: {},
     burned: 0, chilled: 0, bled: 0, healed: 0, healsUsed: 0, crafted: 0, craftedBy: {}, eaten: {},
     rifts: 0, riftBest: 0, riftTime: 0, arenaBest: 0, arenaKills: 0, photos: 0, travels: 0, coinsSpent: 0, maxCoins: 0,
-    wardens: 0, fished: 0, legendFish: 0, sold: 0, fishSold: 0, soldCoins: 0, surges: 0, fishLuck: 0, buffPeak: 0, sessions: 1, hardest: -1, forage: 0, ordersDone: 0, elites: 0, champions: 0, affixKills: {}, setsSeen: {}, relicPeak: 0,
+    wardens: 0, fished: 0, legendFish: 0, sold: 0, fishSold: 0, soldCoins: 0, surges: 0, oathRuns: 0, oathBest: 0, fishLuck: 0, buffPeak: 0, sessions: 1, hardest: -1, forage: 0, ordersDone: 0, elites: 0, champions: 0, affixKills: {}, setsSeen: {}, relicPeak: 0,
   };
 }
 

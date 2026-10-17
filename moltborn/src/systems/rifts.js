@@ -12,6 +12,7 @@ import { RiftSummary } from '../ui/board_scene.js';
 import { ZONE_INFO } from '../data/zoneinfo.js';
 import { newTrial, stepTrial, waveElite, clockText, TRIAL } from './rift_trial.js';
 import { drawText } from '../gfx/font.js';
+import { cleanOaths, oathMult, oathHaste, oathDark, rewardBonus, OATHS } from '../data/oaths.js';
 import { INGREDIENT_IDS } from '../data/items_craft.js';
 import { rng } from '../core/util.js';
 
@@ -51,6 +52,7 @@ export class Rifts {
     const d = run.depth - 1, t = run.tier;
     const m = { hp: (1 + 0.1 * d) * t.mult, dmg: (1 + 0.07 * d) * (1 + (t.mult - 1) * 0.5), xp: 1 + 0.12 * d, coin: 1 };
     for (const id of this.mods()) { const x = RIFT_MODS[id].mult || {}; for (const k of Object.keys(m)) if (x[k]) m[k] *= x[k]; }
+    const o = oathMult(run.oaths); for (const k of Object.keys(m)) m[k] *= o[k];
     return m;
   }
   eliteBonus() { return this.run ? this.mods().reduce((s, id) => s + (RIFT_MODS[id].elite || 0), 0) : 0; }
@@ -62,7 +64,7 @@ export class Rifts {
     const seed = opts.seed ?? Math.floor(Math.random() * 900000 + 100000), w = g.world, p = w.player;
     setRiftThemes(this.unlockedThemes());
     this.run = { seed, tier, max: tier.depths, depth: 1, kills: 0, cleared: false, picking: false, offered: 0, t0: g.state.playtime, daily: !!opts.daily, hub: { zone: w.zone.id, x: p.x, y: p.y }, hp0: p.hp, done: false, depthKills: 0 };
-    g.state.riftRelics = [];
+    g.state.riftRelics = []; this.run.oaths = cleanOaths(opts.oaths); g.state.riftOaths = [...this.run.oaths]; p.recalc?.();
     g.events.emit('rift', 'enter');
     this.go(1, true);
     return true;
@@ -85,6 +87,8 @@ export class Rifts {
     if (!isRiftZone(id)) { this.cleanup(); return; }
     const g = this.g, mods = this.mods();
     for (const m of mods) { const M = RIFT_MODS[m]; if (M.haste) for (const e of world.enemies) if (!e.def.friendly) e.status.apply('haste', { dur: 1e6, power: 1 }); if (M.dark) world.zone.dark = Math.max(world.zone.dark ?? world.biome.dark, M.dark); }
+    if (oathHaste(run.oaths)) for (const e of world.enemies) if (!e.def.friendly) e.status.apply('haste', { dur: 1e6, power: 1 });
+    const od = oathDark(run.oaths); if (od) world.zone.dark = Math.max(world.zone.dark ?? world.biome.dark, od);
     const kind = world.zone.rift?.kind || 'combat'; run.kind = kind; run.trial = kind === 'trial' ? newTrial() : null; run.noOffer = false; run.pending = 0; run.bonusOffer = false; run.stand = null;
     run.ambush = kind === 'ambush' ? { fired: false, x: world.zone.w * 16 * 0.38 } : null;
     if (world.zone.rift?.last) { if (!world.boss) this.crown(world); }
@@ -216,13 +220,13 @@ export class Rifts {
   // ---- ending a run -------------------------------------------------------------------------------------------------------------------------------------------
   rewards(success) {
     const run = this.run, cleared = success ? run.max : run.depth - 1, t = run.tier, r = rng(run.seed + 5);
-    const out = { coins: 0, xp: 0, pearls: 0, black: 0, items: {}, sp: 0 };
+    const out = { coins: 0, xp: 0, pearls: 0, black: 0, items: {}, sp: 0 }, bonus = 1 + rewardBonus(run.oaths);
     if (success) {
-      out.coins = Math.round((120 + 60 * run.max) * t.reward); out.xp = 200 * run.max; out.pearls = run.max >= 8 ? 3 : run.max >= 6 ? 2 : 1; out.black = run.max >= 8 ? 1 : 0;
+      out.coins = Math.round((120 + 60 * run.max) * t.reward * bonus); out.xp = Math.round(200 * run.max * bonus); out.pearls = run.max >= 8 ? 3 : run.max >= 6 ? 2 : 1; out.black = run.max >= 8 ? 1 : 0;
       for (let i = 0; i < 3 + run.max; i++) { const id = INGREDIENT_IDS[Math.floor(r() * INGREDIENT_IDS.length)]; out.items[id] = (out.items[id] || 0) + 1; }
       const key = 'rift_first_' + t.id; if (!this.g.state.flags[key]) { out.sp = 1; out.first = key; }
       if (run.daily) { const dk = 'daily_' + today(); if (!this.g.state.flags[dk]) { out.coins += 200; out.pearls += 1; out.dailyKey = dk; } }
-    } else { out.coins = Math.round(25 * cleared * t.reward); out.xp = 40 * cleared; out.pearls = Math.floor(cleared / 3); }
+    } else { out.coins = Math.round(25 * cleared * t.reward * bonus); out.xp = Math.round(40 * cleared * bonus); out.pearls = Math.floor(cleared / 3); }
     out.cleared = cleared; return out;
   }
   finish(success) {
@@ -230,7 +234,8 @@ export class Rifts {
     const rw = this.rewards(success), s = g.state, rec = s.records;
     const secs = Math.round(s.playtime - run.t0), depth = success ? run.max : run.depth;
     if (rec) { if (success) rec.rifts++; rec.riftBest = Math.max(rec.riftBest, depth); rec.riftTime += secs; }
-    this.summary = { success, depth, max: run.max, tier: run.tier.name, secs, kills: run.kills, relics: [...this.relics()], rw, daily: run.daily };
+    this.summary = { success, depth, max: run.max, tier: run.tier.name, secs, kills: run.kills, relics: [...this.relics()], rw, daily: run.daily, oaths: [...(run.oaths || [])] };
+    if (rec && run.oaths?.length) { rec.oathRuns = (rec.oathRuns || 0) + 1; if (success) rec.oathBest = Math.max(rec.oathBest || 0, run.oaths.length); }
     const ps = g.playScene;
     ps.fadeOut(success ? 1.2 : 0.9, () => {
       this.pay(rw); const hub = run.hub; this.cleanup();
@@ -265,5 +270,5 @@ export class Rifts {
     return true;
   }
   abandon() { if (this.run && !this.run.done) this.finish(false); }
-  cleanup() { this.run = null; this.g.state.riftRelics = []; this.g.world?.player?.recalc?.(); }
+  cleanup() { this.run = null; this.g.state.riftRelics = []; this.g.state.riftOaths = []; this.g.world?.player?.recalc?.(); }
 }
