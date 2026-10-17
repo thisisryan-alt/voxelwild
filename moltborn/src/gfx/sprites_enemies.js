@@ -37,8 +37,9 @@ export const PLANS = {
   crab(p, t, o) {
     const pose = { bob: Math.abs(sin(t * TAU)) * -1, legs: 'walk', legT: t, c1: { ext: o.pose === 'attack' ? 1 : o.pose === 'windup' ? -0.2 : 0.3, lift: o.pose === 'windup' ? 0.8 : 0.1, open: o.pose === 'attack' ? 0.3 : o.pose === 'windup' ? 1 : 0.3 }, c2: { ext: 0.1, lift: 0.2, open: 0.3 }, squash: o.pose === 'guard' ? 0.7 : 0, eyeY: 0, shut: false, glow: 0, tail: 0, lunge: o.pose === 'attack' ? 2 : 0 };
     HERO.shore.paint(p, pose, { ramp: o.ramp, far: o.far || o.ramp.tint(0, 1, 0.7) });
-    if (o.helm) { p.shape(R.steel, {}, (s) => { s.ellipse(p.w / 2 - 1, 11, 9, 5); s.rect(p.w / 2 - 10, 11, 20, 2); }); p.px(p.w / 2 + 3, 9, R.steel.c[4]); p.px(p.w / 2 + 2, 9, R.steel.c[4]); }
-    if (o.shield && o.pose !== 'attack') { p.shape(R.steel, { dither: 0.4 }, (s) => s.ellipse(p.w / 2 + 12, 19, 4, 8)); p.line(p.w / 2 + 12, 13, p.w / 2 + 12, 25, R.steel.c[4]); }
+    const bx = 22, by = 19 + Math.round(pose.bob || 0);
+    if (o.helm) { p.shape(R.steel, {}, (s2) => { s2.ellipse(bx - 1, by - 5, 10, 5.5); s2.rect(bx - 11, by - 5, 21, 2); }); p.px(bx + 4, by - 7, R.steel.c[4]); p.px(bx + 3, by - 7, R.steel.c[4]); p.line(bx - 6, by - 9, bx + 2, by - 10, R.steel.c[4]); }
+    if (o.shield && o.pose !== 'attack') { p.shape(R.steel, { dither: 0.4 }, (s2) => s2.ellipse(bx + 14, by + 2, 4, 8)); p.line(bx + 14, by - 5, bx + 14, by + 9, R.steel.c[4]); }
   },
   // ---- jelly family ------------------------------------------------------------------
   jelly(p, t, o) {

@@ -1,6 +1,7 @@
 // Dev gallery: ?gallery=player  — renders sprite sheets at 5x for visual QA.
 import { playerFrame, ANIMS, FORMS, defaultVariant, variantFor } from '../gfx/sprites_player.js';
 import '../gfx/sprites_forms.js';
+import '../gfx/sprites_hero.js';
 import { drawText } from '../gfx/font.js';
 import { R } from '../gfx/palette.js';
 

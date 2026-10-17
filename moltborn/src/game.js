@@ -13,6 +13,7 @@ import { FORMS, xpToNext } from './data/forms.js';
 import { PlayScene } from './ui/playscene.js';
 import { Pickup } from './entities/entity.js';
 import './gfx/sprites_forms.js';
+import './gfx/sprites_hero.js';
 import './bosses/index.js';
 import { Quests } from './systems/quests.js';
 import { Dialogue } from './systems/dialogue.js';

@@ -16,7 +16,7 @@ export class Krael extends Boss {
       { at: 0.62, name: 'Chains Break', attacks: [['tailSweep', 2], ['clawSmash', 2], ['gazeBeam', 1.6], ['chainLash', 2.2]], rest: 0.95, transTime: 2, onEnter(b) { b.dmgMult = 1.2; b.broken = 2; b.world.fx.text(b.x, b.y - 60, 'THE CHAINS BREAK', '#ffb070', true, { life: 1.6 }); } },
       { at: 0.3, name: 'Unbound', attacks: [['tailSweep', 2], ['clawSmash', 2], ['gazeBeam', 2], ['chainLash', 2], ['titanRoar', 2]], rest: 0.7, onEnter(b) { b.dmgMult = 1.35; b.broken = 4; } },
     ],
-    sprite: { plan: 'krael', w: 250, h: 190, ax: 120, ay: 84, frames: 4, o: {} }, fps: 4,
+    sprite: { plan: 'krael', w: 320, h: 226, ax: 150, ay: 106, frames: 4, o: {} }, fps: 4,
   };
   constructor(world, x, y, spawn) { super(world, x, y, spawn); this.broken = 0; this.beam = null; this.intro = this.introTalk; this.floorY = (this.arena.y + this.arena.h - 3) * TS; this.y = this.floorY - 70; this.hx = this.x; }
   *introTalk(c) {

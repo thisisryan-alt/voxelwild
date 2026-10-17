@@ -19,7 +19,7 @@ export class Poseidon extends Boss {
       { at: 0.14, name: 'The Last Tide', attacks: [['lastTide', 3], ['judgment', 1], ['tideBolts', 1], ['voidBeam', 1]], rest: 0.5, transTime: 3,
         onEnter(b) { b.dmgMult = 1.45; b.say2('No more words. Let us settle it as the tides do: all at once.'); b.world.player.fury = 100; b.cycle = 0; } },
     ],
-    sprite: { plan: 'poseidon', w: 200, h: 200, ax: 100, ay: 104, frames: 4, o: {} }, fps: 5,
+    sprite: { plan: 'poseidon', w: 340, h: 310, ax: 140, ay: 196, frames: 4, o: {} }, fps: 5,
   };
   constructor(world, x, y, spawn) { super(world, x, y, spawn); this.intro = this.introTalk; this.surge = false; this.vents = []; this.cycle = 0; this.clashed = 0; this.waitUlt = false; this.floorY = (this.arena.y + this.arena.h - 4) * TS; }
   *introTalk(c) {

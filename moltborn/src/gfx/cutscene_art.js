@@ -163,9 +163,9 @@ const SCENES = {
     ctx.fillStyle = '#082e3a'; ctx.beginPath(); ctx.moveTo(110, 240); ctx.lineTo(150, 196); ctx.lineTo(330, 196); ctx.lineTo(370, 240); ctx.fill();
     ctx.fillStyle = '#0e4a58'; ctx.fillRect(150, 196, 180, 3); ctx.fillStyle = '#06202a'; ctx.fillRect(0, 240, W, 30);
     // halo and the god
-    const f = enemyFrame('poseidon0', { plan: 'poseidon', w: 200, h: 200, ax: 100, ay: 104, frames: 4, o: { phase: 0 } }, 'idle', Math.floor(t * 4) % 4);
+    const f = enemyFrame('poseidon0', { plan: 'poseidon', w: 340, h: 310, ax: 140, ay: 196, frames: 4, o: { phase: 0 } }, 'idle', Math.floor(t * 4) % 4);
     ctx.save(); ctx.strokeStyle = '#ffe28a'; ctx.lineWidth = 1; ctx.globalAlpha = 0.5; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(240, 78, 48 + k * 9, 0, TAU); ctx.setLineDash([3 + k * 2, 5]); ctx.lineDashOffset = t * (10 + k * 6) * (k % 2 ? 1 : -1); ctx.stroke(); } ctx.restore();
-    sprite(ctx, f, 240, 150 + Math.sin(t * 0.8) * 2, 1);
+    sprite(ctx, f, 240, 200 + Math.sin(t * 0.8) * 2, 1);
     // lantern-bearers of the Court
     for (let i = 0; i < 14; i++) { const x = 20 + i * 34 + (i % 2) * 8, y = 246 + (i % 3) * 5; miniCrab(ctx, x, y, '#0a2630', '#3a8a8a', i > 6); const fl = 0.6 + 0.4 * Math.sin(t * 3 + i); glow(ctx, x, y - 12, 14, '#ffb050', 0.4 * fl); ctx.fillStyle = '#ffd890'; ctx.fillRect(x, y - 13, 2, 2); }
     motes(ctx, t, { n: 40, color: '#a8fff0', a: 0.5, speed: 5 }); vignette(ctx, 0.6);

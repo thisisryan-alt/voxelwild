@@ -17,7 +17,7 @@ export class Kyros extends Boss {
       { at: 0.62, name: 'Tide Guard', attacks: [['tridentCombo', 2], ['shieldRush', 1.5], ['lanceThrow', 1.5], ['skyfall', 1.8], ['tideSurge', 1]], rest: 0.75, onEnter(b) { b.dmgMult = 1.2; b.rageSkin = true; } },
       { at: 0.3, name: 'Unsleeping', attacks: [['tridentCombo', 2], ['lanceThrow', 1.4], ['skyfall', 1.6], ['phantomRush', 2.2], ['lightningStorm', 2]], rest: 0.55, onEnter(b) { b.dmgMult = 1.35; } },
     ],
-    sprite: { plan: 'kyros', w: 110, h: 130, ax: 52, ay: 100, frames: 4, o: {} }, fps: 6,
+    sprite: { plan: 'kyros', w: 176, h: 156, ax: 52, ay: 124, frames: 4, o: {} }, fps: 6,
   };
   constructor(world, x, y, spawn) { super(world, x, y, spawn); if (spawn.floor) this.y = spawn.y - this.h / 2 - 0.2; this.intro = this.introTalk; this.rageSkin = false; }
   *introTalk(c) {

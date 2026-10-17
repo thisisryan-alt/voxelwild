@@ -15,7 +15,7 @@ export class Grumbold extends Boss {
       { at: 1, name: 'The Rockclaw', attacks: [['swipe', 2], ['rockToss', 2], ['charge', 1.6]], rest: 1.2 },
       { at: 0.5, name: 'Rockbreaker Rage', attacks: [['swipe', 2], ['rockToss', 1], ['charge', 2], ['leapSlam', 2.2], ['summonMinions', 0.7]], rest: 0.8, onEnter(b) { b.dmgMult = 1.25; } },
     ],
-    sprite: { plan: 'grumbold', w: 128, h: 90, ax: 64, ay: 84, frames: 4, o: {} }, fps: 8,
+    sprite: { plan: 'grumbold', w: 176, h: 96, ax: 64, ay: 84, frames: 4, o: {} }, fps: 8,
   };
   constructor(world, x, y, spawn) { super(world, x, y, spawn); if (spawn.floor) this.y = spawn.y - this.h / 2 - 0.2; this.intro = this.introTalk; this.idle = 0; }
   *introTalk(c) {

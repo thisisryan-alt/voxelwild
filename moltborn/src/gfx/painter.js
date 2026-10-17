@@ -76,6 +76,7 @@ export class Painter {
     this.d = new Uint32Array(w * h);
     this.ol = toColor(outline);
     this._tone = new Float32Array(w * h).fill(-1);
+    this._om = new Uint32Array(w * h);   // colour written as an outline at each pixel (0 = none); used by the finishing pass
     this._bb = null;
   }
   set(x, y, c) { x |= 0; y |= 0; if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.d[y * this.w + x] = toColor(c); }
@@ -143,7 +144,7 @@ export class Painter {
       for (let y = Math.max(0, y0 - 1); y <= Math.min(this.h - 1, y1 + 1); y++) for (let x = Math.max(0, x0 - 1); x <= Math.min(w - 1, x1 + 1); x++) {
         const i = y * w + x;
         if (tone[i] >= 0) continue;
-        if ((x > 0 && tone[i - 1] >= 0) || (x < w - 1 && tone[i + 1] >= 0) || (y > 0 && tone[i - w] >= 0) || (y < this.h - 1 && tone[i + w] >= 0)) d[i] = outline;
+        if ((x > 0 && tone[i - 1] >= 0) || (x < w - 1 && tone[i + 1] >= 0) || (y > 0 && tone[i - w] >= 0) || (y < this.h - 1 && tone[i + w] >= 0)) { d[i] = outline; this._om[i] = outline; }
       }
     }
     const n = ramp.n, dith = o.dither === undefined ? 0.42 : o.dither, bias = o.bias || 0, contrast = o.contrast || 1;
@@ -183,12 +184,40 @@ export class Painter {
     const col = c ? toColor(c) : this.ol, w = this.w, h = this.h, d = this.d, src = d.slice();
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const i = y * w + x; if (src[i] >>> 24) continue;
-      if ((x > 0 && src[i - 1] >>> 24) || (x < w - 1 && src[i + 1] >>> 24) || (y > 0 && src[i - w] >>> 24) || (y < h - 1 && src[i + w] >>> 24)) d[i] = col;
+      if ((x > 0 && src[i - 1] >>> 24) || (x < w - 1 && src[i + 1] >>> 24) || (y > 0 && src[i - w] >>> 24) || (y < h - 1 && src[i + w] >>> 24)) { d[i] = col; this._om[i] = col; }
+    }
+    return this;
+  }
+
+  // Finishing pass: outlines take a dark version of the colour they border (selective outlining), and the lower
+  // right edge of every form catches a little cool light bounced off the water.
+  finish() {
+    if (this.noFinish) return this;
+    const w = this.w, h = this.h, d = this.d, src = d.slice(), om = this._om, solid = (i) => (src[i] >>> 24) > 0 && !(om[i] && src[i] === om[i]);
+    const [or, og, ob] = unpack(this.ol);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x; if (!(src[i] >>> 24)) continue;
+      if (om[i] && src[i] === om[i]) {
+        let r = 0, g = 0, b = 0, n = 0;
+        const add = (j) => { if (solid(j)) { const [rr, gg, bb] = unpack(src[j]); r += rr; g += gg; b += bb; n++; } };
+        if (x > 0) add(i - 1); if (x < w - 1) add(i + 1); if (y > 0) add(i - w); if (y < h - 1) add(i + w);
+        if (!n) continue;
+        const k = 0.42; r = (r / n) * k; g = (g / n) * k; b = (b / n) * k;
+        // keep the silhouette dark enough to read on any background
+        d[i] = pack(Math.round(or * 0.45 + r * 0.55), Math.round(og * 0.45 + g * 0.55), Math.round(ob * 0.45 + b * 0.55));
+      } else if ((src[i] >>> 24) === 255) {
+        // bounce light: interior pixel whose lower or right neighbour is an outline/empty pixel
+        const below = y < h - 1 ? i + w : -1, right = x < w - 1 ? i + 1 : -1;
+        const edgeB = below < 0 || !(src[below] >>> 24) || (om[below] && src[below] === om[below]), edgeR = right < 0 || !(src[right] >>> 24) || (om[right] && src[right] === om[right]);
+        if (edgeB) { const [rr, gg, bb] = unpack(src[i]); d[i] = pack(Math.round(rr * 0.82 + 90 * 0.18), Math.round(gg * 0.82 + 190 * 0.18), Math.round(bb * 0.82 + 235 * 0.18)); }
+        else if (edgeR) { const [rr, gg, bb] = unpack(src[i]); d[i] = pack(Math.round(rr * 0.92 + 90 * 0.08), Math.round(gg * 0.92 + 190 * 0.08), Math.round(bb * 0.92 + 235 * 0.08)); }
+      }
     }
     return this;
   }
 
   toCanvas() {
+    this.finish();
     const c = document.createElement('canvas');
     c.width = this.w; c.height = this.h;
     const ctx = c.getContext('2d');

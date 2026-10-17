@@ -4,7 +4,7 @@ import { R } from '../gfx/palette.js';
 
 const rockcrab = new Ramp(['#241e14', '#463c26', '#6e6234', '#9a8a4a', '#d0c078']);
 const bonecrab = R.bone.tint(0, 0.7, 0.9);
-const crab = (ramp, o = {}) => ({ plan: 'crab', w: 42, h: 30, ax: 21, ay: 27, frames: 6, o: { ramp, ...o } });
+const crab = (ramp, o = {}) => ({ plan: 'crab', w: 58, h: 34, ax: 24, ay: 31, frames: 6, o: { ramp, ...o } });
 const fish = (len, hgt, ramp, o = {}) => ({ plan: 'fish', w: len + 22, h: hgt + 16, ax: (len + 22) / 2, ay: (hgt + 16) / 2, frames: 4, o: { len, hgt, ramp, ...o } });
 
 export const ENEMIES = {
@@ -16,7 +16,7 @@ export const ENEMIES = {
   urchin: { name: 'Spine Urchin', hp: 10, dmg: 6, w: 13, h: 13, xp: 4, coins: [1, 2], poise: 99, noStagger: true, ai: 'spiky', anchor: 'center', fps: 2, spiky: true, sprite: { plan: 'urchin', w: 32, h: 32, ax: 16, ay: 16, frames: 2, o: { ramp: R.abyssal.tint(0.08, 1.2, 1.1), r: 6 } }, p: {} },
   hermit: { name: 'Hermit Bruiser', hp: 36, dmg: 9, w: 20, h: 16, xp: 12, coins: [3, 6], poise: 24, ai: 'guard', anchor: 'feet', fps: 8, mass: 1.6, sprite: crab(R.coralPink.tint(0.04, 0.8, 1), { helm: false, shield: true }),
     p: { speed: 20, aggro: 110, strike: 22, wind: 0.5, recover: 0.7, cd: 1.6 } },
-  hatchling: { name: 'Hatchling', hp: 99, dmg: 0, w: 10, h: 8, xp: 0, coins: null, poise: 99, ai: 'patrolCharge', anchor: 'feet', fps: 10, friendly: true, contact: false, sprite: { plan: 'crab', w: 42, h: 30, ax: 21, ay: 27, frames: 6, o: { ramp: new Ramp(['#5c2a3a', '#a8506a', '#e88a9a', '#ffc0c8', '#fff0f0']) } }, p: { speed: 14, range: 40, aggro: 0, wind: 9, charge: 0, chargeTime: 0, cd: 99 } },
+  hatchling: { name: 'Hatchling', hp: 99, dmg: 0, w: 10, h: 8, xp: 0, coins: null, poise: 99, ai: 'patrolCharge', anchor: 'feet', fps: 10, friendly: true, contact: false, sprite: { plan: 'crab', w: 58, h: 34, ax: 24, ay: 31, frames: 6, o: { ramp: new Ramp(['#5c2a3a', '#a8506a', '#e88a9a', '#ffc0c8', '#fff0f0']) } }, p: { speed: 14, range: 40, aggro: 0, wind: 9, charge: 0, chargeTime: 0, cd: 99 } },
   // ---- Sunken Forest -----------------------------------------------------------------
   moray: { name: 'Thornback Moray', hp: 24, dmg: 10, w: 24, h: 12, xp: 14, coins: [3, 6], poise: 14, ai: 'ambush', anchor: 'center', fps: 8, ghost: true, flying: true, sprite: { plan: 'eel', w: 64, h: 28, ax: 54, ay: 14, frames: 6, o: { ramp: R.venom, segs: 9, seg: 5, r: 4.5, amp: 3, teeth: true, fin: R.venom.tint(0.1, 1, 1.1) } },
     p: { trigger: 80, wind: 0.5, lunge: 200, reach: 64, cd: 2.4 } },
@@ -43,7 +43,7 @@ export const ENEMIES = {
     shoot: { kind: 'cannonball', speed: 150, count: 1, aim: 'player', lead: true, life: 3, sfx: 'cannon' }, sprite: { plan: 'cannon', w: 40, h: 26, ax: 20, ay: 24, frames: 2, o: {} }, p: { range: 220, wind: 0.8, cd: 3.2 } },
   ironturtle: { name: 'Ironhide Turtle', hp: 60, dmg: 13, w: 26, h: 18, xp: 22, coins: [5, 10], poise: 40, ai: 'shellback', anchor: 'feet', fps: 5, mass: 3, sprite: { plan: 'turtle', w: 44, h: 30, ax: 22, ay: 26, frames: 4, o: { shell: R.rust, skin: R.fishGrey, spikes: true } }, p: { speed: 16, aggro: 110, strike: 24, wind: 0.6, cd: 2.2 } },
   barracuda: { name: 'Barracuda', hp: 24, dmg: 12, w: 26, h: 9, xp: 14, coins: [3, 6], poise: 10, ai: 'kiter', fps: 12, flying: true, sprite: fish(30, 9, R.fishGrey, { teeth: true, belly: R.pearl, tail: 3, dorsalH: 1 }), p: { speed: 70, aggro: 200, hover: 90, wind: 0.5, dash: 250, cd: 1.6 } },
-  mimic: { name: 'Mimic Chest', hp: 44, dmg: 15, w: 20, h: 16, xp: 30, coins: [15, 30], poise: 30, ai: 'mimic', anchor: 'feet', fps: 6, mass: 2, elite: true, ep: 1, sprite: { plan: 'crab', w: 42, h: 30, ax: 21, ay: 27, frames: 6, o: { ramp: R.wood } }, p: { reveal: 40, speed: 40 } },
+  mimic: { name: 'Mimic Chest', hp: 44, dmg: 15, w: 20, h: 16, xp: 30, coins: [15, 30], poise: 30, ai: 'mimic', anchor: 'feet', fps: 6, mass: 2, elite: true, ep: 1, sprite: { plan: 'crab', w: 58, h: 34, ax: 24, ay: 31, frames: 6, o: { ramp: R.wood } }, p: { reveal: 40, speed: 40 } },
   // ---- The Abyss ---------------------------------------------------------------------
   lanternfish: { name: 'Lantern Lurker', hp: 28, dmg: 13, w: 18, h: 12, xp: 20, coins: [4, 9], poise: 12, ai: 'kiter', fps: 8, flying: true, sprite: fish(20, 12, R.abyssal, { lure: true, teeth: true, belly: R.lumen.tint(0, 1, 0.7), tail: 2.5 }), p: { speed: 55, aggro: 150, hover: 70, wind: 0.6, dash: 230, cd: 2 } },
   gulper: { name: 'Gulper Eel', hp: 46, dmg: 17, w: 30, h: 16, xp: 28, coins: [5, 11], poise: 22, ai: 'ambush', anchor: 'center', fps: 7, ghost: true, flying: true, sprite: { plan: 'eel', w: 80, h: 36, ax: 66, ay: 18, frames: 6, o: { ramp: R.void.tint(0.02, 1.3, 1.6), segs: 10, seg: 6, r: 6.5, amp: 3, teeth: true, fin: R.abyssal } }, p: { trigger: 90, wind: 0.6, lunge: 210, reach: 80, cd: 2.6 } },
