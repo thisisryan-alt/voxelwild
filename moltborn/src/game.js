@@ -29,6 +29,7 @@ import { rng } from './core/util.js';
 import { ensureSettings } from './systems/settings.js';
 import { Stats, ensureRecords } from './systems/stats.js';
 import { Achievements } from './systems/achievements.js';
+import { PostFX } from './gfx/post.js';
 
 const rand = rng(8080);
 
@@ -43,7 +44,7 @@ export class Game {
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -226,5 +227,5 @@ export class Game {
     if (npcId === 'old_brine') return null;
     if (qs.some((id) => !q.log[id])) return '!'; return null;
   }
-  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); }
+  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); }
 }

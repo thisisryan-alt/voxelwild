@@ -6,6 +6,7 @@ import { vnoise, fbm, hash2 } from '../core/util.js';
 import { BIOMES } from '../data/biomes.js';
 import { Painter, color, pack, unpack } from '../gfx/painter.js';
 import { R } from '../gfx/palette.js';
+import { paintDetail } from './tile_detail.js';
 
 const M = 5; // margin (px) around a region for blur/distance
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16 - 0.5);
@@ -99,6 +100,7 @@ export class TileLayer {
       out[(y - M) * cw + (x - M)] = col;
     }
     this.ctx.putImageData(img, px0, py0);
+    paintDetail(this.ctx, { vis, W, H, M, ox, oy, px0, py0, cw, ch, g, seed, biome: this.biome.id });
     // non-solid decor tiles: platforms & spikes
     for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
       const t = g.get(tx, ty);

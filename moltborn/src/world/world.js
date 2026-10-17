@@ -1,5 +1,5 @@
 // Runtime for one zone: tile layer, entities, hitboxes, hazards, camera, lighting and drawing.
-import { TS, T, isSolid } from './tiles.js';
+import { TS, T } from './tiles.js';
 import { TileLayer } from './bake.js';
 import { Player } from '../entities/player.js';
 import { Enemy } from '../entities/enemy.js';
@@ -14,6 +14,7 @@ import { ENEMIES } from '../data/enemies.js';
 import { createBoss } from '../entities/bosses.js';
 import { clamp, rng, rectsOverlap } from '../core/util.js';
 import { bodyBlocked } from './physics.js';
+import { AmbientEvents } from '../gfx/events.js';
 
 const rand = rng(2024);
 
@@ -22,7 +23,7 @@ export class World {
     this.game = game; this.zone = zone; this.grid = zone.grid; this.biome = BIOMES[zone.biome];
     this.t = 0; this.fx = new Particles();
     this.layer = new TileLayer(zone); this.applyBroken(); this.layer.renderAll();
-    this.bg = getBackground(zone.biome, zone.seed); this.amb = new Ambience(zone, this.biome);
+    this.bg = getBackground(zone.biome, zone.seed); this.amb = new Ambience(zone, this.biome); this.sky = new AmbientEvents(this);
     this.enemies = []; this.projectiles = []; this.pickups = []; this.hitboxes = []; this.interactables = []; this.decor = []; this.fields = []; this.beams = [];
     this.boss = null; this.cinematic = false; this.slowT = 0; this.slowFactor = 1; this.flash = 0; this.hurtFlash = 0; this.shakeAmt = 0; this.kickX = 0; this.kickY = 0; this.camLock = null;
     this.exitsDisabled = false; this.drawExtra = []; this.overlayExtra = []; this.extraLights = []; this.lightCv = null; this.exiting = false; this.difficulty = 0;
@@ -90,7 +91,11 @@ export class World {
   addField(o) { this.fields.push({ tick: 0, t: 0, ...o }); }
   addBeam(o) { this.beams.push({ t: 0, ...o }); }
   addPickup(o) { this.pickups.push(new Pickup(this, o)); }
-  shake(a) { this.shakeAmt = Math.max(this.shakeAmt, a * (this.game.state.settings.shake ?? 1)); }
+  shake(a) {
+    const s = this.game.state.settings;
+    this.shakeAmt = Math.max(this.shakeAmt, a * (s.shake ?? 1) * (s.reduceMotion ? 0 : 1));
+    if (a >= 5) this.game.events.emit('bigshake', this.player.x, this.player.y, a);
+  }
   // A one-direction camera shove that eases back: gives a heavy blow a sense of weight that random shake cannot.
   kickCam(dx, dy = 0) { const k = this.game.state.settings.shake ?? 1; this.kickX = clamp(this.kickX + dx * k, -6, 6); this.kickY = clamp(this.kickY + dy * k, -6, 6); }
   nearestEnemy(x, y, r) { let best = null, bd = r * r; for (const e of this.enemies) { if (!e.alive || !e.canBeHit()) continue; const d = (e.x - x) ** 2 + (e.y - y) ** 2; if (d < bd) { bd = d; best = e; } } return best; }
@@ -152,7 +157,7 @@ export class World {
     this.fx.update(dt);
     this.flash = Math.max(0, this.flash - dt); this.hurtFlash = Math.max(0, this.hurtFlash - dt); this.shakeAmt *= Math.exp(-9 * dt);
     this.kickX *= Math.exp(-11 * dt); this.kickY *= Math.exp(-11 * dt);
-    this.ambientFx(dt); this.amb.update(dt, this);
+    this.ambientFx(dt); this.amb.update(dt, this); this.sky.update(dt);
     this.updateCamera(dt);
     // nearest interactable
     this.near = null; if (pl.alive && !pl.locked) { let bd = 1e9; for (const i of this.interactables) { if (!i.prompt() || !i.canInteract(pl)) continue; const d = Math.abs(i.x - pl.x) + Math.abs(i.y - pl.y); if (d < bd) { bd = d; this.near = i; } } }
@@ -256,6 +261,7 @@ export class World {
     const cam = { x: Math.round(c.x + this.kickX) + sx, y: Math.round(c.y + this.kickY) + sy };
     this.bg.draw(ctx, cam, this.zone, this.t);
     this.amb.drawBehind(ctx, cam, this.t, clamp(cam.y / Math.max(1, this.zone.h * TS - 270), 0, 1));
+    this.sky.draw(ctx, cam, 'back');
     // tiles
     const cvw = this.layer.canvas.width, cvh = this.layer.canvas.height;
     const sx0 = Math.max(0, cam.x), sy0 = Math.max(0, cam.y), sw = Math.min(480, cvw - sx0), sh = Math.min(270, cvh - sy0);
@@ -280,10 +286,12 @@ export class World {
     for (const fn of this.drawExtra) fn(ctx, cam);
     drawDecor('front');
     this.amb.drawAhead(ctx, cam, this.t);
+    this.sky.draw(ctx, cam, 'front');
     this.fx.draw(ctx, cam);
     this.drawAtmosphere(ctx, cam);
     this.drawLighting(ctx, cam);
     for (const fn of this.overlayExtra) fn(ctx, cam);
+    this.game.systems.post?.apply(ctx, this, cam);
     if (this.flash > 0) { ctx.globalAlpha = Math.min(0.8, this.flash * 5); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }
     if (this.hurtFlash > 0) { ctx.globalAlpha = Math.min(0.35, this.hurtFlash * 1.4); ctx.fillStyle = '#ff2a2a'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }
     if (this.slowT > 0) { ctx.globalAlpha = 0.12; ctx.fillStyle = '#8ae8ff'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }
