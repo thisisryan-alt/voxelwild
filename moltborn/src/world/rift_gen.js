@@ -28,12 +28,14 @@ export const ROOM_KINDS = {
   ambush:   { name: 'Ambush', blurb: 'It is quiet. Too quiet.' },
   treasure: { name: 'Treasure Vault', blurb: 'Chests, and a relic on a stand. Nothing is free.' },
   altar:    { name: 'Altar', blurb: 'A place to rest, to bargain, or to sacrifice.' },
+  trial:    { name: 'Trial', blurb: 'Hold out until the tide turns. Waves keep coming.' },
   boss:     { name: "Warden's Chamber", blurb: 'The last chamber. Something is standing in the current.' },
 };
 export function riftKind(seed, depth, max) {
   if (depth >= max) return 'boss'; if (depth <= 1) return 'combat';
   const r = rng(seed * 41 + depth * 13), prev = riftKind(seed, depth - 1, max), calm = prev === 'treasure' || prev === 'altar';
   const table = calm ? [['combat', 60], ['elite', 22], ['ambush', 18]] : [['combat', 48], ['elite', 16], ['ambush', 14], ['treasure', 12], ['altar', 10]];
+  if (depth >= 3 && !calm) table.push(['trial', 12]);               // a trial is a late-run room
   let x = r() * table.reduce((a, [, w]) => a + w, 0); for (const [k, w] of table) { if ((x -= w) <= 0) return k; } return 'combat';
 }
 export const riftId = (seed, depth, max) => `rift:${seed}:${depth}:${max}`;
@@ -132,7 +134,7 @@ export function buildRift(id) {
     const x = flatSpot(b, 16, floorY, [], 1); b.propFloor('altar', x, { from: floorY - 9 }); b.light(x, floorY - 6, 70, '#ffd8f0', 0.9);
   }
   const quiet = kind === 'treasure' || kind === 'altar';
-  const count = quiet || last ? 0 : kind === 'elite' ? 3 : kind === 'ambush' ? 2 : Math.min(14, 4 + Math.round(P.depth * 1.3));
+  const count = quiet || last || kind === 'trial' ? 0 : kind === 'elite' ? 3 : kind === 'ambush' ? 2 : Math.min(14, 4 + Math.round(P.depth * 1.3));
   const z = b.finish(); z.rift = { depth: P.depth, max: P.max, theme: key, last, kind }; z.points = spawnPoints(w);
   if (last) z.spawns.push(wardenSpawn(z, w, h, floorY, P));
   return count ? scatter(z, enemyList(T0, P.depth, r, count)) : z;

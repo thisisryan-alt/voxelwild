@@ -10,6 +10,8 @@ import { composeWave } from './arena.js';
 import { ROOM_KINDS } from '../world/rift_gen.js';
 import { RiftSummary } from '../ui/board_scene.js';
 import { ZONE_INFO } from '../data/zoneinfo.js';
+import { newTrial, stepTrial, waveElite, clockText, TRIAL } from './rift_trial.js';
+import { drawText } from '../gfx/font.js';
 import { INGREDIENT_IDS } from '../data/items_craft.js';
 import { rng } from '../core/util.js';
 
@@ -83,10 +85,11 @@ export class Rifts {
     if (!isRiftZone(id)) { this.cleanup(); return; }
     const g = this.g, mods = this.mods();
     for (const m of mods) { const M = RIFT_MODS[m]; if (M.haste) for (const e of world.enemies) if (!e.def.friendly) e.status.apply('haste', { dur: 1e6, power: 1 }); if (M.dark) world.zone.dark = Math.max(world.zone.dark ?? world.biome.dark, M.dark); }
-    const kind = world.zone.rift?.kind || 'combat'; run.kind = kind; run.noOffer = false; run.pending = 0; run.bonusOffer = false; run.stand = null;
+    const kind = world.zone.rift?.kind || 'combat'; run.kind = kind; run.trial = kind === 'trial' ? newTrial() : null; run.noOffer = false; run.pending = 0; run.bonusOffer = false; run.stand = null;
     run.ambush = kind === 'ambush' ? { fired: false, x: world.zone.w * 16 * 0.38 } : null;
     if (world.zone.rift?.last) { if (!world.boss) this.crown(world); }
     else if (kind === 'elite') { this.crown(world, { hp: 1.4, scale: 1.15, name: 'Elite Champion' }); run.bonusOffer = true; }
+    else if (kind === 'trial') { run.bonusOffer = true; world.overlayExtra.push((ctx) => this.drawTrial(ctx)); }
     else if (kind === 'treasure' || kind === 'altar') { run.cleared = true; run.noOffer = true; }
     world.player.recalc?.(); world.player.hp = Math.min(world.player.hp, world.player.stats.maxHp);
     const quiet = kind === 'treasure' || kind === 'altar', shown = quiet ? [] : mods;
@@ -112,13 +115,30 @@ export class Rifts {
     if (!run) return;
     const w = this.g.world; if (!w || !isRiftZone(w.zone.id) || run.done) return;
     if (run.ambush && !run.ambush.fired && w.player.x > run.ambush.x) this.ambush(w, 3 + run.depth * 2);
+    if (run.trial) this.stepTrialRoom(dt, w);
     run.checkT -= dt; if (run.cleared || run.checkT > 0) return; run.checkT = 0.4;
     if (run.ambush && !run.ambush.fired) return;                       // the trap has not been sprung yet
+    if (run.trial && !run.trial.done) return;                          // the tide has not turned yet
     if (run.pending > 0 || w.enemies.some((e) => e.alive && !e.def.friendly && (!e.dying || e.def.boss))) return;
     run.cleared = true; this.g.audio.sfx('wave_clear'); w.fx.ring(w.player.x, w.player.y, 6, 90, 0.6, '#ffe8a0', 3);
     if (w.zone.rift.last) { this.g.toast('The Warden falls. The rift quiets.', '#ffd84a'); this.after(1.6, () => this.finish(true)); }
     else if (run.noOffer) this.g.toast('The way opens.', '#9ad8ff');
     else { this.g.toast('The way opens.', '#9ad8ff'); this.after(1.1, () => this.offer()); }
+  }
+  // ---- the Trial room: waves on a clock (timing rules live in rift_trial.js) --------------------------------------------------------------------------------
+  stepTrialRoom(dt, w) {
+    const run = this.run, tr = run.trial, was = tr.done, n = stepTrial(tr, dt, run.depth, run.pending);
+    if (n > 0) {
+      const salt = 60 + tr.waves;
+      this.ambush(w, n, { salt, text: `Wave ${tr.waves}`, elite: waveElite(tr, run.depth) });
+    }
+    if (!was && tr.done) { this.g.toast('The tide turns. Finish what is left.', '#9ad8ff'); this.g.audio.sfx('wave_clear'); }
+  }
+  drawTrial(ctx) {
+    const run = this.run, tr = run?.trial; if (!tr || run.done) return;
+    const frac = tr.done ? 1 : 1 - tr.left / TRIAL.length, label = tr.done ? 'TIDE TURNED' : `TRIAL ${clockText(tr)}`;
+    ctx.fillStyle = 'rgba(5,16,40,0.7)'; ctx.fillRect(190, 246, 100, 15); ctx.fillStyle = '#16284a'; ctx.fillRect(194, 255, 92, 3); ctx.fillStyle = tr.done ? '#7aff9a' : '#c07aff'; ctx.fillRect(194, 255, Math.round(92 * frac), 3);
+    drawText(ctx, label, 240, 248, { color: tr.done ? '#7aff9a' : '#ffffff', align: 'center', shadow: '#000' });
   }
   // game-time delays (they pause with the game and run under deterministic stepping)
   after(sec, fn) { this.timers.push({ t: sec, fn }); }

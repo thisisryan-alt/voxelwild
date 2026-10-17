@@ -71,7 +71,7 @@ Anything the script prints with a `[t]` prefix is echoed; console errors and pag
 
 ### Running many at once
 
-`npm run suite` (`tools/suite.mjs`) runs a default set of 25 browser scripts one after another and prints a table. A script
+`npm run suite` (`tools/suite.mjs`) runs a default set of 26 browser scripts one after another and prints a table. A script
 passes when it exits with code 0 and prints no page error or script error; the scripts also print what they observed (lines
 beginning `[t]`), which is worth reading when a change touches the system they cover. `node tools/suite.mjs bounties fishing`
 runs just those; `node tools/suite.mjs --list` lists every script.
@@ -83,7 +83,7 @@ runs just those; `node tools/suite.mjs --list` lists every script.
 | `smoke.mjs` | builds all 30 zones, drives random input, round-trips a save |
 | `fuzz.mjs` | long random-input runs of every zone watching for exceptions, NaN and runaway entities |
 | `ending.mjs` | plays through the endings |
-| `rifts.mjs`, `riftrooms.mjs`, `warden.mjs` | a whole rift, each room kind, and the Rift Warden fight through to victory and a second run |
+| `rifts.mjs`, `riftrooms.mjs`, `trial.mjs`, `warden.mjs` | a whole rift, each room kind, a Trial room against the clock, and the Rift Warden fight through to victory and a second run |
 | `riftfoes.mjs` | each rift creature's behaviour, the latch and the dash that breaks it |
 | `arena.mjs` | the Gauntlet |
 | `bounties.mjs`, `fishing.mjs`, `market.mjs`, `moonpool.mjs`, `surge.mjs`, `clock.mjs`, `helphall.mjs` | the newer systems end to end, with screenshots |

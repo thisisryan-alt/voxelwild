@@ -29,8 +29,11 @@ Abyssal needs Krael). Each chamber is a procedurally built cave of one of the se
 * **Scaling.** At depth `d` foes have `(1 + 0.1 (d - 1)) x tier` health and `(1 + 0.07 (d - 1))` damage; experience grows
   `+12%` per depth. The tier multiplier is 1, 1.25 and 1.6 for Shallow, Deep and Abyssal.
 * **Rooms.** Depth 1 is always a plain fight and the last depth is always the Warden. In between, a seeded table picks
-  from combat (48%), elite den (16%), ambush (14%), treasure vault (12%) and altar (10%); after a calm room the vault and
-  altar are not offered.
+  from combat (48%), elite den (16%), ambush (14%), treasure vault (12%) and altar (10%), plus a trial (12) from depth 3;
+  after a calm room the vault, altar and trial are not offered.
+* **Trials.** The chamber starts empty. Forty seconds on the clock, a wave every eight (the first after three), none in the
+  last six; each wave is `2 + depth/2` foes, with an elite chance that climbs as time runs down. The way opens when the
+  clock is out and the last foe has fallen, with the better pool of four relics on offer. (`systems/rift_trial.js`)
 * **Relics.** Clearing a chamber opens a choice of three relics (four, from a better pool, after an elite den). Rarity
   weights are common 60, rare 30, epic 10, and epics appear from depth 2. Relics last until the run ends. 27 relics, plus
   the Sacrificial Vow curse an altar can offer.

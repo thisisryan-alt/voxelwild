@@ -7,6 +7,7 @@ Newest first. Version numbers are not used; each entry is one push of the game.
 ### New ways to play
 * **The Rift Warden**, a repeatable boss at the bottom of every Tidal Rift (three phases, eight attacks, fought again on every
   run), with its own sprite, bestiary entry, trophies and a cutscene.
+* **Trial rooms** in the rifts: hold out for forty seconds against waves that grow, then choose from a better pool of relics.
 * **Four rift creatures** with their own behaviours: Shardlings that blink and fire, Latchleeches that cling until you dash
   or strike them twice, Tidecallers that raise a gust, Glass Golems that slam and shatter into Shardlings.
 * **Fishing.** Posts in every realm, a bite-and-reel minigame, 18 species in four rarities, some available only at certain
