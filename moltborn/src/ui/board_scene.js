@@ -9,7 +9,7 @@ import { OrdersScene } from './orders_scene.js';
 import { BountyScene } from './bounty_scene.js';
 import { HallScene } from './hall_scene.js';
 import { OathScene } from './oath_scene.js';
-import { OATHS } from '../data/oaths.js';
+import { OATHS, dailyOath } from '../data/oaths.js';
 
 const bossName = (k) => BOSS_CLASSES[k]?.def?.name || k;
 const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -43,7 +43,7 @@ export class BoardScene {
       if (e.kind === 'bounties') { g.audio.sfx('select'); g.engine.push(new BountyScene(g)); return; }
       g.engine.pop(); g.audio.sfx('select');
       if (e.kind === 'arena') g.systems.arena.start();
-      else g.engine.push(new OathScene(g, `${e.name}: ${e.tier.depths} depths`, (oaths) => g.systems.rifts.start({ tier: e.tier.id, daily: e.kind === 'daily', seed: e.kind === 'daily' ? today() : undefined, oaths })));
+      else { const daily = e.kind === 'daily', forced = daily ? [dailyOath(today())] : []; g.engine.push(new OathScene(g, `${e.name}: ${e.tier.depths} depths`, (oaths) => g.systems.rifts.start({ tier: e.tier.id, daily, seed: daily ? today() : undefined, oaths }), forced)); }
     }
   }
   draw(ctx) {
@@ -54,7 +54,7 @@ export class BoardScene {
     panel(ctx, 216, 50, 226, 140, { alpha: 0.9 });
     if (e.kind === 'rift' || e.kind === 'daily') {
       const t = e.tier; text(ctx, e.name, 224, 56, COL.gold);
-      const blurb = e.kind === 'daily' ? `Everyone swims the same rift today (${today()}). The first clear of the day pays a bonus.` : t.blurb;
+      const blurb = e.kind === 'daily' ? `Everyone swims the same rift today (${today()}), under the ${OATHS[dailyOath(today())].name}. The first clear of the day pays a bonus.` : t.blurb;
       wrapText(blurb, 210).forEach((l, i) => text(ctx, l, 224, 70 + i * 10, COL.text));
       const y = 70 + wrapText(blurb, 210).length * 10 + 6;
       text(ctx, `${t.depths} depths   Reward x${t.reward}`, 224, y, COL.dim);

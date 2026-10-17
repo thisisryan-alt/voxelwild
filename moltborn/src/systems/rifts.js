@@ -12,7 +12,7 @@ import { RiftSummary } from '../ui/board_scene.js';
 import { ZONE_INFO } from '../data/zoneinfo.js';
 import { newTrial, stepTrial, waveElite, clockText, TRIAL } from './rift_trial.js';
 import { drawText } from '../gfx/font.js';
-import { cleanOaths, oathMult, oathHaste, oathDark, rewardBonus, OATHS } from '../data/oaths.js';
+import { cleanOaths, oathMult, oathHaste, oathDark, rewardBonus, dailyOath } from '../data/oaths.js';
 import { INGREDIENT_IDS } from '../data/items_craft.js';
 import { rng } from '../core/util.js';
 
@@ -64,7 +64,7 @@ export class Rifts {
     const seed = opts.seed ?? Math.floor(Math.random() * 900000 + 100000), w = g.world, p = w.player;
     setRiftThemes(this.unlockedThemes());
     this.run = { seed, tier, max: tier.depths, depth: 1, kills: 0, cleared: false, picking: false, offered: 0, t0: g.state.playtime, daily: !!opts.daily, hub: { zone: w.zone.id, x: p.x, y: p.y }, hp0: p.hp, done: false, depthKills: 0 };
-    g.state.riftRelics = []; this.run.oaths = cleanOaths(opts.oaths); g.state.riftOaths = [...this.run.oaths]; p.recalc?.();
+    g.state.riftRelics = []; this.run.oaths = cleanOaths([...(opts.daily ? [dailyOath(seed)] : []), ...(opts.oaths || [])]); g.state.riftOaths = [...this.run.oaths]; p.recalc?.();
     g.events.emit('rift', 'enter');
     this.go(1, true);
     return true;

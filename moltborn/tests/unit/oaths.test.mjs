@@ -48,3 +48,22 @@ test('the history records how many oaths a run carried', () => {
   const g = game(), events = []; g.events.emit = (...a) => events.push(a); g.systems.history = new History(g); const e = g.systems.history.add({ tier: 'Deep Rift', depth: 6, max: 6, success: true, secs: 300, kills: 40, relics: [], rw: { coins: 400 }, oaths: ['iron', 'fury'] }); eq(e.oaths, 2);
   eq(g.systems.history.add({ tier: 'Deep Rift', depth: 6, max: 6, success: true, secs: 300, kills: 40, relics: [], rw: { coins: 400 } }).oaths, 0);
 });
+
+// ---- the daily oath -----------------------------------------------------------------------------------------------------------------------------
+import { dailyOath } from '../../src/data/oaths.js';
+import { OathScene } from '../../src/ui/oath_scene.js';
+import { today } from '../../src/world/rift_gen.js';
+
+test('the daily oath is the same all day and everywhere, and a real oath', () => { const d = today(); eq(dailyOath(d), dailyOath(d)); ok(OATHS[dailyOath(d)]); eq(dailyOath(20260101), dailyOath(20260101)); });
+test('over a year the daily oath visits every oath', () => { const seen = new Set(); for (let d = 0; d < 365; d++) seen.add(dailyOath(20260101 + d)); eq(seen.size, OATH_IDS.length); });
+test('no oath dominates the calendar', () => { const n = {}; for (let d = 0; d < 1000; d++) { const o = dailyOath(20240101 + d); n[o] = (n[o] || 0) + 1; } for (const id of OATH_IDS) ok(n[id] > 100 && n[id] < 320, `${id}: ${n[id]}`); });
+test('a daily run always carries the day\'s oath, once, ahead of the chosen ones', () => {
+  const g = game(), R = g.systems.rifts; g.world = { player: { x: 0, y: 0, hp: 5, recalc() {} }, zone: { id: 'reef_garden' } }; g.playScene = { fadeOut() {}, fadeIn() {} }; const day = today(); R.go = () => {};
+  R.start({ tier: 'shallow', daily: true, seed: day, oaths: ['iron'] }); const d = dailyOath(day); eq(R.run.oaths[0], d); eq(new Set(R.run.oaths).size, R.run.oaths.length); ok(R.run.oaths.length <= MAX_OATHS); ok(R.run.oaths.includes('iron') || d === 'iron');
+  R.run = null; R.start({ tier: 'shallow', oaths: ['fury'] }); eq(R.run.oaths.join(), 'fury', 'an ordinary run has only what was chosen');
+});
+test('the oath scene will not put down a forced oath, and does not remember it as a preference', () => {
+  const popped = [], st = newState(), g = { state: st, audio: { sfx() {} }, engine: { pop: () => popped.push(1) }, input: { pressed: () => false } };
+  let got = null; const s = new OathScene(g, 'daily', (o) => { got = o; }, ['haste']); eq(s.picked.join(), 'haste'); s.sel = OATH_IDS.indexOf('haste'); let pressed = 'confirm'; g.input.pressed = (a) => { if (a === pressed) { pressed = null; return true; } return false; }; s.update(0.016);
+  eq(s.picked.join(), 'haste', 'still sworn'); ok(s.msgT > 0); s.picked.push('iron'); s.start(); eq(got.join(), 'haste,iron'); eq(st.lastOaths.join(), 'iron', 'only the free choice is remembered');
+});

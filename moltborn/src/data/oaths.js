@@ -14,6 +14,12 @@ export const OATHS = {
 };
 export const OATH_IDS = Object.keys(OATHS);
 
+// the daily rift carries one oath that cannot be refused: the same for everyone on the same day, cycling through them all
+import { rng } from '../core/util.js';
+export function dailyOath(day) {
+  const r = rng((day | 0) * 17 + 5); return OATH_IDS[Math.floor(r() * OATH_IDS.length)];
+}
+
 // drop unknown and duplicate ids and anything beyond the limit
 export function cleanOaths(list) {
   const out = []; for (const id of list || []) if (OATHS[id] && !out.includes(id) && out.length < MAX_OATHS) out.push(id); return out;
