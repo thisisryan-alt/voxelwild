@@ -133,6 +133,11 @@ export const DIALOGUE = {
       yield c.say("You. Crab. Stand still. ...No weapons, no collar, no Court badge. Good. I'm Captain Ruby of the Brineguard. The Queen's guard, not Vael's, whatever he tells you.");
       yield c.say("Vael sells passage to the Spires. I don't. I need somebody who isn't one of mine to do a job I can't be seen doing.");
     }
+    if (c.has('stolen_regalia') && !c.flag('regalia_inkwell') && !c.flag('regalia_returned')) {
+      yield c.say("That crate. The Court's own seal on the lid. Somebody was smuggling a relic out of the Kingdom through the graveyard, and it was not me.");
+      const j = yield c.ask('Give the regalia to the Brineguard?', ['Hand it over.', 'Not yet.']);
+      if (j === 0) { c.take('stolen_regalia'); c.set('regalia_returned'); c.gain(120); yield c.say("The Brineguard thanks you. Quietly. Out loud, we will deny you ever walked in here."); return; }
+    }
     if (!c.has('brineguard_key') && !c.qActive('sq_ledger') && !c.qDone('sq_ledger')) {
       const i = yield c.ask("The Queen has been... wrong, lately. Vael keeps a ledger — the Tithe, in numbers. If she sees it, she'll act. I'll give you the inner key, free, if you'll fetch it from the Archive.", ['I will.', 'Why trust me?', 'Not interested.']);
       if (i === 1) yield c.say("I don't. But I trust that the ones who've come through here and aren't Court-bought are very few. It's a short list. You're on it, for now.");

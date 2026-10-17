@@ -1,6 +1,6 @@
 // The player: underwater movement (buoyancy, strokes, free swimming by form), the combat state machine
 // (combo, charged heavy, dash, block/parry, abilities, ultimate), damage intake and animation selection.
-import { Entity, drawFrame } from './entity.js';
+import { Entity, drawFrame, blobShadow } from './entity.js';
 import { moveBody } from '../world/physics.js';
 import { FORMS as FORM_DATA, BRANCHES } from '../data/forms.js';
 import { computeStats } from '../systems/progression.js';
@@ -373,6 +373,7 @@ export class Player extends Entity {
     ctx.globalAlpha = 1;
     let alpha = 1; if (this.invulnT > 0 && this.state !== 'dash' && Math.floor(this.invulnT * 16) % 2) alpha = 0.35;
     if (this.state === 'dash') alpha = 0.7;
+    if (this.onGround && !this.free && this.alive) blobShadow(ctx, x, this.bottom - cam.y, Math.round(this.w * 0.75));
     if (this.alive || this.deathT < 1.4) drawFrame(ctx, f, x, y, flip, false, alpha * (this.alive ? 1 : Math.max(0, 1 - Math.max(0, this.deathT - 0.8) / 0.6)));
     if (this.state === 'charge') { const r = clamp(this.chargeT / (this.form.heavy.charge / (1 + this.stats.chargeSpeed)), 0, 1); ctx.fillStyle = '#170d1c'; ctx.fillRect(Math.round(x) - 11, Math.round(this.y - this.h / 2 - cam.y) - 12, 22, 4); ctx.fillStyle = r >= 1 ? '#ffd84a' : '#ff9a4a'; ctx.fillRect(Math.round(x) - 10, Math.round(this.y - this.h / 2 - cam.y) - 11, Math.round(20 * r), 2); }
     if (this.counterT > 0) { ctx.strokeStyle = '#ff90a8'; ctx.beginPath(); ctx.arc(Math.round(x) + 0.5, Math.round(this.y - cam.y) + 0.5, 14 + Math.sin(this.t * 30) * 2, 0, 6.3); ctx.stroke(); }

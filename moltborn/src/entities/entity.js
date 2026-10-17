@@ -16,6 +16,11 @@ export function drawFrame(ctx, f, x, y, flip = false, flash = false, alpha = 1) 
   if (alpha < 1) ctx.globalAlpha = 1;
 }
 
+// soft contact shadow so characters sit on the seabed instead of floating over it
+export function blobShadow(ctx, x, y, rw, a = 0.28) {
+  x = Math.round(x); y = Math.round(y); ctx.fillStyle = `rgba(4,10,24,${a})`; ctx.fillRect(x - rw, y, rw * 2, 1); ctx.fillRect(x - rw + 2, y - 1, rw * 2 - 4, 1); ctx.fillRect(x - rw + 2, y + 1, rw * 2 - 4, 1);
+}
+
 export class Entity {
   constructor(world, x, y, w, h) {
     this.world = world; this.x = x; this.y = y; this.w = w; this.h = h; this.vx = 0; this.vy = 0;

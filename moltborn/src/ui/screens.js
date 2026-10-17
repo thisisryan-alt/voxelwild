@@ -84,8 +84,9 @@ export class TitleScene {
 export function drawControls(ctx) {
   panel(ctx, 40, 20, 400, 232, { alpha: 0.96 }); text(ctx, 'CONTROLS', 50, 26, COL.gold);
   const rows = [['Move', 'A / D  or  Arrows'], ['Paddle / swim up', 'SPACE  /  W  /  Up'], ['Swim down', 'S  /  Down'], ['Claw (combo)', 'J  /  Z'], ['Heavy (hold to charge)', 'K  /  X'], ['Dash', 'L  /  C'], ['Block / parry', 'SHIFT  /  V'], ['Abilities', '1  2  3'], ['Ultimate', 'Q'], ['Interact', 'E'], ['Menu', 'TAB  /  B'], ['Map', 'M'], ['Pause', 'ESC  /  P'], ['Quick save', 'F5'], ['Quick heal (kelp wrap)', 'F']];
-  rows.forEach((r, i) => { text(ctx, r[0], 52, 42 + i * 14, COL.dim); text(ctx, r[1], 430 - textWidth(r[1]), 42 + i * 14, COL.text); });
-  text(ctx, 'Tip: block just as an attack lands to PARRY (Warrior Crab and beyond).', 52, 236, '#9ad8ff');
+  rows.forEach((r, i) => { const col = i < 8 ? 0 : 1, y = 44 + (i % 8) * 20, x0 = col ? 250 : 52, x1 = col ? 430 : 232; text(ctx, r[0], x0, y, COL.dim); text(ctx, r[1], x1 - textWidth(r[1]), y + 9, COL.text); });
+  ctx.fillStyle = '#1a3a5a'; ctx.fillRect(243, 40, 1, 160);
+  text(ctx, 'Tip: block just as an attack lands to PARRY.', 52, 222, '#9ad8ff'); text(ctx, 'A gamepad works too: stick to move, face buttons to fight.', 52, 234, COL.dim);
 }
 function drawCredits(ctx) {
   panel(ctx, 40, 20, 400, 232, { alpha: 0.96 }); text(ctx, 'CREDITS', 50, 26, COL.gold);

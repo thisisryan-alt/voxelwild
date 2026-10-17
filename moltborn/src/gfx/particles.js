@@ -7,7 +7,7 @@ export class Particles {
   constructor() { this.p = []; this.rings = []; this.texts = []; this.max = 1400; }
   add(o) {
     if (this.p.length >= this.max) this.p.shift();
-    this.p.push({ x: 0, y: 0, vx: 0, vy: 0, life: 1, max: 1, size: 1, color: '#fff', grav: 0, drag: 0, shrink: false, kind: 'rect', fade: true, wob: 0, ...o, max: o.life ?? 1 });
+    this.p.push({ x: 0, y: 0, vx: 0, vy: 0, life: 1, size: 1, color: '#fff', grav: 0, drag: 0, shrink: false, kind: 'rect', fade: true, wob: 0, ...o, max: o.life ?? 1 });
   }
   bubble(x, y, n = 1, spread = 6, vy = -26) {
     for (let i = 0; i < n; i++) this.add({ x: x + (rand() - 0.5) * spread, y, vx: (rand() - 0.5) * 8, vy: vy - rand() * 14, life: 0.9 + rand() * 1.1, size: rand() < 0.3 ? 2 : 1, color: rand() < 0.5 ? '#d8f4ff' : '#a8e0f8', kind: 'bubble', wob: rand() * 6 });

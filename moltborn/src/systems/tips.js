@@ -5,6 +5,8 @@ const TIPS = {
   tuck: { msg: 'Hold SHIFT to tuck into your shell. Tap it just before a hit to parry.', test: (c) => c.p.state === 'hurt' },
   heal: { msg: 'Low on health? Press F to use a kelp wrap.', test: (c) => c.p.hp < c.p.stats.maxHp * 0.4 && (c.g.state.inv.kelp_wrap > 0 || c.g.state.inv.brine_tonic > 0) },
   dash: { msg: 'Press L to dash. You are untouchable for an instant.', test: (c) => c.g.state.level >= 2 },
+  ability: { msg: 'You learned an ability. Press 1 to use it; it spends Tide.', test: (c) => c.g.state.slots?.[0] && c.g.state.stats.kills > 0 },
+  map: { msg: 'Lost? Press M for the map, TAB for quests and gear.', test: (c) => Object.keys(c.g.state.visited || {}).length >= 3 },
   skill: { msg: 'You have skill points. Open the menu (TAB) to spend them.', test: (c) => c.g.state.sp > 0 },
 };
 export class Tips {

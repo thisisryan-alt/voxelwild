@@ -1,6 +1,6 @@
 // Enemy entity: data-driven (data/enemies.js) with behaviours from ai.js. Handles hits, guard, poise,
 // status effects, drops and drawing.
-import { Entity, Projectile, Pickup, drawFrame } from './entity.js';
+import { Entity, Projectile, Pickup, drawFrame, blobShadow } from './entity.js';
 import { moveBody } from '../world/physics.js';
 import { AI } from './ai.js';
 import { ENEMIES } from '../data/enemies.js';
@@ -145,6 +145,7 @@ export class Enemy extends Entity {
     const frame = enemyFrame(this.type, sp, pose, Math.floor(this.t * (d.fps || 8)));
     const feet = d.anchor !== 'center';
     const x = this.x - cam.x, y = (feet ? this.y + this.h / 2 : this.y) - cam.y;
+    if (feet && this.onGround && this.alive !== false) blobShadow(ctx, x, y, Math.round(this.w * 0.7), 0.24);
     const flash = this.flash > 0 || (this.state === 'windup' && Math.floor(this.st * 14) % 2 === 0 && this.def.dmg > 0 && !d.noBlink);
     let alpha = this.phased ? 0.38 : 1; if (this.stunT > 0 && Math.floor(this.t * 20) % 2) alpha *= 0.85;
     if (this.scale !== 1) { ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(this.scale, this.scale); drawFrame(ctx, frame, 0, 0, this.facing < 0 !== (sp.flip === true), this.flash > 0, alpha); ctx.restore(); }
