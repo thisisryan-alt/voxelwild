@@ -33,6 +33,9 @@ sets the exit code.
 | `journal.test.mjs` | the dive log |
 | `rifts.test.mjs`, `trial.test.mjs`, `oaths.test.mjs` | run logic, the Trial room's rules, oaths |
 | `systems2.test.mjs` | cooking, elites, trophies, fast travel, accessibility palettes, progression |
+| `stats.test.mjs` | how events become lifetime records, boss timing and flawless detection |
+| `scenes.test.mjs` | menu scenes driven with a scripted input: oaths, selling, bounties, the board, help, the hall |
+| `bosses.test.mjs` | every boss class is consistent (phases, attack generators, sprites, music, loot) and the Warden's geometry |
 
 ### Conventions
 
