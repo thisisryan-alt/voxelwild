@@ -3,6 +3,7 @@
 import { Entity, Projectile, Pickup, drawFrame, blobShadow } from './entity.js';
 import { moveBody } from '../world/physics.js';
 import { AI } from './ai.js';
+import './ai_rift.js';
 import { ENEMIES } from '../data/enemies.js';
 import { enemyFrame } from '../gfx/sprites_enemies.js';
 import { rng, clamp } from '../core/util.js';

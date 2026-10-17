@@ -10,13 +10,13 @@ import { ENEMIES } from '../data/enemies.js';
 import { spawnPoints } from '../systems/spawner.js';
 
 export const THEMES = {
-  reef:      { biome: 'reef', surface: T.GROUND, light: '#9ae8ff', pool: ['pinchling', 'urchin', 'hermit', 'fumecap', 'mantis'], tough: 'hermit' },
-  forest:    { biome: 'forest', surface: T.GROUND, light: '#a8ffb0', pool: ['venomjelly', 'sporepod', 'mossback', 'mantis', 'splitjelly', 'fumecap'], tough: 'mossback' },
-  kingdom:   { biome: 'kingdom', surface: T.RUIN, light: '#ffd8f0', pool: ['brineguard', 'archerfish', 'puffer', 'anemone_c', 'mantis', 'spawncoral'], tough: 'brineguard' },
-  graveyard: { biome: 'graveyard', surface: T.GROUND, light: '#a8d0c0', pool: ['ghostsailor', 'cannon', 'ironturtle', 'barracuda', 'hookjaw', 'tuskram'], tough: 'ironturtle' },
-  abyss:     { biome: 'abyss', surface: T.ROCK, light: '#7ab8ff', pool: ['lanternfish', 'gulper', 'inksquid', 'voidwisp', 'deepjelly', 'hookjaw'], tough: 'gulper' },
-  trench:    { biome: 'trench', surface: T.BONE, light: '#ff98a8', pool: ['bonecrawler', 'hollowshade', 'wardenbone', 'gulper', 'tuskram', 'guardian'], tough: 'wardenbone' },
-  domain:    { biome: 'domain', surface: T.DIVINE, light: '#a8f4ff', pool: ['guardian', 'stormhorse', 'tidewisp', 'tridentstatue', 'tuskram'], tough: 'guardian' },
+  reef:      { biome: 'reef', surface: T.GROUND, light: '#9ae8ff', pool: ['pinchling', 'urchin', 'hermit', 'fumecap', 'mantis', 'latchleech'], tough: 'hermit' },
+  forest:    { biome: 'forest', surface: T.GROUND, light: '#a8ffb0', pool: ['venomjelly', 'sporepod', 'mossback', 'mantis', 'splitjelly', 'fumecap', 'tidecaller'], tough: 'mossback' },
+  kingdom:   { biome: 'kingdom', surface: T.RUIN, light: '#ffd8f0', pool: ['brineguard', 'archerfish', 'puffer', 'anemone_c', 'mantis', 'spawncoral', 'shardling'], tough: 'brineguard' },
+  graveyard: { biome: 'graveyard', surface: T.GROUND, light: '#a8d0c0', pool: ['ghostsailor', 'cannon', 'ironturtle', 'barracuda', 'hookjaw', 'tuskram', 'latchleech'], tough: 'ironturtle' },
+  abyss:     { biome: 'abyss', surface: T.ROCK, light: '#7ab8ff', pool: ['lanternfish', 'gulper', 'inksquid', 'voidwisp', 'deepjelly', 'hookjaw', 'shardling', 'tidecaller'], tough: 'gulper' },
+  trench:    { biome: 'trench', surface: T.BONE, light: '#ff98a8', pool: ['bonecrawler', 'hollowshade', 'wardenbone', 'gulper', 'tuskram', 'guardian', 'glassgolem'], tough: 'wardenbone' },
+  domain:    { biome: 'domain', surface: T.DIVINE, light: '#a8f4ff', pool: ['guardian', 'stormhorse', 'tidewisp', 'tridentstatue', 'tuskram', 'glassgolem', 'shardling'], tough: 'guardian' },
 };
 export const THEME_ORDER = ['reef', 'forest', 'kingdom', 'graveyard', 'abyss', 'trench', 'domain'];
 

@@ -139,6 +139,8 @@ export class World {
   update(dt) {
     this.t += dt;
     const pl = this.player;
+    // areas with a `ttl` (gusts, pulls) expire on their own, so nothing that made them has to survive to clean up
+    const ar = this.zone.areas; for (let i = ar.length - 1; i >= 0; i--) if (ar[i].ttl !== undefined && (ar[i].ttl -= dt) <= 0) ar.splice(i, 1);
     const edt = this.slowT > 0 ? dt * this.slowFactor : dt;
     if (this.slowT > 0) this.slowT -= dt;
     pl.update(dt); this.companion?.update(dt); this.game.systems.director?.update(this);

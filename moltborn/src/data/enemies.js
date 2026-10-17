@@ -80,3 +80,7 @@ export const ENEMIES = {
   fumecap: { name: 'Fumecap', hp: 26, dmg: 7, w: 16, h: 22, xp: 16, coins: [2, 5], poise: 99, noStagger: true, ai: 'cloudlayer', anchor: 'feet', fps: 4, mass: 99, contact: false,
     sprite: { plan: 'cap', w: 36, h: 34, ax: 18, ay: 32, frames: 4, o: { ramp: R.venom, glow: '#b8ff70' } }, p: { range: 170, wind: 0.7, cd: 3.4, cloudR: 34, cloudLife: 4.5, cloudDps: 4 } },
 };
+
+// creatures from the rifts join the roster here
+import { RIFT_FOES } from './enemies_rift.js';
+Object.assign(ENEMIES, RIFT_FOES);

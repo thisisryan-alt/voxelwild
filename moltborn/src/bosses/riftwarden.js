@@ -107,7 +107,7 @@ export class RiftWarden extends Boss {
     const w = this.world, pl = this.player, a = this.arena; this.pose = 'roar'; this.sfx('whirl');
     w.fx.text(this.x, this.y - 54, 'THE TEAR INHALES', '#d8b8ff', true);
     this.teleCircle(this.x, this.y, 88, 1.6, { color: '#b060ff' });
-    const area = { kind: 'current', x: a.x * TS, y: a.y * TS, w: a.w * TS, h: a.h * TS, vx: 0, vy: 0 }; w.zone.areas.push(area); let t = 0;
+    const area = { kind: 'current', x: a.x * TS, y: a.y * TS, w: a.w * TS, h: a.h * TS, vx: 0, vy: 0, ttl: 1.8 }; w.zone.areas.push(area); let t = 0;
     while (t < 1.6) { const dx = this.x - pl.x, dy = this.y - pl.y, d = Math.hypot(dx, dy) || 1; area.vx = dx / d * 90; area.vy = dy / d * 90; t += 1 / 60; yield 1 / 60; }
     const i = w.zone.areas.indexOf(area); if (i >= 0) w.zone.areas.splice(i, 1);
     this.strikeCircle(this.x, this.y, 88, 22, 0.2, { kb: 300 }); w.fx.ring(this.x, this.y, 8, 90, 0.5, '#d8b8ff', 4); this.sfx('boom'); w.shake(7);
