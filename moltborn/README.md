@@ -7,7 +7,7 @@ music, sound effects) is generated in code: there are no image or audio assets, 
 ## Run it
 
 ```
-node tools/serve.mjs          # serves on http://localhost:8123 (pass a port to change it)
+node tools/serve.mjs          # serves on http://localhost:8080 (pass a port to change it)
 ```
 
 Open the URL in a modern browser. Nothing to install. Click the canvas once so audio can start.
