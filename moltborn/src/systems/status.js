@@ -54,6 +54,14 @@ export const STATUS = {
     name: 'Fortune', color: '#ffd84a', dur: 60, mods: { coin: 1.5 },
     desc: 'Coins from foes are 50% richer.',
   },
+  sunlit: {
+    name: 'Sunlit', color: '#ffe08a', dur: 1e6, mods: { tideRegen: 1.12 }, passive: true,
+    desc: 'Warm shallows: Tide regenerates 12% faster.',
+  },
+  moonlit: {
+    name: 'Moonlit', color: '#9ab0ff', dur: 1e6, mods: { speed: 1.04 }, passive: true,
+    desc: 'Night swimming: a little faster. Foes are warier; experience is richer.',
+  },
   ember: {
     name: 'Emberskin', color: '#ff9a3a', dur: 30, mods: { heat: 0.4, dmgOut: 1.08 },
     desc: 'Vent plumes hurt less and your blows burn hotter.',
@@ -148,6 +156,8 @@ const MAPS = {
   ward:   ['#######', '#.....#', '#.....#', '#.....#', '.#...#.', '..#.#..', '...#...'],
   focus:  ['..###..', '.#...#.', '#..#..#', '#.###.#', '#..#..#', '.#...#.', '..###..'],
   fortune:['..###..', '.#####.', '###.###', '###.###', '.#####.', '..###..', '.......'],
+  sunlit: ['#..#..#', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '#..#..#'],
+  moonlit: ['..###..', '.##....', '##.....', '##.....', '##.....', '.##..#.', '..###..'],
   ember:  ['..#.#..', '.#####.', '#######', '#######', '.#####.', '..###..', '...#...'],
 };
 const iconCache = new Map();

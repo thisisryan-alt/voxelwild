@@ -13,10 +13,12 @@ export class HudExtra {
     const ev = this.g.events;
     ev.on('hurt', (n, src, blocked) => this.onHurt(n, src, blocked));
     ev.on('zone', () => { this.arcs.length = 0; this.xpShown = null; this.hits.length = 0; });
+    ev.on('phase', () => { this.phaseT = 4; });
     ev.on('hitdealt', (e, dmg) => { this.hits.push({ t: performance.now() / 1000, d: dmg }); if (this.hits.length > 400) this.hits.shift(); });
   }
 
   update(dt) {
+    this.phaseT = Math.max(0, (this.phaseT || 0) - dt);
     for (const a of this.arcs) a.t += dt; this.arcs = this.arcs.filter((a) => a.t < 0.9);
     for (const k of Object.keys(this.flashes)) { this.flashes[k] -= dt; if (this.flashes[k] <= 0) delete this.flashes[k]; }
     const p = this.g.world?.player, st = this.g.state; if (!p) return;
@@ -44,10 +46,10 @@ export class HudExtra {
     const p = this.g.world.player, list = p.status.entries(); if (!list.length) return;
     let i = 0;
     for (const s of list.slice(0, 8)) {
-      const def = STATUS[s.id], ix = x + i * 12, expiring = s.t < 4 && Math.floor(s.t * 4) % 2 === 0;
-      ctx.globalAlpha = expiring ? 0.45 : 1; ctx.drawImage(statusIcon(s.id, 1), ix, y);
-      ctx.globalAlpha = 1; ctx.fillStyle = '#05030a'; ctx.fillRect(ix + 1, y + 10, 8, 2);
-      ctx.fillStyle = def.color; ctx.fillRect(ix + 1, y + 10, Math.max(1, Math.round(8 * clamp(s.t / s.max, 0, 1))), 1);
+      const def = STATUS[s.id], ix = x + i * 12, expiring = !def.passive && s.t < 4 && Math.floor(s.t * 4) % 2 === 0;
+      ctx.globalAlpha = expiring ? 0.45 : def.passive ? 0.7 : 1; ctx.drawImage(statusIcon(s.id, 1), ix, y);
+      ctx.globalAlpha = 1;
+      if (!def.passive) { ctx.fillStyle = '#05030a'; ctx.fillRect(ix + 1, y + 10, 8, 2); ctx.fillStyle = def.color; ctx.fillRect(ix + 1, y + 10, Math.max(1, Math.round(8 * clamp(s.t / s.max, 0, 1))), 1); }
       if (s.stacks > 1) text(ctx, String(s.stacks), ix + 6, y + 1, '#ffffff', { shadow: '#000' });
       i++;
     }
@@ -100,6 +102,20 @@ export class HudExtra {
     if (!setting(this.g, 'showDps')) return; const now = performance.now() / 1000; this.hits = this.hits.filter((h) => now - h.t < 5);
     const sum = this.hits.reduce((n, h) => n + h.d, 0), v = this.hits.length ? Math.round(sum / Math.max(2, now - this.hits[0].t)) : 0; this.peak = Math.max(v, (this.peak || 0) * 0.999);
     const s = `DPS ${v}   best ${Math.round(this.peak)}`, w = textWidth(s) + 10; panel(ctx, 476 - w, 252, w, 13, { alpha: 0.6, border: '#2a3a58' }); text(ctx, s, 481 - w, 255, v ? COL.gold : COL.dim);
+  }
+
+  // a small sun or moon beside the coins, with the phase name for a few seconds after it changes
+  clock(ctx, x, y) {
+    const C = this.g.systems.clock; if (!C || !C.on || !setting(this.g, 'showClock')) return;
+    const f = C.frac(), ph = C.phase, night = C.nightness(), cx = x + 7, cy = y + 7;
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, 7, 0, 6.3); ctx.clip(); ctx.fillStyle = night > 0.5 ? '#0a1238' : '#2a6aa8'; ctx.fillRect(x, y, 14, 14);
+    // the body rides an arc from left (dawn) over the top to right (dusk), then the moon crosses below the surface line
+    const day = f < 0.62 ? f / 0.62 : (f - 0.62) / 0.38, a = Math.PI * (1 - day), bx = cx + Math.cos(a) * 6, by = cy + 5 - Math.sin(a) * 9;
+    if (f < 0.62) { ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(bx, by, 2.6, 0, 6.3); ctx.fill(); ctx.fillStyle = '#fff6c8'; ctx.beginPath(); ctx.arc(bx - 0.4, by - 0.4, 1.2, 0, 6.3); ctx.fill(); }
+    else { ctx.fillStyle = '#d8e0ff'; ctx.beginPath(); ctx.arc(bx, by, 2.7, 0, 6.3); ctx.fill(); ctx.fillStyle = '#0a1238'; ctx.beginPath(); ctx.arc(bx + 1.7, by - 0.9, 2.3, 0, 6.3); ctx.fill(); }
+    ctx.fillStyle = 'rgba(20,70,120,0.85)'; ctx.fillRect(x, y + 10, 14, 4); ctx.restore();
+    ctx.strokeStyle = '#2a4a70'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, 6.3); ctx.stroke();
+    if (this.phaseT > 0) { const s = ph.name, a2 = Math.min(1, this.phaseT); ctx.globalAlpha = a2; text(ctx, s, x - textWidth(s) - 4, y + 3, '#cfe0ff', { shadow: '#000' }); ctx.globalAlpha = 1; }
   }
 
   fps(ctx) {

@@ -37,6 +37,7 @@ export class Hud {
     if (this.t - (this.nameT ?? 0) < 5) { ctx.globalAlpha = Math.min(1, 5 - (this.t - this.nameT)); const tt = g.systems.cosmetics?.titleText(); text(ctx, F.name + (tt ? '  ' + tt : ''), 108 + textWidth(String(st.level)) + 5, 8, COL.dim, { shadow: '#000' }); ctx.globalAlpha = 1; }
     this.x.statusRow(ctx, 8, (p.combo || 0) >= 3 && p.comboLife > 0 ? 47 : 30); this.x.endScale(ctx, big);
     // --- currency: one line; EP / SP only when there is something to spend ---
+    this.x.clock(ctx, 476 - textWidth(String(st.coins)) - 36, 3);
     const cw = textWidth(String(st.coins)); ctx.drawImage(iconCoin(), 476 - cw - 14, 6); text(ctx, String(st.coins), 476 - cw, 8, COL.gold);
     let ry = 20; const evolvable = this.g.systems.evolution?.readyFor?.();
     if (st.ep > 0) { text(ctx, `EP ${st.ep}`, 476 - textWidth(`EP ${st.ep}`), ry, COL.pink); ry += 10; }

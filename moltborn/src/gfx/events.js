@@ -186,6 +186,39 @@ const KINDS = {
   },
 
   // a wave of bioluminescence rolling across the whole view, left to right or right to left
+  // night only: pale shafts of moonlight slanting down through the shallows
+  moonbeam: {
+    layer: 'back', life: 30,
+    spawn(e, r) { e.x0 = r() * W; e.sp = (r() < 0.5 ? -1 : 1) * (3 + r() * 3); e.n = 2 + ((r() * 3) | 0); e.t = 0; },
+    step(e, dt) { e.t += dt; e.done = e.t > this.life; },
+    draw(c, e, cam, t, B, world) {
+      const shallow = clamp(1 - (cam.y + H / 2) / Math.max(1, world.zone.h * TS * 0.55), 0, 1); if (shallow <= 0.02) return;
+      const k = Math.min(1, e.t / 5, (this.life - e.t) / 6) * shallow;
+      c.save(); c.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < e.n; i++) {
+        const bx = ((e.x0 + e.t * e.sp + i * 151) % (W + 240)) - 120, wd = 20 + (i * 29) % 26, lean = 70 + (i * 19) % 40;
+        const g = c.createLinearGradient(bx, 0, bx - lean, H * 0.8); g.addColorStop(0, `rgba(170,196,255,${0.13 * k})`); g.addColorStop(1, 'rgba(170,196,255,0)');
+        c.fillStyle = g; c.beginPath(); c.moveTo(bx, 0); c.lineTo(bx + wd, 0); c.lineTo(bx + wd - lean, H * 0.8); c.lineTo(bx - lean, H * 0.8); c.fill();
+      }
+      c.restore();
+    },
+  },
+  // night only: a drift of glowing plankton, thickest near the swimmer's depth
+  plankton: {
+    layer: 'glow', life: 36,
+    spawn(e, r, world) { e.t = 0; e.seed = r() * 1000; e.col = world.zone.biome === 'forest' ? '#9affc0' : world.zone.biome === 'kingdom' ? '#e0b0ff' : '#7ae8ff'; },
+    step(e, dt) { e.t += dt; e.done = e.t > this.life; },
+    draw(c, e, cam, t) {
+      const k = Math.min(1, e.t / 5, (this.life - e.t) / 6); c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = e.col;
+      for (let i = 0; i < 70; i++) {
+        const h = Math.sin((i + e.seed) * 12.9898) * 43758.5453, rx = h - Math.floor(h), h2 = Math.sin((i + e.seed) * 78.233) * 12345.678, ry = h2 - Math.floor(h2), par = 0.5 + rx * 0.9;
+        const x = (((rx * W * 1.4 - cam.x * par + Math.sin(t * 0.4 + i) * 8 + t * 4 * par) % (W + 20)) + W + 20) % (W + 20) - 10, y = (((ry * H * 1.4 - cam.y * par * 0.7 + Math.cos(t * 0.3 + i * 1.3) * 7 - t * 3) % (H + 20)) + H + 20) % (H + 20) - 10;
+        c.globalAlpha = k * (0.25 + 0.55 * (0.5 + 0.5 * Math.sin(t * 1.7 + i * 2.1))); c.fillRect(Math.round(x), Math.round(y), par > 1 ? 2 : 1, par > 1 ? 2 : 1);
+      }
+      c.restore();
+    },
+  },
+
   glowpulse: {
     layer: 'glow', life: 6,
     spawn(e, r, world) { e.dir = r() < 0.5 ? -1 : 1; e.t = 0; e.col = world.zone.biome === 'trench' ? '#ff7ab0' : world.zone.biome === 'domain' ? '#7affe8' : '#5ad8ff'; },
@@ -220,7 +253,13 @@ export class AmbientEvents {
   get enabled() { return !!setting(this.w.game, 'ambientLife') && !this.w.cinematic && !(this.w.boss && this.w.boss.engaged); }
 
   pick() {
-    const tbl = WEIGHTS[this.w.zone.biome]; if (!tbl) return null;
+    let tbl = WEIGHTS[this.w.zone.biome]; if (!tbl) return null;
+    const C = this.w.game.systems.clock;
+    if (C && C.on) {
+      const night = C.nightness(), open = C.openness(this.w.zone.biome); tbl = { ...tbl };
+      if (night > 0.5) { delete tbl.sun; if (open >= 0.4) { tbl.moonbeam = 4; tbl.plankton = 5; } else tbl.glowpulse = (tbl.glowpulse || 0) + 2; }
+      else if (night > 0.15) delete tbl.sun;
+    }
     const entries = Object.entries(tbl); let total = entries.reduce((a, [, v]) => a + v, 0), x = this.r() * total;
     for (const [k, v] of entries) { if ((x -= v) <= 0) return k; }
     return entries[0][0];

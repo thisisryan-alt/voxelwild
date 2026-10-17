@@ -31,6 +31,7 @@ export const COMMANDS = {
   arena: { args: '', run: (g) => { g.engine.pop(); g.systems.arena.start(); return []; } },
   trophy: { args: '<id|all>', run: (g, [id]) => { const A = g.systems.achievements; let n = 0; for (const a of ACHIEVEMENTS) if ((id === 'all' || a.id === id) && A.award(a, true)) n++; return [`Awarded ${n}`]; } },
   elite: { args: '<affix>', run: (g, [a]) => { const e = g.world.enemies.find((x) => x.alive && !x.def.friendly && !x.def.boss && !x.affixes); if (!e) return ['No candidate foe']; g.systems.elites.apply(e, [a]); return [`${e.name}`]; } },
+  time: { args: '[dawn|day|dusk|night|0..1]', run: (g, [t]) => { const C = g.systems.clock; if (t !== undefined) { const n = parseFloat(t); C.jump(Number.isFinite(n) ? n : t); C.update(0); } return [`${C.phase.name} (${C.frac().toFixed(2)}), next phase in ${Math.round(C.untilNext())}s`]; } },
   items: { args: '[filter]', run: (g, [f]) => [Object.keys(ITEMS).filter((k) => !f || k.includes(f)).slice(0, 40).join(', ')] },
   stats: { args: '', run: (g) => { const p = g.world.player, S = p.stats; return [`hp ${Math.round(p.hp)}/${S.maxHp} atk ${S.atk.toFixed(1)} def ${S.def} speed ${S.speed.toFixed(2)} crit ${S.crit}`, `diff ${JSON.stringify(g.systems.difficulty.scale())}`]; } },
 };

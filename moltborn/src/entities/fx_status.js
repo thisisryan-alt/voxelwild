@@ -71,6 +71,8 @@ export function statusFx(owner, dt) {
       case 'focus': if (Math.random() < 0.4) { const a = Math.random() * 6.3; fx.add({ x: owner.x + Math.cos(a) * 16, y: owner.y + Math.sin(a) * 16, vx: -Math.cos(a) * 30, vy: -Math.sin(a) * 30, life: 0.5, size: 1, color: '#8ac8ff', shrink: true }); } break;
       case 'fortune': if (Math.random() < 0.35) fx.add({ x: rx(), y: ry(), vx: 0, vy: -12, life: 0.7, size: 1, color: '#ffe680', kind: 'star', drag: 0.5 }); break;
       case 'ember': if (Math.random() < 0.5) fx.add({ x: rx(), y: owner.y + hh * 0.3, vx: (Math.random() - 0.5) * 12, vy: -30, life: 0.45, size: 1, color: '#ffb040', drag: 1.2, shrink: true }); break;
+      case 'moonlit': if (Math.random() < 0.12) fx.add({ x: rx(), y: ry(), vx: 0, vy: -6, life: 0.9, size: 1, color: '#c8d4ff', kind: 'star', drag: 0.6 }); break;
+      case 'sunlit': if (Math.random() < 0.06) fx.add({ x: rx(), y: owner.y - hh * 0.6, vx: 0, vy: -4, life: 0.6, size: 1, color: '#fff2b0', kind: 'star', drag: 0.6 }); break;
       default: break;
     }
   }

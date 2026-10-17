@@ -17,6 +17,8 @@ export const SCHEMA = [
   { group: 'Video', key: 'particles', label: 'Particle density', type: 'slider', min: 0.2, max: 1, step: 0.2, def: 1 },
   { group: 'Video', key: 'scanlines', label: 'Scanlines', type: 'toggle', def: 0 },
   { group: 'Video', key: 'ambientLife', label: 'Ambient sea life', type: 'toggle', def: 1, hint: 'Fish, jellies, whales and other background life.' },
+  { group: 'Video', key: 'dayNight', label: 'Day and night', type: 'cycle', options: ['off', 'subtle', 'full'], def: 'full', hint: 'A ten-minute day: the light changes, and so do the odds. Off keeps the reef at noon.' },
+  { group: 'Video', key: 'showClock', label: 'Show clock', type: 'toggle', def: 1, hint: 'A small sun or moon beside your coins.' },
   { group: 'Video', key: 'showFps', label: 'Show FPS', type: 'toggle', def: 0 },
 
   { group: 'Gameplay', key: 'difficulty', label: 'Difficulty', type: 'cycle', options: DIFFICULTIES, def: 'tide', hint: 'Calm: forgiving. Tide: as designed. Rip: tougher foes. Maelstrom: unforgiving.' },

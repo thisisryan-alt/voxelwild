@@ -19,7 +19,7 @@ export class Enemy extends Entity {
     const def = ENEMIES[type];
     if (!def) throw new Error('unknown enemy ' + type);
     super(world, x, y, def.w, def.h);
-    this.type = type; this.def = def; this.p = { ...def.p, ...(o.p || {}) };
+    this.type = type; this.def = def; this.p = { ...def.p, ...(o.p || {}) }; const alert = world.game.systems.clock?.aggro(); if (alert && alert !== 1 && this.p.aggro) this.p.aggro = Math.round(this.p.aggro * alert);
     this.maxHp = Math.round(def.hp * (o.hpMult || 1) * (def.friendly ? 1 : world.game.systems.difficulty?.scale().hp ?? 1)); this.hp = this.maxHp;
     this.maxPoise = def.poise ?? 8; this.poise = this.maxPoise;
     this.state = ''; this.st = 0; this.pose = 'move'; this.flash = 0; this.stunT = 0; this.invuln = false; this.scale = 1;

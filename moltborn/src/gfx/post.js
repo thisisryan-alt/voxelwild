@@ -79,6 +79,7 @@ export class PostFX {
     const grading = setting(g, 'grading'), bloom = setting(g, 'bloom'), wobble = setting(g, 'wobble');
     const calm = !!setting(g, 'reduceMotion'), lite = this.lite;
     if (grading > 0.01) this.grade(ctx, world, grading);
+    this.clockGrade(ctx, world);
     if (bloom > 0.01 && !lite) this.bloomPass(ctx, bloom);
     const needFrame = (wobble > 0.01 && !calm && !lite) || this.chroma > 0.05;
     if (needFrame) {
@@ -103,6 +104,17 @@ export class PostFX {
     if (G.lift) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = G.lift * k; ctx.fillStyle = G.glow; ctx.fillRect(0, 0, W, H); }
     ctx.restore();
     this.edge(ctx, k * (0.35 + depth * 0.25));
+  }
+  // the hour of the day: dawn warms the picture, dusk reddens it, night lays a deep blue over everything the sky can reach
+  clockGrade(ctx, world) {
+    const C = this.g.systems.clock; if (!C || !C.on) return;
+    const k = C.mode === 'subtle' ? 0.5 : 1, depth = clamp(world.player.y / Math.max(1, world.zone.h * TS), 0, 1);
+    const open = C.openness(world.zone.biome) * (world.zone.rift ? 0.4 : 1) * (1 - depth * 0.45) * k, G = C.grade();
+    if (open <= 0.02 || (G.a < 0.004 && G.dark < 0.004)) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = Math.min(1, G.a * 2.1 * open); ctx.fillStyle = `rgb(${G.r | 0},${G.g | 0},${G.b | 0})`; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = G.dark * 0.7 * open; ctx.fillStyle = '#020a2c'; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
   }
   // darkened corners, pre-rendered once
   edge(ctx, a) {
