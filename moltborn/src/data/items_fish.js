@@ -9,6 +9,9 @@ export const FISH_DISHES = {
   glass_carpaccio: { name: 'Glassfin Carpaccio', type: 'dish', icon: ['potion', 'cyan'], desc: 'Sliced so thin the plate shows through. Sharpens strength and Tide at once.', use: { buffs: [{ id: 'might', dur: 30 }, { id: 'focus', dur: 25 }] } },
   koi_pie: { name: 'Gilded Koi Pie', type: 'dish', icon: ['potion', 'gold'], desc: 'A pie for people who have everything. Coins find you for a full minute, and you mend a little.', use: { heal: 0.2, buffs: [{ id: 'fortune', dur: 60 }, { id: 'regen', dur: 12 }] } },
   angler_stew: { name: 'Lantern Stew', type: 'dish', icon: ['potion', 'purple'], desc: 'It glows faintly. Refills some Tide and keeps it coming back.', use: { tide: 0.4, buffs: [{ id: 'focus', dur: 30 }, { id: 'regen', dur: 10 }] } },
+  bait_kelp: { name: 'Kelp Ball', type: 'dish', icon: ['drop', 'green'], desc: 'Chewed kelp rolled round a hook. Rarer fish bite for the next four minutes.', use: { buffs: [{ id: 'baited', dur: 240, power: 1 }] } },
+  bait_glow: { name: 'Glow Bait', type: 'dish', icon: ['drop', 'orange'], desc: 'A spore and a scale in a knot of weed. It glows in the water; the fish come to look. Much better odds for four minutes.', use: { buffs: [{ id: 'baited', dur: 240, power: 2 }] } },
+  bait_pearl: { name: 'Pearl Lure', type: 'dish', icon: ['pearl', 'white'], desc: 'A pearl on a hook is vanity. It works. The best odds there are, for two minutes.', use: { buffs: [{ id: 'baited', dur: 120, power: 3.5 }] } },
   moon_sashimi: { name: 'Moonlit Sashimi', type: 'dish', icon: ['potion', 'white'], desc: 'Cut thin, eaten slowly, remembered a long time. Might, haste and a deep calm.', use: { heal: 0.25, buffs: [{ id: 'might', dur: 40 }, { id: 'haste', dur: 30 }, { id: 'ward', dur: 30 }] } },
 };
 export const FISH_RECIPES = [
@@ -17,5 +20,8 @@ export const FISH_RECIPES = [
   { id: 'glass_carpaccio', out: 'glass_carpaccio', n: 1, needs: { fish_glassfin: 1, urchin_spine: 1 }, note: 'The urchin spine is the knife.' },
   { id: 'koi_pie', out: 'koi_pie', n: 1, needs: { fish_gilded_koi: 1, shell_chip: 1, kelp_frond: 1 }, note: 'The crust is gold leaf. The koi did not mind.' },
   { id: 'angler_stew', out: 'angler_stew', n: 1, needs: { fish_lantern_smelt: 2, glow_spore: 1 }, note: 'A stew that finds its own way to the table.' },
+  { id: 'bait_kelp', out: 'bait_kelp', n: 2, needs: { kelp_frond: 2, brine_salt: 1 }, note: 'Two balls from one batch. The fish are not proud.' },
+  { id: 'bait_glow', out: 'bait_glow', n: 2, needs: { glow_spore: 1, fin_scale: 1 }, note: 'The spore is the lamp; the scale is the lie.' },
+  { id: 'bait_pearl', out: 'bait_pearl', n: 1, needs: { pearl: 1, fish_silverfin: 1 }, note: 'A silverfin on a pearl. Cannibals love it.' },
   { id: 'moon_sashimi', out: 'moon_sashimi', n: 1, needs: { fish_moon_koi: 1, brine_salt: 1 }, note: 'Only if you caught it yourself.' },
 ];

@@ -54,6 +54,10 @@ export const STATUS = {
     name: 'Fortune', color: '#ffd84a', dur: 60, mods: { coin: 1.5 },
     desc: 'Coins from foes are 50% richer.',
   },
+  baited: {
+    name: 'Baited', color: '#7ad8ff', dur: 240, mods: {}, maxStacks: 1,
+    desc: 'Something smells good on your line: rarer fish rise to it.',
+  },
   sunlit: {
     name: 'Sunlit', color: '#ffe08a', dur: 1e6, mods: { tideRegen: 1.12 }, passive: true,
     desc: 'Warm shallows: Tide regenerates 12% faster.',
@@ -156,6 +160,7 @@ const MAPS = {
   ward:   ['#######', '#.....#', '#.....#', '#.....#', '.#...#.', '..#.#..', '...#...'],
   focus:  ['..###..', '.#...#.', '#..#..#', '#.###.#', '#..#..#', '.#...#.', '..###..'],
   fortune:['..###..', '.#####.', '###.###', '###.###', '.#####.', '..###..', '.......'],
+  baited: ['...#...', '...#...', '...#...', '...#...', '#..#..#', '.#.#.#.', '..###..'],
   sunlit: ['#..#..#', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '#..#..#'],
   moonlit: ['..###..', '.##....', '##.....', '##.....', '##.....', '.##..#.', '..###..'],
   ember:  ['..#.#..', '.#####.', '#######', '#######', '.#####.', '..###..', '...#...'],

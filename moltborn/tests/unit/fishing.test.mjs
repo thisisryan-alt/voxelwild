@@ -15,7 +15,7 @@ test('fish are well formed and unique', () => {
   for (const f of FISH) { ok(RARITY[f.rarity], f.id); ok(f.biomes.length && f.biomes.every((b) => FISH_BIOMES.includes(b)), f.id); ok(f.len[0] > 0 && f.len[1] > f.len[0], f.id); ok(f.value > 0 && f.note.length > 20, f.id); ok(f.fight.speed > 0 && f.fight.erratic >= 0 && f.fight.drain > 0, f.id); if (f.phases) for (const p of f.phases) ok(PHASES.some((x) => x.id === p), f.id + ':' + p); }
 });
 test('every fish is an ingredient item', () => { for (const f of FISH) { const it = ITEMS['fish_' + f.id]; ok(it && it.type === 'ingredient' && it.price > 0 && it.fish === f.id, f.id); } eq(Object.keys(FISH_INGREDIENTS).length, FISH.length); });
-test('fish dishes and recipes agree', () => { for (const r of FISH_RECIPES) { ok(FISH_DISHES[r.out], r.id); for (const k of Object.keys(r.needs)) ok(ITEMS[k], r.id + ':' + k); ok(Object.keys(r.needs).some((k) => k.startsWith('fish_')), r.id + ' uses a fish'); } for (const [id, d] of Object.entries(FISH_DISHES)) for (const b of d.use.buffs || []) ok(STATUS[b.id], id + ':' + b.id); });
+test('fish dishes and recipes agree', () => { for (const r of FISH_RECIPES) { ok(FISH_DISHES[r.out], r.id); for (const k of Object.keys(r.needs)) ok(ITEMS[k], r.id + ':' + k); if (!r.id.startsWith('bait_')) ok(Object.keys(r.needs).some((k) => k.startsWith('fish_')), r.id + ' uses a fish'); } for (const [id, d] of Object.entries(FISH_DISHES)) for (const b of d.use.buffs || []) ok(STATUS[b.id], id + ':' + b.id); });
 test('every realm has something to catch in every phase', () => { for (const b of FISH_BIOMES) for (const p of PHASES) ok(candidates(b, p.id).length >= 1, `${b} at ${p.id}`); });
 test('every fish can be caught somewhere at some hour', () => { for (const f of FISH) ok(FISH_BIOMES.some((b) => PHASES.some((p) => candidates(b, p.id).includes(f))), f.id); });
 test('night-only fish never bite by day', () => { for (const f of FISH.filter((x) => x.phases && !x.phases.includes('day'))) for (const b of f.biomes) ok(!candidates(b, 'day').includes(f), f.id); });
@@ -59,7 +59,17 @@ test('spots recover with play time', () => {
   const g = game(), F = g.systems.fishing, zs = {}; ok(F.ready(zs, 'k')); F.cool(zs, 'k', 1); ok(!F.ready(zs, 'k')); g.state.playtime += 100; ok(!F.ready(zs, 'k')); g.state.playtime += 100; ok(F.ready(zs, 'k'));
   F.cool(zs, 'k', 0.3); g.state.playtime += 60; ok(F.ready(zs, 'k'), 'a missed bite recovers faster');
 });
-test('luck and skill grow with level but stay capped', () => { const lo = game(1).systems.fishing, hi = game(30).systems.fishing; ok(hi.luck() > lo.luck() && hi.skill() > lo.skill()); ok(game(99).systems.fishing.luck() <= 0.55 && game(99).systems.fishing.skill() <= 0.6); });
+test('luck and skill grow with level but stay capped', () => { const lo = game(1).systems.fishing, hi = game(30).systems.fishing; ok(hi.luck() > lo.luck() && hi.skill() > lo.skill()); ok(game(99).systems.fishing.luck() <= 0.7 && game(99).systems.fishing.skill() <= 0.6); });
+test('bait raises luck in proportion to its power, and expires with its status', () => {
+  const g = game(10), F = g.systems.fishing, base = F.luck(); const set = new Map(); g.world.player = { status: { get: (id) => set.get(id) || null } };
+  set.set('baited', { power: 1 }); const one = F.luck(); set.set('baited', { power: 3.5 }); const big = F.luck(); set.delete('baited');
+  ok(one > base && big > one, `${base} ${one} ${big}`); near(one - base, 0.1, 1e-9); near(F.luck(), base, 1e-12);
+});
+test('bait items give the baited status with rising power, and the status is a real buff', () => {
+  const k = FISH_DISHES.bait_kelp.use.buffs[0], gl = FISH_DISHES.bait_glow.use.buffs[0], pe = FISH_DISHES.bait_pearl.use.buffs[0]; ok(STATUS.baited && !STATUS.baited.harmful);
+  ok(k.id === 'baited' && gl.power > k.power && pe.power > gl.power); ok(pe.dur < k.dur, 'the best lure is the shortest');
+  for (const r of FISH_RECIPES.filter((x) => x.id.startsWith('bait_'))) { ok(ITEMS[r.out].type === 'dish'); ok(r.n >= 1); }
+});
 test('picking a catch is deterministic for a spot, hour and salt, and returns a legal fish', () => {
   const g = game(), F = g.systems.fishing, spot = { seed: 12345 }; const a = F.pick(spot, 3), b = F.pick(spot, 3); eq(a.fish.id, b.fish.id); eq(a.len, b.len);
   for (let s = 0; s < 40; s++) { const c = F.pick(spot, s); ok(c.fish.biomes.includes('reef') && c.len >= c.fish.len[0] && c.len <= c.fish.len[1]); }

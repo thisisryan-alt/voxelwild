@@ -186,6 +186,21 @@ const KINDS = {
   },
 
   // a wave of bioluminescence rolling across the whole view, left to right or right to left
+  // a tidal surge: long streaks of silt and bubbles racing across the picture, thickest in the middle of the rush
+  surge: {
+    layer: 'front', life: 24,
+    spawn(e, r) { e.dir = e.dir || (r() < 0.5 ? -1 : 1); e.t = 0; e.seed = r() * 1000; },
+    step(e, dt) { e.t += dt; e.done = e.t > this.life; },
+    draw(c, e, cam, t) {
+      const k = Math.min(1, e.t / 4, (this.life - e.t) / 5); if (k <= 0) return; c.save();
+      for (let i = 0; i < 46; i++) {
+        const h = Math.sin((i + e.seed) * 12.9898) * 43758.5453, rx = h - Math.floor(h), h2 = Math.sin((i + e.seed) * 78.233) * 12345.678, ry = h2 - Math.floor(h2), sp = 160 + rx * 220, len = 18 + rx * 40;
+        const x = ((rx * (W + 120) + e.dir * t * sp) % (W + 120) + W + 120) % (W + 120) - 60, y = ry * H;
+        c.globalAlpha = k * (0.12 + rx * 0.22); c.fillStyle = i % 4 ? '#cfeeff' : '#ffffff'; c.fillRect(Math.round(x), Math.round(y), Math.round(len), 1);
+      }
+      c.restore();
+    },
+  },
   // night only: pale shafts of moonlight slanting down through the shallows
   moonbeam: {
     layer: 'back', life: 30,
@@ -264,15 +279,15 @@ export class AmbientEvents {
     for (const [k, v] of entries) { if ((x -= v) <= 0) return k; }
     return entries[0][0];
   }
-  start(kind) {
+  start(kind, o = {}) {
     const K = KINDS[kind]; if (!K) return null;
-    const e = { kind, done: false }; K.spawn(e, this.r, this.w); this.active.push(e); this.log.push(kind); if (this.log.length > 12) this.log.shift();
+    const e = { kind, done: false, dir: o.dir }; K.spawn(e, this.r, this.w); this.active.push(e); this.log.push(kind); if (this.log.length > 12) this.log.shift();
     this.w.game.events.emit('ambevent', kind);
     return e;
   }
   // start an event now; `mid` puts travellers in the middle of the screen (used by tests and photo mode)
   force(kind, o = {}) {
-    const e = this.start(kind); if (e && o.mid) { if (e.x !== undefined) e.x = W / 2 + (e.dir || 1) * -30; if (e.t !== undefined && kind !== 'tremor') e.t = kind === 'glowpulse' ? 3 : 6; }
+    const e = this.start(kind, o); if (e && o.mid) { if (e.x !== undefined) e.x = W / 2 + (e.dir || 1) * -30; if (e.t !== undefined && kind !== 'tremor') e.t = kind === 'glowpulse' ? 3 : 6; }
     return e;
   }
 

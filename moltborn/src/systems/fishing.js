@@ -51,7 +51,9 @@ export class Reel {
 export class Fishing {
   constructor(game) { this.g = game; game.systems.fishing = this; }
   get log() { const s = this.g.state; return s.fish || (s.fish = { total: 0, species: {} }); }
-  luck() { const g = this.g, st = g.state; return clamp((st.level || 1) / 60 + Math.min(0.15, (this.log.total || 0) / 400) + (g.world?.player?.stats?.fishLuck || 0), 0, 0.55); }
+  // 0..0.7: grows with level and catches, a lucky charm, and the bait on the line
+  baitPower() { return this.g.world?.player?.status?.get('baited')?.power || 0; }
+  luck() { const g = this.g, st = g.state; return clamp((st.level || 1) / 60 + Math.min(0.15, (this.log.total || 0) / 400) + (g.world?.player?.stats?.fishLuck || 0) + this.baitPower() * 0.1, 0, 0.7); }
   skill() { return clamp((this.g.state.level || 1) / 40, 0, 0.6); }
   phase() { return this.g.systems.clock?.phase.id || 'day'; }
 
