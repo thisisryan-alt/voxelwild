@@ -13,3 +13,16 @@ test('displayValue formats each type', () => { eq(displayValue(BY_KEY.music, 0.7
 test('setting() falls back to the default', () => { eq(setting({ state: { settings: {} } }, 'bloom'), 0.6); eq(setting({}, 'bloom'), 0.6); eq(setting({ state: { settings: { bloom: 0.2 } } }, 'bloom'), 0.2); });
 test('motion and flash helpers follow the access options', () => { const g = (o) => ({ state: { settings: o } }); eq(motionScale(g({ reduceMotion: 1 })), 0); eq(motionScale(g({})), 1); eq(flashScale(g({ reduceFlashes: 1 })), 0.25); });
 test('difficulty tiers match the options', () => { deep(DIFFICULTIES, BY_KEY.difficulty.options); });
+
+// ---- the settings added with the newer systems --------------------------------------------------------------------------------------------
+import { SCHEMA as SCHEMA2, BY_KEY as BY_KEY2, ensureSettings as ensure2, defaults as defaults2 } from '../../src/systems/settings.js';
+test('day and night, the clock readout and surges are options with sensible defaults', () => {
+  eq(BY_KEY2.dayNight.type, 'cycle'); ok(BY_KEY2.dayNight.options.includes('off') && BY_KEY2.dayNight.options.includes('subtle') && BY_KEY2.dayNight.options.includes('full')); eq(BY_KEY2.dayNight.def, 'full');
+  eq(BY_KEY2.showClock.type, 'toggle'); eq(BY_KEY2.showClock.def, 1); eq(BY_KEY2.surges.type, 'toggle'); eq(BY_KEY2.surges.def, 1); eq(BY_KEY2.dayNight.group, 'Video'); eq(BY_KEY2.surges.group, 'Gameplay');
+});
+test('a damaged value for a new option falls back to its default and a good one survives', () => {
+  const s = ensure2({ dayNight: 'sideways', surges: 'yes', showClock: 0 }); eq(s.dayNight, 'full'); eq(s.surges, 1); eq(s.showClock, 0); const t = ensure2({ dayNight: 'subtle' }); eq(t.dayNight, 'subtle'); eq(t.surges, 1);
+});
+test('every option has a unique key, a label and a hint that is not too long for the screen', () => {
+  eq(new Set(SCHEMA2.map((r) => r.key)).size, SCHEMA2.length); for (const r of SCHEMA2) { ok(r.label && r.label.length < 28, r.key); if (r.hint) ok(r.hint.length < 120, r.key + ' hint'); } ok(Object.keys(defaults2()).length >= SCHEMA2.length - SCHEMA2.filter((r) => r.runtime).length);
+});
