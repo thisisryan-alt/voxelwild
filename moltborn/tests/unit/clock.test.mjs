@@ -49,3 +49,10 @@ test('moving into a new phase announces it once and swaps the status', () => {
 test('statuses are removed when the clock is turned off', () => { const g = fake(0), C = g.systems.clock, st = g.world.player.status; C.update(0); ok(st.has('sunlit')); g.state.settings.dayNight = 'off'; C.update(0); ok(!st.has('sunlit')); });
 test('a lost status is restored by the periodic sync', () => { const g = fake(0), C = g.systems.clock, st = g.world.player.status; C.update(0); st.remove('sunlit'); C.update(2); ok(st.has('sunlit')); });
 test('nightness is 0 by day and reaches 1 deep in the night', () => { const g = fake(0), C = g.systems.clock; C.jump('day'); near(C.nightness(), 0, 1e-9); C.jump(0.8); near(C.nightness(), 1, 1e-9); });
+
+test('the Moonpool gate opens at night and in late dusk, shuts by day, and warns without spamming', () => {
+  const g = fake(0), C = g.systems.clock; g.audio = { sfx() {} }; g.state.playtime = 0;
+  C.jump('day'); eq(C.gate('Closed.'), false); eq(g.toasts.length, 1); C.gate('Closed.'); eq(g.toasts.length, 1, 'within three seconds there is no second warning'); g.state.playtime += 4; C.gate('Closed.'); eq(g.toasts.length, 2);
+  C.jump('night'); eq(C.gate('Closed.'), true); C.jump(0.61); eq(C.gate('Closed.'), true, 'late dusk is dark enough'); C.jump('dawn'); eq(C.gate('Closed.'), false);
+  g.state.settings.dayNight = 'off'; eq(C.gate('Closed.'), true, 'with the clock off nothing is gated');
+});
