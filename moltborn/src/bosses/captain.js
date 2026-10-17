@@ -9,7 +9,7 @@ import { TS } from '../world/tiles.js';
 
 export class CaptainRust extends Boss {
   static def = {
-    key: 'captain_rust', name: 'Captain Rust', title: 'Drowned Master of the Gannet', hp: 900, w: 32, h: 50, armor: 90, xp: 700, music: 'boss4', contact: 15, flying: true, ghost: true,
+    key: 'captain_rust', name: 'Captain Rust', title: 'Drowned Master of the Gannet', hp: 1400, w: 32, h: 50, armor: 90, xp: 700, music: 'boss4', contact: 15, flying: true, ghost: true,
     loot: { ep: 4, sp: 2, coins: [200, 280], items: { abyssal_core: 1 } },
     phases: [
       { at: 1, name: 'All Hands', attacks: [['anchorSwing', 2], ['anchorSlam', 2], ['ghostCrew', 1]], rest: 1.1 },

@@ -9,7 +9,7 @@ import { TS } from '../world/tiles.js';
 
 export class Aurelia extends Boss {
   static def = {
-    key: 'aurelia', name: 'Queen Aurelia', title: 'The Coral Regent', hp: 760, w: 34, h: 54, armor: 80, xp: 520, music: 'boss3', contact: 14, flying: true, ghost: true,
+    key: 'aurelia', name: 'Queen Aurelia', title: 'The Coral Regent', hp: 1200, w: 34, h: 54, armor: 80, xp: 520, music: 'boss3', contact: 14, flying: true, ghost: true,
     loot: { ep: 4, sp: 2, coins: [160, 220], items: { claw_coral: 1 } },
     phases: [
       { at: 1, name: 'The Regent', attacks: [['pearlBarrage', 2], ['scepterThrust', 2], ['coralSpires', 2]], rest: 1.1 },

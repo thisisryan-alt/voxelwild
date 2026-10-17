@@ -9,7 +9,7 @@ import { clamp } from '../core/util.js';
 const N = 18, SP = 9;
 export class MotherMoray extends Boss {
   static def = {
-    key: 'mother_moray', name: 'Mother Moray', title: 'Grief of the Mangrove Heart', hp: 520, w: 26, h: 22, armor: 55, xp: 320, music: 'boss2', contact: 14, flying: true, ghost: true,
+    key: 'mother_moray', name: 'Mother Moray', title: 'Grief of the Mangrove Heart', hp: 800, w: 26, h: 22, armor: 55, xp: 320, music: 'boss2', contact: 14, flying: true, ghost: true,
     loot: { ep: 4, sp: 1, coins: [100, 140], items: { mut_gills: 1 } },
     phases: [
       { at: 1, name: 'The Mother', attacks: [['coilDash', 2], ['thornSpit', 2], ['rootCrush', 1.6]], rest: 1.1 },

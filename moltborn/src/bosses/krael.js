@@ -9,7 +9,7 @@ import { TS } from '../world/tiles.js';
 
 export class Krael extends Boss {
   static def = {
-    key: 'krael', name: 'Krael, the Chained Titan', title: 'First Wall of the Sea-King', hp: 1600, w: 150, h: 80, armor: 130, xp: 1100, music: 'boss6', contact: 20, flying: true, ghost: true,
+    key: 'krael', name: 'Krael, the Chained Titan', title: 'First Wall of the Sea-King', hp: 2500, w: 150, h: 80, armor: 130, xp: 1100, music: 'boss6', contact: 20, flying: true, ghost: true,
     loot: { ep: 6, sp: 1, coins: [320, 420], items: { titan_heart: 1 } },
     phases: [
       { at: 1, name: 'First Wall', attacks: [['tailSweep', 2], ['clawSmash', 2], ['gazeBeam', 1.6]], rest: 1.2 },

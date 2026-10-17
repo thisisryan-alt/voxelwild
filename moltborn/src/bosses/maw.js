@@ -9,7 +9,7 @@ import { TS } from '../world/tiles.js';
 
 export class HollowMaw extends Boss {
   static def = {
-    key: 'hollow_maw', name: 'The Hollow Maw', title: 'A Wound That Learned to Dream', hp: 2200, w: 100, h: 80, armor: 150, xp: 2000, music: 'boss8', contact: 22, flying: true, ghost: true,
+    key: 'hollow_maw', name: 'The Hollow Maw', title: 'A Wound That Learned to Dream', hp: 3200, w: 100, h: 80, armor: 150, xp: 2000, music: 'boss8', contact: 22, flying: true, ghost: true,
     loot: { ep: 6, sp: 3, coins: [500, 700], items: { dye_spectral: 1 } },
     phases: [
       { at: 1, name: 'The Dreaming', attacks: [['eyeVolley', 2], ['tendrilSlam', 2], ['shadeCall', 1]], rest: 1.1 },

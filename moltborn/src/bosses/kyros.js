@@ -10,7 +10,7 @@ import { TS } from '../world/tiles.js';
 
 export class Kyros extends Boss {
   static def = {
-    key: 'kyros', name: 'Kyros the Unsleeping', title: "Doorman of the Sea-King", hp: 1500, w: 30, h: 70, armor: 120, xp: 1300, music: 'boss7', contact: 18, npc: 'kyros',
+    key: 'kyros', name: 'Kyros the Unsleeping', title: "Doorman of the Sea-King", hp: 2300, w: 30, h: 70, armor: 120, xp: 1300, music: 'boss7', contact: 18, npc: 'kyros',
     loot: { ep: 6, sp: 2, coins: [420, 520], items: { tide_sigil: 1 } },
     phases: [
       { at: 1, name: 'The Doorman', attacks: [['tridentCombo', 2.2], ['shieldRush', 1.6], ['lanceThrow', 1.8]], rest: 0.9 },

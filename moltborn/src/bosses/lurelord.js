@@ -9,7 +9,7 @@ import { TS } from '../world/tiles.js';
 
 export class Lurelord extends Boss {
   static def = {
-    key: 'lurelord', name: 'The Lurelord', title: 'Bright Hunger of the Abyssal Throat', hp: 1200, w: 100, h: 60, armor: 100, xp: 900, music: 'boss5', contact: 17, flying: true, ghost: true,
+    key: 'lurelord', name: 'The Lurelord', title: 'Bright Hunger of the Abyssal Throat', hp: 1900, w: 100, h: 60, armor: 100, xp: 900, music: 'boss5', contact: 17, flying: true, ghost: true,
     loot: { ep: 5, sp: 2, coins: [260, 340], items: { trench_gate_rune: 1 } },
     phases: [
       { at: 1, name: 'The Lure', attacks: [['lureSnap', 2], ['gulpCharge', 2], ['mineBloom', 1.5]], rest: 1.1 },

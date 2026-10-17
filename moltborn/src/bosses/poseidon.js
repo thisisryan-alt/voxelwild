@@ -9,7 +9,7 @@ import { TS } from '../world/tiles.js';
 
 export class Poseidon extends Boss {
   static def = {
-    key: 'poseidon', name: 'Poseidon', title: 'God of the Sea, Warden of the Seal', hp: 3800, w: 84, h: 130, armor: 200, xp: 5000, music: 'boss_final', contact: 24, flying: true, ghost: true, staggerTime: 2.6, noLoot: true,
+    key: 'poseidon', name: 'Poseidon', title: 'God of the Sea, Warden of the Seal', hp: 8500, w: 84, h: 130, armor: 200, xp: 5000, music: 'boss_final', contact: 24, flying: true, ghost: true, staggerTime: 2.6, noLoot: true,
     phases: [
       { at: 1, name: 'The Judgment of the Sea', attacks: [['judgment', 2.2], ['tideBolts', 2], ['breakingWave', 2], ['crownBlast', 1.2]], rest: 1.0 },
       { at: 0.7, name: 'The Wrath of the Ocean', attacks: [['judgment', 1.6], ['tideBolts', 1.4], ['breakingWave', 1.6], ['lightningRain', 2], ['whirlpools', 1.2], ['summonTide', 0.9]], rest: 0.8, transTime: 2.2,
