@@ -43,6 +43,7 @@ import { Arena } from './systems/arena.js';
 import { Barks } from './systems/barks.js';
 import { Travel } from './systems/travel.js';
 import { Orders } from './systems/orders.js';
+import { Bounties } from './systems/bounties.js';
 import { Access } from './systems/access.js';
 import { CompanionSys } from './systems/companion.js';
 import { Director } from './systems/director.js';
@@ -64,7 +65,7 @@ export class Game {
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this); new Elites(this); new Rifts(this); new Arena(this); new Barks(this); new Travel(this); new Orders(this); new Access(this); new CompanionSys(this); new Director(this); new Captions(this); new Cosmetics(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this); new Elites(this); new Rifts(this); new Arena(this); new Barks(this); new Travel(this); new Orders(this); new Bounties(this); new Access(this); new CompanionSys(this); new Director(this); new Captions(this); new Cosmetics(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -266,5 +267,5 @@ export class Game {
     if (npcId === 'old_brine') return null;
     if (qs.some((id) => !q.log[id])) return '!'; return null;
   }
-  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); this.systems.minimap?.update(dt); this.systems.audiofeel?.update(dt); this.systems.rifts?.update(dt); this.systems.arena?.update(dt); this.systems.barks?.update(dt); this.systems.captions?.update(dt); }
+  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); this.systems.minimap?.update(dt); this.systems.audiofeel?.update(dt); this.systems.rifts?.update(dt); this.systems.arena?.update(dt); this.systems.barks?.update(dt); this.systems.captions?.update(dt); this.systems.bounties?.update(dt); }
 }

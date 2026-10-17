@@ -6,6 +6,7 @@ import { itemIcon } from '../gfx/sprites_ui.js';
 import { ITEMS } from '../data/items.js';
 import { today } from '../world/rift_gen.js';
 import { OrdersScene } from './orders_scene.js';
+import { BountyScene } from './bounty_scene.js';
 
 const bossName = (k) => BOSS_CLASSES[k]?.def?.name || k;
 const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -20,6 +21,7 @@ export class BoardScene {
     list.push({ kind: 'daily', tier: best, name: 'Daily Rift', open: true, why: '' });
     const arenaOpen = !!s.bosses.grumbold;
     list.push({ kind: 'arena', name: 'Pearl Gauntlet', open: arenaOpen, why: arenaOpen ? '' : `Defeat ${bossName('grumbold')} first.` });
+    list.push({ kind: 'bounties', name: 'Hunt Bounties' + (this.g.systems.bounties.readyCount() ? ' !' : ''), open: true, why: '' });
     list.push({ kind: 'orders', name: 'Kitchen Orders', open: true, why: '' });
     return list;
   }
@@ -33,6 +35,7 @@ export class BoardScene {
       const e = list[this.sel];
       if (!e.open) { g.audio.sfx('deny'); this.say(e.why); return; }
       if (e.kind === 'orders') { g.audio.sfx('select'); g.engine.push(new OrdersScene(g)); return; }
+      if (e.kind === 'bounties') { g.audio.sfx('select'); g.engine.push(new BountyScene(g)); return; }
       g.engine.pop(); g.audio.sfx('select');
       if (e.kind === 'arena') g.systems.arena.start();
       else g.systems.rifts.start({ tier: e.tier.id, daily: e.kind === 'daily', seed: e.kind === 'daily' ? today() : undefined });
@@ -52,6 +55,10 @@ export class BoardScene {
       text(ctx, `${t.depths} depths   Reward x${t.reward}`, 224, y, COL.dim);
       wrapText('Clear every foe to open the way. Choose a relic between depths. Death ends the run.', 210).forEach((l, i) => text(ctx, l, 224, y + 14 + i * 10, '#9ad8ff'));
       if (e.kind === 'daily') text(ctx, g.state.flags['daily_' + today()] ? 'Bonus already claimed today.' : 'Bonus available!', 224, y + 54, g.state.flags['daily_' + today()] ? COL.dim : COL.green);
+    } else if (e.kind === 'bounties') {
+      const B = g.systems.bounties, list2 = B.refresh(), st = B.state; text(ctx, 'Hunt Bounties', 224, 56, COL.gold);
+      wrapText('Four jobs a day: hunt creatures you have met, open chests, forage, cook. Claim them for coins, experience and the odd pearl.', 210).forEach((l, i) => text(ctx, l, 224, 70 + i * 10, COL.text));
+      text(ctx, `Today: ${list2.filter((x) => x.claimed).length}/${list2.length} claimed   ${B.readyCount()} ready`, 224, 124, B.readyCount() ? COL.green : COL.dim); text(ctx, `Streak: ${st.streak} day${st.streak === 1 ? '' : 's'}`, 224, 136, COL.dim);
     } else if (e.kind === 'orders') {
       text(ctx, 'Kitchen Orders', 224, 56, COL.gold);
       wrapText('Three requests a day for dishes you know how to cook. Deliver them for coins; every third pays a pearl.', 210).forEach((l, i) => text(ctx, l, 224, 70 + i * 10, COL.text));
