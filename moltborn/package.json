@@ -1,0 +1,13 @@
+{
+  "name": "moltborn",
+  "version": "1.0.0",
+  "description": "Moltborn: From Crab to Godslayer - a 2D pixel-art ocean action-adventure RPG (HTML5 Canvas, no build step)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "validate": "node tests/validate_zones.mjs && node tests/validate_links.mjs && node tests/validate_content.mjs && node tests/interactable_keys.mjs",
+    "economy": "node tests/economy.mjs",
+    "smoke": "node tools/run.mjs tests/scripts/smoke.mjs"
+  }
+}

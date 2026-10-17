@@ -27,14 +27,14 @@ export class AudioSys {
     this.revSend = c.createGain(); this.revSend.gain.value = 0.25; this.revSend.connect(this.reverb); this.reverb.connect(this.master);
     this.noiseBuf = this.makeNoise(2);
     this.applyVolumes(); this.ready = true;
-    this.music.init(c, this.musicBus, this.revSend);
+    this.music.init(c, this.musicBus, this.revSend); this.music.master?.gain && 0;
     if (this.pendingAmb) this.ambience(this.pendingAmb);
   }
   applyVolumes() {
     if (!this.ctx) return;
     const s = this.settings, t = this.ctx.currentTime;
     this.sfxBus.gain.setTargetAtTime(this.muted ? 0 : (s.sfx ?? 0.8) * 0.9, t, 0.05);
-    this.musicBus.gain.setTargetAtTime(this.muted ? 0 : (s.music ?? 0.7) * 0.55, t, 0.05);
+    this.musicBus.gain.setTargetAtTime(this.muted ? 0 : (s.music ?? 0.7) * 0.9, t, 0.05);
     this.ambBus.gain.setTargetAtTime(this.muted ? 0 : (s.sfx ?? 0.8) * 0.5, t, 0.05);
   }
   impulse(sec, decay) {

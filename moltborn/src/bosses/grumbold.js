@@ -9,7 +9,7 @@ import { TS } from '../world/tiles.js';
 
 export class Grumbold extends Boss {
   static def = {
-    key: 'grumbold', name: 'Grumbold the Rockclaw', title: 'Tyrant of the Kelp Hollow', hp: 300, w: 54, h: 34, armor: 70, xp: 160, music: 'boss1', contact: 10, npc: 'grumbold',
+    key: 'grumbold', name: 'Grumbold the Rockclaw', title: 'Tyrant of the Kelp Hollow', hp: 240, w: 54, h: 34, armor: 70, xp: 160, music: 'boss1', contact: 10, npc: 'grumbold',
     loot: { ep: 5, sp: 1, coins: [60, 80], items: { brine_core: 1 } },
     phases: [
       { at: 1, name: 'The Rockclaw', attacks: [['swipe', 2], ['rockToss', 2], ['charge', 1.6]], rest: 1.2 },

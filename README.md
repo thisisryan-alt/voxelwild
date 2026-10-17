@@ -143,3 +143,8 @@ docs/             ROADMAP, ARCHITECTURE, ASSET_PIPELINE, perf data, images
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): world data, generation, lighting, meshing, culling, rendering
 - [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md): scanned and generated textures, Blender → Unity (Phase 3)
 - [CREDITS.md](CREDITS.md): texture sources (CC0)
+
+## Moltborn
+
+This repository also contains [Moltborn](moltborn/README.md), a self-contained 2D pixel-art ocean
+action-adventure RPG that runs in the browser (`cd moltborn && node tools/serve.mjs`).

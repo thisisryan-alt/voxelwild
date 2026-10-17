@@ -31,7 +31,6 @@ export function forest_edge() {
   b.chest(9, { item: 'mp2', coins: [40, 60] }, { from: 14, tint: 1, secret: true, key: 'mp2_chest' });
   b.itemAt(70, 42, 'map_fragment');
   b.mural(6, 'forest_records', { from: 40 });
-  b.props.push({ type: 'sign', x: 130, y: 100, text: 'The Sunken Forest. Tall things grow here, and so do tall stories. Watch the walls: they have teeth.', speaker: 'Faded Marker' });
   b.decorate(FOREST_DECOR, 0.28);
   return b.finish();
 }

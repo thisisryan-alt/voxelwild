@@ -6,6 +6,7 @@ import { AI } from './ai.js';
 import { ENEMIES } from '../data/enemies.js';
 import { enemyFrame } from '../gfx/sprites_enemies.js';
 import { rng, clamp } from '../core/util.js';
+import { chestFrame } from '../gfx/sprites_ui.js';
 
 const rand = rng(31337);
 
@@ -31,7 +32,7 @@ export class Enemy extends Entity {
   sfx(n) { this.world.game.audio.sfx(n, { x: this.x, y: this.y }); }
   alertFx() { this.world.fx.text(this.x, this.y - this.h / 2 - 8, '!', '#ff6a5a', false, { life: 0.5, vy: -10 }); this.sfx('alert'); }
   stun(t) { this.stunT = Math.max(this.stunT, t); }
-  canBeHit() { return this.alive && !this.dying && !this.invuln && !this.phased && this.state !== 'hidden' && !this.disguised; }
+  canBeHit() { return this.alive && !this.dying && !this.invuln && !this.def.friendly && !this.phased && this.state !== 'hidden' && !this.disguised; }
   hurtBox() { const s = this.scale; return { x: this.x - this.w * s / 2, y: this.y - this.h * s / 2, w: this.w * s, h: this.h * s }; }
   dmgNow() { return Math.round(this.def.dmg * (this.dmgMult || 1) * (1 + (this.world.difficulty || 0) * 0)); }
   strike(rel, dmg, life = 0.12, o = {}) { this.world.spawnHitbox({ team: 'enemy', x: this.x + rel.x - rel.w / 2, y: this.y + rel.y - rel.h / 2, w: rel.w, h: rel.h, dmg, life, kb: o.kb ?? 100, poise: 8, owner: this, follow: this, status: o.status || this.def.status, unblockable: o.unblockable }); }
@@ -139,7 +140,8 @@ export class Enemy extends Entity {
       if (Math.sin(this.t * 3) > 0.2) { ctx.fillStyle = '#ffe85a'; ctx.fillRect(x - 3, y - 2, 2, 2); ctx.fillRect(x + 1, y - 2, 2, 2); }
       return;
     }
-    const pose = this.disguised ? 'disguise' : this.pose;
+    if (this.disguised) { const c = chestFrame(false, 0); ctx.drawImage(c, Math.round(this.x - cam.x - c.width / 2), Math.round(this.y + this.h / 2 - cam.y - c.height)); return; }
+    const pose = this.pose;
     const frame = enemyFrame(this.type, sp, pose, Math.floor(this.t * (d.fps || 8)));
     const feet = d.anchor !== 'center';
     const x = this.x - cam.x, y = (feet ? this.y + this.h / 2 : this.y) - cam.y;

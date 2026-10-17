@@ -9,7 +9,7 @@ export const KEYMAP = {
   menu: ['Tab', 'KeyB'], map: ['KeyM'], pause: ['Escape', 'KeyP'],
   confirm: ['Enter', 'Space', 'KeyJ', 'KeyE'], cancel: ['Escape', 'KeyK', 'Backspace'],
   tabL: ['KeyQ', 'BracketLeft'], tabR: ['KeyE', 'BracketRight'],
-  quicksave: ['F5'], debug: ['Backquote'],
+  quicksave: ['F5'], heal: ['KeyF', 'KeyH'], debug: ['Backquote'],
 };
 const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'F5']);
 

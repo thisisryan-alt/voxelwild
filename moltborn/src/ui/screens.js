@@ -69,7 +69,7 @@ export class TitleScene {
     drawText(ctx, 'FROM CRAB TO GODSLAYER', 240, 80, { color: '#9af0ff', scale: 1, align: 'center', shadow: '#05204a' });
     if (this.mode === 'main') {
       const items = this.items(); items.forEach((it, i) => { const y = 110 + i * 16, sel = i === this.sel; if (sel) { ctx.fillStyle = 'rgba(10,40,90,0.7)'; ctx.fillRect(176, y - 2, 128, 14); drawText(ctx, '▶', 182, y + 1, { color: '#ffd84a' }); } drawText(ctx, it, 240, y + 1, { color: sel ? '#ffffff' : '#a8c8e8', align: 'center', shadow: '#05204a' }); });
-      drawText(ctx, 'Arrows + ENTER', 240, 258, { color: '#6a9ad0', align: 'center' });
+      const en = (this.g.state.settings.endings || []).length; drawText(ctx, 'Arrows + ENTER' + (en ? `     Endings ${en}/4` : ''), 240, 258, { color: '#6a9ad0', align: 'center' });
     } else if (this.mode === 'load' || this.mode === 'new') {
       panel(ctx, 60, 100, 360, 130, { alpha: 0.92 }); text(ctx, this.mode === 'new' ? 'NEW GAME — choose a slot' : 'LOAD GAME', 70, 106, COL.gold);
       Save.list().forEach((s, i) => { const y = 120 + i * 32, sel = i === this.slotSel; panel(ctx, 68, y, 344, 28, { fill: sel ? '#1e4a7a' : '#0c1830', border: sel ? COL.borderLit : COL.border }); if (s.meta) { text(ctx, `Slot ${i + 1}  Lv ${s.meta.level}  ${FORMS[s.meta.form]?.name || ''}`, 76, y + 4, COL.text); text(ctx, `${s.meta.zone}   ${fmtTime(s.meta.playtime || 0)}   ${s.meta.coins ?? 0} coins`, 76, y + 15, COL.dim); } else text(ctx, `Slot ${i + 1}  —  empty`, 76, y + 10, '#6a8ab0'); });
@@ -82,7 +82,7 @@ export class TitleScene {
 
 export function drawControls(ctx) {
   panel(ctx, 40, 20, 400, 232, { alpha: 0.96 }); text(ctx, 'CONTROLS', 50, 26, COL.gold);
-  const rows = [['Move', 'A / D  or  Arrows'], ['Paddle / swim up', 'SPACE  /  W  /  Up'], ['Swim down', 'S  /  Down'], ['Claw (combo)', 'J  /  Z'], ['Heavy (hold to charge)', 'K  /  X'], ['Dash', 'L  /  C'], ['Block / parry', 'SHIFT  /  V'], ['Abilities', '1  2  3'], ['Ultimate', 'Q'], ['Interact', 'E'], ['Menu', 'TAB  /  B'], ['Map', 'M'], ['Pause', 'ESC  /  P'], ['Quick save', 'F5']];
+  const rows = [['Move', 'A / D  or  Arrows'], ['Paddle / swim up', 'SPACE  /  W  /  Up'], ['Swim down', 'S  /  Down'], ['Claw (combo)', 'J  /  Z'], ['Heavy (hold to charge)', 'K  /  X'], ['Dash', 'L  /  C'], ['Block / parry', 'SHIFT  /  V'], ['Abilities', '1  2  3'], ['Ultimate', 'Q'], ['Interact', 'E'], ['Menu', 'TAB  /  B'], ['Map', 'M'], ['Pause', 'ESC  /  P'], ['Quick save', 'F5'], ['Quick heal (kelp wrap)', 'F']];
   rows.forEach((r, i) => { text(ctx, r[0], 52, 42 + i * 14, COL.dim); text(ctx, r[1], 430 - textWidth(r[1]), 42 + i * 14, COL.text); });
   text(ctx, 'Tip: block just as an attack lands to PARRY (Warrior Crab and beyond).', 52, 236, '#9ad8ff');
 }

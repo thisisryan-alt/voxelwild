@@ -19,6 +19,7 @@ import { Dialogue } from './systems/dialogue.js';
 import { Codex } from './systems/codex.js';
 import { Evolution } from './systems/evolution.js';
 import { Endings } from './systems/endings.js';
+import { ZoneScripts } from './systems/zonescripts.js';
 import { MenuScene } from './ui/menu.js';
 import { PauseScene, OptionsScene, ShopScene, ForgeScene, MoltShrineScene, CutsceneScene, TitleScene } from './ui/screens.js';
 import { rng } from './core/util.js';
@@ -35,7 +36,7 @@ export class Game {
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }

@@ -31,6 +31,7 @@ export class Hud {
     // --- currency ---
     ctx.drawImage(iconCoin(), 438, 3); text(ctx, String(st.coins), 476 - textWidth(String(st.coins)), 8, COL.gold, { });
     const evolvable = this.g.systems.evolution?.readyFor?.(); text(ctx, `EP ${st.ep}`, 476 - textWidth(`EP ${st.ep}`), 19, COL.pink);
+    if (evolvable && Math.floor(this.t * 2) % 2) text(ctx, 'MOLT READY', 476 - textWidth('MOLT READY'), 41, '#ffffff', { shadow: '#a0306a' });
     if (st.sp > 0) text(ctx, `SP ${st.sp}`, 476 - textWidth(`SP ${st.sp}`), 30, COL.blue);
     // --- quest tracker ---
     const tr = g.systems.quests?.tracker?.();

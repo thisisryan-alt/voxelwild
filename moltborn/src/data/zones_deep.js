@@ -108,7 +108,7 @@ export function trench_temple() {
   b.exitW(30, 38, 'trench_titan', 'east'); b.entryFloor('west', 4, { facing: 1, from: 20 });
   b.shrine('rest', 60, { from: 20 });
   b.npc('thessaly', 56, { from: 20 });
-  b.prop('hatchling_vault', 5, 56, {});
+  b.prop('cocoons', 4, 60, {}); b.prop('cocoons', 8, 60, {}); b.prop('cocoons', 12, 60, {});
   b.spawn('hollowshade', 30, 18, { count: 2 }); b.spawn('hollowshade', 78, 18, { count: 2 }); b.spawnFloor('wardenbone', 44, 28); b.spawnFloor('wardenbone', 84, 28); b.spawnFloor('bonecrawler', 36, 56); b.spawnFloor('bonecrawler', 70, 56); b.spawn('voidwisp', 60, 50, { count: 2 }); b.spawnFloor('guardian', 60, 46);
   b.coins(30, 16, 5); b.coins(90, 16, 5); b.coins(50, 52, 6);
   b.chest(98, { item: 'shell_tidewoven', ep: 1 }, { from: 40, tint: 1 }); b.chest(40, { black_pearl: 2, coins: [120, 160] }, { from: 46 });

@@ -58,7 +58,8 @@ export class World {
       }
       if (p.type === 'npc') continue;
       let spr; try { spr = propSprite(p.type, p.v || 0); } catch (e) { continue; }
-      this.decor.push({ spr, x: p.x, y: p.y, ph: rand() * 6, layer: p.layer || 'back', glow: spr.glow });
+      if (p.type === 'cocoons' && this.game.flag('hatchlings_freed')) continue;
+      this.decor.push({ spr, x: p.x, y: p.y, ph: rand() * 6, layer: p.layer || 'back', glow: spr.glow, type: p.type, cocoon: p.type === 'cocoons' });
     }
   }
 

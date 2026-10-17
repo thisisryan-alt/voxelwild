@@ -16,6 +16,7 @@ export const ENEMIES = {
   urchin: { name: 'Spine Urchin', hp: 10, dmg: 6, w: 13, h: 13, xp: 3, coins: [1, 2], poise: 99, noStagger: true, ai: 'spiky', anchor: 'center', fps: 2, spiky: true, sprite: { plan: 'urchin', w: 32, h: 32, ax: 16, ay: 16, frames: 2, o: { ramp: R.abyssal.tint(0.08, 1.2, 1.1), r: 6 } }, p: {} },
   hermit: { name: 'Hermit Bruiser', hp: 36, dmg: 9, w: 20, h: 16, xp: 12, coins: [3, 6], poise: 24, ai: 'guard', anchor: 'feet', fps: 8, mass: 1.6, sprite: crab(R.coralPink.tint(0.04, 0.8, 1), { helm: false, shield: true }),
     p: { speed: 20, aggro: 110, strike: 22, wind: 0.5, recover: 0.7, cd: 1.6 } },
+  hatchling: { name: 'Hatchling', hp: 99, dmg: 0, w: 10, h: 8, xp: 0, coins: null, poise: 99, ai: 'patrolCharge', anchor: 'feet', fps: 10, friendly: true, contact: false, sprite: { plan: 'crab', w: 42, h: 30, ax: 21, ay: 27, frames: 6, o: { ramp: new Ramp(['#5c2a3a', '#a8506a', '#e88a9a', '#ffc0c8', '#fff0f0']) } }, p: { speed: 14, range: 40, aggro: 0, wind: 9, charge: 0, chargeTime: 0, cd: 99 } },
   // ---- Sunken Forest -----------------------------------------------------------------
   moray: { name: 'Thornback Moray', hp: 24, dmg: 10, w: 24, h: 12, xp: 14, coins: [3, 6], poise: 14, ai: 'ambush', anchor: 'center', fps: 8, ghost: true, flying: true, sprite: { plan: 'eel', w: 64, h: 28, ax: 54, ay: 14, frames: 6, o: { ramp: R.venom, segs: 9, seg: 5, r: 4.5, amp: 3, teeth: true, fin: R.venom.tint(0.1, 1, 1.1) } },
     p: { trigger: 80, wind: 0.5, lunge: 200, reach: 64, cd: 2.4 } },

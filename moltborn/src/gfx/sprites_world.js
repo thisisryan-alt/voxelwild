@@ -172,6 +172,11 @@ const PAINT = {
     p.glow(11, h - 12, 14, r.hex[4], 0.4);
     return { cv: p.toCanvas(), ax: w / 2, ay: h, amp: 0, glow: r.hex[3] };
   },
+  cocoons(v, rand) {
+    const w = 40, h = 40, p = new Painter(w, h + 1);
+    for (let i = 0; i < 6; i++) { const x = 7 + (i % 3) * 13, y = 12 + Math.floor(i / 3) * 18; p.shape(R.pearl, { dither: 0.4 }, (s) => s.ellipse(x, y, 5, 7)); p.px(x - 1, y - 3, '#fff'); p.glow(x, y, 9, '#ffd8f0', 0.35); p.line(x - 2, y + 7, x - 4, h, R.shoreFar.hex[2]); }
+    return { cv: p.toCanvas(), ax: w / 2, ay: h, amp: 0, glow: '#ffd8f0' };
+  },
   chainhang(v, rand) {
     const h = 30 + (v % 3) * 10, w = 8, p = new Painter(w, h + 1);
     for (let y = 1; y < h; y += 4) p.ellipse(4, y + 1.5, 2, 2.2, R.chain, {});
