@@ -20,6 +20,7 @@ export const ZONE_INFO = {
   grave_captain: { name: "Captain's Bridge", biome: 'graveyard', map: { x: 6, y: 2 }, boss: 'captain_rust', molt: true },
   abyss_descent: { name: 'Twilight Descent', biome: 'abyss', map: { x: 6, y: 3 } },
   abyss_lanterns: { name: 'Lantern Caverns', biome: 'abyss', map: { x: 5, y: 3 } },
+  abyss_vents: { name: 'Ember Vents', biome: 'abyss', map: { x: 5, y: 4 }, boss: 'magmaw' },
   abyss_throat: { name: 'Abyssal Throat', biome: 'abyss', map: { x: 4, y: 3 }, boss: 'lurelord' },
   trench_bones: { name: 'Bone Fields', biome: 'trench', map: { x: 4, y: 4 } },
   trench_temple: { name: 'Temple of the Old Gods', biome: 'trench', map: { x: 3, y: 4 } },
@@ -31,7 +32,7 @@ export const ZONE_INFO = {
   domain_throne: { name: 'Throne of Tides', biome: 'domain', map: { x: 5, y: 5 }, boss: 'poseidon' },
 };
 export const ZONE_LINKS = [
-  ['reef_garden', 'reef_clam'], ['reef_hollow', 'reef_tidepools'], ['forest_roots', 'forest_grotto'], ['kingdom_gate', 'kingdom_vaults'],
+  ['reef_garden', 'reef_clam'], ['reef_hollow', 'reef_tidepools'], ['forest_roots', 'forest_grotto'], ['kingdom_gate', 'kingdom_vaults'], ['abyss_lanterns', 'abyss_vents'],
   ['reef_nursery', 'reef_garden'], ['reef_garden', 'reef_hollow'], ['reef_hollow', 'reef_arena'], ['reef_arena', 'forest_edge'], ['forest_edge', 'forest_roots'], ['forest_roots', 'forest_heart'],
   ['forest_heart', 'kingdom_gate'], ['kingdom_gate', 'kingdom_spires'], ['kingdom_spires', 'kingdom_court'], ['kingdom_court', 'grave_shallows'], ['grave_shallows', 'grave_galleon'], ['grave_galleon', 'grave_captain'],
   ['grave_captain', 'abyss_descent'], ['abyss_descent', 'abyss_lanterns'], ['abyss_lanterns', 'abyss_throat'], ['abyss_throat', 'trench_bones'], ['trench_bones', 'trench_temple'], ['trench_temple', 'trench_titan'],

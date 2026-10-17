@@ -129,6 +129,33 @@ export const DIALOGUE = {
     yield c.say("I have the last drawer's ledger now. I have been reading it very slowly, so that it lasts.");
   },
 
+  *sear(c) {
+    if (!c.flag('met_sear')) {
+      c.set('met_sear');
+      yield c.say("HOLD IT. Don't — okay, you're fine, you're not standing on a vent. Sear. Vent-smith. I cast with what the floor breathes out, and the floor is MOODY today.");
+      yield c.say("Four plumes between here and the pit. They go in cycles. Count four, move on three. Dash if you have to; the vents do not care how brave you are.");
+    }
+    if (!c.qActive('sq_vents') && !c.qDone('sq_vents')) {
+      const i = yield c.ask("I need three cinder cores for a proper smelt, and something big in the pit has been eating my supply. Interested?", ['Sure.', 'What is in the pit?', 'Not now.']);
+      if (i === 2) { yield c.say("Sure. Fine. I will just keep smelting nothing."); return; }
+      if (i === 1) yield c.say("Magmaw. Vent-eel. Grew too big for the throat so it moved into the pit. It is not evil. It is HOT, and it is lonely, and those are two different problems that look identical from the outside.");
+      yield c.say("Cores lie in the passage past the plumes: one after the second vent, one in the river, one by the pit. Bring all three, and then say hello to Magmaw from me. Forcefully.");
+      c.quest('sq_vents'); return;
+    }
+    if (c.qActive('sq_vents')) {
+      if (c.count('cinder_core') >= 3 && c.boss('magmaw') && !c.flag('vents_done')) {
+        c.take('cinder_core', 3); c.set('vents_done'); c.gain(220); c.give('shell_cinder');
+        yield c.say("THREE CORES. And the pit has gone quiet. I did not think you would — okay. Okay. Hold still.");
+        yield c.say("Cinderplate. The vents will barely notice you. I made it fast and I made it right. Do not thank me, I will cry, and my tears evaporate on contact and it ruins the effect.");
+        return;
+      }
+      if (c.boss('magmaw')) { yield c.say("Pit is quiet. Bring me the three cores and I will forge something that makes the vents sulk."); return; }
+      yield c.say("Three cores. Then the eel. Count four, move on three.");
+      return;
+    }
+    yield c.say("The vents have been behaving. That terrifies me. I have started apologising to them in advance.");
+  },
+
   *cowrie(c) {
     if (!c.flag('met_cowrie')) { c.set('met_cowrie'); yield c.say("Darling! A customer! Or a thief — but you've the face for honest trade. Madame Cowrie, purveyor of the finest and the nearly finest."); }
     while (true) {

@@ -210,7 +210,7 @@ export class World {
       const r = pl.takeHit({ dmg: 8 + Math.round(pl.stats.maxHp * 0.04), x: pl.x, y: pl.y + 8, kb: 90, spike: true }); if (r) { pl.vy = -120; }
     }
     for (const a of this.zone.areas) if (a.kind === 'vent' && pl.x > a.x && pl.x < a.x + a.w && pl.y > a.y && pl.y < a.y + a.h) {
-      const on = (this.t + (a.phase || 0)) % (a.period || 4) < (a.on || 1.4); if (on) pl.takeHit({ dmg: a.dmg || 10, x: pl.x, y: pl.y + 20, kb: 100, spike: true });
+      const on = (this.t + (a.phase || 0)) % (a.period || 4) < (a.on || 1.4); if (on) pl.takeHit({ dmg: a.dmg || 10, x: pl.x, y: pl.y + 20, kb: 100, spike: true, vent: true });
     }
   }
   ambientFx(dt) {

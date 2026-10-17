@@ -10,6 +10,7 @@ export const NPCS = {
   brack: { name: 'Brack the Counter', color: '#ffb060', sprite: { kind: 'hermit', k: 'brack', o: { shell: R.coralOrange, body: R.shoreFar, beard: true } } },
   morel: { name: 'Dr. Morel', color: '#d8ff90', sprite: { kind: 'octopus', k: 'morel', o: { ramp: R.venom.tint(0.1, 0.9, 1.1), hat: true } } },
   tallow: { name: 'Tallow the Archivist', color: '#ffe08a', sprite: { kind: 'seahorse', k: 'tallow', o: { ramp: R.gold.tint(0, 0.7, 0.9), robe: R.rust, crest: R.pearl } } },
+  sear: { name: 'Sear the Vent-Smith', color: '#ff9a5a', sprite: { kind: 'hermit', k: 'sear', o: { shell: R.coralRed, body: R.rust, beard: true } } },
   fenwick: { name: 'Fenwick', color: '#9af0c0', sprite: { kind: 'seahorse', k: 'fenwick', o: { ramp: R.fishGreen, crest: R.gold } } },
   vael: { name: 'Chancellor Vael', color: '#c8a0ff', sprite: { kind: 'seahorse', k: 'vael', o: { ramp: R.coralPink.tint(0.5, 0.8, 0.9), robe: R.abyssal, crest: R.gold } } },
   ruby: { name: 'Captain Ruby', color: '#ff7a8a', sprite: { kind: 'guard', k: 'ruby', o: { ramp: R.crimson } } },

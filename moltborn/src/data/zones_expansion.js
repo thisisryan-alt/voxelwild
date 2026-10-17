@@ -103,3 +103,39 @@ export function kingdom_vaults() {
   b.decorate(VAULT_DECOR, 0.22);
   return b.finish();
 }
+
+// ---- Ember Vents (abyss, below the Lantern Caverns): a hot descent of timed vent plumes and a river-current, ending at Magmaw's hole ------------
+const VENT_DECOR = { floor: [['rocks', 3, 2], ['pebbles', 2, 2], ['bones', 1, 1], ['glowcap', 1.2, 1], ['kelp', 0.6, 3]], ceil: [['stalactite', 3, 3], ['chainhang', 0.5, 3]] };
+export function abyss_vents() {
+  const b = new ZoneBuilder({ id: 'abyss_vents', name: 'Ember Vents', biome: 'abyss', w: 132, h: 72, seed: 53, music: 'abyss', pressure: 2, dark: 0.42, title: 'Ember Vents' });
+  b.fill(T.ROCK);
+  b.path([[22, 3], [22, 12], [32, 24], [26, 36], [40, 46], [62, 52], [84, 52], [104, 54]], [3.8, 5], { wobble: 1.1 });
+  b.ellipse(22, 14, 11, 8); b.ellipse(31, 26, 10, 7); b.ellipse(42, 46, 12, 8); b.ellipse(72, 52, 13, 8); b.ellipse(96, 52, 8, 6);
+  b.path([[26, 36], [10, 40], [8, 52], [20, 60], [38, 62]], 3.4, { wobble: 0.9 }); b.ellipse(40, 62, 8, 5);   // a loop below for the forge
+  b.carve(104, 34, 26, 30);                                                                              // Magmaw's pit
+  b.floorLine(104, 130, 62, T.ROCK);
+  b.smooth(1); b.surface(T.GROUND, 1);
+  b.carve(104, 34, 26, 28); b.floorLine(104, 130, 62, T.ROCK); b.keep(102, 32, 30, 32);
+  b.exitN(19, 25, 'abyss_lanterns', 'vents'); b.entry('north', 22, 8);
+  b.shrine('rest', 22, { from: 6 }); b.shrine('rest2', 34, { from: 58 });
+  b.npc('sear', 42, { from: 58 });
+  b.sign(26, 'WARNING: the floor below breathes out at regular intervals. Count four. Move on three. - Sear', { from: 6, speaker: 'Scorched Plank' });
+  b.mural(18, 'mural_vents', { from: 6 });
+  // vents (timed plumes) and a current against the traveller
+  b.area('vent', 47, 39, 3, 14, { period: 4, on: 1.4, dmg: 22, phase: 0 }); b.area('vent', 56, 45, 3, 11, { period: 4, on: 1.4, dmg: 22, phase: 1.3 });
+  b.area('vent', 62, 47, 3, 10, { period: 4, on: 1.4, dmg: 22, phase: 2.6 }); b.area('vent', 84, 47, 3, 10, { period: 4, on: 1.4, dmg: 24, phase: 0.6 }); b.area('vent', 90, 48, 3, 9, { period: 4, on: 1.4, dmg: 24, phase: 2.6 });
+  b.area('current', 66, 44, 16, 15, { vx: -60, vy: 0 });
+  b.light(48, 52, 56, '#ff8a3a', 0.6); b.light(57, 55, 50, '#ff8a3a', 0.6); b.light(63, 56, 50, '#ff8a3a', 0.6); b.light(85, 56, 50, '#ff8a3a', 0.6); b.light(91, 56, 50, '#ff8a3a', 0.6); b.light(40, 64, 46, '#ffb060', 0.6); b.light(118, 60, 70, '#ff6a3a', 0.5);
+  b.itemAt(58, 52, 'cinder_core'); b.itemAt(87, 54, 'cinder_core'); b.itemAt(99, 55, 'cinder_core');
+  b.chest(36, { item: 'charm_emberglass', coins: [80, 120] }, { from: 58, tint: 1, key: 'vents_forge_chest' });
+  b.chest(70, { coins: [100, 140], pearl: 3, items: { brine_tonic: 2 } }, { from: 50 });
+  b.chest(100, { black_pearl: 2, coins: [90, 120] }, { from: 50, tint: 1 });
+  b.coins(30, 24, 4); b.coins(44, 44, 5); b.coins(70, 50, 5); b.coins(94, 52, 4); b.coins(30, 60, 4);
+  b.spawn('tuskram', 44, 42); b.spawn('hookjaw', 52, 48, { count: 1 }); b.spawn('inksquid', 30, 28); b.spawn('voidwisp', 72, 48, { count: 2 }); b.spawn('tuskram', 78, 52); b.spawn('hookjaw', 94, 50); b.spawn('gulper', 60, 52); b.spawn('deepjelly', 36, 36); b.spawn('splitjelly', 22, 20, { hpMult: 1.4 });
+  b.spawnFloor('mender', 70, 48); b.spawnFloor('mantis', 74, 48); b.spawnFloor('fumecap', 88, 48);
+  b.spawn('lanternfish', 20, 12);
+  b.spawns.push({ boss: 'magmaw', x: 118 * 16, y: 46 * 16, arena: { x: 104, y: 34, w: 26, h: 28 }, trigger: { x: 108, y: 38, w: 18, h: 22 }, barriers: [{ x: 103, y: 47, w: 1, h: 12 }] });
+  b.coins(112, 56, 5);
+  b.decorate(VENT_DECOR, 0.22);
+  return b.finish();
+}

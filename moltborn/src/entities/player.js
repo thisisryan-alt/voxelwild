@@ -280,6 +280,7 @@ export class Player extends Entity {
       return 'blocked';
     }
     let dmg = src.dmg, blocked = false;
+    if (src.vent && S.heatResist) dmg *= 1 - S.heatResist;
     if (this.state === 'block' && !src.unblockable && !src.thorn) {
       const frontal = ((src.x ?? this.x) - this.x) * this.facing >= -3;
       if (frontal) {

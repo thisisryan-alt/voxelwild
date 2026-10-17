@@ -12,3 +12,4 @@ import './poseidon.js';
 import './hermitking.js';
 import './sporemother.js';
 import './colossus.js';
+import './magmaw.js';

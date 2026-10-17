@@ -44,6 +44,7 @@ export function abyss_lanterns() {
   b.surface(T.GROUND, 1); b.smooth(1);
   b.exitE(48, 54, 'abyss_descent', 'west'); b.entryFloor('east', 122, { facing: -1, from: 40 });
   b.exitW(26, 32, 'abyss_throat', 'east'); b.entryFloor('west', 4, { facing: 1, from: 20 });
+  b.path([[48, 54], [48, 58]], 3.2, { wobble: 0.4 }); b.exitS(45, 51, 'abyss_vents', 'north'); b.entry('vents', 48, 55);
   b.shrine('rest', 66, { from: 24 });
   b.prop('brazier', 112, 14, { total: 3 }); b.prop('brazier', 66, 30, { total: 3 }); b.prop('brazier', 36, 10, { total: 3 });
   b.itemAt(48, 52, 'lantern_stone'); b.itemAt(108, 12, 'lantern_stone');

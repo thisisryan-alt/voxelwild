@@ -81,5 +81,10 @@ export const QUESTS = {
     { text: 'Open the strongroom and stop its guardian.', done: boss('brass_colossus') },
     { text: 'Tell Tallow the last drawer is open.', done: f('vaults_done') },
   ], desc: 'Tallow catalogued the Court\'s strongroom for sixty years. He has not been allowed to see the last drawer. He would like to, before he is too old to read it.' },
+  sq_vents: { name: 'Quench the Hearth', type: 'side', giver: 'sear', steps: [
+    { text: 'Gather 3 Cinder Cores from the vent passage of the Ember Vents.', done: (g) => g.itemCount('cinder_core') >= 3 || g.flag('vents_done') },
+    { text: 'Calm Magmaw, the eel that grew in the vent-throat.', done: boss('magmaw') },
+    { text: 'Bring the cores to Sear.', done: f('vents_done') },
+  ], desc: 'Sear forges with vent-glass and has run out. She will make you something nice for three good cores, provided you do not mind her yelling at the eel.' },
   sq_tyrant: { name: 'The Pearl Tyrant', type: 'side', giver: 'pip', steps: [{ text: 'Defeat the Pearl Tyrant, the giant clam beneath the garden.', done: boss('pearl_tyrant') }], desc: 'Pip’s pearl was swallowed by something enormous.' },
 };
