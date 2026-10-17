@@ -20,7 +20,7 @@ export class PlayScene {
     if (f.a !== f.target) { f.a += Math.sign(f.target - f.a) * f.speed * dt; if (Math.abs(f.a - f.target) < f.speed * dt) { f.a = f.target; if (f.target === 1 && f.cb) { const cb = f.cb; f.cb = null; if (g.deathCard) { this.hold = 1.8; this.holdCb = cb; } else cb(); } } }
     if (this.hold > 0) { this.hold -= dt; if (this.hold <= 0) { const cb = this.holdCb; this.holdCb = null; cb?.(); } }
     this.letterbox += (this.letterTarget - this.letterbox) * Math.min(1, dt * 4);
-    this.hud.update(dt);
+    this.hud.update(dt); g.systems.story?.pump(dt);
     const pl = w.player;
     pl.locked = this.dialogue.active || this.lock > 0 || !!w.cinematic;
     if (this.dialogue.active) { this.dialogue.update(dt); w.fx.update(dt); w.updateCamera(dt); g.audio.setListener(pl.x, pl.y); return; }

@@ -250,8 +250,8 @@ export class MoltShrineScene {
 // ---------------------------------------------------------------------------------------------------------------
 // Story panels (intro / endings): fading text over procedural illustrations
 export class CutsceneScene {
-  constructor(game, panels, done) { this.g = game; this.panels = panels; this.done = done; this.opaque = true; this.i = 0; this.t = 0; this.shown = 0; this.prev = null; this.xf = 1; }
-  onEnter() { this.g.audio.music.play?.(this.panels[0]?.music || 'title'); }
+  constructor(game, panels, done, opts = {}) { this.g = game; this.panels = panels; this.done = done; this.opts = opts; this.opaque = true; this.i = 0; this.t = 0; this.shown = 0; this.prev = null; this.xf = 1; }
+  onEnter() { const m = this.panels[0]?.music || (this.opts.music === undefined ? 'title' : this.opts.music); if (m) this.g.audio.music.play?.(m); }
   go(i) { this.prev = { p: this.panels[this.i], t: this.t + this.i * 3 }; this.i = i; this.t = 0; this.shown = 0; this.xf = 0; this.g.audio.sfx('tick'); if (this.panels[i].music) this.g.audio.music.play?.(this.panels[i].music); }
   update(dt) {
     const inp = this.g.input, p = this.panels[this.i]; this.t += dt; this.shown += dt * 38; this.xf = Math.min(1, this.xf + dt / 0.9); if (this.prev) this.prev.t += dt * 0.3; if (this.xf >= 1) this.prev = null;
@@ -268,7 +268,7 @@ export class CutsceneScene {
     // cinematic bars, a soft shade under the text, then the text
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 480, 14);
     const sh = ctx.createLinearGradient(0, 168, 0, 270); sh.addColorStop(0, 'rgba(2,6,14,0)'); sh.addColorStop(0.35, 'rgba(2,6,14,0.82)'); sh.addColorStop(1, 'rgba(2,6,14,0.96)'); ctx.fillStyle = sh; ctx.fillRect(0, 168, 480, 102);
-    if (p.title) { const a = Math.min(1, this.t * 0.8); drawText(ctx, p.title, 240, 30, { color: '#ffe08a', scale: 3, align: 'center', outline: '#3a1008', shadow: '#000', alpha: a }); }
+    if (p.title) { const a = Math.min(1, this.t * 0.8); const sc = textWidth(p.title, 3) <= 430 ? 3 : textWidth(p.title, 2) <= 440 ? 2 : 1; drawText(ctx, p.title, 240, sc === 3 ? 30 : 34, { color: '#ffe08a', scale: sc, align: 'center', outline: '#3a1008', shadow: '#000', alpha: a }); }
     const wrapped = wrapText(p.text, 410); let before = 0;
     wrapped.forEach((l, i) => { const part = l.slice(0, Math.max(0, Math.floor(this.shown) - before)); before += l.length + 1; text(ctx, part, 240 - textWidth(l) / 2, 206 + i * 11, '#eaf6ff', { shadow: '#000' }); });
     const dots = this.panels.length; for (let k = 0; k < dots; k++) { ctx.fillStyle = k === this.i ? '#9ad8ff' : '#2a4a6a'; ctx.fillRect(240 - dots * 4 + k * 8, 258, 5, 2); }

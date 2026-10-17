@@ -4,6 +4,9 @@ import { getBackground } from './background.js';
 import { playerFrame, variantFor } from './sprites_player.js';
 import { enemyFrame } from './sprites_enemies.js';
 import { propSprite } from './sprites_world.js';
+import './sprites_bosses.js';
+import './sprites_hero.js';
+import { morayHead, moraySeg } from './sprites_bosses.js';
 import { Painter, Ramp } from './painter.js';
 import { rng, TAU, lerp, clamp } from '../core/util.js';
 
@@ -258,6 +261,76 @@ const SCENES = {
     glow(ctx, 238 + dx * 0.4, 120, 36 + close * 30, '#ffffff', 0.6 + 0.3 * Math.sin(t * 3));
     drawStrip(ctx, strip('coral', '#0a4a78', 5, 100), 270, t * 2, 0.95); motes(ctx, t, { n: 50, color: '#fff6d0', a: 0.8, speed: 7 }); vignette(ctx, 0.35);
   },
+
+  // ---- biome establishing shots ---------------------------------------------------------------------------------
+  forest(ctx, t) {
+    grad(ctx, [[0, '#2aa890'], [0.5, '#0e5a56'], [1, '#04201e']]);
+    glow(ctx, 300, 0, 200, '#c8ffd8', 0.28); rays(ctx, t, { x0: 300, a: 0.11, color: '#d8ffd8', n: 8, spread: 220 });
+    const bg = getBackground('forest', 3); bg.draw(ctx, { x: t * 8, y: 0 }, { h: 30 }, t, true);
+    drawStrip(ctx, strip('column', '#0a3a34', 4, 250), 270, t * 3, 0.9);          // trunks
+    drawStrip(ctx, strip('kelp', '#0c5a3c', 5, 220), 280, t * 6, 0.95);
+    // a root arch with a tiny crab on it
+    ctx.strokeStyle = '#06261e'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(120, 262); ctx.bezierCurveTo(130, 160, 250, 150, 340, 262); ctx.stroke(); ctx.lineWidth = 3; ctx.strokeStyle = '#0a3a2c'; ctx.beginPath(); ctx.moveTo(140, 262); ctx.bezierCurveTo(150, 190, 240, 180, 320, 262); ctx.stroke();
+    const f = playerFrame('shore', variantFor({ form: 'shore', branches: {}, dye: 'default' }), 'idle', Math.floor(t * 4) % 4); sprite(ctx, f, 236, 178, 2);
+    for (let i = 0; i < 26; i++) { const x = (i * 83) % W, y = 120 + ((i * 47 + t * 6 * (1 + (i % 3))) % 130); glow(ctx, x, y, 7, '#a8ff88', 0.5 * (0.4 + 0.6 * Math.abs(Math.sin(t * 1.5 + i)))); }
+    motes(ctx, t, { n: 40, color: '#c8ffc8', a: 0.5, speed: 4, seed: 21 }); vignette(ctx, 0.6);
+  },
+  kingdom(ctx, t) {
+    grad(ctx, [[0, '#5a9cf8'], [0.5, '#2a3a98'], [1, '#0a1040']]);
+    glow(ctx, 240, 0, 240, '#e0d0ff', 0.4); rays(ctx, t, { x0: 240, a: 0.12, color: '#f0e8ff', n: 8 });
+    drawStrip(ctx, strip('spire', '#2a2a78', 6, 220), 250, t * 2, 0.8); drawStrip(ctx, strip('spire', '#4a3a98', 9, 180), 262, t * 4 + 100, 0.95);
+    // lit windows and banners
+    for (let i = 0; i < 40; i++) { const x = (i * 59 + 20) % W, y = 120 + (i * 37) % 110; ctx.fillStyle = `rgba(255,220,140,${0.35 + 0.4 * Math.abs(Math.sin(t + i))})`; ctx.fillRect(x, y, 2, 3); }
+    // the great gate, lit from inside
+    ctx.fillStyle = '#0c0c3a'; ctx.beginPath(); ctx.moveTo(190, 262); ctx.lineTo(190, 170); ctx.arc(240, 170, 50, Math.PI, 0); ctx.lineTo(290, 262); ctx.fill(); glow(ctx, 240, 215, 70, '#ffe8a0', 0.5);
+    for (const bx of [170, 310]) { ctx.fillStyle = '#7a2a8a'; ctx.beginPath(); ctx.moveTo(bx, 110); ctx.lineTo(bx + 16, 110); ctx.lineTo(bx + 16, 150 + Math.sin(t * 2 + bx) * 3); ctx.lineTo(bx + 8, 142); ctx.lineTo(bx, 150 + Math.sin(t * 2 + bx) * 3); ctx.fill(); ctx.fillStyle = '#ffd84a'; ctx.fillRect(bx + 6, 120, 4, 4); }
+    fishShoal(ctx, t, { y: 100, spread: 40, col: '#ffd8f0', n: 14, seed: 12, speed: 10 });
+    motes(ctx, t, { n: 40, color: '#e8e0ff', a: 0.6, speed: 5, seed: 22 }); vignette(ctx, 0.5);
+  },
+  graveyard(ctx, t) {
+    grad(ctx, [[0, '#2c6a6a'], [0.5, '#123a40'], [1, '#04161c']]);
+    glow(ctx, 330, 0, 180, '#a8e8e0', 0.2); rays(ctx, t, { x0: 330, a: 0.08, color: '#c8fff0', n: 5 });
+    // hulls and masts leaning in the silt
+    const hull = (x, y, w, h, tilt, col) => { ctx.save(); ctx.translate(x, y); ctx.rotate(tilt); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(-w / 2, -h); ctx.lineTo(w / 2, -h * 0.8); ctx.lineTo(w * 0.35, 0); ctx.lineTo(-w * 0.4, 0); ctx.fill(); ctx.fillRect(-2, -h - 70, 3, 72); ctx.fillRect(-26, -h - 50, 50, 2); ctx.restore(); };
+    hull(100, 214, 150, 44, -0.2, '#14424a'); hull(390, 222, 170, 52, 0.16, '#103840'); hull(250, 232, 120, 34, 0.05, '#1a4e56');
+    ctx.fillStyle = '#0c3236'; ctx.fillRect(0, 222, W, 60);
+    for (let i = 0; i < 5; i++) { const x = 90 + i * 80 + Math.sin(t * 0.8 + i) * 10, y = 160 + Math.sin(t * 1.1 + i * 2) * 8; glow(ctx, x, y, 24, '#9affff', 0.35); ctx.fillStyle = '#d8ffff'; ctx.fillRect(Math.round(x), Math.round(y), 2, 3); }
+    ctx.fillStyle = 'rgba(160,220,220,0.07)'; for (let k = 0; k < 6; k++) ctx.fillRect(0, 150 + k * 18 + Math.sin(t * 0.6 + k) * 4, W, 9);
+    motes(ctx, t, { n: 36, color: '#a8d8d8', a: 0.5, speed: 3, seed: 23 }); vignette(ctx, 0.65);
+  },
+  abyss(ctx, t) {
+    grad(ctx, [[0, '#0e2250'], [0.6, '#040a24'], [1, '#010208']]);
+    drawStrip(ctx, strip('rock', '#02040e', 7, 130), 270, 0, 1);
+    // drifting jellyfish of light, and a far-off lure
+    for (let i = 0; i < 8; i++) { const x = (i * 71 + 40 + Math.sin(t * 0.3 + i) * 20) % W, y = 40 + ((i * 53 + t * (3 + i % 3)) % 170), r = 8 + (i % 3) * 3; glow(ctx, x, y, r * 3, '#58a0ff', 0.4); ctx.fillStyle = '#9ad0ff'; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.7, 0, Math.PI, 0); ctx.fill(); for (let k = -1; k <= 1; k++) ctx.fillRect(Math.round(x + k * r * 0.5), Math.round(y), 1, 8 + Math.round(Math.sin(t * 2 + k + i) * 2)); ctx.globalAlpha = 1; }
+    const lx = 390 + Math.sin(t * 0.5) * 10; glow(ctx, lx, 120, 40, '#ffe890', 0.6); ctx.fillStyle = '#fff6c0'; ctx.fillRect(Math.round(lx) - 1, 119, 3, 3);
+    ctx.fillStyle = '#02040e'; ctx.beginPath(); ctx.ellipse(lx + 30, 150, 60, 26, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff6c0'; ctx.fillRect(lx + 6, 142, 3, 3);
+    const f = playerFrame('shore', variantFor({ form: 'shore', branches: {}, dye: 'default' }), 'idle', Math.floor(t * 4) % 4); glow(ctx, 120, 232, 40, '#ffb89a', 0.18); sprite(ctx, f, 120, 238, 2);
+    motes(ctx, t, { n: 60, color: '#6a98e8', a: 0.45, speed: 3, seed: 24 }); vignette(ctx, 0.7);
+  },
+  trench(ctx, t) {
+    grad(ctx, [[0, '#2a0a3a'], [0.5, '#12041c'], [1, '#030106']]);
+    glow(ctx, 240, 250, 240, '#a040c0', 0.3 + 0.1 * Math.sin(t));
+    // the cleft: two walls and the ruins in between
+    ctx.fillStyle = '#06020a'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(150, 0); ctx.lineTo(120, 120); ctx.lineTo(170, 270); ctx.lineTo(0, 270); ctx.fill(); ctx.beginPath(); ctx.moveTo(W, 0); ctx.lineTo(330, 0); ctx.lineTo(360, 110); ctx.lineTo(310, 270); ctx.lineTo(W, 270); ctx.fill();
+    drawStrip(ctx, strip('column', '#1c0c2a', 8, 170), 262, 0, 0.95);
+    // a colossal carved face with two dim eyes, half-buried
+    ctx.fillStyle = '#1a0c28'; ctx.beginPath(); ctx.ellipse(240, 160, 70, 60, 0, 0, TAU); ctx.fill(); for (const ex of [212, 268]) { ctx.fillStyle = '#05010a'; ctx.fillRect(ex - 12, 148, 24, 10); const f2 = 0.4 + 0.5 * Math.abs(Math.sin(t * 0.8 + ex)); ctx.fillStyle = `rgba(200,120,255,${f2})`; ctx.fillRect(ex - 2, 150, 4, 5); glow(ctx, ex, 152, 22, '#b060ff', 0.4 * f2); }
+    ctx.fillStyle = '#05010a'; ctx.fillRect(228, 176, 24, 4);
+    motes(ctx, t, { n: 60, color: '#c090ff', a: 0.5, speed: 6, seed: 25 }); vignette(ctx, 0.7);
+  },
+  domain(ctx, t) {
+    grad(ctx, [[0, '#1a7a9a'], [0.5, '#0a3a5a'], [1, '#03101c']]);
+    glow(ctx, 240, 40, 220, '#ffe8a0', 0.35); rays(ctx, t, { x0: 240, a: 0.14, color: '#fff0c0', n: 9, spread: 160 });
+    drawStrip(ctx, strip('column', '#0a3a4e', 11, 240), 262, 0, 0.85); drawStrip(ctx, strip('column', '#062a3a', 14, 270), 270, 200, 1);
+    // the open doors and the road of tide-marble
+    ctx.fillStyle = '#0c4a5e'; ctx.beginPath(); ctx.moveTo(120, 270); ctx.lineTo(210, 150); ctx.lineTo(270, 150); ctx.lineTo(360, 270); ctx.fill(); ctx.strokeStyle = '#ffd84a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(240, 270); ctx.lineTo(240, 150); ctx.stroke();
+    for (const dx of [-1, 1]) { ctx.fillStyle = '#082a3a'; ctx.beginPath(); ctx.moveTo(240 + dx * 30, 150); ctx.lineTo(240 + dx * 90, 80); ctx.lineTo(240 + dx * 90, 150 + 20); ctx.lineTo(240 + dx * 30, 200); ctx.fill(); }
+    glow(ctx, 240, 150, 60, '#fff0c0', 0.5);
+    // a trident carved over the door
+    ctx.strokeStyle = '#ffd84a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(240, 60); ctx.lineTo(240, 100); ctx.moveTo(228, 68); ctx.lineTo(228, 86); ctx.lineTo(252, 86); ctx.lineTo(252, 68); ctx.stroke();
+    motes(ctx, t, { n: 46, color: '#fff0c0', a: 0.5, speed: 5, seed: 26 }); vignette(ctx, 0.5);
+  },
 };
 
 // shared nursery scene: whole clutch hatching, or the shells left behind
@@ -298,8 +371,58 @@ function nursery(ctx, t, full) {
 }
 function grad2(ctx, y0, y1, c0, c1) { const g = ctx.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.fillRect(0, y0, W, y1 - y0); }
 
-export const hasScene = (name) => !!SCENES[name];
+// ---- boss portraits and evolution scenes: "boss:<key>" and "form:<id>" --------------------------------------------
+const BOSS_ART = {
+  grumbold: { sp: { plan: 'grumbold', w: 176, h: 96, ax: 64, ay: 84, frames: 4 }, z: 2, y: 196, bg: ['#2aa8c8', '#0a3a62'], aura: '#ffb0e0' },
+  aurelia: { sp: { plan: 'aurelia', w: 112, h: 112, ax: 56, ay: 58, frames: 4 }, z: 2, y: 150, bg: ['#4a3a98', '#12104a'], aura: '#ffd8f0' },
+  captain_rust: { sp: { plan: 'captain', w: 120, h: 112, ax: 60, ay: 52, frames: 4 }, z: 2, y: 140, bg: ['#1e4a52', '#06161c'], aura: '#9affff' },
+  lurelord: { sp: { plan: 'lurelord', w: 150, h: 120, ax: 76, ay: 62, frames: 4 }, z: 2, y: 132, bg: ['#0e0a30', '#020208'], aura: '#ffe890' },
+  krael: { sp: { plan: 'krael', w: 320, h: 226, ax: 150, ay: 106, frames: 4 }, z: 1, y: 150, bg: ['#2a0a3a', '#030106'], aura: '#ff7a3a' },
+  kyros: { sp: { plan: 'kyros', w: 176, h: 156, ax: 52, ay: 124, frames: 4 }, z: 1, y: 190, bg: ['#0a5a7a', '#031620'], aura: '#9af0ff' },
+  hollow_maw: { sp: { plan: 'maw', w: 180, h: 150, ax: 88, ay: 70, frames: 4 }, z: 1, y: 130, bg: ['#12041c', '#010003'], aura: '#c070ff' },
+};
+function bossScene(ctx, key, t) {
+  const B = BOSS_ART[key]; if (!B) return SCENES.night(ctx, t);
+  grad(ctx, [[0, B.bg[0]], [1, B.bg[1]]]); glow(ctx, 240, 120, 230, B.aura, 0.3); rays(ctx, t, { x0: 240, a: 0.09, color: B.aura, n: 7, spread: 220 });
+  // light leaves the fallen: a slow fountain of motes and a ring of broken shell
+  const k = clamp(t / 3, 0, 1);
+  if (key === 'mother_moray') { /* handled below */ }
+  const f = enemyFrame(`cs_${key}`, { ...B.sp, o: { rage: false, phase: 0 } }, 'idle', Math.floor(t * 3) % 4);
+  ctx.save(); ctx.globalAlpha = 1 - 0.0 * k; sprite(ctx, f, 240, B.y + Math.sin(t * 0.7) * 3 + k * 6, B.z); ctx.restore();
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = B.aura; const r = rng(31);
+  for (let i = 0; i < 70; i++) { const x = 240 + (r() - 0.5) * 300, y0 = 150 + r() * 120, sp = 8 + r() * 24, y = y0 - ((t * sp) % 200); ctx.globalAlpha = 0.3 + 0.6 * Math.abs(Math.sin(t + i)); ctx.fillRect(Math.round(x), Math.round(y), 1 + (i % 4 === 0), 1 + (i % 4 === 0)); }
+  ctx.restore();
+  drawStrip(ctx, strip('rock', '#02040a', 15, 70), 272, 0, 0.9); vignette(ctx, 0.55);
+}
+function morayScene(ctx, t) {
+  grad(ctx, [[0, '#1a6a4a'], [1, '#04180e']]); glow(ctx, 240, 120, 220, '#a8ff98', 0.25); rays(ctx, t, { x0: 240, a: 0.09, color: '#d8ffd0', n: 6 });
+  drawStrip(ctx, strip('kelp', '#0a3a22', 17, 200), 270, t * 4, 0.9);
+  // the great serpent coiled round a nest of green-lit eggs
+  const head = morayHead(0, 0);
+  for (let i = 0; i < 22; i++) { const a = i * 0.34 - t * 0.3, rad = 90 - i * 2.2, x = 230 + Math.cos(a) * rad * 1.5, y = 150 + Math.sin(a) * rad * 0.55, seg = moraySeg(15 - i * 0.35, i); sprite(ctx, seg, x, y, 1); }
+  sprite(ctx, head, 300, 118 + Math.sin(t) * 2, 2);
+  for (let i = 0; i < 7; i++) { const x = 195 + i * 15, y = 158 + (i % 2) * 5; glow(ctx, x, y, 14, '#a8ff68', 0.4 + 0.2 * Math.sin(t * 2 + i)); ctx.fillStyle = '#d8ffb8'; ctx.beginPath(); ctx.ellipse(x, y, 4, 5, 0, 0, TAU); ctx.fill(); }
+  motes(ctx, t, { n: 40, color: '#c8ffb0', a: 0.5, speed: 4, seed: 27 }); vignette(ctx, 0.6);
+}
+function formScene(ctx, id, t, info) {
+  const st = info?.st || { form: id, branches: {}, dye: 'default' }, form = id;
+  const cols = { shore: ['#4ab8d8', '#0a3a62', '#ffd8a0'], warrior: ['#4a78d8', '#0a1a4a', '#a8d8ff'], abyssal: ['#0e3a4a', '#020a12', '#7affb0'], leviathan: ['#3a2a52', '#08040e', '#ffb44a'], mythic: ['#3a5ac8', '#060a30', '#9af0ff'], primordial: ['#a89ad8', '#1a1440', '#fff6c0'] }[form] || ['#2a6a9a', '#06203a', '#ffffff'];
+  grad(ctx, [[0, cols[0]], [1, cols[1]]]); glow(ctx, 240, 120, 210, cols[2], 0.4); rays(ctx, t, { x0: 240, a: 0.12, color: cols[2], n: 9, spread: 160 });
+  // the shell it left behind, cracked open on the sand
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(0, 232, W, 40);
+  const big = { shore: 4, warrior: 4, abyssal: 3, leviathan: 2, mythic: 2, primordial: 2 }[form] || 2;
+  const f = playerFrame(form, variantFor({ ...st, form }), 'idle', Math.floor(t * 4) % 4);
+  const lift = clamp(t / 1.2, 0, 1); ctx.save(); ctx.globalAlpha = lift; sprite(ctx, f, 240, 200 - (1 - lift) * 20 + Math.sin(t) * 1.5, big); ctx.restore();
+  const r = rng(41); ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 22; i++) { const a = r() * TAU, d = 40 + r() * 140, sp = 0.2 + r() * 0.5, x = 240 + Math.cos(a + t * sp) * d, y = 150 + Math.sin(a + t * sp) * d * 0.5; ctx.fillStyle = cols[2]; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x + 2, y); ctx.lineTo(x, y + 3); ctx.lineTo(x - 2, y); ctx.fill(); }
+  ctx.restore(); motes(ctx, t, { n: 40, color: cols[2], a: 0.7, speed: 6, seed: 28 }); vignette(ctx, 0.5);
+}
+
+export const hasScene = (name) => !!SCENES[name] || name.startsWith('boss:') || name.startsWith('form:');
 export function drawScene(ctx, name, t, info, lift = 0) {
   ctx.save(); if (lift) { ctx.fillStyle = '#02060e'; ctx.fillRect(0, 0, W, H); ctx.translate(0, -lift); }
-  (SCENES[name] || SCENES.ocean)(ctx, t, info); ctx.restore();
+  if (name.startsWith('boss:')) { const key = name.slice(5); (key === 'mother_moray' ? morayScene : (c, tt) => bossScene(c, key, tt))(ctx, t, info); }
+  else if (name.startsWith('form:')) formScene(ctx, name.slice(5), t, info);
+  else (SCENES[name] || SCENES.ocean)(ctx, t, info);
+  ctx.restore();
 }

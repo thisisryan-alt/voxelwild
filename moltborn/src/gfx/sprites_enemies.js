@@ -142,24 +142,30 @@ export const PLANS = {
   },
   // ---- armoured guardian (humanoid) -------------------------------------------------------
   knight(p, t, o) {
-    const cx = p.w / 2, base = p.h - 2, bob = sin(t * TAU) * 0.8, atk = o.pose === 'attack', wnd = o.pose === 'windup', grd = o.pose === 'guard';
-    const m = o.ramp, g = R.trident;
-    // legs / tail of foam
-    p.chain([[cx - 3, base - 12 + bob], [cx - 6, base - 5], [cx - 7, base]], 2.8, 2, m, {}); p.chain([[cx + 3, base - 12 + bob], [cx + 5, base - 5], [cx + 7, base]], 2.8, 2, m, {});
-    p.shape(m, { dither: 0.4 }, (s) => { s.ellipse(cx, base - 17 + bob, 8, 9); });
-    p.line(cx - 7, base - 19 + bob, cx + 7, base - 19 + bob, m.c[0]); p.line(cx, base - 25 + bob, cx, base - 10 + bob, m.c[1]);
-    p.shape(m, { dither: 0.3 }, (s) => { s.ellipse(cx + 1, base - 29 + bob, 5.5, 5.5); });
-    p.rect(cx - 1, base - 30 + bob, 8, 2, R.void, { outline: false, flat: 0 }); p.px(cx + 3, base - 29 + bob, '#9affff'); p.px(cx + 5, base - 29 + bob, '#9affff');
-    p.poly([[cx - 2, base - 34 + bob], [cx + 1, base - 40 + bob], [cx + 4, base - 34 + bob]], g, {});
+    const cx = 20, base = 46, bob = sin(t * TAU) * 0.8, walk = sin(t * TAU), atk = o.pose === 'attack', wnd = o.pose === 'windup', grd = o.pose === 'guard';
+    const m = o.ramp, g = R.trident, dk = m.tint(0, 1, 0.68);
+    // armoured legs with greaves and boots, striding
+    for (const side of [-1, 1]) { const r = side < 0 ? dk : m, st = walk * side * (o.pose === 'idle' ? 0.5 : 2.4); p.chain([[cx + side * 3, base - 15 + bob], [cx + side * 3 + st * 0.4, base - 8], [cx + side * 4 + st, base - 2]], 3.4, 2.7, r, { dither: 0.4 }); p.shape(r, { dither: 0.3 }, (s2) => s2.ellipse(cx + side * 4 + st + 1.5, base - 1, 3.8, 1.9)); p.px(cx + side * 3 + Math.round(st * 0.4), base - 9, g.c[3]); }
+    // tasset skirt of overlapping plates
+    for (let k = 0; k < 4; k++) p.shape(m, { dither: 0.3 }, (s2) => s2.poly([[cx - 8 + k * 4, base - 17 + bob], [cx - 4 + k * 4, base - 17 + bob], [cx - 6 + k * 4, base - 10 + bob + (k % 2)]]));
+    p.line(cx - 8, base - 17 + bob, cx + 8, base - 17 + bob, g.c[3]);
+    // cuirass with gold trim and an emblem
+    p.shape(m, { dither: 0.4, texture: { seed: 3, p: 0.04 } }, (s2) => { s2.poly([[cx - 9, base - 34 + bob], [cx + 9, base - 34 + bob], [cx + 6, base - 17 + bob], [cx - 6, base - 17 + bob]]); });
+    p.line(cx, base - 33 + bob, cx, base - 19 + bob, m.c[1]); p.line(cx - 7, base - 28 + bob, cx + 7, base - 28 + bob, g.c[3]); p.px(cx, base - 24 + bob, '#9affff'); p.px(cx - 1, base - 24 + bob, g.c[4]); p.px(cx + 1, base - 24 + bob, g.c[4]);
+    for (const sx of [-1, 1]) { p.shape(m, { dither: 0.3 }, (s2) => s2.ellipse(cx + sx * 9, base - 33 + bob, 4, 3)); p.px(cx + sx * 9 - 1, base - 35 + bob, m.c[4]); }
+    // helm: visor slit, fin crest, plume
+    p.shape(m, { dither: 0.3 }, (s2) => { s2.ellipse(cx + 1, base - 39 + bob, 6, 6.5); s2.rect(cx - 4, base - 38 + bob, 10, 5); });
+    p.rect(cx - 1, base - 40 + bob, 8, 2, R.void, { outline: false, flat: 0 }); p.px(cx + 2, base - 39 + bob, '#9affff'); p.px(cx + 5, base - 39 + bob, '#9affff'); p.line(cx + 1, base - 36 + bob, cx + 5, base - 36 + bob, m.c[0]);
+    p.poly([[cx - 4, base - 44 + bob], [cx + 1, base - 52 + bob], [cx + 6, base - 44 + bob]], g, {}); p.poly([[cx - 6, base - 41 + bob], [cx - 12, base - 46 + bob + Math.round(walk)], [cx - 4, base - 38 + bob]], m.tint(0, 1, 1.15), {});
     // spear arm
     const ay = wnd ? -10 : atk ? 6 : 0, ax = atk ? 18 : wnd ? -4 : 6;
-    p.capsule(cx + 6, base - 21 + bob, cx + 10 + ax * 0.3, base - 19 + bob + ay * 0.4, 2.2, 2, m, {});
-    const hx = cx + 10 + ax * 0.5, hy = base - 19 + bob + ay * 0.4;
-    p.line(hx - 8, hy + 2, hx + 18, hy - 2, g.c[1]); p.line(hx - 8, hy + 1, hx + 18, hy - 3, g.c[3]);
-    p.poly([[hx + 18, hy - 5], [hx + 24, hy - 2.5], [hx + 18, hy]], g, {}); p.poly([[hx + 16, hy - 6], [hx + 18, hy - 5], [hx + 17, hy - 4]], g, {});
-    if (grd) p.shape(R.steel, { dither: 0.4 }, (s) => s.ellipse(cx + 12, base - 18 + bob, 4, 10));
-    else p.capsule(cx - 6, base - 20 + bob, cx - 10, base - 14 + bob, 2, 1.8, m, {});
-    if (atk) p.glow(hx + 20, hy - 2, 8, '#9af0ff', 0.6);
+    p.chain([[cx + 7, base - 30 + bob], [cx + 10 + ax * 0.15, base - 26 + bob + ay * 0.2], [cx + 10 + ax * 0.3, base - 23 + bob + ay * 0.4]], 3, 2.4, m, {});
+    const hx = cx + 10 + ax * 0.5, hy = base - 23 + bob + ay * 0.4;
+    p.line(hx - 9, hy + 2, hx + 18, hy - 2, g.c[1]); p.line(hx - 9, hy + 1, hx + 18, hy - 3, g.c[3]);
+    p.poly([[hx + 18, hy - 5], [hx + 25, hy - 2.5], [hx + 18, hy]], g, {}); p.poly([[hx + 16, hy - 7], [hx + 18, hy - 5], [hx + 17, hy - 4]], g, {}); p.poly([[hx + 16, hy + 2], [hx + 18, hy], [hx + 17, hy - 1]], g, {});
+    if (grd) { p.shape(R.steel, { dither: 0.4 }, (s2) => s2.ellipse(cx + 12, base - 22 + bob, 4.4, 11)); p.ellipse(cx + 12, base - 22 + bob, 1.6, 4, g, { dither: 0.2 }); }
+    else { p.chain([[cx - 8, base - 30 + bob], [cx - 12, base - 25 + bob], [cx - 10, base - 20 + bob]], 3, 2.4, dk, {}); p.shape(R.steel, { dither: 0.4 }, (s2) => s2.ellipse(cx - 13, base - 23 + bob, 3, 7)); }
+    if (atk) p.glow(hx + 21, hy - 2, 9, '#9af0ff', 0.6);
   },
 };
 
