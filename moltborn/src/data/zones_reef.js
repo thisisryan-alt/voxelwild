@@ -14,7 +14,7 @@ export function reef_nursery() {
   b.platform(50, 24, 6); b.platform(58, 21, 5); b.platform(66, 18, 5);   // coral shelf stair up to a ledge
   b.rect(70, 14, 8, 2, T.ROCK); b.rect(72, 12, 4, 2, T.ROCK);       // sunlit ledge up top (chest)
   b.rect(62, 31, 12, 8, T.ROCK); b.carve(63, 32, 10, 6);            // dip
-  b.mound(14, 31, 5, 2.2, T.GROUND);
+  b.mound(30, 31, 4, 1.8, T.GROUND);
   // left wall rock with a one-tile crevice (small forms only) leading to a hidden pocket
   b.rect(2, 4, 8, 33, T.ROCK); b.carve(2, 28, 1, 1);
   b.rect(10, 27, 4, 4, T.ROCK); b.carve(2, 31, 12, 1); b.carve(3, 29, 4, 3);   // pocket behind the first rock
@@ -42,28 +42,27 @@ export function reef_nursery() {
 
 export function reef_garden() {
   const b = new ZoneBuilder({ id: 'reef_garden', name: 'Coral Garden', biome: 'reef', w: 120, h: 46, seed: 12, music: 'reef' });
-  b.fill(T.ROCK).carve(2, 4, 116, 39);
-  const floor = (x) => 36 + Math.round(Math.sin(x * 0.09) * 2 + Math.sin(x * 0.2) * 0.8);
+  b.fill(T.ROCK).carve(2, 5, 116, 36);
+  const floor = (x) => 37 + Math.round(Math.sin(x * 0.08) * 1.3 + Math.sin(x * 0.19) * 0.6);
   b.seabed(2, 118, floor); b.ceiling(2, 118, (x) => 6 + Math.round(Math.sin(x * 0.2) * 1.2));
-  // coral terraces
-  b.rect(20, 30, 10, 12, T.CORAL); b.rect(36, 26, 8, 20, T.CORAL); b.platform(46, 28, 5); b.platform(54, 23, 5); b.platform(62, 18, 6);
-  b.rect(70, 22, 12, 24, T.ROCK); b.rect(72, 20, 8, 2, T.ROCK);
-  // cracked wall hiding a vault (needs the Warrior's heavy strike)
-  b.rect(100, 24, 12, 22, T.ROCK); b.carve(103, 26, 7, 12); b.breakable(100, 36, 3, 2);
-  b.rect(88, 14, 10, 2, T.ROCK); b.platform(86, 30, 4); b.platform(92, 25, 4);
-  // little hall above the first ceiling dip: market alcove
-  b.rect(8, 10, 14, 2, T.ROCK); b.carve(10, 12, 10, 6); b.rect(8, 12, 2, 7, T.ROCK); b.rect(20, 12, 2, 7, T.ROCK); b.carve(14, 10, 2, 2);
-  b.surface(T.GROUND, 2); b.smooth(1); b.carve(104, 30, 5, 6);
-  b.exitW(32, 38, 'reef_nursery', 'east'); b.entryFloor('west', 4, { facing: 1 });
-  b.exitE(34, 40, 'reef_hollow', 'west'); b.entryFloor('east', 114, { facing: -1 });
-  b.shrine('rest', 10, { from: 12 });
-  b.npc('cowrie', 15, { from: 12 }); b.npc('pip', 52, { from: 20 });
-  b.spawnFloor('pinchling', 28, 0); b.spawnFloor('hermit', 40, 0); b.spawn('minnow', 48, 22, { count: 5 }); b.spawnFloor('urchin', 58, 0); b.spawnFloor('urchin', 60, 0);
-  b.spawnFloor('pinchling', 76, 0, { count: 2, spread: 24 }); b.spawn('minnow', 92, 18, { count: 4 }); b.spawnFloor('hermit', 96, 0);
-  b.coins(22, 28, 5); b.coins(56, 20, 3); b.coins(64, 15, 3); b.coins(90, 11, 4);
-  b.chest(74, { coins: [30, 50], black_pearl: 0, pearl: 2 }, { from: 16 });
-  b.chest(106, { item: 'mut_barbed' }, { from: 26, tint: 1, key: 'garden_vault' });
-  b.mural(24, 'mural_garden', { from: 20 });
+  // coral terraces (short, climbable) and a platform stair to a sunlit ledge
+  b.ellipse(30, 38, 5, 4, T.CORAL); b.ellipse(41, 38, 6, 5, T.CORAL);
+  b.platform(46, 33, 4); b.platform(52, 30, 4); b.platform(58, 27, 4); b.rect(62, 26, 12, 2, T.ROCK); b.rect(66, 24, 4, 2, T.ROCK);
+  b.rect(78, 34, 4, 4, T.ROCK);
+  // vault: a rock mass over the passage, its west face cracked (heavy strike). Platforms let small crabs reach the wall.
+  b.rect(94, 20, 17, 14, T.ROCK); b.carve(99, 24, 7, 6); b.breakable(94, 28, 2, 2);
+  b.platform(86, 33, 4); b.platform(89, 30, 4);
+  b.surface(T.GROUND, 1); b.smooth(1); b.carve(99, 24, 7, 6); b.breakable(94, 28, 2, 2); b.keep(93, 20, 19, 12);
+  b.exitW(33, 39, 'reef_nursery', 'east'); b.entryFloor('west', 4, { facing: 1 });
+  b.exitE(33, 39, 'reef_hollow', 'west'); b.entryFloor('east', 114, { facing: -1 });
+  b.shrine('rest', 17, { from: 10 });
+  b.npc('cowrie', 11, { from: 10 }); b.npc('pip', 49, { from: 10 });
+  b.spawnFloor('pinchling', 28, 10); b.spawnFloor('hermit', 38, 10); b.spawn('minnow', 46, 26, { count: 5 }); b.spawnFloor('urchin', 55, 10); b.spawnFloor('urchin', 57, 10);
+  b.spawnFloor('pinchling', 74, 10, { count: 2, spread: 24 }); b.spawn('minnow', 90, 26, { count: 4 }); b.spawnFloor('hermit', 108, 10);
+  b.coins(23, 33, 5); b.coins(58, 24, 3); b.coins(66, 20, 3); b.coins(84, 30, 4);
+  b.chest(69, { coins: [30, 50], pearl: 2 }, { from: 8 });
+  b.chest(102, { item: 'mut_barbed' }, { from: 24, tint: 1, key: 'garden_vault', secret: true });
+  b.mural(25, 'mural_garden', { from: 10 });
   b.decorate(REEF_DECOR, 0.3);
   return b.finish();
 }
@@ -94,7 +93,7 @@ export function reef_hollow() {
   b.spawnFloor('hermit', 44, 22); b.spawn('minnow', 56, 18, { count: 3 }); b.spawnFloor('pinchling', 76, 18, { count: 2, spread: 22 }); b.spawnFloor('urchin', 70, 20); b.spawnFloor('hermit', 82, 20);
   b.coins(20, 27, 5); b.coins(56, 18, 3); b.coins(66, 9, 4); b.coins(48, 8, 3);
   b.chest(5, { item: 'spiral_shell' }, { from: 34, key: 'spiral_shell_chest' });
-  b.chest(90, { pearl: 3, coins: [30, 40] }, { from: 6, tint: 1 });
+  b.chest(90, { pearl: 3, coins: [30, 40] }, { from: 6, tint: 1, secret: true });
   b.chest(78, { item: 'shell_driftwood', coins: [20, 30] }, { from: 6 });
   b.mural(30, 'mural_hollow', { from: 24 });
   b.sign(8, 'Tessa the hermit-child says: the spiral shell is in the little hole under the first cavern. You have to be small. (Dash is useful here.)', { from: 28 });

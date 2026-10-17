@@ -76,6 +76,7 @@ export class LockDoor extends Interactable {
   interact(game) {
     if (this.open) return;
     const key = this.o.key_item;
+    if (this.o.need && !this.o.need(game)) { game.say('Sealed', this.o.lockText || 'It will not open.'); return; }
     if (key && !game.hasItem(key)) { game.say('Locked', this.o.lockText || 'The door is sealed. A key must exist somewhere in this place.'); return; }
     this.open = true; (this.zs.opened ||= {})[this.key] = true; this.clearTiles(false);
     game.audio.sfx('unlock'); this.world.fx.burst(this.x, this.y, ['#ffd84a', '#fff'], 100, 0.5, 3); game.toast('Unlocked');
@@ -98,4 +99,42 @@ export class NpcEntity extends Interactable {
   }
 }
 
-export const INTERACTABLES = { chest: Chest, shrine: Shrine, mural: Mural, sign: Sign, lockdoor: LockDoor, npc: NpcEntity };
+// Singing kelp bulb: struck in the order low, high, middle plays the old tune (Choir of Kelp quest)
+export class Bulb extends Interactable {
+  constructor(world, o) { super(world, o, 14, 16); this.tone = o.tone; this.glowT = 0; this.range = 0; }
+  prompt() { return null; }
+  canInteract() { return false; }
+  update(dt) { this.t += dt; this.glowT = Math.max(0, this.glowT - dt); }
+  onHit() {
+    const w = this.world, g = w.game; if (g.flag('choir_done') || this.glowT > 0.2) return;
+    this.glowT = 0.7; const f = [196, 392, 294][this.tone]; g.audio.tone?.({ f, dur: 0.6, v: 0.35, type: 'sine', rev: 0.7 }); w.fx.ring(this.x, this.y, 2, 24, 0.4, ['#6ab0ff', '#ffb0d8', '#9affb0'][this.tone], 2);
+    const seq = (w.choirSeq ||= []); seq.push(this.tone); if (seq.length > 3) seq.shift();
+    if (seq.length === 3 && seq[0] === 0 && seq[1] === 1 && seq[2] === 2) { g.setFlag('choir_done'); g.toast('The kelp sings back.', '#9affb0'); g.audio.sfx('item'); w.fx.burst(this.x, this.y - 20, ['#9affb0', '#fff'], 120, 1, 3); g.grantLoot({ coins: 40, xp: 30 }, this.x, this.y - 10, false); }
+  }
+  draw(ctx, cam) {
+    const c = [['#4a7ad8', '#7ab0f2', '#c0e0ff'], ['#c85a96', '#e87e90', '#ffd0e0'], ['#2f8a2c', '#58b82a', '#c0ffb0']][this.tone], x = Math.round(this.x - cam.x), y = Math.round(this.y + 8 - cam.y), lit = this.glowT > 0;
+    ctx.fillStyle = '#170d1c'; ctx.fillRect(x - 1, y - 8, 3, 8); ctx.fillRect(x - 6, y - 18, 13, 11); ctx.fillStyle = lit ? c[2] : c[0]; ctx.fillRect(x - 5, y - 17, 11, 9); ctx.fillStyle = lit ? '#ffffff' : c[1]; ctx.fillRect(x - 4, y - 16, 4, 3);
+    if (lit) { ctx.globalAlpha = 0.4; ctx.fillStyle = c[2]; ctx.beginPath(); ctx.arc(x, y - 12, 14, 0, 6.3); ctx.fill(); ctx.globalAlpha = 1; }
+  }
+}
+
+// A brazier lit with a Lantern Stone (Lantern Pact quest)
+export class Brazier extends Interactable {
+  constructor(world, o) { super(world, o, 14, 18); this.lit = !!this.zs.opened?.[this.key]; }
+  prompt() { return this.lit ? null : 'Light'; }
+  interact(game) {
+    if (this.lit) return;
+    if (!game.hasItem('lantern_stone')) { game.say('Brazier', 'A cold bowl of dark stone. It wants a Lantern Stone.'); return; }
+    game.addItem('lantern_stone', -1); this.lit = true; (this.zs.opened ||= {})[this.key] = true; game.audio.sfx('unlock');
+    this.world.fx.burst(this.x, this.y - 6, ['#ffd84a', '#ff9a3a', '#fff'], 100, 0.8, 2);
+    const n = this.world.interactables.filter((i) => i instanceof Brazier && i.lit).length;
+    game.toast(`Brazier lit (${n}/${this.o.total || 3})`, '#ffd84a'); if (n >= (this.o.total || 3)) { game.setFlag('lanterns_lit'); game.audio.sfx('item'); }
+  }
+  draw(ctx, cam) {
+    const x = Math.round(this.x - cam.x), y = Math.round(this.y + 9 - cam.y);
+    ctx.fillStyle = '#170d1c'; ctx.fillRect(x - 6, y - 8, 13, 9); ctx.fillRect(x - 2, y - 12, 5, 6); ctx.fillStyle = '#6a6a7a'; ctx.fillRect(x - 5, y - 7, 11, 7); ctx.fillStyle = '#9a9aaa'; ctx.fillRect(x - 5, y - 7, 11, 1);
+    if (this.lit) { const f = Math.floor(this.t * 8) % 3; ctx.fillStyle = '#ff9a3a'; ctx.fillRect(x - 3, y - 14 - f, 7, 7 + f); ctx.fillStyle = '#ffd84a'; ctx.fillRect(x - 2, y - 12 - f, 5, 5); ctx.fillStyle = '#fff6a8'; ctx.fillRect(x - 1, y - 10, 3, 3); }
+  }
+  get glowing() { return this.lit; }
+}
+export const INTERACTABLES = { bulb: Bulb, brazier: Brazier, chest: Chest, shrine: Shrine, mural: Mural, sign: Sign, lockdoor: LockDoor, npc: NpcEntity };

@@ -130,7 +130,7 @@ export class ZoneBuilder {
 Object.assign(ZoneBuilder.prototype, {
   entryFloor(name, tx, o = {}) { const f = this.floorRow(tx, o.from ?? 0); this.entry(name, tx, f - 1); if (o.facing) this.entries[name].facing = o.facing; return this; },
   shrine(name, tx, o = {}) { const f = this.floorRow(tx, o.from ?? 0); this.entry(name, tx, f - 1); this.props.push({ type: 'shrine', x: (tx + 0.5) * TS, y: (f - 1) * TS - 2 + 16 - 2, kind: o.kind || 'rest', entry: name, key: `${this.id}:shrine:${name}`, name: o.title }); return this; },
-  chest(tx, loot, o = {}) { const f = this.floorRow(tx, o.from ?? 0); this.props.push({ type: 'chest', x: (tx + 0.5) * TS, y: f * TS - 8 + 8, loot, tint: o.tint, key: o.key }); return this; },
+  chest(tx, loot, o = {}) { const f = this.floorRow(tx, o.from ?? 0); this.props.push({ type: 'chest', x: (tx + 0.5) * TS, y: f * TS - 8 + 8, loot, tint: o.tint, key: o.key, secret: !!o.secret }); return this; },
   npc(id, tx, o = {}) { const f = this.floorRow(tx, o.from ?? 0); this.props.push({ type: 'npc', npc: id, x: (tx + 0.5) * TS, y: f * TS - 11, facing: o.facing }); return this; },
   sign(tx, text, o = {}) { const f = this.floorRow(tx, o.from ?? 0); this.props.push({ type: 'sign', x: (tx + 0.5) * TS, y: f * TS - 9, text, speaker: o.speaker }); return this; },
   mural(tx, codex, o = {}) { const f = this.floorRow(tx, o.from ?? 0); this.props.push({ type: 'mural', x: (tx + 0.5) * TS, y: f * TS - 15, codex, v: o.v || 0 }); return this; },
@@ -146,6 +146,8 @@ Object.assign(ZoneBuilder.prototype, {
   entryW(name, ty) { this.entry(name, 3, ty); return this; },
   // fill the open area under a y-line with solid (a flat floor) between x0..x1
   floorLine(x0, x1, y, t = T.ROCK) { for (let x = x0; x < x1; x++) for (let j = y; j < this.h; j++) this.grid.set(x, j, t); return this; },
+  // zig-zag stair of one-way platforms from yBottom up to yTop around column xc (rises of `rise` tiles)
+  ladder(xc, yBottom, yTop, spread = 6, w = 4, rise = 5) { let side = -1, y = yBottom - rise; while (y >= yTop) { this.platform(xc + side * spread - Math.floor(w / 2), y, w); side *= -1; y -= rise; } return this; },
   breakable(x, y, w = 1, h = 1) { this.rect(x, y, w, h, T.CRACKED); return this; },
   seal(x, y, w = 1, h = 1) { this.rect(x, y, w, h, T.SEAL); return this; },
   tidegate(x, y, w = 1, h = 1) { this.rect(x, y, w, h, T.TIDEGATE); return this; },

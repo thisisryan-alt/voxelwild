@@ -145,6 +145,7 @@ export class Game {
     if (it.type === 'mutation') { if (!this.state.mutOwned.includes(id)) this.state.mutOwned.push(id); if (this.state.mutations.length < FORMS[this.state.form].mutationSlots) { this.state.mutations.push(id); this.world?.player.recalc(); } }
     else if (it.type === 'dye') { if (!this.state.dyes) this.state.dyes = {}; this.state.dyes[id] = true; this.addItem(id, 1); }
     else this.addItem(id, n);
+    if (/^mp\d$/.test(id)) { this.systems.codex.read(id); this.setFlag('has_' + id); }
     if (announce) { this.popup(id, it.name + (n > 1 ? ' x' + n : ''), '#fff6a8'); this.audio.sfx('item'); }
     this.events.emit('gotitem', id);
   }

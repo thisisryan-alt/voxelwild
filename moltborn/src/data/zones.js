@@ -1,7 +1,11 @@
 // Zone registry: name, biome and map placement for every zone (building is lazy and always fresh).
 import * as reef from './zones_reef.js';
+import * as forest from './zones_forest.js';
+import * as kingdom from './zones_kingdom.js';
+import * as grave from './zones_graveyard.js';
+import * as deep from './zones_deep.js';
 
-const REG = { ...reef };
+const REG = { ...reef, ...forest, ...kingdom, ...grave, ...deep };
 export { ZONE_INFO } from './zoneinfo.js';
 export function buildZone(id) {
   const f = REG[id]; if (!f) throw new Error('unknown zone ' + id);

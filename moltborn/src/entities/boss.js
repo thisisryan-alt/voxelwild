@@ -143,6 +143,9 @@ export class Boss extends Enemy {
   }
   shootDir(kind, dmg, ang, speed, o = {}) { return this.world.addProjectile({ kind, team: 'enemy', x: o.x ?? this.x, y: o.y ?? this.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, dmg: Math.round(dmg * (this.dmgMult || 1)), grav: o.grav || 0, life: o.life || 3, kb: 110, boss: true, ghost: o.ghost, trail: o.trail, scale: o.scale, pierce: o.pierce, homing: o.homing || 0 }); }
   summon(type, x, y, o = {}) { const w = this.world, e = new (Enemy)(w, type, x, y, { floor: false, ...o }); e.minion = true; e.xpMult = 0; e.def = { ...e.def, coins: null }; w.enemies.push(e); w.fx.ring(x, y, 2, 20, 0.3, '#ff9aff', 2); return e; }
+  flyPhysics(dt, m = 3) { const a = this.arena; this.x += this.vx * dt; this.y += this.vy * dt; if (a) { this.x = clamp(this.x, (a.x + m) * TS, (a.x + a.w - m) * TS); this.y = clamp(this.y, (a.y + m) * TS, (a.y + a.h - m) * TS); } }
+  // run a dialogue generator and wait for it (use with yield*)
+  *talk(fn, npc = null) { let done = false; this.world.player.locked = true; this.world.game.systems.dialogue.run(fn, npc, null, () => { done = true; }); while (!done) yield 0.1; this.world.player.locked = false; }
   faceTo(x) { this.facing = x >= this.x ? 1 : -1; }
   *moveTo(tx, ty, speed, maxT = 3, tol = 4) { let t = 0; while (t < maxT) { const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy); if (d < tol) break; this.vx = dx / d * speed; this.vy = dy / d * speed; t += 1 / 60; yield 1 / 60; } this.vx = this.vy = 0; }
   // ---- drawing -------------------------------------------------------------------------------------------------------------

@@ -280,7 +280,7 @@ export class World {
     for (const d of this.decor) if (d.spr.glow) L.push({ x: d.x, y: d.y - 12, r: 38, a: 0.8, color: d.spr.glow });
     for (const e of this.enemies) if (e.def.glow || e.def.sprite.o?.glow || e.type === 'lanternfish') L.push({ x: e.x, y: e.y - 4, r: 34, a: 0.8 });
     for (const p of this.projectiles) L.push({ x: p.x, y: p.y, r: 22, a: 0.8 });
-    for (const i of this.interactables) if (i instanceof INTERACTABLES.shrine) L.push({ x: i.x, y: i.y - 6, r: 52, a: 1 });
+    for (const i of this.interactables) { if (i instanceof INTERACTABLES.shrine) L.push({ x: i.x, y: i.y - 6, r: 52, a: 1 }); else if (i.glowing) L.push({ x: i.x, y: i.y - 10, r: 60, a: 1, color: '#ffb060' }); }
     for (const f of this.fields) L.push({ x: f.x, y: f.y, r: f.r, a: 0.6 });
     for (const fn of this.extraLights || []) fn(L);
     return L;
