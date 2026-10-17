@@ -80,7 +80,7 @@ export class MenuScene {
   u_SKILLS(inp, s) {
     const keys = Object.keys(SKILL_BRANCHES), g = this.g;
     if (inp.pressed('left')) { s.i = (s.i + 7) % 8; g.audio.sfx('tick'); } if (inp.pressed('right')) { s.i = (s.i + 1) % 8; g.audio.sfx('tick'); }
-    if (inp.pressed('up')) { s.j = (s.j + 3) % 4; g.audio.sfx('tick'); } if (inp.pressed('down')) { s.j = (s.j + 1) % 4; g.audio.sfx('tick'); }
+    if (inp.pressed('up')) { s.j = (s.j + 4) % 5; g.audio.sfx('tick'); } if (inp.pressed('down')) { s.j = (s.j + 1) % 5; g.audio.sfx('tick'); }
     if (inp.pressed('confirm')) {
       const id = this.nodeAt(s);
       if (id) { if (buySkill(g.state, id)) { g.audio.sfx('levelup'); g.world.player.recalc(); this.say('Learned ' + SKILLS[id].name); } else { g.audio.sfx('deny'); this.say(g.state.skills[id] ? 'Already learned' : 'Cannot learn yet'); } }
@@ -93,7 +93,7 @@ export class MenuScene {
     bs.forEach((b, bi) => {
       const x0 = 8 + bi * 116, B = SKILL_BRANCHES[b];
       panel(ctx, x0, 32, 112, 150, { border: B.color }); text(ctx, B.name + ' — ' + B.desc, x0 + 6, 36, B.color);
-      const pos = (n) => [x0 + 18 + n.col * 48, 52 + n.row * 32];
+      const pos = (n) => [x0 + 18 + n.col * 48, 52 + n.row * 26];
       for (const [id, n] of Object.entries(SKILLS)) { if (n.branch !== b) continue; for (const r of n.req) { const a = pos(SKILLS[r]), c = pos(n); ctx.fillStyle = st.skills[r] && st.skills[id] ? B.color : '#2a3a58'; ctx.fillRect(a[0] + 9, a[1] + 18, 1, c[1] - a[1] - 18); if (a[0] !== c[0]) ctx.fillRect(Math.min(a[0], c[0]) + 9, c[1] - 4, Math.abs(a[0] - c[0]) + 1, 1); ctx.fillRect(c[0] + 9, c[1] - 4, 1, 4); } }
       for (const [id, n] of Object.entries(SKILLS)) {
         if (n.branch !== b) continue; const [x, y] = pos(n), own = st.skills[id], can = canBuySkill(st, id), sel = (s.i >> 1) === bi && (s.i & 1) === n.col && s.j === n.row;

@@ -16,7 +16,7 @@ export class Player extends Entity {
     this.game = game; this.st = game.state; this.state = 'free'; this.stateT = 0; this.anim = 'idle'; this.animT = 0;
     this.strokesLeft = 0; this.strokeT = 0; this.coyote = 0; this.dashCd = 0; this.dashT = 0; this.dashI = 0; this.dashDir = [1, 0];
     this.invulnT = 0; this.counterT = 0; this.blockT = 0; this.blockCd = 0; this.comboIdx = 0; this.comboT = 0; this.atk = null; this.chargeT = 0; this.queued = false;
-    this.cool = {}; this.ultCd = 0; this.surge = 0; this.spin = null; this.dashAttack = null; this.locked = false; this.deathT = 0; this.respawnT = 0;
+    this.cool = {}; this.ultCd = 0; this.surge = 0; this.aegis = 0; this.aegisT = 0; this.rushT = 0; this.spin = null; this.dashAttack = null; this.locked = false; this.deathT = 0; this.respawnT = 0;
     this.images = []; this.imgT = 0; this.lastAttackAt = 0; this.pressureT = 0; this.fear = 0; this.interactT = 0; this.collectT = 0; this.castT = 0; this.stepT = 0; this.mood = '';
     this.alive = true; this.combatT = 0; this.evolveGlow = 0; this.hideSprite = false;
     this.recalc(true);
@@ -51,6 +51,7 @@ export class Player extends Entity {
     const g = this.game, inp = g.input, F = this.form, M = F.move, S = this.stats, w = this.world;
     this.t += dt; this.stateT += dt; this.animT += dt;
     if (this.comboLife > 0) { this.comboLife -= dt; if (this.comboLife <= 0) this.combo = 0; } this.comboPop = Math.max(0, (this.comboPop || 0) - dt * 6);
+    if (this.aegisT > 0) { this.aegisT -= dt; if (this.aegisT <= 0) this.aegis = 0; } if (this.rushT > 0) this.rushT -= dt;
     this.dashCd -= dt; this.invulnT -= dt; this.counterT -= dt; this.blockCd -= dt; this.comboT -= dt; this.combatT -= dt; this.strokeT -= dt; this.surge -= dt;
     this.coyote -= dt; this.ultCd -= dt; this.evolveGlow = Math.max(0, this.evolveGlow - dt);
     for (const k in this.cool) this.cool[k] -= dt;
@@ -166,7 +167,7 @@ export class Player extends Entity {
     this.atk = { def, t: 0, i: -1, hit: false, fired: false, heavy: true, mult, full: chargeRatio >= 0.98 }; this.setState('attack'); this.queued = false; this.animT = 0;
   }
   fxColor() { const v = variantFor(this.st); return v.glow || v.ramp.hex[4] || '#fff0c8'; }
-  attackSpeed() { return 1 + this.stats.atkSpeed; }
+  attackSpeed() { return 1 + this.stats.atkSpeed + (this.rushT > 0 ? 0.3 : 0); }
   updateAttack(dt, ok) {
     const a = this.atk, d = a.def, w = this.world, inp = this.game.input, sp = this.attackSpeed();
     a.t += dt * sp;
@@ -247,6 +248,7 @@ export class Player extends Entity {
     this.dashCd = M.dash.cd * (1 + S.dashCd); this.dashSpeed = M.dash.speed * (attack ? 1.15 : 1) * S.speed; this.animT = 0;
     this.sfx('dash'); this.world.fx.foam(this.x - this.dashDir[0] * 6, this.y, -this.dashDir[0] || -this.facing, 6);
     this.dashHit = new Set();
+    if (S.dashStrike && !this.dashAttack) this.dashAttack = { dmg: S.atk * 0.8, t: this.dashT };
   }
   updateDash(dt) {
     this.dashT -= dt; this.dashI -= dt;
@@ -272,6 +274,11 @@ export class Player extends Entity {
     if (this.state === 'locked' || this.world.cinematic) return false;
     const w = this.world, S = this.stats, F = this.form;
     if (this.counterT > 0 && !src.thorn && !src.unblockable) { this.counterT = 0; this.invulnT = 0.6; this.riposte(src); return 'parried'; }
+    if (this.aegis > 0 && !src.thorn) { // the bubble eats the blow whole
+      this.aegis--; this.invulnT = 0.45; w.fx.ring(this.x, this.y, 8, 30, 0.3, '#c8f0ff', 2); w.fx.burst(this.x, this.y, ['#ffffff', '#c8f0ff'], 60, 0.3, 2);
+      w.fx.text(this.x, this.y - this.h / 2 - 8, this.aegis ? 'AEGIS' : 'AEGIS BREAKS', '#c8f0ff', true); this.sfx('clang'); this.game.hitstop(3); if (!this.aegis) this.aegisT = 0;
+      return 'blocked';
+    }
     let dmg = src.dmg, blocked = false;
     if (this.state === 'block' && !src.unblockable && !src.thorn) {
       const frontal = ((src.x ?? this.x) - this.x) * this.facing >= -3;
@@ -393,6 +400,12 @@ export class Player extends Entity {
     if (this.state === 'dash') alpha = 0.7;
     if (this.onGround && !this.free && this.alive) blobShadow(ctx, x, this.bottom - cam.y, Math.round(this.w * 0.75));
     if (this.alive || this.deathT < 1.4) drawFrame(ctx, f, x, y, flip, false, alpha * (this.alive ? 1 : Math.max(0, 1 - Math.max(0, this.deathT - 0.8) / 0.6)));
+    if (this.aegis > 0) { // a faint shimmering bubble; one pip per blow left
+      const bx = Math.round(x), by = Math.round(this.y - cam.y), R = Math.round(Math.max(this.w, this.h) * 0.62) + 5;
+      ctx.globalAlpha = 0.5 + Math.sin(this.t * 6) * 0.12; ctx.strokeStyle = '#c8f0ff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(bx + 0.5, by + 0.5, R, R * 0.9, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 0.12; ctx.fillStyle = '#c8f0ff'; ctx.fill(); ctx.globalAlpha = 0.9; ctx.fillStyle = '#ffffff'; ctx.fillRect(bx - R * 0.6, by - R * 0.6, 2, 1); ctx.fillRect(bx - R * 0.6, by - R * 0.6 + 1, 1, 1);
+      for (let i = 0; i < this.aegis; i++) ctx.fillRect(bx - 4 + i * 4, by - R - 4, 2, 2); ctx.globalAlpha = 1;
+    }
     if (this.state === 'charge') { const r = clamp(this.chargeT / (this.form.heavy.charge / (1 + this.stats.chargeSpeed)), 0, 1); ctx.fillStyle = '#170d1c'; ctx.fillRect(Math.round(x) - 11, Math.round(this.y - this.h / 2 - cam.y) - 12, 22, 4); ctx.fillStyle = r >= 1 ? '#ffd84a' : '#ff9a4a'; ctx.fillRect(Math.round(x) - 10, Math.round(this.y - this.h / 2 - cam.y) - 11, Math.round(20 * r), 2); }
     if (this.counterT > 0) { ctx.strokeStyle = '#ff90a8'; ctx.beginPath(); ctx.arc(Math.round(x) + 0.5, Math.round(this.y - cam.y) + 0.5, 14 + Math.sin(this.t * 30) * 2, 0, 6.3); ctx.stroke(); }
     if (this.surge > 0) { ctx.globalAlpha = 0.4 + 0.2 * Math.sin(this.t * 12); ctx.strokeStyle = '#9af0ff'; ctx.beginPath(); ctx.arc(Math.round(x) + 0.5, Math.round(this.y - cam.y) + 0.5, 22, 0, 6.3); ctx.stroke(); ctx.globalAlpha = 1; }

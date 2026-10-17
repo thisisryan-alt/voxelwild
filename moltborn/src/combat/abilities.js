@@ -1,7 +1,9 @@
 // Active abilities and ultimates. cast(p, w) runs when the player triggers one; p is the Player, w the World.
 // Damage helpers scale with the player's attack and ability bonuses.
 const dir = (p) => p.facing;
-const hb = (w, p, o) => w.spawnHitbox({ team: 'player', owner: p, ...o });
+const hb = (w, p, o) => w.spawnHitbox({ team: 'player', owner: p, ability: true, ...o });
+// the player's body is bigger than a point: a spot is free when its centre and four corners are open water
+const fits = (w, p, x, y) => [[0, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]].every(([a, b]) => !w.grid.solidPx(x + a * p.w * 0.4, y + b * p.h * 0.4));
 
 export const ABILITIES = {
   bubbleShot: { name: 'Bubble Spit', icon: 'bubble', cost: 8, cd: 0.7, time: 0.28, anim: 'cast', desc: 'Spit a stunning bubble. Cheap, quick and good at range.',
@@ -45,6 +47,35 @@ export const ABILITIES = {
     cast(p, w) { w.slowT = 4; w.slowFactor = 0.33; w.fx.ring(p.x, p.y, 4, 160, 0.6, '#a0f0ff', 2); p.sfx('slack'); } },
   pearlStorm: { name: 'Pearl Storm', icon: 'pearl', cost: 24, cd: 5, time: 0.4, anim: 'cast', desc: 'Loose a burst of homing pearls.',
     cast(p, w) { for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; w.addProjectile({ kind: 'pearl', team: 'player', x: p.x, y: p.y, vx: Math.cos(a) * 110, vy: Math.sin(a) * 110, dmg: p.abDmg(1.4), life: 2.2, homing: 5, poise: 8, kb: 70 }); } p.sfx('spit'); } },
+  crescent: { name: 'Crescent Wave', icon: 'blade', cost: 14, cd: 2.2, time: 0.32, anim: 'attack3', desc: 'Carve a wave of force that races ahead and pierces everything in its path.',
+    cast(p, w) {
+      const col = p.fxColor(); w.fx.slash(p.x + dir(p) * 6, p.y, dir(p), 26, col, { life: 0.22, th: 9, arc: 1.25, tilt: -0.3 });
+      w.addProjectile({ kind: 'crescent', team: 'player', x: p.x + dir(p) * 22, y: p.y, vx: dir(p) * 230, vy: 0, dmg: p.abDmg(1.7), life: 0.95, pierce: true, poise: 26, kb: 150, trail: col });
+      p.sfx('heavy'); w.kickCam(dir(p) * 2, 0);
+    } },
+  aegis: { name: 'Aegis Bubble', icon: 'shell', cost: 18, cd: 10, time: 0.35, anim: 'block', desc: 'Wrap yourself in a pearl-bright bubble that swallows the next three blows.',
+    cast(p, w) { p.aegis = 3; p.aegisT = 9; w.fx.ring(p.x, p.y, 6, 36, 0.4, '#c8f0ff', 3); w.fx.burst(p.x, p.y, ['#ffffff', '#c8f0ff'], 70, 0.4, 2); p.sfx('revive'); } },
+  tideStep: { name: 'Tide Step', icon: 'dash', cost: 12, cd: 3, time: 0.2, anim: 'dash', desc: 'Vanish in a rush of foam and reappear up to 96 units away. Foes you pass are cut, and you cannot be touched for an instant.',
+    cast(p, w) {
+      const inp = p.game.input; let dx = inp.axisX() || p.facing, dy = p.free ? inp.axisY() : 0; const n = Math.hypot(dx, dy) || 1; dx /= n; dy /= n;
+      let d = 0; while (d < 96 && fits(w, p, p.x + dx * (d + 4), p.y + dy * (d + 4))) d += 4;
+      const x0 = p.x, y0 = p.y, col = p.fxColor();
+      for (let i = 0; i <= d; i += 6) { w.fx.burst(x0 + dx * i, y0 + dy * i, ['#ffffff', col], 6, 0.35, 2); }
+      w.fx.ring(x0, y0, 3, 26, 0.3, col, 2);
+      hb(w, p, { x: Math.min(x0, x0 + dx * d) - p.w / 2, y: Math.min(y0, y0 + dy * d) - p.h / 2, w: Math.abs(dx * d) + p.w, h: Math.abs(dy * d) + p.h, dmg: p.abDmg(1.1), life: 0.1, kb: 120, poise: 20, stop: 3, pierce: true });
+      p.x = x0 + dx * d; p.y = y0 + dy * d; p.vx = dx * 60; p.vy = dy * 60; p.invulnT = Math.max(p.invulnT, 0.5);
+      w.fx.ring(p.x, p.y, 3, 26, 0.3, col, 2); p.sfx('dash'); w.kickCam(dx * 3, dy * 3);
+    } },
+  stormCall: { name: 'Storm Call', icon: 'beam', cost: 26, cd: 6, time: 0.5, anim: 'cast', desc: 'Call lightning down on up to four nearby foes. Stunned targets take double.',
+    cast(p, w) {
+      const list = w.enemies.filter((e) => e.alive && e.canBeHit() && Math.hypot(e.x - p.x, e.y - p.y) < 230).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y)).slice(0, 4);
+      if (!list.length) { const x = p.x + dir(p) * 70; w.fx.bolt(x + 6, p.y - 150, x, p.y, '#bfe8ff'); hb(w, p, { x: x - 14, y: p.y - 20, w: 28, h: 40, dmg: p.abDmg(1.4), life: 0.1, kb: 80, poise: 20, stop: 3 }); }
+      for (const e of list) {
+        w.fx.bolt(e.x + (Math.random() - 0.5) * 10, e.y - 150, e.x, e.y, '#bfe8ff');
+        e.takeHit({ dmg: p.abDmg(2.0) * (e.stunT > 0 ? 2 : 1), dir: Math.sign(e.x - p.x) || 1, kb: 60, poise: 40, stop: 4, shake: 3, stun: 0.5, fromAbility: true, crit: e.stunT > 0 }, p);
+      }
+      w.flash = Math.max(w.flash, 0.08); w.shake(3); p.sfx('zap');
+    } },
   tailLash: { name: 'Tail Lash', icon: 'tail', cost: 14, cd: 2.5, time: 0.4, anim: 'attack3', desc: 'A whip of the telson in a full circle.',
     cast(p, w) { hb(w, p, { x: p.x - 66, y: p.y - 30, w: 132, h: 60, dmg: p.abDmg(2), life: 0.18, kb: 240, poise: 40, stop: 5, shake: 3, heavy: true }); w.fx.ring(p.x, p.y, 10, 70, 0.25, '#ffffff', 2); p.sfx('slam'); } },
 };

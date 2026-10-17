@@ -5,7 +5,7 @@ import { drawText } from './font.js';
 const rand = rng(77);
 const pixCache = new WeakMap();
 export class Particles {
-  constructor() { this.p = []; this.rings = []; this.texts = []; this.slashes = []; this.impacts = []; this.max = 1800; }
+  constructor() { this.p = []; this.rings = []; this.texts = []; this.slashes = []; this.impacts = []; this.bolts = []; this.max = 1800; }
   add(o) {
     if (this.p.length >= this.max) this.p.shift();
     this.p.push({ x: 0, y: 0, vx: 0, vy: 0, life: 1, size: 1, color: '#fff', grav: 0, drag: 0, shrink: false, kind: 'rect', fade: true, wob: 0, ...o, max: o.life ?? 1 });
@@ -30,6 +30,13 @@ export class Particles {
     const n = o.sparks ?? (crit ? 12 : 7);
     for (let i = 0; i < n; i++) { const a = (rand() - 0.5) * 2.2 + (dir > 0 ? 0 : Math.PI), sp = 90 + rand() * 150; this.add({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.8, life: 0.16 + rand() * 0.16, size: 1, color: rand() < 0.5 ? '#ffffff' : col, kind: 'streak', drag: 3.2 }); }
   }
+  // a jagged lightning bolt from (x1,y1) to (x2,y2); the path is rolled once so it flickers rather than crawls
+  bolt(x1, y1, x2, y2, color = '#bfe8ff', life = 0.2) {
+    const n = Math.max(3, Math.round(Math.hypot(x2 - x1, y2 - y1) / 9)), pts = [], dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    for (let i = 0; i <= n; i++) { const u = i / n, j = i === 0 || i === n ? 0 : (rand() - 0.5) * 12; pts.push([x1 + dx * u + nx * j, y1 + dy * u + ny * j]); }
+    this.bolts.push({ pts, color, life, max: life });
+    for (let i = 0; i < 6; i++) this.add({ x: x2, y: y2, vx: (rand() - 0.5) * 120, vy: -rand() * 80, life: 0.2 + rand() * 0.2, size: 1, color: i % 2 ? '#ffffff' : color, kind: 'streak', drag: 3 });
+  }
   // the sprite itself breaks apart: real pixels sampled from the frame fly out and sink
   debris(f, x, y, flip = false, n = 40, power = 70, o = {}) {
     if (!f || !f.canvas) return;
@@ -50,6 +57,7 @@ export class Particles {
   update(dt) {
     for (let i = this.slashes.length - 1; i >= 0; i--) { this.slashes[i].life -= dt; if (this.slashes[i].life <= 0) this.slashes.splice(i, 1); }
     for (let i = this.impacts.length - 1; i >= 0; i--) { this.impacts[i].life -= dt; if (this.impacts[i].life <= 0) this.impacts.splice(i, 1); }
+    for (let i = this.bolts.length - 1; i >= 0; i--) { this.bolts[i].life -= dt; if (this.bolts[i].life <= 0) this.bolts.splice(i, 1); }
     for (let i = this.p.length - 1; i >= 0; i--) {
       const q = this.p[i]; q.life -= dt;
       if (q.life <= 0) { this.p.splice(i, 1); continue; }
@@ -75,6 +83,7 @@ export class Particles {
     ctx.globalAlpha = 1;
     for (const sl of this.slashes) this.drawSlash(ctx, cam, sl);
     for (const im of this.impacts) this.drawImpact(ctx, cam, im);
+    for (const b of this.bolts) this.drawBolt(ctx, cam, b);
     ctx.globalAlpha = 1;
     for (const r of this.rings) {
       const t = 1 - r.life / r.max, rad = r.r1 + (r.r2 - r.r1) * (1 - (1 - t) * (1 - t));
@@ -104,6 +113,11 @@ export class Particles {
       }
     }
     ctx.globalAlpha = 1;
+  }
+  drawBolt(ctx, cam, b) {
+    const a = b.life / b.max, pts = b.pts.map((q) => [Math.round(q[0] - cam.x), Math.round(q[1] - cam.y)]);
+    const stroke = (w, col, al) => { ctx.globalAlpha = al; ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'square'; ctx.beginPath(); pts.forEach((q, i) => (i ? ctx.lineTo(q[0] + 0.5, q[1] + 0.5) : ctx.moveTo(q[0] + 0.5, q[1] + 0.5))); ctx.stroke(); };
+    stroke(5, b.color, 0.25 * a); stroke(3, b.color, 0.6 * a); stroke(1, '#ffffff', a); ctx.globalAlpha = 1;
   }
   // a starburst: a diamond core with long and short rays, shrinking as it fades
   drawImpact(ctx, cam, im) {

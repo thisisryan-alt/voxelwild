@@ -31,7 +31,7 @@ export function computeStats(state) {
     maxHp: base.hp + (state.level - 1) * 4, maxTide: base.tide + (state.level - 1) * 1.2, atk: base.atk + (state.level - 1) * 0.5, def: base.def,
     crit: 0.05, critMult: 1.6, speed: 1, dmg: 0, heavyDmg: 0, abilityDmg: 0, comboWindow: 0, atkSpeed: 0, chargeSpeed: 0, execute: 0, furyGain: 0, reach: 0,
     thorns: 0, parryWindow: 0, parryTide: 0, poise: base.poise, secondWind: 0, dashDist: 0, dashCd: 0, strokes: 0, iframes: 0, currentResist: 0,
-    tideRegen: 0, cooldown: 0, ultCharge: 0, tideCost: 0, pressure: base.pressure, light: 0, magnet: 40, coinBonus: 0, discount: 0, lifeOnKill: 0, poison: 0, poisonResist: 0, sense: 0, crit2: 0, regen: 0,
+    tideRegen: 0, cooldown: 0, ultCharge: 0, tideCost: 0, pressure: base.pressure, light: 0, magnet: 40, coinBonus: 0, discount: 0, lifeOnKill: 0, poison: 0, poisonResist: 0, sense: 0, crit2: 0, regen: 0, killRush: 0, dashStrike: 0, abKillTide: 0,
   };
   const mult = { hp: 1, atk: 1, def: 1, tide: 1, speed: 1 };
   // branches earned so far all contribute

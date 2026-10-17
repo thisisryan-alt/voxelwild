@@ -47,6 +47,8 @@ const PROJ = {
   trident: { w: 22, h: 8, paint: (p) => { p.line(1, 5, 20, 5, R.trident.c[2]); p.line(1, 6, 20, 6, R.trident.c[1]); p.poly([[19, 2], [26, 5.5], [19, 9]], R.trident, {}); p.glow(23, 5, 8, '#9af0ff', 0.4); }, size: [28, 12] },
   shard: { w: 8, h: 8, paint: (p) => { p.poly([[1, 6], [8, 1], [11, 7], [4, 10]], R.glass, {}); }, size: [12, 12] },
   ink: { w: 8, h: 8, paint: (p) => { p.ellipse(5, 5, 3.8, 3.8, R.void, { dither: 0.3 }); p.px(4, 4, '#c8a0ff'); }, size: [10, 10] },
+  crescent: { w: 12, h: 18, paint: (p) => { p.poly([[3, 1], [9, 5], [11, 9], [9, 14], [3, 17], [6, 13], [7, 9], [6, 5]], R.pearl, {}); p.glow(8, 9, 10, '#ffffff', 0.35); }, size: [16, 22] },
+  hook: { w: 10, h: 6, paint: (p) => { p.line(1, 4, 10, 4, R.chain.hex[3]); p.poly([[9, 1], [14, 4], [9, 7], [11, 4]], R.chain, {}); }, size: [18, 10] },
   fire: { w: 8, h: 8, paint: (p) => { p.ellipse(5, 5, 3.6, 3.6, R.coralOrange, { dither: 0.3 }); p.px(4, 4, '#fff6a8'); p.glow(5, 5, 7, '#ffb040', 0.5); }, size: [10, 10] },
 };
 const pcache = {};
@@ -61,7 +63,7 @@ export class Projectile extends Entity {
   constructor(world, o) {
     const d = PROJ[o.kind] || PROJ.bubble;
     super(world, o.x, o.y, o.w || d.w, o.h || d.h);
-    Object.assign(this, { kind: o.kind || 'bubble', team: o.team || 'enemy', dmg: o.dmg || 5, vx: o.vx || 0, vy: o.vy || 0, life: o.life ?? 3, grav: o.grav || 0, kb: o.kb ?? 90, pierce: !!o.pierce, homing: o.homing || 0, ghost: !!o.ghost, status: o.status || null, poise: o.poise ?? 6, reflectable: o.reflectable !== false, hits: new Set(), onHit: o.onHit, spin: !!o.spin, trail: o.trail || null, stun: o.stun || 0, unblockable: !!o.unblockable, boss: !!o.boss, bounce: !!o.bounce, scale: o.scale || 1 });
+    Object.assign(this, { kind: o.kind || 'bubble', team: o.team || 'enemy', dmg: o.dmg || 5, vx: o.vx || 0, vy: o.vy || 0, life: o.life ?? 3, grav: o.grav || 0, kb: o.kb ?? 90, pierce: !!o.pierce, homing: o.homing || 0, ghost: !!o.ghost, status: o.status || null, poise: o.poise ?? 6, reflectable: o.reflectable !== false, hits: new Set(), onHit: o.onHit, spin: !!o.spin, trail: o.trail || null, stun: o.stun || 0, unblockable: !!o.unblockable, boss: !!o.boss, bounce: !!o.bounce, scale: o.scale || 1, pull: o.pull || 0, owner: o.owner || null, cloud: o.cloud || null });
     this.angle = Math.atan2(this.vy, this.vx);
   }
   update(dt) {
@@ -81,6 +83,7 @@ export class Projectile extends Entity {
       if (pl && pl.alive && this.overlaps(pl.hurtBox())) {
         const res = pl.takeHit({ dmg: this.dmg, x: this.x - Math.sign(this.vx) * 6, y: this.y, kb: this.kb, status: this.status, proj: this, poise: this.poise, unblockable: this.unblockable, boss: this.boss });
         if (res === 'parried') return;
+        if (this.pull && res && this.owner && pl.state !== 'block') { const d = Math.hypot(this.owner.x - pl.x, this.owner.y - pl.y) || 1; pl.vx = (this.owner.x - pl.x) / d * this.pull; pl.vy = (this.owner.y - pl.y) / d * this.pull * 0.7; this.world.fx.text(pl.x, pl.y - 14, 'HOOKED', '#c8c8d8'); }
         if (!this.pierce) this.die(true);
       }
     } else {
@@ -91,7 +94,7 @@ export class Projectile extends Entity {
     }
   }
   reflect() { this.team = 'player'; this.vx *= -1.3; this.vy *= -1.3; this.dmg = Math.round(this.dmg * 2); this.hits.clear(); this.life = Math.max(this.life, 2); this.world.fx.burst(this.x, this.y, '#ffffff', 40, 0.3, 2); }
-  die(hit) { this.alive = false; if (hit) { this.world.fx.burst(this.x, this.y, this.kind === 'cannonball' ? ['#aaa', '#fff'] : ['#ffffff', '#9fd8f0'], 40, 0.3, 2); } }
+  die(hit) { if (!this.alive) return; this.alive = false; if (this.cloud) { const c = this.cloud; this.world.addField({ kind: 'cloud', team: 'enemy', x: this.x, y: this.y, r: c.r, life: c.life, dps: c.dps, pull: 0, poison: 2 }); this.world.fx.burst(this.x, this.y, ['#b8ff90', '#e8ffc8'], 50, 0.5, 2); } if (hit) { this.world.fx.burst(this.x, this.y, this.kind === 'cannonball' ? ['#aaa', '#fff'] : ['#ffffff', '#9fd8f0'], 40, 0.3, 2); } }
   draw(ctx, cam) {
     const f = projFrame(this.kind);
     const x = Math.round(this.x - cam.x), y = Math.round(this.y - cam.y);

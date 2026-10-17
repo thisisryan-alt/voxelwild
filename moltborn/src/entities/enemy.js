@@ -21,7 +21,7 @@ export class Enemy extends Entity {
     this.state = ''; this.st = 0; this.pose = 'move'; this.flash = 0; this.stunT = 0; this.invuln = false; this.scale = 1;
     this.contactMult = 1; this.contactCd = 0; this.losT = 0; this.los = false; this.a = null; this.phased = false; this.disguised = false;
     this.guardFront = false; this.guardAll = false; this.tuckT = 0; this.statuses = {}; this.ghost = !!def.ghost; this.slowT = 0; this.weakT = 0;
-    this.xpMult = o.xpMult || 1; this.spawnId = o.spawnId; this.persistKey = o.persistKey; this.group = o.group;
+    this.xpMult = o.xpMult || 1; this.dmgMult = o.dmgMult || 1; this.spawnId = o.spawnId; this.persistKey = o.persistKey; this.group = o.group;
     this.behaviour = AI[def.ai];
     this.facing = o.facing || (rand() < 0.5 ? -1 : 1);
     this.alpha = 1; this.deathT = 0; this.dying = false;
@@ -111,6 +111,7 @@ export class Enemy extends Entity {
       w.fx.debris(f, this.x, feet ? this.y + this.h / 2 : this.y, this.facing < 0 !== (d.sprite.flip === true), clamp(Math.round(f.w * f.h / 60), 14, 46), 70, { vx: (hit?.dir || 0) * 30 });
     }
     this.sfx(d.boss ? 'bossdie' : 'die');
+    if (d.splits && !silent) for (let i = 0; i < d.splits.n; i++) { const dx = (i - (d.splits.n - 1) / 2) * 2; w.spawnMinion(d.splits.type, this.x + dx * 4, this.y, { vx: dx * 60, vy: -40 }); }
     if (silent && !d.dropOnBurst) return;
     g.onEnemyKilled(this, hit);
   }

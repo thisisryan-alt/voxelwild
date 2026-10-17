@@ -191,6 +191,8 @@ export class Game {
     if (d.ep) { s.ep += d.ep; this.popup('gem', `+${d.ep} Evolution Point`, '#ff9ad8'); }
     if (d.drops) for (const [id, ch] of d.drops) if (rand() < ch) this.grantItem(id, 1, true);
     if (p.stats.lifeOnKill) p.heal(p.stats.lifeOnKill);
+    if (p.stats.killRush) { if (!(p.rushT > 0)) w.fx.text(p.x, p.y - p.h / 2 - 12, 'RUSH', '#ff9a6a', true, { life: 0.7 }); p.rushT = 4; }
+    if (p.stats.abKillTide && hit?.fromAbility) { p.addTide(14); w.fx.text(e.x, e.y - 10, '+14 TIDE', '#8ad0ff'); }
     p.addFury(4); p.addTide(3);
     if (e.unique || e.persistKey && d.elite) this.zoneState(w.zone.id).killed[e.persistKey] = true;
     this.events.emit('kill', e.type, e);

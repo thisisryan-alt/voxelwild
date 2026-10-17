@@ -44,7 +44,7 @@ export class World {
       const n = s.count || 1;
       for (let k = 0; k < n; k++) {
         const ox = (k - (n - 1) / 2) * (s.spread ?? 14), oy = s.floor ? 0 : ((k % 2) - 0.5) * (s.spreadY ?? 8);
-        const e = new Enemy(this, s.type, s.x + ox, s.floor ? s.y - def.h / 2 - 0.1 : s.y + oy, { p: s.p, hpMult: s.hpMult, spawnId: id, facing: s.facing });
+        const e = new Enemy(this, s.type, s.x + ox, s.floor ? s.y - def.h / 2 - 0.1 : s.y + oy, { p: s.p, hpMult: s.hpMult, dmgMult: s.dmgMult, xpMult: s.xpMult, spawnId: id, facing: s.facing });
         e.unique = !!s.unique; e.persistKey = id; this.enemies.push(e);
       }
     });
@@ -68,6 +68,10 @@ export class World {
     const hb = { x: 0, y: 0, w: 10, h: 10, dmg: 1, life: 0.1, kb: 60, poise: 0, hits: new Set(), t: 0, ...o };
     if (hb.once) hb.hits = hb.once;
     this.hitboxes.push(hb); return hb;
+  }
+  spawnMinion(type, x, y, o = {}) {
+    if (!ENEMIES[type]) return null;
+    const e = new Enemy(this, type, x, y, o); e.minion = true; e.vx = o.vx || 0; e.vy = o.vy || 0; this.enemies.push(e); return e;
   }
   addProjectile(o) { const p = new Projectile(this, o); this.projectiles.push(p); return p; }
   addField(o) { this.fields.push({ tick: 0, t: 0, ...o }); }
@@ -158,7 +162,7 @@ export class World {
           if (hb.crit && rand() < S.crit) { crit = true; dmg *= S.critMult; }
           if (hb.crit && S.execute && e.hp / e.maxHp < 0.3) dmg *= 1 + S.execute;
           if (pl.stats.dmg && !hb.crit) dmg *= 1 + 0;
-          const res = e.takeHit({ dmg: Math.max(1, Math.round(dmg)), dir: Math.sign(e.x - pl.x) || pl.facing, kb: hb.kb, poise: hb.poise, stop: hb.stop, shake: hb.shake, guardBreak: hb.guardBreak, heavy: hb.heavy, status: hb.status, crit, stun: hb.stun, x: pl.x, y: pl.y }, pl);
+          const res = e.takeHit({ dmg: Math.max(1, Math.round(dmg)), dir: Math.sign(e.x - pl.x) || pl.facing, kb: hb.kb, poise: hb.poise, stop: hb.stop, shake: hb.shake, guardBreak: hb.guardBreak, heavy: hb.heavy, status: hb.status, crit, stun: hb.stun, fromAbility: !!hb.ability, x: pl.x, y: pl.y }, pl);
           if (res === true) pl.onHitLanded(e, hb, dmg, crit);
         }
         if (hb.breaks || hb.seals || hb.gates) this.hitBreakables(hb);
@@ -186,7 +190,7 @@ export class World {
       f.t += dt; f.life -= dt; f.tick -= dt;
       if (f.team === 'enemy') {
         const pl = this.player; const dx = f.x - pl.x, dy = f.y - pl.y, d = Math.hypot(dx, dy);
-        if (pl.alive && d < f.r && pl.state !== 'locked') { const k = (1 - d / f.r + 0.2) * f.pull; pl.vx += dx / (d || 1) * k * dt * 5; pl.vy += dy / (d || 1) * k * dt * 5; if (f.tick <= 0) pl.takeHit({ dmg: Math.max(1, Math.round(f.dps)), x: f.x, y: f.y, kb: 0, unblockable: true, field: true }); }
+        if (pl.alive && d < f.r && pl.state !== 'locked') { const k = (1 - d / f.r + 0.2) * f.pull; pl.vx += dx / (d || 1) * k * dt * 5; pl.vy += dy / (d || 1) * k * dt * 5; if (f.tick <= 0) pl.takeHit({ dmg: Math.max(1, Math.round(f.dps)), x: f.x, y: f.y, kb: 0, unblockable: true, field: true, status: f.poison ? { poison: f.poison } : undefined }); }
         if (f.tick <= 0) f.tick = 0.5; continue;
       }
       for (const e of this.enemies) {
@@ -272,6 +276,10 @@ export class World {
   }
   drawField(ctx, cam, f) {
     const x = f.x - cam.x, y = f.y - cam.y, k = Math.min(1, f.life * 2, f.t * 4);
+    if (f.kind === 'cloud') { // drifting spore puffs: soft green discs that rise and wobble
+      for (let i = 0; i < 14; i++) { const a = i * 2.4 + f.t * (0.4 + (i % 3) * 0.15), rr = f.r * (0.25 + ((i * 37) % 10) / 14), px = x + Math.cos(a) * rr, py = y + Math.sin(a * 1.3) * rr * 0.6 - ((f.t * 6 + i * 5) % 12); ctx.globalAlpha = 0.28 * k; ctx.fillStyle = i % 3 ? '#8ad04a' : '#c8ff90'; const sz = 3 + (i % 3) * 2; ctx.fillRect(Math.round(px - sz / 2), Math.round(py - sz / 2), sz, sz); }
+      ctx.globalAlpha = 0.12 * k; ctx.fillStyle = '#6ab030'; ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y), f.r, f.r * 0.7, 0, 0, 6.3); ctx.fill(); ctx.globalAlpha = 1; return;
+    }
     ctx.save(); ctx.globalAlpha = 0.55 * k; ctx.strokeStyle = f.kind === 'maw' ? '#7a62c8' : '#9af0ff';
     for (let r = 0; r < 4; r++) { ctx.beginPath(); const rad = f.r * (0.3 + r * 0.22); for (let a = 0; a < 5; a += 0.3) { const rr = rad * (0.6 + a / 12); ctx.lineTo(Math.round(x + Math.cos(a + f.t * (5 - r)) * rr), Math.round(y + Math.sin(a + f.t * (5 - r)) * rr * 0.7)); } ctx.stroke(); }
     ctx.restore();
@@ -291,7 +299,7 @@ export class World {
     for (const e of this.enemies) if (e.def.glow || e.def.sprite.o?.glow || e.type === 'lanternfish') L.push({ x: e.x, y: e.y - 4, r: 34, a: 0.8 });
     for (const p of this.projectiles) L.push({ x: p.x, y: p.y, r: 22, a: 0.8 });
     for (const i of this.interactables) { if (i instanceof INTERACTABLES.shrine) L.push({ x: i.x, y: i.y - 6, r: 52, a: 1 }); else if (i.glowing) L.push({ x: i.x, y: i.y - 10, r: 60, a: 1, color: '#ffb060' }); }
-    for (const f of this.fields) L.push({ x: f.x, y: f.y, r: f.r, a: 0.6 });
+    for (const f of this.fields) if (f.kind !== 'cloud') L.push({ x: f.x, y: f.y, r: f.r, a: 0.6 });
     for (const fn of this.extraLights || []) fn(L);
     return L;
   }

@@ -2,8 +2,9 @@
 import { Painter, color } from './painter.js';
 import { R, OUTLINE } from './palette.js';
 import { FORMS as HERO } from './sprites_player.js';
+import { legs } from './crab_kit.js';
 
-const TAU = Math.PI * 2, sin = Math.sin, cos = Math.cos;
+const TAU = Math.PI * 2, sin = Math.sin, cos = Math.cos, rd = Math.round;
 const eyeAt = (p, x, y, r = 1.6, angry = false, glow = null) => {
   p.ellipse(x, y, r, r, glow ? new (R.gold.constructor)([glow, glow, glow, '#fff', '#fff']) : R.eyeWhite, { dither: 0 });
   p.px(x + 0.5, y, '#170d1c'); if (r > 1.4) p.px(x + 0.5, y + 1, '#170d1c');
@@ -30,6 +31,8 @@ export const PLANS = {
     else p.line(mx - 3, cy + H * 0.1, mx, cy + H * 0.15, '#170d1c');
     if (o.teeth && !open) { p.px(mx - 2, cy + H * 0.1 + 1, '#ffffff'); p.px(mx - 4, cy + H * 0.1 + 1, '#ffffff'); }
     eyeAt(p, cx + L * 0.27, cy - H * 0.12, Math.max(1.2, H * 0.14), o.angry !== false);
+    if (o.tusk) p.chain([[mx - 2, cy - H * 0.1], [mx + L * 0.2, cy - H * 0.18 - 1], [mx + L * 0.4, cy - H * 0.3 - 2]], 1.7, 0.5, R.bone, {});
+    if (o.hook) p.chain([[mx - 4, cy + H * 0.3], [mx - 3, cy + H * 0.3 + 5], [mx - 7, cy + H * 0.3 + 8]], 0.9, 0.7, R.chain, {});
     if (o.spines) for (let i = 0; i < 7; i++) { const a = -0.9 + i * 0.3 + Math.PI, x1 = cx + cos(a) * L * 0.42, y1 = cy + sin(a) * H * 0.42; p.line(x1, y1, x1 + cos(a) * 4, y1 + sin(a) * 4, '#f8f0d8'); }
     if (o.lure) { const lx = cx + L * 0.15, ly = cy - H * 0.5; p.chain([[cx + L * 0.05, cy - H * 0.45], [lx + 4, ly - 7], [cx + L * 0.5 + 3, ly - 6 + sin(t * TAU) * 1.5]], 0.7, 0.5, R.chain, { outline: false }); p.glow(cx + L * 0.5 + 3, ly - 6 + sin(t * TAU) * 1.5, 6, '#9affff', 0.8); p.ellipse(cx + L * 0.5 + 3, ly - 6 + sin(t * TAU) * 1.5, 1.6, 1.6, R.glass, {}); }
   },
@@ -139,6 +142,54 @@ export const PLANS = {
     p.shape(o.ramp, { dither: 0.5 }, (s) => s.ellipse(cx + 3, cy, r, r));
     p.glow(cx + 3, cy, r + 8, o.glow || '#c8a0ff', 0.5);
     p.ellipse(cx + 5, cy - 1, 1.5, 1.5, R.eyeWhite, { outline: false }); p.px(cx + 5.5, cy - 1, '#170d1c');
+  },
+  // ---- shrimp (mantis & mender): stalked eyes, curled abdomen and a jointed raptorial arm --------------------------
+  shrimp(p, t, o) {
+    const s = o.s ?? 1, cx = o.cx ?? 38, base = p.h - 3, by = base - 11 * s + Math.abs(sin(t * TAU)) * -0.8;
+    const atk = o.pose === 'attack', wnd = o.pose === 'windup', jab = atk ? (Math.floor(t * 4) % 2 ? 1 : 0.35) : wnd ? -0.5 : 0.1;
+    const body = o.ramp, acc = o.accent || R.coralRed, lg = acc.tint(0, 1, 0.8);
+    legs(p, { legs: 'walk', legT: t }, { n: 4, hipX: cx - 4 * s, hipY: by + 3 * s, footY: base, span: 9 * s, splay: 1.5, ramp: lg, r0: 1.1 * s, r1: 0.7 * s, stride: 2 * s, lift: 1.6, kneeUp: 1 });
+    const seg = [[-6, 0, 5], [-12, 1, 4.6], [-18, 3.5, 4], [-23, 7, 3.4]];
+    for (let i = seg.length - 1; i >= 0; i--) { const [dx, dy, r] = seg[i]; p.shape(body, { dither: 0.45 }, (q) => q.ellipse(cx + dx * s, by + dy * s, r * s, r * 0.86 * s)); p.line(rd(cx + (dx - 1) * s), rd(by + (dy - r * 0.6) * s), rd(cx + (dx - 1) * s), rd(by + (dy + r * 0.6) * s), body.c[1]); }
+    p.poly([[cx - 24 * s, by + 5 * s], [cx - 31 * s, by + 2 * s], [cx - 30 * s, by + 10 * s], [cx - 24 * s, by + 9 * s]], acc, { dither: 0.3 });
+    p.shape(body, { dither: 0.45, texture: { seed: 5, p: 0.05 } }, (q) => q.ellipse(cx + 3 * s, by - 0.5 * s, 9 * s, 6.4 * s));
+    p.ellipse(cx + 2 * s, by + 4 * s, 7 * s, 1.8 * s, R.belly, { outline: false, dither: 0.25 });
+    for (let k = 0; k < 3; k++) p.px(rd(cx + (-2 + k * 3) * s), rd(by - 3.5 * s + k * 0.5), acc.c[3]);
+    for (const [ex, ey] of [[7, -8], [12, -7]]) { p.line(rd(cx + (ex - 2) * s), rd(by - 3 * s), rd(cx + ex * s), rd(by + (ey + 2) * s), body.c[2]); p.ellipse(cx + ex * s, by + ey * s, 2.5 * s, 2.5 * s, acc, { dither: 0 }); p.px(rd(cx + ex * s + 1), rd(by + ey * s), '#170d1c'); p.px(rd(cx + (ex - 1) * s), rd(by + (ey - 1) * s), '#fff6c8'); }
+    p.line(rd(cx + 11 * s), rd(by - 3 * s), rd(cx + 19 * s), rd(by - 9 * s + sin(t * TAU)), body.c[3]);
+    { // the arm: folded under the chin, cocked back as it winds up, thrown forward in a jab
+      const sx = cx + 8 * s, sy = by + 3 * s, ex = sx + (4 + jab * 12) * s, ey = sy + (2 - Math.max(0, jab) * 1.5 + (wnd ? -4 : 0)) * s;
+      p.chain([[sx, sy], [sx + 3 * s + (wnd ? -3 : 0), sy + 3 * s - (wnd ? 5 : 0)], [ex, ey]], 1.7 * s, 1.3 * s, body, { dither: 0.3 });
+      p.shape(acc, { dither: 0.3 }, (q) => q.ellipse(ex + 1.5 * s, ey, 3.4 * s, 2.3 * s));
+      if (atk || wnd) { p.px(rd(ex + 4 * s), rd(ey - 1), '#ffffff'); p.px(rd(ex + 4 * s), rd(ey), acc.c[4]); }
+    }
+    if (o.heal && wnd) { const hx = rd(cx + 3 * s), hy = rd(by - 12 * s); for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) p.px(hx + dx, hy + dy, dx || dy ? '#c8ffd8' : '#ffffff'); }
+    if (o.glow) p.glow(cx + 3 * s, by, 12 * s, o.glow, 0.28);
+  },
+  // ---- brood coral: a fat polyp mound carrying egg sacs that swell before it spawns ------------------------------------
+  brood(p, t, o) {
+    const cx = p.w / 2, base = p.h - 2, open = o.pose === 'windup' || o.pose === 'attack', pulse = sin(t * TAU);
+    p.shape(o.ramp, { dither: 0.5, texture: { seed: 8, p: 0.07 } }, (q) => { q.ellipse(cx, base - 9, 15, 10); q.rect(cx - 12, base - 4, 24, 5, 1); });
+    for (const [dx, dy, r] of [[-9, -18, 4], [0, -22, 4.6], [9, -17, 3.8]]) {
+      const rr = r + (open ? 1 : 0) + pulse * 0.4;
+      p.chain([[cx + dx * 0.6, base - 12], [cx + dx, base + dy + 4]], 1.8, 1.3, o.ramp, { outline: false });
+      p.shape(o.egg || o.ramp.tint(0.04, 1, 1.15), { dither: 0.3 }, (q) => q.ellipse(cx + dx, base + dy, rr, rr * 0.9)); p.px(rd(cx + dx - 1), rd(base + dy - 1), '#ffffff');
+      if (open) p.glow(cx + dx, base + dy, rr + 5, o.glow || '#ffb0d8', 0.5);
+    }
+    p.ellipse(cx + 1, base - 7, open ? 5 : 4, open ? 4 : 2.2, R.void, { outline: false });
+    for (const k of [-1, 1]) p.px(cx + 1 + k * 3, base - 8, '#ffffff');
+    eyeAt(p, cx - 6, base - 12, 1.6, true); eyeAt(p, cx + 7, base - 12, 1.6, true);
+  },
+  // ---- cap: a toadstool on a bone-pale stalk that breathes spores ---------------------------------------------------------
+  cap(p, t, o) {
+    const cx = p.w / 2, base = p.h - 2, open = o.pose === 'windup' || o.pose === 'attack', sw = sin(t * TAU);
+    p.chain([[cx, base], [cx + sw * 0.5, base - 9], [cx + sw, base - 15]], 3, 2.2, o.stalk || R.bone, {});
+    const px = cx + sw, py = base - 17;
+    p.shape(o.ramp, { dither: 0.5, texture: { seed: 3, p: 0.07 } }, (q) => q.ellipse(px, py, open ? 11 : 10, open ? 5.5 : 5));
+    for (let i = 0; i < 4; i++) p.px(rd(px - 6 + i * 4), rd(py - 2 + (i % 2)), o.ramp.c[4]);
+    p.line(rd(px - 8), rd(py + 3), rd(px + 8), rd(py + 3), o.ramp.c[1]);
+    if (open) for (let i = 0; i < 5; i++) p.px(rd(px - 8 + i * 4 + sin(t * TAU + i) * 1.5), rd(py + 6 + (i % 3) * 2), '#c8ffa0');
+    if (o.glow) p.glow(px, py, 14, o.glow, open ? 0.5 : 0.18);
   },
   // ---- armoured guardian (humanoid) -------------------------------------------------------
   knight(p, t, o) {
