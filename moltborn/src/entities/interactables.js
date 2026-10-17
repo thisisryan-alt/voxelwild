@@ -187,3 +187,33 @@ export class ForagePatch extends Interactable {
   }
 }
 INTERACTABLES.forage = ForagePatch;
+
+// Treasure vault relic stand: takes an epic relic and wakes the vault (handled by systems/rifts.js)
+export class RelicStand extends Interactable {
+  constructor(world, o) { super(world, o, 18, 24); this.range = 24; this.taken = false; this.t = 0; }
+  prompt() { return this.taken ? null : 'Take the relic'; }
+  canInteract(pl) { return !this.taken && super.canInteract(pl); }
+  interact(game) { game.systems.rifts?.takeStand(this); }
+  get glowing() { return !this.taken; }
+  draw(ctx, cam) {
+    this.t += 1 / 60; const x = Math.round(this.x - cam.x), y = Math.round(this.y + 12 - cam.y);
+    ctx.fillStyle = '#170d1c'; ctx.fillRect(x - 8, y - 8, 17, 9); ctx.fillRect(x - 4, y - 14, 9, 7); ctx.fillStyle = '#7a7ab0'; ctx.fillRect(x - 7, y - 7, 15, 7); ctx.fillStyle = '#a8a8d8'; ctx.fillRect(x - 7, y - 7, 15, 2); ctx.fillRect(x - 3, y - 13, 7, 6);
+    if (!this.taken) { const f = Math.sin(this.t * 3); ctx.globalAlpha = 0.55 + 0.25 * f; ctx.fillStyle = '#ff7ad8'; ctx.fillRect(x - 3, y - 22 + Math.round(f), 6, 6); ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 1, y - 21 + Math.round(f), 2, 2); ctx.globalAlpha = 0.18; ctx.fillRect(x - 9, y - 26 + Math.round(f), 18, 14); ctx.globalAlpha = 1; }
+  }
+}
+INTERACTABLES.relicstand = RelicStand;
+
+// A rift altar: opens the rest / offering / sacrifice menu (ui/altar_scene.js). Gives one gift, then falls quiet.
+export class Altar extends Interactable {
+  constructor(world, o) { super(world, o, 26, 26); this.range = 28; this.used = false; this.t = 0; }
+  prompt() { return this.used ? null : 'Approach the altar'; }
+  canInteract(pl) { return !this.used && super.canInteract(pl); }
+  interact(game) { import('../ui/altar_scene.js').then(({ AltarScene }) => game.engine.push(new AltarScene(game, this))); }
+  get glowing() { return !this.used; }
+  draw(ctx, cam) {
+    this.t += 1 / 60; const x = Math.round(this.x - cam.x), y = Math.round(this.y + 13 - cam.y), on = !this.used, f = Math.sin(this.t * 2.4);
+    ctx.fillStyle = '#170d1c'; ctx.fillRect(x - 12, y - 6, 25, 7); ctx.fillRect(x - 9, y - 16, 19, 11); ctx.fillStyle = '#6a5a8a'; ctx.fillRect(x - 11, y - 5, 23, 5); ctx.fillRect(x - 8, y - 15, 17, 9); ctx.fillStyle = '#9a8aba'; ctx.fillRect(x - 8, y - 15, 17, 2);
+    if (on) { for (let i = -1; i <= 1; i++) { const h = 6 + Math.round((Math.sin(this.t * 5 + i * 2) + 1) * 2); ctx.fillStyle = '#ff9a3a'; ctx.fillRect(x + i * 4 - 1, y - 15 - h, 3, h); ctx.fillStyle = '#fff0a0'; ctx.fillRect(x + i * 4, y - 15 - h + 2, 1, h - 2); } ctx.globalAlpha = 0.2 + 0.1 * f; ctx.fillStyle = '#ffd8f0'; ctx.fillRect(x - 14, y - 30, 29, 28); ctx.globalAlpha = 1; }
+  }
+}
+INTERACTABLES.altar = Altar;

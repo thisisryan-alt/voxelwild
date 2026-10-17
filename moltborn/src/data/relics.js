@@ -38,7 +38,9 @@ export const RELICS = {
   parry_pearl:    { name: 'Parry Pearl', rarity: 'epic', icon: ['pearl', 'white'], fx: { parryWindow: 0.5, parryTide: 4 }, desc: 'A longer parry window; parries refund Tide.' },
   shock_nova:     { name: 'Shock Nova', rarity: 'epic', icon: ['gem', 'cyan'], hook: 'nova', desc: 'A quarter of kills burst outward and hurt what is near.' },
 };
-export const RELIC_IDS = Object.keys(RELICS);
+// the price of an altar's sacrifice: not offered anywhere else
+RELICS.sacrificial_vow = { name: 'Sacrificial Vow', rarity: 'common', icon: ['heart', 'red'], curse: true, fx: { hp: -0.2 }, desc: '-20% health for the rest of the run.' };
+export const RELIC_IDS = Object.keys(RELICS).filter((id) => !RELICS[id].curse);
 
 // ---- rift modifiers --------------------------------------------------------------------------------------------------------------------------
 // mult: folded into the difficulty multipliers (hp / dmg / xp / coin);  haste: enemies keep a haste status;  dark: visibility penalty

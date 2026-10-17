@@ -18,7 +18,9 @@ for (let seed = 1; seed <= SEEDS; seed++) {
       built++; for (const p of r.probs) fail(id, p);
       const z = r.z;
       if (!z.entries.west || !z.entries.east) fail(id, 'missing entry');
-      if (!z.spawns.length) fail(id, 'no spawns');
+      const quiet = z.rift.kind === 'treasure' || z.rift.kind === 'altar'; if (quiet === !!z.spawns.length) fail(id, `spawn presence wrong for ${z.rift.kind}`);
+      if (quiet) { const want = z.rift.kind === 'altar' ? ['altar'] : ['relicstand']; for (const t of want) if (!z.props.some((p) => p.type === t)) fail(id, `missing ${t}`); }
+      if (z.rift.kind === 'treasure' && z.props.filter((p) => p.type === 'chest').length < 3) fail(id, 'treasure vault needs its chests');
       const last = depth === max; if (last === !!z.exits.length) fail(id, `exit presence wrong (last=${last})`);
       for (const s of z.spawns) { spawns++; if (isSolid(z.grid.get(Math.floor(s.x / TS), Math.floor((s.y - (s.floor ? 2 : 0)) / TS)))) fail(id, `spawn ${s.type} inside rock`); }
       if (z.exits.length && typeof z.exits[0].cond !== 'function') fail(id, 'exit has no clearing condition');

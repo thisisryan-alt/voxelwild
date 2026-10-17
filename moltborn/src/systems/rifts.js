@@ -5,6 +5,9 @@
 import { RELICS, RELIC_IDS, RARITY, RIFT_MODS, RIFT_MOD_IDS, RIFT_TIERS } from '../data/relics.js';
 import { riftId, parseId, setRiftThemes, THEME_ORDER, today } from '../world/rift_gen.js';
 import { RelicScene } from '../ui/relic_scene.js';
+import { spawnFoe } from './spawner.js';
+import { composeWave } from './arena.js';
+import { ROOM_KINDS } from '../world/rift_gen.js';
 import { RiftSummary } from '../ui/board_scene.js';
 import { ZONE_INFO } from '../data/zoneinfo.js';
 import { INGREDIENT_IDS } from '../data/items_craft.js';
@@ -80,19 +83,24 @@ export class Rifts {
     if (!isRiftZone(id)) { this.cleanup(); return; }
     const g = this.g, mods = this.mods();
     for (const m of mods) { const M = RIFT_MODS[m]; if (M.haste) for (const e of world.enemies) if (!e.def.friendly) e.status.apply('haste', { dur: 1e6, power: 1 }); if (M.dark) world.zone.dark = Math.max(world.zone.dark ?? world.biome.dark, M.dark); }
+    const kind = world.zone.rift?.kind || 'combat'; run.kind = kind; run.noOffer = false; run.pending = 0; run.bonusOffer = false; run.stand = null;
+    run.ambush = kind === 'ambush' ? { fired: false, x: world.zone.w * 16 * 0.38 } : null;
     if (world.zone.rift?.last) this.crown(world);
+    else if (kind === 'elite') { this.crown(world, { hp: 1.4, scale: 1.15, name: 'Elite Champion' }); run.bonusOffer = true; }
+    else if (kind === 'treasure' || kind === 'altar') { run.cleared = true; run.noOffer = true; }
     world.player.recalc?.(); world.player.hp = Math.min(world.player.hp, world.player.stats.maxHp);
-    const sub = mods.length ? mods.map((m) => RIFT_MODS[m].name).join('  ·  ').replace(/·/g, '-') : 'The water is calm. For now.';
-    g.banner(`RIFT - DEPTH ${run.depth}/${run.max}`, sub); g.audio.sfx('rift');
-    for (const m of mods) g.toast(RIFT_MODS[m].name + ': ' + RIFT_MODS[m].desc, RIFT_MODS[m].color);
+    const quiet = kind === 'treasure' || kind === 'altar', shown = quiet ? [] : mods;
+    const sub = [ROOM_KINDS[kind].blurb, shown.map((m) => RIFT_MODS[m].name).join(' - ')].filter(Boolean).join('   ') || 'The water is calm. For now.';
+    g.banner(`RIFT - DEPTH ${run.depth}/${run.max}${kind === 'combat' || kind === 'boss' ? '' : ' - ' + ROOM_KINDS[kind].name.toUpperCase()}`, sub); g.audio.sfx('rift');
+    for (const m of shown) g.toast(RIFT_MODS[m].name + ': ' + RIFT_MODS[m].desc, RIFT_MODS[m].color);
     g.events.emit('rift', 'depth', run.depth);
   }
-  // the last chamber's strongest creature becomes a champion with two affixes
-  crown(world) {
+  // a chamber's strongest creature becomes a champion with two affixes (the last room's is the biggest)
+  crown(world, o = {}) {
     const foes = world.enemies.filter((e) => !e.def.friendly && !e.def.boss && !e.affixes); if (!foes.length) return;
     foes.sort((a, b) => b.maxHp - a.maxHp); const c = foes[0], ids = ['armored', 'swift', 'vampiric', 'volatile', 'scorching', 'frostbitten', 'mending', 'thorned', 'shielded'];
-    const r = rng(this.run.seed + 99), a = ids[Math.floor(r() * ids.length)]; let b = ids[Math.floor(r() * ids.length)]; if (b === a) b = ids[(ids.indexOf(a) + 3) % ids.length];
-    this.g.systems.elites.apply(c, [a, b]); c.maxHp = Math.round(c.maxHp * 1.6); c.hp = c.maxHp; c.scale = 1.25; c.w = Math.round(c.w * 1.25); c.h = Math.round(c.h * 1.25); c.xpMult = (c.xpMult || 1) * 2; c.name = 'Rift Champion'; c.champion = true;
+    const r = rng(this.run.seed + 99 + this.run.depth), a = ids[Math.floor(r() * ids.length)]; let b = ids[Math.floor(r() * ids.length)]; if (b === a) b = ids[(ids.indexOf(a) + 3) % ids.length];
+    const sc = o.scale ?? 1.25; this.g.systems.elites.apply(c, [a, b]); c.maxHp = Math.round(c.maxHp * (o.hp ?? 1.6)); c.hp = c.maxHp; c.scale = sc; c.w = Math.round(c.w * sc); c.h = Math.round(c.h * sc); c.xpMult = (c.xpMult || 1) * 2; c.name = o.name || 'Rift Champion'; c.champion = true;
   }
 
   // ---- per-frame bookkeeping ------------------------------------------------------------------------------------------------------------------------------
@@ -103,10 +111,13 @@ export class Rifts {
     this.timers = this.timers.filter((x) => x.t > 0);
     if (!run) return;
     const w = this.g.world; if (!w || !isRiftZone(w.zone.id) || run.done) return;
+    if (run.ambush && !run.ambush.fired && w.player.x > run.ambush.x) this.ambush(w, 3 + run.depth * 2);
     run.checkT -= dt; if (run.cleared || run.checkT > 0) return; run.checkT = 0.4;
-    if (w.enemies.some((e) => e.alive && !e.dying && !e.def.friendly)) return;
+    if (run.ambush && !run.ambush.fired) return;                       // the trap has not been sprung yet
+    if (run.pending > 0 || w.enemies.some((e) => e.alive && !e.dying && !e.def.friendly)) return;
     run.cleared = true; this.g.audio.sfx('wave_clear'); w.fx.ring(w.player.x, w.player.y, 6, 90, 0.6, '#ffe8a0', 3);
     if (w.zone.rift.last) { this.g.toast('The champion falls. The rift quiets.', '#ffd84a'); this.after(1.6, () => this.finish(true)); }
+    else if (run.noOffer) this.g.toast('The way opens.', '#9ad8ff');
     else { this.g.toast('The way opens.', '#9ad8ff'); this.after(1.1, () => this.offer()); }
   }
   // game-time delays (they pause with the game and run under deterministic stepping)
@@ -120,9 +131,9 @@ export class Rifts {
   }
 
   // ---- relics --------------------------------------------------------------------------------------------------------------------------------------------------------
-  roll(n = 3) {
-    const run = this.run, r = rng(run.seed * 13 + run.depth * 7 + run.offered * 3), have = new Set(this.relics()), out = [];
-    const pool = RELIC_IDS.filter((id) => !have.has(id) && (RELICS[id].rarity !== 'epic' || run.depth >= 2));
+  roll(n = 3, minRarity = 'common') {
+    const run = this.run, r = rng(run.seed * 13 + run.depth * 7 + run.offered * 3), have = new Set(this.relics()), out = [], rank = { common: 0, rare: 1, epic: 2 };
+    const pool = RELIC_IDS.filter((id) => !have.has(id) && rank[RELICS[id].rarity] >= rank[minRarity] && (RELICS[id].rarity !== 'epic' || run.depth >= 2 || minRarity === 'epic'));
     while (out.length < n && pool.length) {
       const weights = pool.map((id) => RARITY[RELICS[id].rarity].weight); let x = r() * weights.reduce((a, b) => a + b, 0), i = 0;
       for (; i < pool.length - 1; i++) { x -= weights[i]; if (x <= 0) break; }
@@ -132,7 +143,7 @@ export class Rifts {
   }
   offer() {
     const run = this.run; if (!run || run.picking) return;
-    const choices = this.roll(); if (!choices.length) { run.picking = false; return; }
+    const choices = this.roll(run.bonusOffer ? 4 : 3, run.bonusOffer ? 'rare' : 'common'); if (!choices.length) { run.picking = false; return; }
     run.picking = true; run.offered++;
     this.g.engine.push(new RelicScene(this.g, choices));
   }
@@ -142,6 +153,40 @@ export class Rifts {
     g.toast(RELICS[id].name + ': ' + RELICS[id].desc, RARITY[RELICS[id].rarity].color);
     g.events.emit('relic', id);
   }
+  // ---- room features -----------------------------------------------------------------------------------------------------------------------------------------
+  // spring a trap: a wave of foes drops into the chamber around the swimmer
+  ambush(w, n, o = {}) {
+    const run = this.run; if (run.ambush) run.ambush.fired = true; else run.ambush = { fired: true };
+    const r = rng(run.seed * 7 + run.depth * 3 + (o.salt || 0)), list = composeWave(run.depth * 2 + 3, r).slice(0, n), g = this.g;
+    g.toast(o.text || 'The walls shudder!', '#ff9a7a'); g.audio.sfx('wave_start'); w.shake(4); run.pending += list.length; run.cleared = false; run.checkT = 1;
+    list.forEach((type, i) => this.after(0.5 + i * 0.28, () => {
+      const e = spawnFoe(w, type, r, { near: w.player.x }); run.pending = Math.max(0, run.pending - 1);
+      if (e && (o.elite || r() < 0.12 + run.depth * 0.03)) g.systems.elites.apply(e, [['armored', 'swift', 'vampiric', 'scorching', 'thorned'][Math.floor(r() * 5)]]);
+    }));
+  }
+  // the relic stand in a treasure vault: an epic relic now, and the vault's guardians wake
+  takeStand(stand) {
+    const run = this.run, g = this.g, w = g.world; if (!run || stand.taken) return;
+    stand.taken = true; const have = new Set(this.relics()), pool = RELIC_IDS.filter((id) => !have.has(id) && RELICS[id].rarity === 'epic'), r = rng(run.seed + run.depth * 91);
+    if (pool.length) this.pick(pool[Math.floor(r() * pool.length)]); else g.grantItem('pearl', 1, true);
+    run.noOffer = true; this.ambush(w, 6 + run.depth, { text: 'The vault wakes!', elite: run.depth >= 3, salt: 5 });
+  }
+  // altars: rest, bargain or sacrifice (one gift per altar)
+  altar(option, altarEnt) {
+    const g = this.g, run = this.run, p = g.world.player, s = g.state; if (!run || altarEnt.used) return false;
+    if (option === 'rest') { p.heal(Math.round(p.stats.maxHp * 0.6)); p.addTide(p.stats.maxTide); p.status.cleanse(9); g.toast('The altar warms you.', '#ffd8f0'); }
+    else if (option === 'offering') {
+      const cost = 60 * run.depth; if (s.coins < cost) { g.toast('The altar wants ' + cost + ' coins.', '#ffb070'); g.audio.sfx('deny'); return false; }
+      const choices = this.roll(3, 'rare'); if (!choices.length) { g.toast('The altar has nothing left to give.', '#ffb070'); return false; }
+      s.coins -= cost; run.picking = true; g.engine.push(new RelicScene(g, choices));
+    } else if (option === 'sacrifice') {
+      const choices = this.roll(3, 'epic'); if (!choices.length) { g.toast('The altar has nothing left to give.', '#ffb070'); return false; }
+      if (!this.relics().includes('sacrificial_vow')) this.relics().push('sacrificial_vow'); p.recalc(); p.hp = Math.min(p.hp, p.stats.maxHp); run.picking = true; g.engine.push(new RelicScene(g, choices));
+      g.toast('A part of you stays behind.', '#ff9a8a');
+    }
+    altarEnt.used = true; g.events.emit('altar', option); return true;
+  }
+
   nova(e) {
     const w = this.g.world, p = w.player, R = 46; if (!w || !e) return;
     w.fx.ring(e.x, e.y, 4, R, 0.35, '#9af0ff', 3); w.fx.burst(e.x, e.y, ['#c8f8ff', '#ffffff'], 90, 0.4, 2);

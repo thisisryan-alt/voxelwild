@@ -4,12 +4,11 @@
 import { ENEMIES } from '../data/enemies.js';
 import { RELICS, RARITY, RELIC_IDS } from '../data/relics.js';
 import { arenaId } from '../world/rift_gen.js';
-import { Enemy } from '../entities/enemy.js';
+import { spawnFoe } from './spawner.js';
 import { RelicScene } from '../ui/relic_scene.js';
 import { RiftSummary } from '../ui/board_scene.js';
 import { text, textWidth, panel } from '../ui/ui.js';
 import { rng, clamp } from '../core/util.js';
-import { TS, isSolid } from '../world/tiles.js';
 
 const SKIP_AI = new Set(['turret', 'ambush', 'mimic', 'noop', 'healer', 'summoner']);
 const power = (d) => d.hp + d.dmg * 4;
@@ -74,14 +73,8 @@ export class Arena {
     g.events.emit('arena', 'wave', run.wave);
   }
   spawn(type, r, champion) {
-    const run = this.run, w = this.g.world, z = w.zone, d = ENEMIES[type]; if (!run || !w) return;
-    const cols = z.points, tx = cols[Math.floor(r() * cols.length)];
-    let ty = 6; const g = w.grid; while (ty < z.h - 2 && !isSolid(g.get(tx, ty))) ty++;
-    const floor = d.anchor === 'feet', x = (tx + 0.5) * TS, y = floor ? ty * TS - d.h / 2 - 1 : Math.min(ty - 4, 10 + Math.floor(r() * 10)) * TS;
-    w.fx.ring(x, y, 4, 22, 0.5, '#ffe8a0', 2); w.fx.burst(x, y, ['#ffe8a0', '#ffffff'], 50, 0.4, 2);
-    const e = new Enemy(w, type, x, y, { facing: x < w.player.x ? 1 : -1 }); w.enemies.push(e);
-    if (floor) { e.y = ty * TS - e.h / 2 - 0.1; }
-    run.pending = Math.max(0, run.pending - 1);
+    const run = this.run, w = this.g.world; if (!run || !w) return;
+    const e = spawnFoe(w, type, r); run.pending = Math.max(0, run.pending - 1); if (!e) return;
     if (champion) { this.g.systems.elites.apply(e, ['shielded', 'armored']); e.maxHp = Math.round(e.maxHp * 1.8); e.hp = e.maxHp; e.xpMult = (e.xpMult || 1) * 2; e.champion = true; }
     else if (r() < this.eliteChance()) { const ids = ['armored', 'swift', 'vampiric', 'volatile', 'scorching', 'frostbitten', 'brooding', 'mending', 'thorned', 'shielded']; this.g.systems.elites.apply(e, [ids[Math.floor(r() * ids.length)]]); }
   }
