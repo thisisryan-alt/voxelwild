@@ -102,7 +102,7 @@ export class Arena {
   // ---- finishing ----------------------------------------------------------------------------------------------------------------------------------------------
   summary() {
     const run = this.run, g = this.g, n = Math.max(0, run.wave - (run.state === 'fight' ? 1 : 0));
-    return { success: n >= 10, title: 'GAUNTLET OVER', label: `Wave ${run.wave} reached`, tier: 'Pearl Gauntlet', depth: run.wave, max: run.wave, secs: Math.round(g.state.playtime - run.t0), kills: run.kills, relics: [...(g.state.riftRelics || [])], rw: { coins: run.bonus, xp: 0, pearls: run.pearls, black: 0, items: {}, sp: 0 } };
+    return { success: n >= 10, kind: 'arena', title: 'GAUNTLET OVER', label: `Wave ${run.wave} reached`, tier: 'Pearl Gauntlet', depth: run.wave, max: run.wave, secs: Math.round(g.state.playtime - run.t0), kills: run.kills, relics: [...(g.state.riftRelics || [])], rw: { coins: run.bonus, xp: 0, pearls: run.pearls, black: 0, items: {}, sp: 0 } };
   }
   onDeath() { return this.end(true); }
   abandon() { return this.end(false); }

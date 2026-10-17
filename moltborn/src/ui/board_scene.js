@@ -7,6 +7,7 @@ import { ITEMS } from '../data/items.js';
 import { today } from '../world/rift_gen.js';
 import { OrdersScene } from './orders_scene.js';
 import { BountyScene } from './bounty_scene.js';
+import { HallScene } from './hall_scene.js';
 
 const bossName = (k) => BOSS_CLASSES[k]?.def?.name || k;
 const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -23,6 +24,7 @@ export class BoardScene {
     list.push({ kind: 'arena', name: 'Pearl Gauntlet', open: arenaOpen, why: arenaOpen ? '' : `Defeat ${bossName('grumbold')} first.` });
     list.push({ kind: 'bounties', name: 'Hunt Bounties' + (this.g.systems.bounties.readyCount() ? ' !' : ''), open: true, why: '' });
     list.push({ kind: 'orders', name: 'Kitchen Orders', open: true, why: '' });
+    list.push({ kind: 'hall', name: 'Hall of Tides', open: true, why: '' });
     return list;
   }
   say(m) { this.msg = m; this.msgT = 2; }
@@ -35,6 +37,7 @@ export class BoardScene {
       const e = list[this.sel];
       if (!e.open) { g.audio.sfx('deny'); this.say(e.why); return; }
       if (e.kind === 'orders') { g.audio.sfx('select'); g.engine.push(new OrdersScene(g)); return; }
+      if (e.kind === 'hall') { g.audio.sfx('select'); g.engine.push(new HallScene(g)); return; }
       if (e.kind === 'bounties') { g.audio.sfx('select'); g.engine.push(new BountyScene(g)); return; }
       g.engine.pop(); g.audio.sfx('select');
       if (e.kind === 'arena') g.systems.arena.start();
@@ -59,6 +62,10 @@ export class BoardScene {
       const B = g.systems.bounties, list2 = B.refresh(), st = B.state; text(ctx, 'Hunt Bounties', 224, 56, COL.gold);
       wrapText('Four jobs a day: hunt creatures you have met, open chests, forage, cook. Claim them for coins, experience and the odd pearl.', 210).forEach((l, i) => text(ctx, l, 224, 70 + i * 10, COL.text));
       text(ctx, `Today: ${list2.filter((x) => x.claimed).length}/${list2.length} claimed   ${B.readyCount()} ready`, 224, 124, B.readyCount() ? COL.green : COL.dim); text(ctx, `Streak: ${st.streak} day${st.streak === 1 ? '' : 's'}`, 224, 136, COL.dim);
+    } else if (e.kind === 'hall') {
+      const S = g.systems.history.stats(); text(ctx, 'Hall of Tides', 224, 56, COL.gold);
+      wrapText('Your rift and gauntlet history, the fish log and lifetime totals.', 210).forEach((l, i) => text(ctx, l, 224, 70 + i * 10, COL.text));
+      text(ctx, `${S.runs} runs, ${S.wins} cleared`, 224, 112, COL.dim);
     } else if (e.kind === 'orders') {
       text(ctx, 'Kitchen Orders', 224, 56, COL.gold);
       wrapText('Three requests a day for dishes you know how to cook. Deliver them for coins; every third pays a pearl.', 210).forEach((l, i) => text(ctx, l, 224, 70 + i * 10, COL.text));
@@ -77,7 +84,7 @@ export class BoardScene {
 
 // shown after a rift or gauntlet ends, over the hub zone
 export class RiftSummary {
-  constructor(game, s) { this.g = game; this.opaque = false; this.s = s; this.t = 0; }
+  constructor(game, s) { this.g = game; this.opaque = false; this.s = s; this.t = 0; game.systems.history?.add(s); }
   onEnter() { this.g.audio.sfx(this.s.success ? 'levelup' : 'wave_clear'); }
   update(dt) { this.t += dt; const inp = this.g.input; if (this.t > 0.6 && (inp.pressed('confirm') || inp.pressed('cancel'))) { this.g.audio.sfx('select'); this.g.engine.pop(); } }
   draw(ctx) {
