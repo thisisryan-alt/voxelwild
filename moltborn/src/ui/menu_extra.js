@@ -199,4 +199,30 @@ const craft = {
   },
 };
 
-export function installMenuExtras(Menu) { Object.assign(Menu.prototype, beast, trophy, craft); }
+// ======================================================= SHRINE TRAVEL (map tab) =========================================
+const travel = {
+  travelNav(inp, s) {
+    const g = this.g, T = g.systems.travel, list = T.list(); if (!list.length) return;
+    s.i = clamp(s.i ?? 0, 0, list.length - 1);
+    if (inp.pressed('left') || inp.pressed('up')) { s.i = (s.i + list.length - 1) % list.length; g.audio.sfx('tick'); }
+    if (inp.pressed('right') || inp.pressed('down')) { s.i = (s.i + 1) % list.length; g.audio.sfx('tick'); }
+    if (inp.pressed('confirm')) { const why = T.blocked(); if (why) { g.audio.sfx('deny'); this.say(why); } else T.go(list[s.i]); }
+  },
+  drawTravel(ctx, s) {
+    const g = this.g, T = g.systems.travel, list = T.list(), cur = g.world.zone.id;
+    text(ctx, 'Red = boss   Pink = shrine   Flashing = you', 14, 238, COL.dim);
+    if (!list.length) { text(ctx, 'Rest at a shrine to add it to the travel map.', 14, 226, '#7a90b0'); return; }
+    const cw = 46, ch = 24, gx = 22, gy = 20;
+    list.forEach((id, i) => {
+      const m = ZONE_INFO[id].map, x = 28 + m.x * (cw + gx), y = 40 + m.y * (ch + gy), sel = i === s.i;
+      ctx.fillStyle = '#ff9ad8'; ctx.fillRect(x + cw - 7, y + 2, 5, 5); ctx.fillStyle = '#05030a'; ctx.fillRect(x + cw - 6, y + 3, 3, 3); ctx.fillStyle = '#ffd8f0'; ctx.fillRect(x + cw - 5, y + 4, 1, 1);
+      if (sel) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.strokeRect(x - 2.5, y - 2.5, cw + 5, ch + 5); }
+    });
+    const id = list[s.i], why = T.blocked(), here = id === cur;
+    const label = `${ZONE_INFO[id].name}${here ? '  (here)' : ''}`;
+    text(ctx, label, 14, 214, here ? COL.dim : '#ffffff');
+    text(ctx, why ? why : here ? 'You are already here' : 'ENTER: swim to this shrine', 14, 226, why || here ? '#7a90b0' : COL.green);
+  },
+};
+
+export function installMenuExtras(Menu) { Object.assign(Menu.prototype, beast, trophy, craft, travel); }

@@ -2,6 +2,7 @@
 import { Hud } from './hud.js';
 import { DialogueBox } from './dialogue_ui.js';
 import { drawText } from '../gfx/font.js';
+import { PhotoScene } from './photo.js';
 
 export class PlayScene {
   constructor(game) {
@@ -32,6 +33,7 @@ export class PlayScene {
       if (inp.pressed('heal') && pl.alive) { if (g.hasItem('kelp_wrap') && pl.hp < pl.stats.maxHp) { g.addItem('kelp_wrap', -1); pl.heal(Math.round(pl.stats.maxHp * 0.4)); g.audio.sfx('pickup'); } else if (g.hasItem('brine_tonic') && pl.tide < pl.stats.maxTide * 0.7) { g.addItem('brine_tonic', -1); pl.addTide(pl.stats.maxTide * 0.5); g.audio.sfx('pickup'); } else g.audio.sfx('deny'); }
       if (inp.pressed('debug')) g.debug = !g.debug;
       if (inp.pressed('minimap')) g.systems.minimap?.cycle();
+      if (inp.pressed('photo') && pl.alive && !w.cinematic) { g.engine.push(new PhotoScene(g)); return; }
       if (inp.pressed('interact') && w.near && pl.alive) { pl.interactT = 0.25; g.audio.sfx('select'); w.near.interact(g); inp.consume('interact'); }
     }
     if (g.freeze > 0) { g.freeze--; w.fx.update(dt * 0.3); w.shakeAmt *= 0.9; g.audio.music.update?.(dt, w); return; }
@@ -43,7 +45,7 @@ export class PlayScene {
     const g = this.g, w = g.world; if (!w) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 480, 270); return; }
     w.draw(ctx);
     if (this.letterbox > 0.5) { const h = Math.round(this.letterbox); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 480, h); ctx.fillRect(0, 270 - h, 480, h); }
-    if (this.letterbox < 6) this.hud.draw(ctx);
+    if (this.letterbox < 6 && !g.photoMode?.hideHud) this.hud.draw(ctx);
     this.dialogue.draw(ctx);
     if (this.fade.a > 0.001) { ctx.globalAlpha = Math.min(1, this.fade.a); ctx.fillStyle = '#02050c'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }
     const dc = this.g.deathCard;

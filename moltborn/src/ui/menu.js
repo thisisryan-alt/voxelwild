@@ -240,7 +240,7 @@ export class MenuScene {
   }
 
   // ===================== MAP =====================
-  u_MAP(inp, s) {}
+  u_MAP(inp, s) { this.travelNav(inp, s); }
   d_MAP(ctx, s) {
     const g = this.g, st = g.state, cur = g.world.zone.id; panel(ctx, 8, 20, 464, 230);
     const ids = Object.keys(ZONE_INFO), cw = 46, ch = 24, gx = 22, gy = 20;
@@ -256,7 +256,7 @@ export class MenuScene {
       if (!v) text(ctx, '?', x + cw / 2 - 2, y + 8, '#6a8ab0');
       else { if (Z.boss) { const d = st.bosses[Z.boss]; ctx.fillStyle = d ? '#406040' : '#e03a3a'; ctx.fillRect(x + 3, y + 3, 5, 5); ctx.fillStyle = '#05030a'; ctx.fillRect(x + 4, y + 5, 1, 1); ctx.fillRect(x + 6, y + 5, 1, 1); } if (Z.molt) { ctx.fillStyle = '#ff9ad8'; ctx.fillRect(x + cw - 8, y + 3, 5, 5); } }
     }
-    text(ctx, 'Red = boss   Pink = Molt Shrine   Flashing = you', 14, 238, COL.dim);
+    this.drawTravel(ctx, s);
     text(ctx, ZONE_INFO[cur]?.name || '', 466 - textWidth(ZONE_INFO[cur]?.name || ''), 238, COL.gold);
   }
 

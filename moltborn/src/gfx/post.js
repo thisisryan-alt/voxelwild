@@ -87,7 +87,8 @@ export class PostFX {
       if (this.chroma > 0.05) this.aberrate(ctx);
     }
     if (this.lowHp > 0.03) this.hurtLook(ctx);
-    if (this.zoom > 0.004 || this.zoom < -0.004) this.applyZoom(ctx, world, cam);
+    if (g.photoMode && g.photoMode.filter !== 'none') this.photoFilter(ctx, g.photoMode.filter);
+    if (this.zoom + (this.photoZoom || 0) > 0.004 || this.zoom < -0.004) this.applyZoom(ctx, world, cam);
     if (setting(g, 'scanlines')) this.scanlines(ctx);
   }
 
@@ -208,9 +209,20 @@ export class PostFX {
   // scale the finished picture about the swimmer; the frame buffer is refreshed so earlier passes are included
   applyZoom(ctx, world, cam) {
     const f = this.frame.getContext('2d'); f.globalCompositeOperation = 'copy'; f.drawImage(ctx.canvas, 0, 0); f.globalCompositeOperation = 'source-over';
-    const k = 1 + this.zoom, p = world.player, ax = clamp(p.x - cam.x, 60, W - 60), ay = clamp(p.y - cam.y, 40, H - 40);
+    const k = 1 + this.zoom + (this.photoZoom || 0), p = world.player, ax = clamp(p.x - cam.x, 60, W - 60), ay = clamp(p.y - cam.y, 40, H - 40);
     ctx.save(); ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.frame, 0, 0, W, H, Math.round(ax - ax * k), Math.round(ay - ay * k), Math.round(W * k), Math.round(H * k));
+    ctx.restore();
+  }
+
+  // photo-mode looks: each is a few blend passes over the finished picture
+  photoFilter(ctx, kind) {
+    ctx.save();
+    if (kind === 'warm') { ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#ffb060'; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.18; ctx.fillStyle = '#ffd8a8'; ctx.fillRect(0, 0, W, H); }
+    else if (kind === 'noir') { ctx.globalCompositeOperation = 'saturation'; ctx.globalAlpha = 1; ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.55; ctx.drawImage(ctx.canvas, 0, 0); this.edge(ctx, 0.9); }
+    else if (kind === 'vivid') { ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.6; ctx.drawImage(ctx.canvas, 0, 0); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.5; ctx.drawImage(ctx.canvas, 0, 0); }
+    else if (kind === 'dream') { this.bloomPass(ctx, 1); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.45; ctx.fillStyle = '#ffc8f0'; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = 0.12; ctx.fillStyle = '#a8c8ff'; ctx.fillRect(0, 0, W, H); }
+    else if (kind === 'abyss') { ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.55; ctx.fillStyle = '#5a60c0'; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = 0.14; ctx.fillStyle = '#40e0d0'; ctx.fillRect(0, 0, W, H); this.edge(ctx, 0.8); }
     ctx.restore();
   }
 

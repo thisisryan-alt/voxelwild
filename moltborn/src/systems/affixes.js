@@ -18,6 +18,7 @@ export class Elites {
   // called by World once its enemies exist; deterministic per zone seed so a zone's elites are stable between visits
   roll(world) {
     if (world.zone.safe) return;
+    if (world.zone.arena) return;   // the gauntlet decides its own elites
     const p = this.chance(world); if (p <= 0) return;
     const r = rng((world.zone.seed | 0) * 31 + 7), depth = this.g.systems.rifts?.run?.depth || 0;
     for (const e of world.enemies) {

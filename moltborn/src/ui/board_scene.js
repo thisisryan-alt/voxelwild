@@ -1,6 +1,6 @@
 // The Tide Board menu (choose a rift, the daily rift or the Pearl Gauntlet) and the summary shown when a run ends.
 import { panel, text, button, COL, drawText, textWidth, wrapText } from './ui.js';
-import { RELICS, RARITY, RIFT_TIERS } from '../data/relics.js';
+import { RELICS, RARITY } from '../data/relics.js';
 import { BOSS_CLASSES } from '../entities/bosses.js';
 import { itemIcon } from '../gfx/sprites_ui.js';
 import { ITEMS } from '../data/items.js';
@@ -41,15 +41,14 @@ export class BoardScene {
     panel(ctx, 30, 20, 420, 230, { alpha: 0.96 }); drawText(ctx, 'THE TIDE BOARD', 240, 26, { color: COL.gold, scale: 2, align: 'center', shadow: '#000' });
     list.forEach((it, i) => button(ctx, it.name + (it.open ? '' : '  (locked)'), 40, 52 + i * 20, 168, 17, i === this.sel));
     panel(ctx, 216, 50, 226, 140, { alpha: 0.9 });
-    const lines = [];
     if (e.kind === 'rift' || e.kind === 'daily') {
       const t = e.tier; text(ctx, e.name, 224, 56, COL.gold);
       const blurb = e.kind === 'daily' ? `Everyone swims the same rift today (${today()}). The first clear of the day pays a bonus.` : t.blurb;
       wrapText(blurb, 210).forEach((l, i) => text(ctx, l, 224, 70 + i * 10, COL.text));
       const y = 70 + wrapText(blurb, 210).length * 10 + 6;
       text(ctx, `${t.depths} depths   Reward x${t.reward}`, 224, y, COL.dim);
-      text(ctx, 'Clear every foe to open the way. Choose a relic', 224, y + 14, '#9ad8ff'); text(ctx, 'between depths. Death ends the run.', 224, y + 24, '#9ad8ff');
-      if (e.kind === 'daily') text(ctx, g.state.flags['daily_' + today()] ? 'Bonus already claimed today.' : 'Bonus available!', 224, y + 40, g.state.flags['daily_' + today()] ? COL.dim : COL.green);
+      wrapText('Clear every foe to open the way. Choose a relic between depths. Death ends the run.', 210).forEach((l, i) => text(ctx, l, 224, y + 14 + i * 10, '#9ad8ff'));
+      if (e.kind === 'daily') text(ctx, g.state.flags['daily_' + today()] ? 'Bonus already claimed today.' : 'Bonus available!', 224, y + 54, g.state.flags['daily_' + today()] ? COL.dim : COL.green);
     } else {
       text(ctx, 'Pearl Gauntlet', 224, 56, COL.gold);
       wrapText('A sealed arena. Wave after wave of the sea\'s creatures, each tougher than the last. Pearls at every fifth wave.', 210).forEach((l, i) => text(ctx, l, 224, 70 + i * 10, COL.text));
@@ -72,7 +71,7 @@ export class RiftSummary {
     panel(ctx, 90, 24, 300, 222, { alpha: 0.97, border: s.success ? COL.gold : '#a05060' });
     drawText(ctx, s.title || (s.success ? 'RIFT CLEARED' : 'RIFT LOST'), 240, 32, { color: s.success ? COL.gold : '#ff9a8a', scale: 2, align: 'center', shadow: '#000' });
     text(ctx, s.label || `${s.tier}  -  depth ${s.depth} of ${s.max}`, 240 - textWidth(s.label || `${s.tier}  -  depth ${s.depth} of ${s.max}`) / 2, 52, COL.dim);
-    const rows = [['Time', fmt(s.secs)], ['Foes defeated', s.kills], ['Coins', '+' + rw.coins], ['Experience', '+' + rw.xp]];
+    const rows = [['Time', fmt(s.secs)], ['Foes defeated', s.kills], ['Coins', '+' + rw.coins]]; if (rw.xp) rows.push(['Experience', '+' + rw.xp]);
     if (rw.pearls) rows.push(['Pearls', '+' + rw.pearls]); if (rw.black) rows.push(['Black pearls', '+' + rw.black]); if (rw.sp) rows.push(['Skill point', '+' + rw.sp]);
     rows.forEach(([k, v], i) => { text(ctx, k, 110, 70 + i * 12, COL.dim); const t = String(v); text(ctx, t, 370 - textWidth(t), 70 + i * 12, COL.text); });
     const items = Object.entries(rw.items || {}); let y = 70 + rows.length * 12 + 6;

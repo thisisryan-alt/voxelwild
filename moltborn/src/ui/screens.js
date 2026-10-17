@@ -110,7 +110,7 @@ export class PauseScene {
   constructor(game) { this.g = game; this.opaque = false; this.sel = 0; this.mode = 'main'; this.t = 0; this.os = 0; }
   onEnter() { this.g.audio.setMuffle?.(0.6); this.g.audio.sfx('select'); }
   onExit() { this.g.audio.setMuffle?.(0); }
-  items() { return ['RESUME', 'SAVE GAME', 'OPTIONS', 'CONTROLS', 'QUIT TO TITLE']; }
+  items() { return this.g.systems.rifts?.active || this.g.systems.arena?.active ? ['RESUME', 'OPTIONS', 'CONTROLS', 'LEAVE RUN'] : ['RESUME', 'SAVE GAME', 'OPTIONS', 'CONTROLS', 'QUIT TO TITLE']; }
   update(dt) {
     const g = this.g, inp = g.input; this.t += dt;
     if (this.mode === 'main') {
@@ -120,6 +120,7 @@ export class PauseScene {
       if (inp.pressed('confirm')) {
         const k = it[this.sel]; g.audio.sfx('select');
         if (k === 'RESUME') g.engine.pop(); else if (k === 'SAVE GAME') { g.saveGame(); } else if (k === 'OPTIONS') { this.mode = 'options'; this.os = 0; } else if (k === 'CONTROLS') g.engine.push(new ControlsScene(g));
+        else if (k === 'LEAVE RUN') { g.engine.pop(); (g.systems.rifts.active ? g.systems.rifts.abandon() : g.systems.arena.abandon()); }
         else if (k === 'QUIT TO TITLE') { g.saveGame(true); g.audio.music.stop?.(); g.world = null; g.engine.replace(new TitleScene(g)); }
       }
     } else if (this.mode === 'options') updateOptions(this, g, inp, () => { this.mode = 'main'; });

@@ -7,9 +7,8 @@ import { riftId, parseId, setRiftThemes, THEME_ORDER, today } from '../world/rif
 import { RelicScene } from '../ui/relic_scene.js';
 import { RiftSummary } from '../ui/board_scene.js';
 import { ZONE_INFO } from '../data/zoneinfo.js';
-import { ITEMS } from '../data/items.js';
 import { INGREDIENT_IDS } from '../data/items_craft.js';
-import { rng, clamp } from '../core/util.js';
+import { rng } from '../core/util.js';
 
 export const isRiftZone = (id) => typeof id === 'string' && id.startsWith('rift:');
 export { today };
@@ -200,5 +199,6 @@ export class Rifts {
     }
     return true;
   }
+  abandon() { if (this.run && !this.run.done) this.finish(false); }
   cleanup() { this.run = null; this.g.state.riftRelics = []; this.g.world?.player?.recalc?.(); }
 }

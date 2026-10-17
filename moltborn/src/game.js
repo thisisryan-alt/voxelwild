@@ -39,6 +39,9 @@ import { Haptics } from './core/haptics.js';
 import { applyKeymap } from './core/keymap.js';
 import { Elites } from './systems/affixes.js';
 import { Rifts } from './systems/rifts.js';
+import { Arena } from './systems/arena.js';
+import { Barks } from './systems/barks.js';
+import { Travel } from './systems/travel.js';
 import { isProcedural } from './world/rift_gen.js';
 
 const rand = rng(8080);
@@ -55,7 +58,7 @@ export class Game {
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this); new Elites(this); new Rifts(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this); new Elites(this); new Rifts(this); new Arena(this); new Barks(this); new Travel(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -124,7 +127,7 @@ export class Game {
     this.audio.ambience(this.world.biome.amb); this.audio.music.play(z.music || this.world.biome.music);
     // spirit purse (coins lost on death)
     const pu = this.state.purse; if (pu && pu.zone === zoneId) this.world.pickups.push(new Pickup(this.world, { kind: 'coin', value: pu.amount, x: pu.x, y: pu.y, fixed: true, delay: 0, life: 1e9, id: 'purse' })), this.world.pickups[this.world.pickups.length - 1].purse = true;
-    this.systems.rifts?.onWorld(this.world);
+    this.systems.rifts?.onWorld(this.world); this.systems.arena?.onWorld(this.world);
     this.events.emit('zone', zoneId);
     this.systems.quests?.onZone?.(zoneId);
     if (!o.silentBanner) this.banner(z.title || z.name, this.world.biome.name);
@@ -145,6 +148,7 @@ export class Game {
   rest(shrine) {
     const w = this.world, p = w.player, s = this.state;
     s.checkpoint = { zone: w.zone.id, entry: shrine.o.entry || 'rest', shrine: shrine.key };
+    this.systems.travel.remember(w.zone.id, shrine.o.entry);
     p.hp = p.stats.maxHp; p.tide = p.stats.maxTide; p.fury = Math.max(p.fury, 0); s.flags.secondWindUsed = false;
     this.audio.sfx('rest'); w.fx.ring(shrine.x, shrine.y - 6, 4, 70, 0.7, '#a0f0ff', 2); w.fx.burst(shrine.x, shrine.y - 10, ['#a0f0ff', '#ffffff', '#ffd8f0'], 80, 0.8, 2);
     this.toast('Rested. The tide remembers this place.', '#9ad8ff'); this.saveGame(true);
@@ -153,6 +157,7 @@ export class Game {
   }
   onPlayerDeath() {
     if (this.systems.rifts?.active) return this.systems.rifts.onDeath();
+    if (this.systems.arena?.active) return this.systems.arena.onDeath();
     const s = this.state, w = this.world, p = w.player;
     const lose = Math.floor(s.coins * 0.25);
     s.purse = lose > 0 ? { zone: w.zone.id, x: p.x, y: p.y, amount: lose } : null; s.coins -= lose;
@@ -255,5 +260,5 @@ export class Game {
     if (npcId === 'old_brine') return null;
     if (qs.some((id) => !q.log[id])) return '!'; return null;
   }
-  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); this.systems.minimap?.update(dt); this.systems.audiofeel?.update(dt); this.systems.rifts?.update(dt); }
+  update(dt) { this.state.playtime += dt; this.systems.stats?.update(dt); this.systems.achievements?.update(dt); this.systems.post?.update(dt); this.systems.minimap?.update(dt); this.systems.audiofeel?.update(dt); this.systems.rifts?.update(dt); this.systems.arena?.update(dt); this.systems.barks?.update(dt); }
 }

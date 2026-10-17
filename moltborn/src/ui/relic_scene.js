@@ -2,12 +2,11 @@
 import { panel, text, COL, drawText, textWidth, wrapText } from './ui.js';
 import { RELICS, RARITY } from '../data/relics.js';
 import { itemIcon } from '../gfx/sprites_ui.js';
-import { STATUS } from '../systems/status.js';
 
 const EFFECT_LABEL = { dmg: 'Damage', hp: 'Health', def: 'Defence', speed: 'Speed', crit: 'Crit', tideRegen: 'Tide regen', coinBonus: 'Coins', light: 'Light', regen: 'Regen', thorns: 'Thorns' };
 
 export class RelicScene {
-  constructor(game, choices) { this.g = game; this.opaque = false; this.choices = choices; this.sel = 0; this.t = 0; this.locked = 0.5; }
+  constructor(game, choices, onPick) { this.g = game; this.opaque = false; this.choices = choices; this.onPick = onPick; this.sel = 0; this.t = 0; this.locked = 0.5; }
   onEnter() { this.g.audio.sfx('relic'); this.g.audio.setMuffle?.(0.4); }
   onExit() { this.g.audio.setMuffle?.(0); }
   update(dt) {
@@ -15,7 +14,7 @@ export class RelicScene {
     const n = this.choices.length;
     if (inp.pressed('left') || inp.pressed('up')) { this.sel = (this.sel + n - 1) % n; this.g.audio.sfx('tick'); }
     if (inp.pressed('right') || inp.pressed('down')) { this.sel = (this.sel + 1) % n; this.g.audio.sfx('tick'); }
-    if (this.locked <= 0 && (inp.pressed('confirm') || inp.pressed('attack'))) { this.g.audio.sfx('select'); this.g.systems.rifts.pick(this.choices[this.sel]); this.g.engine.pop(); }
+    if (this.locked <= 0 && (inp.pressed('confirm') || inp.pressed('attack'))) { this.g.audio.sfx('select'); this.g.engine.pop(); (this.onPick || ((id) => this.g.systems.rifts.pick(id)))(this.choices[this.sel]); }
   }
   draw(ctx) {
     ctx.fillStyle = 'rgba(2,8,20,0.78)'; ctx.fillRect(0, 0, 480, 270);

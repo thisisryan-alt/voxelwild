@@ -90,16 +90,16 @@ export function buildRift(id) {
 
 // ---- the Pearl Gauntlet: a sealed round arena, waves are spawned by systems/arena.js ------------------------------------------------------------
 export function buildArena(id) {
-  const P = parseId(id), r = rng(P.seed * 53 + 11), w = 64, h = 34, keys = THEME_ORDER;
+  const P = parseId(id), w = 64, h = 34, keys = THEME_ORDER;
   const key = keys[P.seed % keys.length], T0 = THEMES[key];
-  const b = new ZoneBuilder({ id, name: 'Pearl Gauntlet', title: 'The Pearl Gauntlet', biome: 'kingdom', w, h, seed: P.seed * 7 + 1, pressure: 0, safe: false });
+  const b = new ZoneBuilder({ id, name: 'Pearl Gauntlet', title: 'The Pearl Gauntlet', biome: T0.biome, w, h, seed: P.seed * 7 + 1, pressure: 0, safe: false });
   b.fill(T.ROCK).carve(4, 4, w - 8, h - 9);
   b.seabed(4, w - 4, (x) => h - 8 + Math.sin(x * 0.2) * 1.2);
   b.ceiling(4, w - 4, (x) => 5 + Math.sin(x * 0.3) * 1);
   for (const x of [16, 32, 48]) { b.platform(x - 3, h - 15, 7); }
   b.platform(8, h - 20, 6); b.platform(w - 14, h - 20, 6); b.platform(w / 2 - 4, h - 22, 8);
   b.pillar(24, h - 16, h - 6, 2, T.RUIN); b.pillar(40, h - 16, h - 6, 2, T.RUIN);
-  b.surface(T.RUIN, 1); b.smooth(1);
+  b.surface(T0.surface, 1); b.smooth(1);
   b.entryFloor('west', 8, { facing: 1, from: 6 }); b.entryFloor('start', w / 2, { facing: 1, from: 6 });
   for (const tx of [10, 32, 54]) b.light(tx, 12, 60, '#ffe8a0', 0.8);
   const z = b.finish(); z.arena = { theme: key, seed: P.seed }; z.nospawn = true;
