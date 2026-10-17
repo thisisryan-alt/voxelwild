@@ -96,7 +96,7 @@ export class Boss extends Enemy {
   die(silent, hit) {
     if (this.dying) return; this.dying = true; this.invuln = true; this.script = null; this.teles = []; this.world.setBarrier(this.barriers, false);
     for (const e of this.world.enemies) if (e !== this && e.minion) e.hp = 0; for (const p of this.world.projectiles) if (p.team === 'enemy') p.die(false);
-    this.deathScript = new Script(this.defeat()); this.world.game.audio.music.stop?.(1);
+    this.deathScript = new Script(this.defeat()); this.world.game.audio.music.stop?.(1); this.world.game.audio.music.stinger?.('victory');
   }
   *defeat() {
     const w = this.world, g = w.game; w.slowT = 3.2; w.slowFactor = 0.25; w.flash = 0.25; this.sfx('bossdie'); w.shake(10); this.pose = 'stagger';
@@ -153,7 +153,7 @@ export class Boss extends Enemy {
   drawTeles(ctx, cam) {
     if (!this._ov) return;
     for (const t of this.teles) {
-      const k = Math.min(1, t.t / t.dur), pulse = 0.35 + 0.25 * Math.sin(t.t * 30), a = t.t > t.dur ? 0.9 : pulse + k * 0.2;
+      const k = Math.min(1, t.t / t.dur), pulse = 0.1 + 0.05 * Math.sin(t.t * 30), a = t.t > t.dur ? 0.5 : pulse + k * 0.16;
       ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = t.color; ctx.strokeStyle = '#ffffff';
       if (t.kind === 'rect') { const x = Math.round(t.x - cam.x), y = Math.round(t.y - cam.y); ctx.fillRect(x, y, t.w, t.h); ctx.globalAlpha = 0.9; ctx.strokeRect(x + 0.5, y + 0.5, t.w - 1, t.h - 1); ctx.globalAlpha = 0.5; const fh = Math.round(t.h * k), fw = Math.round(t.w * k); if (t.fill === 'h') { ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, fw, t.h); } else if (t.fill !== false) { ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y + t.h - fh, t.w, fh); } }
       else if (t.kind === 'line') { ctx.globalAlpha = a; ctx.strokeStyle = t.color; ctx.lineWidth = t.w || 6; ctx.beginPath(); ctx.moveTo(Math.round(t.x - cam.x), Math.round(t.y - cam.y)); ctx.lineTo(Math.round(t.x2 - cam.x), Math.round(t.y2 - cam.y)); ctx.stroke(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke(); }

@@ -8,11 +8,13 @@ const TIPS = {
   skill: { msg: 'You have skill points. Open the menu (TAB) to spend them.', test: (c) => c.g.state.sp > 0 },
 };
 export class Tips {
-  constructor(game) { this.g = game; this.cur = null; this.stuck = 0; this.lastX = 0; game.systems.tips = this; }
+  constructor(game) { this.g = game; this.cur = null; this.stuck = 0; this.lastX = 0; this.quiet = 8; game.systems.tips = this; }
   update(dt) {
     const g = this.g, w = g.world, p = w?.player; if (!p || p.dead || !p.alive) return;
     if (w.boss?.engaged || g.playScene?.dialogue?.active) return;
-    if (this.cur) { this.cur.t += dt; if (this.cur.t > 5) this.cur = null; return; }
+    this.quiet -= dt;
+    if (this.cur) { this.cur.t += dt; if (this.cur.t > 4.5) { this.cur = null; this.quiet = 25; } return; }
+    if (this.quiet > 0) return;
     const held = g.input.held; const dir = (held.right ? 1 : 0) - (held.left ? 1 : 0);
     this.stuck = dir && Math.abs(p.x - this.lastX) < 0.05 ? this.stuck + dt : 0; this.lastX = p.x;
     let nearEnemy = 999; for (const e of w.enemies) if (!e.dead && !e.def?.friendly) nearEnemy = Math.min(nearEnemy, Math.hypot(e.x - p.x, e.y - p.y));
@@ -26,7 +28,7 @@ export class Tips {
   }
   draw(ctx, panel, text, textWidth) {
     const c = this.cur; if (!c) return;
-    const a = Math.min(1, (5 - c.t) * 2, c.t * 4), tw = textWidth(c.msg) + 14, y = 222;
+    const a = Math.min(1, (4.5 - c.t) * 2, c.t * 4), tw = textWidth(c.msg) + 14, y = 222;
     ctx.globalAlpha = a; panel(ctx, 240 - tw / 2, y, tw, 15, { alpha: 0.9 }); text(ctx, c.msg, 240 - tw / 2 + 7, y + 4, '#bff0ff'); ctx.globalAlpha = 1;
   }
 }

@@ -99,19 +99,24 @@ export class ZoneBuilder {
   area(kind, x, y, w, h, o = {}) { this.areas.push({ kind, x: x * TS, y: y * TS, w: w * TS, h: h * TS, ...o }); return this; }
   // scatter dressing on exposed floors / ceilings. table: {floor:[[type,weight,variants],...], ceil:[...], density}
   decorate(table, density = 0.35) {
-    const r = rng(this.seed + 99), g = this.grid, taken = new Set(this.props.map((p) => Math.floor(p.x / TS)));
+    // Clustered and sparse: noise makes lush clumps with bare gaps, and props keep a gap from each other and from interactables.
+    const r = rng(this.seed + 99), g = this.grid, solidProps = this.props.map((p) => Math.floor(p.x / TS));
     const total = (a) => a.reduce((s, e) => s + e[1], 0);
     const pick = (a) => { let k = r() * total(a); for (const e of a) { k -= e[1]; if (k <= 0) return e; } return a[0]; };
+    let lastFloor = -9, lastCeil = -9;
     for (let x = 1; x < this.w - 1; x++) {
+      const clump = vnoise(x / 7, this.seed * 0.37, this.seed + 5), k = density * 0.85 * Math.max(0, clump * 1.8 - 0.3);
+      const busy = solidProps.some((px) => Math.abs(px - x) < 2);
       for (let y = 1; y < this.h - 1; y++) {
-        if (table.floor && g.get(x, y) === T.AIR && isSolid(g.get(x, y + 1)) && g.get(x, y + 1) !== T.CRACKED && r() < density && !this.nearEntry(x, y)) {
+        if (table.floor && x - lastFloor >= 2 && !busy && g.get(x, y) === T.AIR && isSolid(g.get(x, y + 1)) && g.get(x, y + 1) !== T.CRACKED && r() < k && !this.nearEntry(x, y)) {
           const e = pick(table.floor);
           this.props.push({ type: e[0], x: (x + 0.5) * TS + (r() - 0.5) * 8, y: (y + 1) * TS + 1, v: Math.floor(r() * (e[2] || 3)), layer: e[3] || 'back' });
-          y += 1;
+          lastFloor = x; y += 1;
         }
-        if (table.ceil && g.get(x, y) === T.AIR && isSolid(g.get(x, y - 1)) && g.get(x, y - 1) !== T.PLATFORM && r() < density * 0.4) {
+        if (table.ceil && x - lastCeil >= 3 && g.get(x, y) === T.AIR && isSolid(g.get(x, y - 1)) && g.get(x, y - 1) !== T.PLATFORM && r() < density * 0.25) {
           const e = pick(table.ceil);
           this.props.push({ type: e[0], x: (x + 0.5) * TS + (r() - 0.5) * 6, y: y * TS - 1, v: Math.floor(r() * (e[2] || 3)), layer: 'back' });
+          lastCeil = x;
         }
       }
     }

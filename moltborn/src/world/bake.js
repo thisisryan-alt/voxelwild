@@ -130,9 +130,9 @@ export class TileLayer {
       }
       case T.ROCK: case T.CRACKED: {
         const n = fbm(px / 7, py / 7, seed + 3, 3);
-        let col = pick(n * 0.9 + 0.05, 1, 3, 0.45);
+        let col = pick(n * 0.9 + 0.05, 1, 3, 0.28);
         const crack = Math.abs(vnoise(px / 11, py / 11, seed + 11) - 0.5);
-        if (crack < 0.011) col = c[0];
+        if (crack < 0.008) col = c[1];
         if (mat === T.CRACKED) { const k = Math.abs(vnoise(px / 5, py / 5, seed + 21) - 0.5); if (k < 0.045) return color('#fff0c0'); if (k < 0.07) return color('#d08a4a'); }
         return col;
       }

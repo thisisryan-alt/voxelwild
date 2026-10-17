@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "start": "node tools/serve.mjs",
-    "validate": "node tests/validate_zones.mjs && node tests/validate_links.mjs && node tests/validate_content.mjs && node tests/interactable_keys.mjs",
+    "validate": "node tests/validate_zones.mjs && node tests/validate_links.mjs && node tests/validate_content.mjs && node tests/interactable_keys.mjs && node tests/music_compose.mjs",
     "economy": "node tests/economy.mjs",
     "smoke": "node tools/run.mjs tests/scripts/smoke.mjs"
   }

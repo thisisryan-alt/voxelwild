@@ -11,44 +11,49 @@ export class Hud {
     this.t += dt; const g = this.g, p = g.world?.player; if (!p) return;
     if (this.hpShown === null) this.hpShown = p.hp; this.hpShown += (p.hp - this.hpShown) * Math.min(1, dt * 6);
     g.systems.tips?.update(dt);
-    for (const t of g.toasts) t.t += dt; g.toasts = g.toasts.filter((t) => t.t < 3.2);
+    for (const t of g.toasts) t.t += dt; g.toasts = g.toasts.filter((t) => t.t < 2.8);
     for (const t of g.popups) t.t += dt; g.popups = g.popups.filter((t) => t.t < 3.2);
-    if (g.bannerState) { g.bannerState.t += dt; if (g.bannerState.t > 3.4) g.bannerState = null; }
+    if (g.bannerState) { g.bannerState.t += dt; if (g.bannerState.t > 2.8) g.bannerState = null; }
   }
   draw(ctx) {
     const g = this.g, w = g.world; if (!w) return; const p = w.player, S = p.stats, st = g.state;
-    // --- vitals ---
-    panel(ctx, 4, 4, 138, 41, { alpha: 0.78 });
+    // --- vitals: no backing panel, just the bars ---
     const F = FORMS[st.form];
-    text(ctx, `Lv ${st.level}`, 9, 8, COL.gold); text(ctx, F.name, 46, 8, COL.dim);
-    bar(ctx, 9, 19, 128, 10, this.hpShown / S.maxHp, '#e0383a', '#ff8a6a', '#3a1020');
-    bar(ctx, 9, 19, 128, 10, 0, '#000', '#000', 'rgba(0,0,0,0)');
-    ctx.fillStyle = '#ff5a4a'; const hpw = Math.round(128 * Math.max(0, p.hp) / S.maxHp); ctx.fillRect(9, 19, hpw, 10); ctx.fillStyle = '#ff9a7a'; ctx.fillRect(9, 19, hpw, 3); ctx.fillStyle = '#b02030'; ctx.fillRect(9, 27, hpw, 2);
-    text(ctx, `${Math.ceil(p.hp)}/${S.maxHp}`, 12, 20, '#ffffff', { shadow: '#3a0a14' });
-    bar(ctx, 9, 32, 100, 5, p.tide / S.maxTide, '#3a8ae8', '#8ad0ff', '#0a1a3a');
-    bar(ctx, 9, 39, 100, 3, p.fury / 100, p.fury >= 100 ? '#ffd84a' : '#ff8a3a', '#ffe0a0', '#2a1408');
-    if (p.fury >= 100 && Math.floor(this.t * 4) % 2) text(ctx, 'ULT', 112, 35, COL.gold);
-    const need = xpToNext(st.level); ctx.fillStyle = '#9ad8ff'; ctx.fillRect(9, 44, Math.round(128 * st.xp / need), 1);
-    // --- currency ---
-    ctx.drawImage(iconCoin(), 438, 3); text(ctx, String(st.coins), 476 - textWidth(String(st.coins)), 8, COL.gold, { });
-    const evolvable = this.g.systems.evolution?.readyFor?.(); text(ctx, `EP ${st.ep}`, 476 - textWidth(`EP ${st.ep}`), 19, COL.pink);
-    if (evolvable && Math.floor(this.t * 2) % 2) text(ctx, 'MOLT READY', 476 - textWidth('MOLT READY'), 41, '#ffffff', { shadow: '#a0306a' });
-    if (st.sp > 0) text(ctx, `SP ${st.sp}`, 476 - textWidth(`SP ${st.sp}`), 30, COL.blue);
-    // --- quest tracker ---
+    const hpw = 96, hpf = Math.max(0, Math.min(1, p.hp / S.maxHp));
+    bar(ctx, 8, 8, hpw, 7, this.hpShown / S.maxHp, '#7a2030', '#a8404a', '#1a0a14');
+    ctx.fillStyle = '#e8483c'; ctx.fillRect(8, 8, Math.round(hpw * hpf), 7); ctx.fillStyle = '#ff9a7a'; ctx.fillRect(8, 8, Math.round(hpw * hpf), 2);
+    text(ctx, `${Math.ceil(p.hp)}`, 11, 8, '#ffffff', { shadow: '#3a0a14' });
+    bar(ctx, 8, 18, 64, 3, p.tide / S.maxTide, '#3a8ae8', '#8ad0ff', '#0a1a3a');
+    if (p.fury > 2) bar(ctx, 8, 24, 48, 2, p.fury / 100, p.fury >= 100 ? '#ffd84a' : '#ff8a3a', '#ffe0a0', '#2a1408');
+    text(ctx, `${st.level}`, 108, 8, COL.gold, { shadow: '#000' });
+    if (this.t < 6 || g.state.level !== this.lvShown) { this.lvShown = g.state.level; this.nameT = this.t; }
+    if (this.t - (this.nameT ?? 0) < 5) { ctx.globalAlpha = Math.min(1, 5 - (this.t - this.nameT)); text(ctx, F.name, 108 + textWidth(String(st.level)) + 5, 8, COL.dim, { shadow: '#000' }); ctx.globalAlpha = 1; }
+    // --- currency: one line; EP / SP only when there is something to spend ---
+    const cw = textWidth(String(st.coins)); ctx.drawImage(iconCoin(), 476 - cw - 14, 6); text(ctx, String(st.coins), 476 - cw, 8, COL.gold);
+    let ry = 20; const evolvable = this.g.systems.evolution?.readyFor?.();
+    if (st.ep > 0) { text(ctx, `EP ${st.ep}`, 476 - textWidth(`EP ${st.ep}`), ry, COL.pink); ry += 10; }
+    if (st.sp > 0) { text(ctx, `SP ${st.sp}`, 476 - textWidth(`SP ${st.sp}`), ry, COL.blue); ry += 10; }
+    if (evolvable && Math.floor(this.t * 2) % 2) text(ctx, 'MOLT READY', 476 - textWidth('MOLT READY'), ry, '#ffffff', { shadow: '#a0306a' });
+    // --- quest tracker: full for a few seconds after it changes, then one dim line ---
     const tr = g.systems.quests?.tracker?.();
-    if (tr) { const lines = wrapText(tr.text, 130); const h = 14 + lines.length * 10; panel(ctx, 480 - 142, 42, 138, h, { alpha: 0.6 }); text(ctx, tr.title, 342, 46, COL.gold); lines.forEach((l, i) => text(ctx, l, 342, 56 + i * 10, COL.text)); }
-    // --- abilities ---
-    const slots = st.slots, y0 = 270 - 26, nS = Math.max(1, F.abilitySlots), x0 = 240 - ((nS + 1) * 24) / 2;
-    for (let i = 0; i < nS; i++) {
-      const id = slots[i], x = x0 + i * 24; panel(ctx, x, y0, 22, 22, { alpha: 0.8, border: id ? COL.border : '#2a3a58' });
-      if (id) {
-        const ab = ABILITIES[id]; ctx.drawImage(abilityIcon(ab.icon), x + 4, y0 + 4);
-        const cd = p.cool[id] || 0; if (cd > 0) { ctx.fillStyle = 'rgba(5,10,20,0.7)'; const hh = Math.round(22 * Math.min(1, cd / (ab.cd || 1))); ctx.fillRect(x + 1, y0 + 22 - hh, 20, hh); }
-        else if (p.tide < Math.round(ab.cost * (1 + S.tideCost))) { ctx.fillStyle = 'rgba(40,60,160,0.45)'; ctx.fillRect(x + 1, y0 + 1, 20, 20); }
-      }
-      text(ctx, String(i + 1), x + 2, y0 + 13, '#9ad8ff', { shadow: '#000' });
+    if (tr && !g.bannerState && !(w.boss && w.boss.engaged)) {
+      const key = tr.title + '|' + tr.text; if (key !== this.trKey) { this.trKey = key; this.trT = this.t; }
+      const age = this.t - this.trT, full = age < 7;
+      if (full) { const lines = wrapText(tr.text, 150); const h = 13 + lines.length * 10; ctx.globalAlpha = Math.min(1, (7 - age) * 1.5, age * 4 + 0.2); panel(ctx, 480 - 162, 38, 158, h, { alpha: 0.6 }); text(ctx, tr.title, 324, 42, COL.gold); lines.forEach((l, i) => text(ctx, l, 324, 52 + i * 10, COL.text)); ctx.globalAlpha = 1; }
+      else { const t2 = tr.title.length > 26 ? tr.title.slice(0, 25) + '...' : tr.title; ctx.globalAlpha = 0.45; text(ctx, t2, 476 - textWidth(t2), ry + (evolvable ? 11 : 1), COL.gold); ctx.globalAlpha = 1; }
     }
-    { const x = x0 + nS * 24, ready = p.fury >= 100; panel(ctx, x, y0, 22, 22, { alpha: 0.8, border: ready ? COL.gold : '#2a3a58' }); ctx.globalAlpha = ready ? 1 : 0.4; ctx.drawImage(abilityIcon('ult'), x + 4, y0 + 4); ctx.globalAlpha = 1; text(ctx, 'Q', x + 2, y0 + 13, ready ? COL.gold : '#6a7a98', { shadow: '#000' }); if (ready) { ctx.globalAlpha = 0.3 + 0.3 * Math.sin(this.t * 8); ctx.fillStyle = '#ffd84a'; ctx.fillRect(x + 1, y0 + 1, 20, 20); ctx.globalAlpha = 1; } }
+    // --- abilities: only what you have ---
+    const slots = st.slots, nS = Math.max(1, F.abilitySlots), have = [];
+    for (let i = 0; i < nS; i++) if (slots[i]) have.push(i);
+    const showUlt = p.fury > 4, cells = have.length + (showUlt ? 1 : 0), y0 = 270 - 25, x0 = 240 - (cells * 24) / 2;
+    have.forEach((i, k) => {
+      const id = slots[i], x = x0 + k * 24; panel(ctx, x, y0, 22, 22, { alpha: 0.7, border: COL.border });
+      const ab = ABILITIES[id]; ctx.drawImage(abilityIcon(ab.icon), x + 4, y0 + 4);
+      const cd = p.cool[id] || 0; if (cd > 0) { ctx.fillStyle = 'rgba(5,10,20,0.7)'; const hh = Math.round(22 * Math.min(1, cd / (ab.cd || 1))); ctx.fillRect(x + 1, y0 + 22 - hh, 20, hh); }
+      else if (p.tide < Math.round(ab.cost * (1 + S.tideCost))) { ctx.fillStyle = 'rgba(40,60,160,0.45)'; ctx.fillRect(x + 1, y0 + 1, 20, 20); }
+      text(ctx, String(i + 1), x + 2, y0 + 13, '#9ad8ff', { shadow: '#000' });
+    });
+    if (showUlt) { const x = x0 + have.length * 24, ready = p.fury >= 100; panel(ctx, x, y0, 22, 22, { alpha: 0.7, border: ready ? COL.gold : '#2a3a58' }); ctx.globalAlpha = ready ? 1 : 0.4; ctx.drawImage(abilityIcon('ult'), x + 4, y0 + 4); ctx.globalAlpha = 1; text(ctx, 'Q', x + 2, y0 + 13, ready ? COL.gold : '#6a7a98', { shadow: '#000' }); }
     // --- boss bar ---
     const b = w.boss; if (b && b.alive && b.engaged && !b.dying) {
       const bw = 190, bx = 145, by = 15;
@@ -67,9 +72,9 @@ export class Hud {
     g.popups.forEach((pp, i) => { const a = Math.min(1, (3.2 - pp.t) * 2, pp.t * 4), y = 84 + i * 20; ctx.globalAlpha = a; panel(ctx, 4, y, 130, 18, { alpha: 0.8, border: '#a08a3a' }); try { ctx.drawImage(pp.icon === 'gem' ? itemIcon('abyssal_core') : itemIcon(pp.icon), 7, y + 1); } catch (e) {} text(ctx, pp.text, 26, y + 5, pp.color); ctx.globalAlpha = 1; });
     g.systems.tips?.draw(ctx, panel, text, textWidth);
     // --- toasts ---
-    g.toasts.forEach((t, i) => { const a = Math.min(1, (3.2 - t.t) * 2, t.t * 5), tw = textWidth(t.msg) + 12, y = 50 + i * 15 - Math.max(0, 1 - t.t * 6) * 6; ctx.globalAlpha = a; panel(ctx, 240 - tw / 2, y, tw, 13, { alpha: 0.85 }); text(ctx, t.msg, 240 - tw / 2 + 6, y + 3, t.color); ctx.globalAlpha = 1; });
+    g.toasts.forEach((t, i) => { const a = Math.min(1, (3.2 - t.t) * 2, t.t * 5), tw = textWidth(t.msg) + 12, y = 78 + i * 15 - Math.max(0, 1 - t.t * 6) * 6; ctx.globalAlpha = a; panel(ctx, 240 - tw / 2, y, tw, 13, { alpha: 0.85 }); text(ctx, t.msg, 240 - tw / 2 + 6, y + 3, t.color); ctx.globalAlpha = 1; });
     // --- zone banner ---
-    const bn = g.bannerState; if (bn) { const a = Math.min(1, bn.t * 2, (3.4 - bn.t) * 1.5); ctx.globalAlpha = a; drawText(ctx, bn.title, 240, 86, { color: '#ffffff', scale: 2, align: 'center', shadow: '#05204a', outline: '#05204a' }); if (bn.sub) drawText(ctx, bn.sub, 240, 108, { color: '#9ad8ff', align: 'center', shadow: '#05204a' }); ctx.globalAlpha = 1; }
+    const bn = g.bannerState; if (bn) { const a = Math.min(1, bn.t * 2, (2.8 - bn.t) * 1.5); ctx.globalAlpha = a * 0.92; drawText(ctx, bn.title, 240, 44, { color: '#ffffff', scale: 2, align: 'center', shadow: '#05204a', outline: '#05204a' }); if (bn.sub) drawText(ctx, bn.sub, 240, 64, { color: '#9ad8ff', align: 'center', shadow: '#05204a' }); ctx.globalAlpha = 1; }
     // --- low health pulse ---
     if (p.hp / S.maxHp < 0.25 && p.alive) { ctx.globalAlpha = 0.18 + 0.12 * Math.sin(this.t * 6); ctx.fillStyle = '#c01020'; ctx.fillRect(0, 0, 480, 6); ctx.fillRect(0, 264, 480, 6); ctx.fillRect(0, 0, 6, 270); ctx.fillRect(474, 0, 6, 270); ctx.globalAlpha = 1; }
     // pressure warning

@@ -70,11 +70,11 @@ export class Background {
     this.rays = this.B.rays ? Array.from({ length: 6 }, () => ({ x: r.range(0, LW), w: r.range(10, 28), a: r.range(0.04, 0.1), s: r.range(0.1, 0.3) })) : null;
     this.fish = Array.from({ length: 14 }, () => ({ x: r.range(0, 480), y: r.range(40, 230), s: r.range(10, 24) * (r() < 0.5 ? -1 : 1), sz: r() < 0.3 ? 2 : 1 }));
   }
-  draw(ctx, cam, zone, t) {
+  draw(ctx, cam, zone, t, noGrad = false) {
     const B = this.B, ph = Math.max(0, Math.min(1, cam.y / Math.max(1, zone.h * 16 - 270)));
     const g = ctx.createLinearGradient(0, 0, 0, 270);
     g.addColorStop(0, mix(B.top, B.bottom, Math.min(1, ph * 0.9))); g.addColorStop(1, mix(B.top, B.bottom, Math.min(1, 0.45 + ph * 0.55)));
-    ctx.fillStyle = g; ctx.fillRect(0, 0, 480, 270);
+    if (!noGrad) { ctx.fillStyle = g; ctx.fillRect(0, 0, 480, 270); }
     // god rays
     if (this.rays && ph < 0.7) {
       ctx.save(); for (const r of this.rays) { const x = ((r.x - cam.x * 0.2 + Math.sin(t * r.s) * 12) % LW + LW) % LW - 40; ctx.globalAlpha = r.a * (1 - ph * 1.4); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + r.w, 0); ctx.lineTo(x + r.w * 2.4 - 40, 270); ctx.lineTo(x - 40, 270); ctx.fill(); } ctx.restore(); ctx.globalAlpha = 1;
@@ -82,7 +82,7 @@ export class Background {
     for (const L of this.layers) {
       const ox = -(cam.x * L.px) % LW, oy = Math.round(-cam.y * L.py * 0.4 - ph * 30 + 0);
       ctx.globalAlpha = L.alpha;
-      for (let x = ox - LW; x < 480; x += LW) ctx.drawImage(L.cv, Math.round(x), 270 - LH + 40 + oy + 0);
+      for (let x = ox - LW; x < 480; x += LW) ctx.drawImage(L.cv, Math.round(x), 270 - LH - 8 + oy);
     }
     ctx.globalAlpha = 1;
     // drifting fish silhouettes

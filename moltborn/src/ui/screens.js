@@ -1,4 +1,5 @@
 // Title, pause/options, shop, forge, molt-shrine and story-panel screens.
+import { drawScene } from '../gfx/cutscene_art.js';
 import { panel, text, button, bar, COL, drawText, textWidth, wrapText } from './ui.js';
 import { Save } from '../core/save.js';
 import { KEYMAP } from '../core/input.js';
@@ -248,37 +249,31 @@ export class MoltShrineScene {
 
 // ---------------------------------------------------------------------------------------------------------------
 // Story panels (intro / endings): fading text over procedural illustrations
-const ART = {
-  ocean(ctx, t) { const g = ctx.createLinearGradient(0, 0, 0, 270); g.addColorStop(0, '#2a8ab8'); g.addColorStop(1, '#06203a'); ctx.fillStyle = g; ctx.fillRect(0, 0, 480, 270); ctx.fillStyle = 'rgba(255,255,255,0.06)'; for (let i = 0; i < 6; i++) { const x = (i * 90 + t * 10) % 520 - 20; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 30, 0); ctx.lineTo(x + 90, 270); ctx.lineTo(x + 30, 270); ctx.fill(); } },
-  eggs(ctx, t) { ART.ocean(ctx, t); ctx.fillStyle = '#c89c5e'; ctx.fillRect(0, 200, 480, 70); for (let i = 0; i < 9; i++) { const x = 120 + i * 30, y = 210 + (i % 3) * 3; ctx.fillStyle = '#f2d8b8'; ctx.beginPath(); ctx.ellipse(x, y, 7, 9, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 3, y - 4, 2, 2); } const f = playerFrame('shore', variantFor({ form: 'shore', branches: {}, dye: 'default' }), 'idle', Math.floor(t * 4) % 4); drawFrame(ctx, f, 240, 202); },
-  empty(ctx, t) { ART.ocean(ctx, t); ctx.fillStyle = '#c89c5e'; ctx.fillRect(0, 200, 480, 70); for (let i = 0; i < 9; i++) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(120 + i * 30, 212 + (i % 3) * 3, 7, 3, 0, 0, TAU); ctx.fill(); } const f = playerFrame('shore', variantFor({ form: 'shore', branches: {}, dye: 'default' }), 'idle', Math.floor(t * 4) % 4); drawFrame(ctx, f, 240, 202); },
-  throne(ctx, t) { ctx.fillStyle = '#04141e'; ctx.fillRect(0, 0, 480, 270); const g = ctx.createRadialGradient(240, 120, 20, 240, 120, 180); g.addColorStop(0, 'rgba(64,224,208,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 480, 270); ctx.fillStyle = '#021018'; ctx.fillRect(210, 110, 60, 160); ctx.beginPath(); ctx.arc(240, 96, 22, 0, TAU); ctx.fill(); ctx.fillRect(225, 50, 4, 40); ctx.fillRect(250, 50, 4, 40); ctx.fillRect(236, 30, 8, 60); ctx.fillStyle = '#ffe890'; ctx.fillRect(236, 20, 8, 12); ctx.fillRect(222, 30, 3, 8); ctx.fillRect(255, 30, 3, 8); },
-  seal(ctx, t) { ctx.fillStyle = '#05020a'; ctx.fillRect(0, 0, 480, 270); const p = 0.5 + 0.5 * Math.sin(t * 2); ctx.fillStyle = `rgba(160,64,192,${0.3 + p * 0.3})`; ctx.beginPath(); ctx.ellipse(240, 220, 110, 24, 0, 0, TAU); ctx.fill(); ctx.strokeStyle = '#a0a0b0'; ctx.lineWidth = 3; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(120 + i * 48, 0); ctx.lineTo(240, 220); ctx.stroke(); } ctx.fillStyle = '#ffe890'; ctx.fillRect(236, 100, 8, 120); },
-  dawn(ctx, t) { const g = ctx.createLinearGradient(0, 0, 0, 270); g.addColorStop(0, '#ffe8a0'); g.addColorStop(0.5, '#68d0e0'); g.addColorStop(1, '#0c4a7a'); ctx.fillStyle = g; ctx.fillRect(0, 0, 480, 270); for (let i = 0; i < 12; i++) { ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.moveTo(240, -20); ctx.lineTo(i * 44 - 40, 270); ctx.lineTo(i * 44 + 10, 270); ctx.fill(); } },
-  night(ctx, t) { ctx.fillStyle = '#02050f'; ctx.fillRect(0, 0, 480, 270); for (let i = 0; i < 60; i++) { ctx.fillStyle = `rgba(160,220,255,${0.2 + 0.6 * Math.abs(Math.sin(t + i))})`; ctx.fillRect((i * 83) % 480, (i * 37) % 270, 1, 1); } },
-  crab(ctx, t, o) { ART.night(ctx, t); const st = o.st; const f = playerFrame(st.form, variantFor(st), 'idle', Math.floor(t * 4) % 4); const g = ctx.createRadialGradient(240, 150, 10, 240, 150, 120); g.addColorStop(0, 'rgba(154,240,255,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 480, 270); drawFrame(ctx, f, 240, 170); },
-};
 export class CutsceneScene {
-  constructor(game, panels, done) { this.g = game; this.panels = panels; this.done = done; this.opaque = true; this.i = 0; this.t = 0; this.shown = 0; this.leave = false; this.fade = 1; }
+  constructor(game, panels, done) { this.g = game; this.panels = panels; this.done = done; this.opaque = true; this.i = 0; this.t = 0; this.shown = 0; this.prev = null; this.xf = 1; }
   onEnter() { this.g.audio.music.play?.(this.panels[0]?.music || 'title'); }
+  go(i) { this.prev = { p: this.panels[this.i], t: this.t + this.i * 3 }; this.i = i; this.t = 0; this.shown = 0; this.xf = 0; this.g.audio.sfx('tick'); if (this.panels[i].music) this.g.audio.music.play?.(this.panels[i].music); }
   update(dt) {
-    const inp = this.g.input, p = this.panels[this.i]; this.t += dt; this.shown += dt * 40; this.fade += ((this.leave ? 1 : 0) - this.fade) * Math.min(1, dt * 3 + (this.leave ? 0.02 : 0));
-    if (this.t > 0.6 && (inp.pressed('confirm') || inp.pressed('attack') || inp.pressed('interact'))) {
+    const inp = this.g.input, p = this.panels[this.i]; this.t += dt; this.shown += dt * 38; this.xf = Math.min(1, this.xf + dt / 0.9); if (this.prev) this.prev.t += dt * 0.3; if (this.xf >= 1) this.prev = null;
+    if (this.t > 0.5 && (inp.pressed('confirm') || inp.pressed('attack') || inp.pressed('interact'))) {
       const full = p.text.length; if (this.shown < full) { this.shown = full; return; }
-      if (this.i < this.panels.length - 1) { this.i++; this.t = 0; this.shown = 0; this.g.audio.sfx('tick'); if (this.panels[this.i].music) this.g.audio.music.play?.(this.panels[this.i].music); } else { this.g.engine.pop(); this.done?.(); }
+      if (this.i < this.panels.length - 1) this.go(this.i + 1); else { this.g.engine.pop(); this.done?.(); }
     }
     if (inp.pressed('pause')) { this.g.engine.pop(); this.done?.(); }
   }
   draw(ctx) {
-    const p = this.panels[this.i], a = Math.min(1, this.t * 1.5);
-    (ART[p.art] || ART.ocean)(ctx, this.t + this.i * 3, { st: this.g.state });
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 196, 480, 74);
-    const lines = wrapText(p.text.slice(0, Math.floor(this.shown)), 420); const full = wrapText(p.text, 420);
-    if (p.title) drawText(ctx, p.title, 240, 18, { color: '#ffe08a', scale: 2, align: 'center', outline: '#3a1008', shadow: '#000' });
-    full.forEach((l, i) => { const shown = (wrapText(p.text, 420).slice(0, i).join(' ').length + 1); });
-    const revealed = p.text.slice(0, Math.floor(this.shown)); wrapText(p.text, 420).forEach((l, i) => { const before = wrapText(p.text, 420).slice(0, i).reduce((s, x) => s + x.length + 1, 0); const part = l.slice(0, Math.max(0, Math.floor(this.shown) - before)); text(ctx, part, 30, 206 + i * 11, '#ffffff'); });
-    if (this.shown >= p.text.length && Math.floor(this.t * 2) % 2) text(ctx, '▼', 456, 256, '#9ad8ff');
-    ctx.globalAlpha = Math.max(0, 1 - a); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1;
+    const info = { st: this.g.state }, p = this.panels[this.i];
+    drawScene(ctx, p.art, this.t + this.i * 3, info, 26);
+    if (this.prev && this.xf < 1) { ctx.save(); ctx.globalAlpha = 1 - this.xf; drawScene(ctx, this.prev.p.art, this.prev.t, info, 26); ctx.restore(); }
+    // cinematic bars, a soft shade under the text, then the text
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 480, 14);
+    const sh = ctx.createLinearGradient(0, 168, 0, 270); sh.addColorStop(0, 'rgba(2,6,14,0)'); sh.addColorStop(0.35, 'rgba(2,6,14,0.82)'); sh.addColorStop(1, 'rgba(2,6,14,0.96)'); ctx.fillStyle = sh; ctx.fillRect(0, 168, 480, 102);
+    if (p.title) { const a = Math.min(1, this.t * 0.8); drawText(ctx, p.title, 240, 30, { color: '#ffe08a', scale: 3, align: 'center', outline: '#3a1008', shadow: '#000', alpha: a }); }
+    const wrapped = wrapText(p.text, 410); let before = 0;
+    wrapped.forEach((l, i) => { const part = l.slice(0, Math.max(0, Math.floor(this.shown) - before)); before += l.length + 1; text(ctx, part, 240 - textWidth(l) / 2, 206 + i * 11, '#eaf6ff', { shadow: '#000' }); });
+    const dots = this.panels.length; for (let k = 0; k < dots; k++) { ctx.fillStyle = k === this.i ? '#9ad8ff' : '#2a4a6a'; ctx.fillRect(240 - dots * 4 + k * 8, 258, 5, 2); }
+    if (this.shown >= p.text.length && Math.floor(this.t * 2) % 2) text(ctx, 'ENTER', 440, 256, '#6aa8d8');
+    const a = Math.max(0, 1 - this.t * 1.4); if (this.i === 0 && a > 0) { ctx.globalAlpha = a; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }
   }
 }
 
@@ -292,7 +287,7 @@ export class CreditsScene {
   }
   draw(ctx) {
     const g = this.g, s = g.state, t = this.t;
-    ART.night(ctx, t, { st: s }); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, 480, 270);
+    drawScene(ctx, 'night', t, { st: s }); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, 480, 270);
     const a = Math.min(1, t * 0.6); ctx.globalAlpha = a;
     drawText(ctx, 'THE END', 240, 20, { color: '#ffe08a', scale: 3, align: 'center', outline: '#3a1008', shadow: '#000' });
     drawText(ctx, 'Ending: ' + this.title, 240, 56, { color: '#9af0ff', align: 'center', shadow: '#000' });
@@ -304,5 +299,3 @@ export class CreditsScene {
     ctx.globalAlpha = 1;
   }
 }
-ART.hands = (ctx, t) => { ART.dawn(ctx, t); ctx.fillStyle = '#05204a'; ctx.beginPath(); ctx.ellipse(190, 150, 46, 14, 0.2, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.ellipse(290, 150, 46, 14, -0.2, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff6c0'; ctx.fillRect(236, 144, 8, 8); };
-ART.stars = (ctx, t) => { ART.night(ctx, t); for (let i = 0; i < 80; i++) { ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.7 * Math.abs(Math.sin(t * 2 + i))})`; ctx.fillRect(240 + Math.cos(i * 2.4 + t * 0.2) * (i * 2.4), 120 + Math.sin(i * 2.4 + t * 0.2) * (i * 1.4), 2, 2); } };
