@@ -67,3 +67,20 @@ test('every third delivery pays a pearl', () => {
   for (let i = 0; i < 6; i++) { const o = { id: 'x' + i, npc: 'pip', dish: 'kelp_wrap', n: 1, coins: 10, done: false }; g.addItem('kelp_wrap', 1); O.deliver(o); } eq(pearls.length, 2); eq(O.state.delivered, 6);
 });
 test('the board refreshes when the day changes but keeps today\'s progress', () => { const g = ordersGame(), O = g.systems.orders, a = O.refresh(); a[0].done = true; eq(O.refresh()[0].done, true); O.state.day = 1; const b = O.refresh(); ok(b[0].done === false || b !== a); });
+
+// ---- sound captions ------------------------------------------------------------------------------------------------------------------------------
+import { Captions } from '../../src/systems/captions.js';
+import { defaults } from '../../src/systems/settings.js';
+
+function captionGame(on = 1, player = { x: 100, y: 100 }) {
+  const g = base(); g.state.settings = { ...defaults(), captions: on }; g.world = { player }; g.audio.onSfx = null; g.systems.captions = new Captions(g); return g;
+}
+test('captions are silent unless the option is on, and only describe sounds that carry information', () => {
+  const off = captionGame(0); off.audio.onSfx('alert', {}); eq(off.systems.captions.live.length, 0); const on = captionGame(1); on.audio.onSfx('alert', {}); on.audio.onSfx('tick', {}); on.audio.onSfx('select', {}); eq(on.systems.captions.live.length, 1); eq(on.systems.captions.live[0].text, 'Something notices you');
+});
+test('a repeated sound is not captioned twice in a row', () => { const g = captionGame(1); g.audio.onSfx('boom', {}); g.audio.onSfx('boom', {}); eq(g.systems.captions.live.length, 1); });
+test('a sound off to one side gets an arrow, a nearby one does not, and a far one is dropped', () => {
+  const g = captionGame(1, { x: 100, y: 100 }); g.audio.onSfx('roar', { x: 400, y: 100 }); eq(g.systems.captions.live[0].side, 1); g.audio.onSfx('boom', { x: -100, y: 100 }); eq(g.systems.captions.live[1].side, -1); g.audio.onSfx('slam', { x: 130, y: 100 }); eq(g.systems.captions.live[2].side, 0); g.audio.onSfx('cannon', { x: 900, y: 100 }); eq(g.systems.captions.live.length, 3, 'too far to hear');
+});
+test('captions expire and the list is kept short', () => { const g = captionGame(1), C = g.systems.captions; for (const n of ['alert', 'clang', 'parry', 'riposte', 'die', 'bossdie']) g.audio.onSfx(n, {}); ok(C.live.length <= 4); C.update(3); eq(C.live.length, 0); });
+test('the newer sounds that matter have captions, and every caption is readable', () => { const g = captionGame(1); for (const n of ['wave_start', 'rift', 'relic']) { g.systems.captions.last = {}; g.audio.onSfx(n, {}); } ok(g.systems.captions.live.length >= 3); for (const c of g.systems.captions.live) ok(c.text.length > 3 && /^#/.test(c.color)); });

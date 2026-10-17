@@ -37,7 +37,7 @@ Newest first. Version numbers are not used; each entry is one push of the game.
   would have outlived a boss killed mid-attack.
 * `Clock.gate()` lets any exit open only at night.
 * Zones can place their own fishing spots; auto-placement stands down if they do.
-* **Tests:** unit tests grew from none to 389 across 21 files (status, settings, data, systems, AI, bounties, clock,
+* **Tests:** unit tests grew from none to 407 across 22 files (status, settings, data, systems, AI, bounties, clock,
   fishing, market, surges, journal, rifts, trials, oaths, crafting, elites, trophies, travel, accessibility, progression, statistics,
   menu scenes, and every boss class), the rift
   validator checks every chamber's last room holds exactly the Warden, and 25 browser scripts run as a suite

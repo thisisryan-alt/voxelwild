@@ -121,7 +121,7 @@ tests/                validators and Playwright scenarios
 Unit tests and validators are plain Node and need nothing installed:
 
 ```
-npm test             # 389 unit tests: rules, tables, formulas, behaviours against stub worlds
+npm test             # 407 unit tests: rules, tables, formulas, behaviours against stub worlds
 npm run check        # unit tests + validators + the browser smoke test
 npm run validate     # zone reachability per form size, exit/entry links, content cross-checks, composer checks
 npm run economy      # XP / evolution-point pacing report
