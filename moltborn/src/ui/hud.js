@@ -10,6 +10,7 @@ export class Hud {
   update(dt) {
     this.t += dt; const g = this.g, p = g.world?.player; if (!p) return;
     if (this.hpShown === null) this.hpShown = p.hp; this.hpShown += (p.hp - this.hpShown) * Math.min(1, dt * 6);
+    g.systems.tips?.update(dt);
     for (const t of g.toasts) t.t += dt; g.toasts = g.toasts.filter((t) => t.t < 3.2);
     for (const t of g.popups) t.t += dt; g.popups = g.popups.filter((t) => t.t < 3.2);
     if (g.bannerState) { g.bannerState.t += dt; if (g.bannerState.t > 3.4) g.bannerState = null; }
@@ -64,6 +65,7 @@ export class Hud {
     }
     // --- loot popups (left) ---
     g.popups.forEach((pp, i) => { const a = Math.min(1, (3.2 - pp.t) * 2, pp.t * 4), y = 84 + i * 20; ctx.globalAlpha = a; panel(ctx, 4, y, 130, 18, { alpha: 0.8, border: '#a08a3a' }); try { ctx.drawImage(pp.icon === 'gem' ? itemIcon('abyssal_core') : itemIcon(pp.icon), 7, y + 1); } catch (e) {} text(ctx, pp.text, 26, y + 5, pp.color); ctx.globalAlpha = 1; });
+    g.systems.tips?.draw(ctx, panel, text, textWidth);
     // --- toasts ---
     g.toasts.forEach((t, i) => { const a = Math.min(1, (3.2 - t.t) * 2, t.t * 5), tw = textWidth(t.msg) + 12, y = 50 + i * 15 - Math.max(0, 1 - t.t * 6) * 6; ctx.globalAlpha = a; panel(ctx, 240 - tw / 2, y, tw, 13, { alpha: 0.85 }); text(ctx, t.msg, 240 - tw / 2 + 6, y + 3, t.color); ctx.globalAlpha = 1; });
     // --- zone banner ---

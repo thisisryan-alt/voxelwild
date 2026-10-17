@@ -9,7 +9,7 @@ import { TS } from '../world/tiles.js';
 
 export class Grumbold extends Boss {
   static def = {
-    key: 'grumbold', name: 'Grumbold the Rockclaw', title: 'Tyrant of the Kelp Hollow', hp: 240, w: 54, h: 34, armor: 70, xp: 160, music: 'boss1', contact: 10, npc: 'grumbold',
+    key: 'grumbold', name: 'Grumbold the Rockclaw', title: 'Tyrant of the Kelp Hollow', hp: 200, w: 54, h: 34, armor: 70, xp: 160, music: 'boss1', contact: 10, npc: 'grumbold',
     loot: { ep: 5, sp: 1, coins: [60, 80], items: { brine_core: 1 } },
     phases: [
       { at: 1, name: 'The Rockclaw', attacks: [['swipe', 2], ['rockToss', 2], ['charge', 1.6]], rest: 1.2 },
@@ -29,13 +29,13 @@ export class Grumbold extends Boss {
     const pl = this.player; this.faceTo(pl.x); this.pose = 'windup'; const d = this.facing;
     const x = d > 0 ? this.x + 10 : this.x - 10 - 78;
     this.teleRect(x, this.y - 26, 78, 52, 0.75);
-    yield 0.75; this.pose = 'swipe'; this.strikeBox(x, this.y - 26, 78, 52, 16, 0.2, { kb: 200 }); this.sfx('heavy'); this.world.shake(3); this.world.fx.foam(this.x + d * 40, this.y, d, 8);
+    yield 0.75; this.pose = 'swipe'; this.strikeBox(x, this.y - 26, 78, 52, 13, 0.2, { kb: 200 }); this.sfx('heavy'); this.world.shake(3); this.world.fx.foam(this.x + d * 40, this.y, d, 8);
     yield 0.55;
   }
   *rockToss() {
     this.faceTo(this.player.x); this.pose = 'toss'; yield 0.55;
     const n = this.phaseIdx ? 4 : 3;
-    for (let i = 0; i < n; i++) { this.faceTo(this.player.x); const dx = this.player.x - this.x; this.shootDir('cannonball', 11, Math.atan2(-0.9, Math.sign(dx)) + (i - (n - 1) / 2) * 0.12, 120 + Math.abs(dx) * 0.4, { x: this.x + this.facing * 24, y: this.y - 22, grav: 190, life: 3, trail: '#8a7c50' }); this.sfx('shoot'); yield 0.28; }
+    for (let i = 0; i < n; i++) { this.faceTo(this.player.x); const dx = this.player.x - this.x; this.shootDir('cannonball', 9, Math.atan2(-0.9, Math.sign(dx)) + (i - (n - 1) / 2) * 0.12, 120 + Math.abs(dx) * 0.4, { x: this.x + this.facing * 24, y: this.y - 22, grav: 190, life: 3, trail: '#8a7c50' }); this.sfx('shoot'); yield 0.28; }
     yield 0.4;
   }
   *charge() {
@@ -53,8 +53,8 @@ export class Grumbold extends Boss {
     const tx = pl.x; this.teleCircle(tx, this.floorY - 4, 44, 0.9); this.vy = -360; this.vx = (tx - this.x) * 1.15; this.pose = 'roar'; this.sfx('swoosh');
     yield 0.35; let t = 0; while (!this.onGround && t < 1.4) { this.vx *= 0.99; t += 1 / 60; yield 1 / 60; }
     this.vx = 0; this.pose = 'slam'; this.world.shake(9); this.sfx('boom'); this.world.game.hitstop(5);
-    this.strikeBox(this.x - 46, this.y - 10, 92, 40, 18, 0.2, { kb: 260 });
-    for (const d of [-1, 1]) this.world.addProjectile({ kind: 'shard', team: 'enemy', x: this.x + d * 30, y: this.y + 12, vx: d * 170, vy: 0, dmg: 11, life: 1.6, ghost: true, boss: true, trail: '#f6d9a6', pierce: true });
+    this.strikeBox(this.x - 46, this.y - 10, 92, 40, 14, 0.2, { kb: 260 });
+    for (const d of [-1, 1]) this.world.addProjectile({ kind: 'shard', team: 'enemy', x: this.x + d * 30, y: this.y + 12, vx: d * 170, vy: 0, dmg: 9, life: 1.6, ghost: true, boss: true, trail: '#f6d9a6', pierce: true });
     yield 0.8;
   }
   *summonMinions() {

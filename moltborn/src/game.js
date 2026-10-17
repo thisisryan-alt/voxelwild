@@ -20,6 +20,7 @@ import { Codex } from './systems/codex.js';
 import { Evolution } from './systems/evolution.js';
 import { Endings } from './systems/endings.js';
 import { ZoneScripts } from './systems/zonescripts.js';
+import { Tips } from './systems/tips.js';
 import { MenuScene } from './ui/menu.js';
 import { PauseScene, OptionsScene, ShopScene, ForgeScene, MoltShrineScene, CutsceneScene, TitleScene } from './ui/screens.js';
 import { rng } from './core/util.js';
@@ -36,7 +37,7 @@ export class Game {
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -122,11 +123,14 @@ export class Game {
     const s = this.state, w = this.world, p = w.player;
     const lose = Math.floor(s.coins * 0.25);
     s.purse = lose > 0 ? { zone: w.zone.id, x: p.x, y: p.y, amount: lose } : null; s.coins -= lose;
+    const HINTS = ['Tuck (SHIFT) just before a hit lands to parry.', 'Dash (L) makes you untouchable for an instant.', 'Rest at a Pearl Shrine to set your return point.', 'Heavy strikes (K) break armour and shatter cracked walls.', 'Telegraphed attacks glow red before they land.'];
+    this.deathCard = { lose, hint: HINTS[Math.floor(Math.random() * HINTS.length)] };
+    if (this.systems.tips) this.systems.tips.cur = null;
     this.playScene.fadeOut(0.9, () => {
       const c = s.checkpoint; s.fury = 0;
       this.buildWorld(c.zone, c.entry, { respawn: true });
       if (lose > 0) this.toast(`Lost ${lose} coins — find your spirit purse where you fell`, '#ffb070');
-      this.playScene.fadeIn(0.8); this.world.player.setState('free');
+      this.deathCard = null; this.playScene.fadeIn(0.8); this.world.player.setState('free');
     });
   }
 

@@ -34,7 +34,7 @@ export class TileLayer {
     if (!r) {
       const base = mat === T.CRACKED ? T.ROCK : mat === T.SEAL ? T.RUIN : mat === T.TIDEGATE ? T.DIVINE : mat === T.BARRIER ? T.OBSID : mat === T.LOCKED ? T.WOOD : mat;
       const rp = this.biome.mats[base] || this.biome.mats[T.ROCK];
-      r = { c: rp.c, edge: darken(rp.c[0], 0.45) }; this._ramps[mat] = r;
+      r = { c: rp.c, edge: this.biome.rim ? rp.c[this.biome.rim] : darken(rp.c[0], 0.45) }; this._ramps[mat] = r;
     }
     return r;
   }
@@ -163,7 +163,8 @@ export class TileLayer {
         return pick(s * 0.5 + vnoise(px / 5, py / 5, seed) * 0.5, 1, 3, 0.3);
       }
       case T.DIVINE: case T.TIDEGATE: {
-        if (py % 16 === 3 && mat === T.DIVINE) return color('#ffd84a');
+        if (mat === T.DIVINE && (py % 16 === 3 || py % 16 === 4) && (px % 32) >= 12 && (px % 32) < 20) return color(py % 16 === 3 ? '#ffe07a' : '#d09a2a');
+        if (mat === T.DIVINE && px % 16 === 0) return c[0];
         const vein = Math.abs(Math.sin(vnoise(px / 12, py / 12, seed) * 9));
         if (mat === T.TIDEGATE) { const cx = (px % 16) - 8, cy = (py % 16) - 8; if (Math.abs(cx) + Math.abs(cy) < 4) return color('#9af0ff'); }
         return vein < 0.12 ? c[4] : pick(fbm(px / 8, py / 8, seed, 2), 1, 3, 0.3);

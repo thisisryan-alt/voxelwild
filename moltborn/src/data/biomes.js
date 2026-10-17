@@ -47,20 +47,20 @@ export const BIOMES = {
     particles: 'debris', music: 'graveyard', amb: 'wrecks', rays: false,
   },
   abyss: {
-    id: 'abyss', name: 'The Abyss', top: '#0e2250', bottom: '#020510', tint: '#3a58c0', tintA: 0.30, dark: 0.82, fog: 0.6,
+    id: 'abyss', name: 'The Abyss', top: '#0e2250', bottom: '#020510', tint: '#3a58c0', tintA: 0.2, dark: 0.66, fog: 0.6, rim: 3,
     mats: {
-      [T.GROUND]: ramp(['#0c0c1e', '#18183a', '#26265a', '#3a3a82', '#5a5ab0']),
-      [T.ROCK]: ramp(['#06060e', '#101022', '#1c1c3a', '#2c2c58', '#444484']),
+      [T.GROUND]: ramp(['#10102a', '#26265a', '#3e3e86', '#5e5ebc', '#8a8aec']),
+      [T.ROCK]: ramp(['#0a0a1a', '#1c1c3c', '#34346a', '#50509a', '#7a7ac8']),
       [T.CORAL]: R.coralBlue, [T.RUIN]: ramp(['#0e1a2a', '#1e3a4e', '#34607a', '#5a90a8', '#98c8d8']),
       [T.WOOD]: R.wood, [T.BONE]: R.bone, [T.DIVINE]: R.marble, [T.OBSID]: R.rockDark,
     },
     particles: 'snow', music: 'abyss', amb: 'abyss', rays: false,
   },
   trench: {
-    id: 'trench', name: 'Trench of the Forgotten', top: '#2a0a3a', bottom: '#050208', tint: '#a040c0', tintA: 0.30, dark: 0.7, fog: 0.55,
+    id: 'trench', name: 'Trench of the Forgotten', top: '#2a0a3a', bottom: '#050208', tint: '#a040c0', tintA: 0.2, dark: 0.56, fog: 0.55, rim: 3,
     mats: {
-      [T.GROUND]: ramp(['#140a18', '#2a1630', '#46284e', '#6c4678', '#9a70a4']),
-      [T.ROCK]: ramp(['#0a0610', '#1a0e24', '#2e1a40', '#46285e', '#6a4488']),
+      [T.GROUND]: ramp(['#1c0e28', '#3e2250', '#643a80', '#8c5aa8', '#c090d4']),
+      [T.ROCK]: ramp(['#12081c', '#2a1640', '#46266a', '#6a3c94', '#946cc0']),
       [T.CORAL]: R.coralRed, [T.RUIN]: ramp(['#241a30', '#44364e', '#6e5c76', '#a094a4', '#d8ccd4']),
       [T.WOOD]: R.wood, [T.BONE]: R.bone, [T.DIVINE]: R.marble, [T.OBSID]: R.void,
     },

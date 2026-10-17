@@ -28,8 +28,8 @@ export class MenuScene {
   update(dt) {
     const g = this.g, inp = g.input; this.t += dt; this.msgT -= dt;
     if (inp.pressed('cancel') || inp.pressed('menu') || inp.pressed('pause')) { g.audio.sfx('back'); g.engine.pop(); return; }
-    if (inp.pressed('tabL')) { this.tab = (this.tab + TABS.length - 1) % TABS.length; g.audio.sfx('tick'); }
-    if (inp.pressed('tabR')) { this.tab = (this.tab + 1) % TABS.length; g.audio.sfx('tick'); }
+    if (inp.pressed('tabL')) { this.tab = (this.tab + TABS.length - 1) % TABS.length; g.audio.sfx('tick'); this.msgT = 0; return; }
+    if (inp.pressed('tabR')) { this.tab = (this.tab + 1) % TABS.length; g.audio.sfx('tick'); this.msgT = 0; return; }
     this['u_' + TABS[this.tab]](inp, this.sel[TABS[this.tab]]);
   }
   draw(ctx) {
@@ -66,7 +66,7 @@ export class MenuScene {
     const owned = Object.keys(DYES).filter((k) => k !== 'default' && st.dyes?.[DYES[k]?.item]);
     if (owned.length) text(ctx, `◀ Mutation: ${st.dye} ▶`, 14, 238, '#ff9ad8');
     panel(ctx, 214, 20, 258, 230);
-    const row = (i, k, v, c = COL.text) => { text(ctx, k, 222, 28 + i * 11, COL.dim); text(ctx, String(v), 464 - textWidth(String(v)), 28 + i * 11, c); };
+    const row = (i, k, v, c = COL.text) => { text(ctx, k, 222, 26 + i * 10, COL.dim); text(ctx, String(v), 464 - textWidth(String(v)), 26 + i * 10, c); };
     row(0, 'Level', st.level, COL.gold); row(1, 'Health', `${Math.ceil(p.hp)} / ${S.maxHp}`, '#ff8a7a'); row(2, 'Tide', `${Math.floor(p.tide)} / ${S.maxTide}`, '#8ad0ff');
     row(3, 'Attack', S.atk.toFixed(1)); row(4, 'Defence', S.def.toFixed(1)); row(5, 'Critical', Math.round(S.crit * 100) + '%'); row(6, 'Speed', (S.speed >= 1 ? '+' : '') + Math.round((S.speed - 1) * 100) + '%');
     row(7, 'Pressure resistance', S.pressure); row(8, 'Poise', Math.round(S.poise)); row(9, 'Strokes', F.move.free ? 'free swim' : S.strokes);
@@ -137,8 +137,7 @@ export class MenuScene {
     text(ctx, 'Equipped', 222, 120, COL.gold);
     for (let k = 0; k < 3; k++) { const x = 222 + k * 50; const locked = k >= F.abilitySlots; panel(ctx, x, 134, 44, 44, { border: locked ? '#2a3a58' : COL.border }); if (!locked && st.slots[k]) { ctx.drawImage(abilityIcon(ABILITIES[st.slots[k]].icon), x + 15, y2(138)); } text(ctx, locked ? 'locked' : String(k + 1), x + 4, 166, locked ? '#506080' : '#9ad8ff'); }
     function y2(v) { return v; }
-    const U = ULTS[st.form] || ULTS.shore; text(ctx, 'Ultimate (Q)', 222, 190, COL.gold); text(ctx, U.name, 222, 202, '#ffd8a0'); text(ctx, 'Fury builds as you fight. At 100%, press Q.', 222, 216, COL.dim);
-    text(ctx, 'With an ability selected, press 1, 2 or 3 to assign it to that slot.', 222, 232, COL.dim);
+    const U = ULTS[st.form] || ULTS.shore; text(ctx, 'Ultimate (Q)', 222, 190, COL.gold); text(ctx, U.name, 222, 202, '#ffd8a0'); wrapText('Fury builds as you fight. At 100%, press Q. With an ability selected, press 1, 2 or 3 to assign it to that slot.', 244).forEach((l, i) => text(ctx, l, 222, 216 + i * 10, COL.dim));
   }
 
   // ===================== EVOLUTION =====================

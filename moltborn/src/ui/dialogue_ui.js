@@ -20,7 +20,10 @@ export class DialogueBox {
     if (!this.active) return; const inp = this.g.input; this.t += dt;
     const done = this.shown >= this.full.length;
     if (!done) { const before = Math.floor(this.shown); this.shown += dt * 55; if (Math.floor(this.shown / 2) !== Math.floor(before / 2) && this.cur.speaker) this.g.audio.sfx('talk'); }
-    if (inp.pressed('confirm') || inp.pressed('interact') || inp.pressed('attack')) {
+    const last = this.choices?.[this.choices.length - 1];
+    const bail = done && last && inp.pressed('cancel') && /^(leave|goodbye|never mind|not now|keep|no\b|walk away|back)/i.test(String(last.label ?? last.text ?? last));
+    if (bail) this.sel = this.choices.length - 1;
+    if (bail || inp.pressed('confirm') || inp.pressed('interact') || inp.pressed('attack')) {
       if (!done) { this.shown = this.full.length; }
       else if (this.choices) { const c = this.choices[this.sel], cb = this.cur.onChoose, i = this.sel; this.g.audio.sfx('select'); this.queue = []; this.active = false; this.cur = null; this.onDone = null; cb?.(c, i); }
       else { this.g.audio.sfx('tick'); this.next(); }

@@ -282,7 +282,7 @@ export class World {
   lightList() {
     const L = [], pl = this.player, st = pl.stats;
     const stage = pl.form.stage;
-    L.push({ x: pl.x, y: pl.y, r: 56 + st.light + (stage >= 3 ? 26 : 0) + (stage >= 5 ? 40 : 0), a: 1 });
+    L.push({ x: pl.x, y: pl.y, r: 66 + st.light + (stage >= 3 ? 26 : 0) + (stage >= 5 ? 40 : 0), a: 1 });
     for (const l of this.zone.lights) L.push(l);
     for (const d of this.decor) if (d.spr.glow) L.push({ x: d.x, y: d.y - 12, r: 38, a: 0.8, color: d.spr.glow });
     for (const e of this.enemies) if (e.def.glow || e.def.sprite.o?.glow || e.type === 'lanternfish') L.push({ x: e.x, y: e.y - 4, r: 34, a: 0.8 });

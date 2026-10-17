@@ -2,7 +2,7 @@
 export const SKILL_BRANCHES = {
   claw:    { name: 'Claw',    color: '#ff7a4a', desc: 'Offence' },
   shell:   { name: 'Shell',   color: '#6ab0ff', desc: 'Defence' },
-  current: { name: 'Current', color: '#7affc8', desc: 'Mobility' },
+  current: { name: 'Current', color: '#7affc8', desc: 'Motion' },
   tide:    { name: 'Tide',    color: '#c07aff', desc: 'Magic' },
 };
 // col/row place nodes in the menu; req = prerequisite ids; minStage gates by evolution stage.

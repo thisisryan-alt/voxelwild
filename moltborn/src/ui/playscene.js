@@ -1,11 +1,12 @@
 // The in-world scene: ticks the World + HUD, routes menu/pause keys, runs fades and dialogue freezes.
 import { Hud } from './hud.js';
 import { DialogueBox } from './dialogue_ui.js';
+import { drawText } from '../gfx/font.js';
 
 export class PlayScene {
   constructor(game) {
     this.g = game; this.opaque = true; this.hud = new Hud(game); this.dialogue = new DialogueBox(game);
-    this.fade = { a: 1, target: 0, speed: 2.5, cb: null }; this.lock = 0; this.letterbox = 0; this.letterTarget = 0;
+    this.fade = { a: 1, target: 0, speed: 2.5, cb: null }; this.lock = 0; this.hold = 0; this.letterbox = 0; this.letterTarget = 0;
     game.playScene = this;
   }
   fadeOut(sec, cb) { this.fade.target = 1; this.fade.speed = 1 / sec; this.fade.cb = cb || null; this.lock++; }
@@ -16,7 +17,8 @@ export class PlayScene {
     g.update(dt);
     // fade
     const f = this.fade;
-    if (f.a !== f.target) { f.a += Math.sign(f.target - f.a) * f.speed * dt; if (Math.abs(f.a - f.target) < f.speed * dt) { f.a = f.target; if (f.target === 1 && f.cb) { const cb = f.cb; f.cb = null; cb(); } } }
+    if (f.a !== f.target) { f.a += Math.sign(f.target - f.a) * f.speed * dt; if (Math.abs(f.a - f.target) < f.speed * dt) { f.a = f.target; if (f.target === 1 && f.cb) { const cb = f.cb; f.cb = null; if (g.deathCard) { this.hold = 1.8; this.holdCb = cb; } else cb(); } } }
+    if (this.hold > 0) { this.hold -= dt; if (this.hold <= 0) { const cb = this.holdCb; this.holdCb = null; cb?.(); } }
     this.letterbox += (this.letterTarget - this.letterbox) * Math.min(1, dt * 4);
     this.hud.update(dt);
     const pl = w.player;
@@ -43,5 +45,7 @@ export class PlayScene {
     if (this.letterbox < 6) this.hud.draw(ctx);
     this.dialogue.draw(ctx);
     if (this.fade.a > 0.001) { ctx.globalAlpha = Math.min(1, this.fade.a); ctx.fillStyle = '#02050c'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }
+    const dc = this.g.deathCard;
+    if (dc && this.fade.a > 0.5) { const a = (this.fade.a - 0.5) * 2; drawText(ctx, 'THE TIDE CLAIMS YOU', 240, 104, { color: '#ff8a7a', scale: 2, align: 'center', shadow: '#3a0a14', alpha: a }); if (dc.lose) drawText(ctx, `Your spirit purse holds ${dc.lose} coins. Find it where you fell.`, 240, 132, { color: '#ffd8a0', align: 'center', alpha: a }); drawText(ctx, dc.hint, 240, 154, { color: '#9ad8ff', align: 'center', alpha: a }); }
   }
 }
