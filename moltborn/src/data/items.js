@@ -10,6 +10,7 @@ export const ITEMS = {
   crew_token: { name: 'Crew Token', type: 'key', desc: 'A brass crew tag, green with age. Hobb wants it back.' },
   map_fragment: { name: 'Map Fragment', type: 'key', desc: 'A torn piece of Fenwick\'s atlas of the forest.' },
   tithe_ledger: { name: "Vael's Tithe Ledger", type: 'key', desc: 'Names, dates, and a running tally of the Seal.' },
+  tide_barnacle: { name: 'Tide Barnacle', type: 'key', desc: 'A fat pearl-barnacle from the Tidepools. Brack counts these.' },
   // evolution catalysts
   brine_core: { name: 'Brine Core', type: 'evo', desc: 'The crystallised pride of the Reef. Needed for the Hardshell Molt.' },
   abyssal_core: { name: 'Abyssal Core', type: 'evo', desc: 'Dense as a dying star. Needed for the Deep Molt.' },
@@ -36,12 +37,14 @@ export const ITEMS = {
   shell_barnacle: { name: 'Barnacle Mantle', type: 'equip', slot: 'shell', price: 220, desc: '+4 Def, 8% thorns.', fx: { def: 4, thorns: 0.08 } },
   shell_pearl: { name: 'Pearl-Lined Shell', type: 'equip', slot: 'shell', desc: '+6 Def, +10% max HP.', fx: { def: 6, hp: 0.1 } },
   shell_ironhull: { name: 'Ironhull Plating', type: 'equip', slot: 'shell', desc: 'Salvaged ship iron. +9 Def, -5% speed.', fx: { def: 9, speed: -0.05 } },
+  shell_hermitking: { name: "Hermit King's Carapace", type: 'equip', slot: 'shell', desc: '+8 Def, +12% max HP, 10% thorns. It hums a lullaby.', fx: { def: 8, hp: 0.12, thorns: 0.1 } },
   shell_tidewoven: { name: 'Tidewoven Carapace', type: 'equip', slot: 'shell', desc: '+8 Def, +15% Tide.', fx: { def: 8, tide: 0.15 } },
   // equipment — claw
   claw_rusty: { name: 'Rusty Pincer-Cap', type: 'equip', slot: 'claw', price: 90, desc: '+2 Atk.', fx: { atk: 2 } },
   claw_urchin: { name: 'Urchin-Spine Claw', type: 'equip', slot: 'claw', price: 240, desc: '+4 Atk, hits poison briefly.', fx: { atk: 4, poison: 1 } },
   claw_coral: { name: 'Coral Edge', type: 'equip', slot: 'claw', desc: '+7 Atk, +8% crit.', fx: { atk: 7, crit: 0.08 } },
   claw_anchor: { name: 'Anchor-Fluke Claw', type: 'equip', slot: 'claw', desc: '+10 Atk, heavy hits +20%.', fx: { atk: 10, heavyDmg: 0.2 } },
+  claw_hermit: { name: "Hermit's Pincer", type: 'equip', slot: 'claw', desc: '+8 Atk, parry window 30% longer.', fx: { atk: 8, parryWindow: 0.3 } },
   claw_lumen: { name: 'Lumen Fang', type: 'equip', slot: 'claw', desc: '+9 Atk, +20% ability damage.', fx: { atk: 9, abilityDmg: 0.2 } },
   // equipment — charm / relic
   charm_pearlstring: { name: 'Pearl String', type: 'equip', slot: 'charm', price: 150, desc: 'Coins and pearls are drawn to you from farther away.', fx: { magnet: 60 } },
@@ -61,6 +64,7 @@ export const ITEMS = {
   mut_pressure: { name: 'Pressure Lung', type: 'mutation', desc: 'Deep water presses less hard (+2 pressure resistance).', fx: { pressure: 2 } },
   mut_tidememory: { name: 'Tide Memory', type: 'mutation', desc: 'Abilities cost 20% less Tide.', fx: { tideCost: -0.2 } },
   mut_coralarmor: { name: 'Coral Armor', type: 'mutation', desc: '+3 defence; sluggish.', fx: { def: 3, speed: -0.04 } },
+  mut_census: { name: 'Census Eye', type: 'mutation', desc: 'You notice what others miss: secrets shimmer, +15% coins from foes.', fx: { sense: 1, coinBonus: 0.15 } },
   mut_venom: { name: 'Venom Blood', type: 'mutation', desc: 'Your strikes carry poison.', fx: { poison: 1 } },
   // dyes
   dye_albino: { name: 'Albino Mutation', type: 'dye', desc: 'A pale, ghostly shell colour.' },

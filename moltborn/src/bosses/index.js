@@ -9,3 +9,4 @@ import './kyros.js';
 import './maw.js';
 import './tyrant.js';
 import './poseidon.js';
+import './hermitking.js';

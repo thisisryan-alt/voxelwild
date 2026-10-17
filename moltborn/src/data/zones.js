@@ -4,11 +4,12 @@ import * as forest from './zones_forest.js';
 import * as kingdom from './zones_kingdom.js';
 import * as grave from './zones_graveyard.js';
 import * as deep from './zones_deep.js';
+import * as expansion from './zones_expansion.js';
 
 import { scatter } from '../world/scatter.js';
 import { EXTRA } from './roster.js';
 
-const REG = { ...reef, ...forest, ...kingdom, ...grave, ...deep };
+const REG = { ...reef, ...forest, ...kingdom, ...grave, ...deep, ...expansion };
 export { ZONE_INFO } from './zoneinfo.js';
 export function buildZone(id) {
   const f = REG[id]; if (!f) throw new Error('unknown zone ' + id);

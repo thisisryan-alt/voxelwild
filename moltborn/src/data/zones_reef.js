@@ -78,6 +78,7 @@ export function reef_hollow() {
   b.path([[78, 12], [80, 20], [80, 26], [86, 31], [97, 32]], 3.4, { wobble: 0.9 }); // back down to the exit
   b.path([[74, 10], [60, 8], [50, 9]], 2.6, { wobble: 0.6 });                        // canopy passage west
   b.ellipse(46, 9, 6, 4);
+  b.path([[44, 9], [30, 8], [14, 9], [4, 9]], 2.6, { wobble: 0.6 });                  // tunnel on west: the hairline cracks
   // flat-ish floors so the crab can walk
   b.floorLine(4, 16, 32); b.floorLine(16, 30, 32); b.platform(30, 26, 5); b.platform(38, 22, 4);
   b.platform(54, 20, 4); b.platform(62, 16, 4);
@@ -87,6 +88,8 @@ export function reef_hollow() {
   // secret vault behind cracked stone near the top-right chamber
   b.carve(86, 6, 8, 5); b.breakable(84, 9, 2, 2); b.keep(84, 5, 12, 7);
   b.exitW(28, 33, 'reef_garden', 'east'); b.entryFloor('west', 5, { facing: 1 });
+  b.rect(20, 5, 2, 8, T.CRACKED); b.exitW(7, 11, 'reef_tidepools', 'west'); b.entryFloor('tide', 5, { from: 6, facing: 1 }); b.keep(2, 4, 24, 10);
+  b.sign(26, 'Hairline cracks run through the stone here. It sounds hollow, and faintly damp.', { from: 6 });
   b.exitE(30, 34, 'reef_arena', 'west'); b.entryFloor('east', 94, { facing: -1 });
   b.shrine('rest', 50, { from: 24 });
   b.spawnFloor('pinchling', 18, 20); b.spawnFloor('pinchling', 24, 20); b.spawn('minnow', 30, 24, { count: 4 }); b.spawnFloor('urchin', 34, 26);

@@ -49,6 +49,33 @@ export const DIALOGUE = {
     yield c.say("The Pearl Tyrant's behind the cracked wall at the east end of the Garden. You'll need a heavy hit — a big charged one, you know?");
   },
 
+  *brack(c) {
+    if (!c.flag('met_brack')) {
+      c.set('met_brack');
+      yield c.say("WHAT? ...A crab. Speak up! I said SPEAK — oh, you did. Brack. Counter of the Tidepools, third in the family, deaf in the left claw and, on most days, the right.");
+      yield c.say("Three hundred and eleven barnacles, every spring, in a tidy ledger. Then a gentleman in an enormous shell moved in and declared himself King. He ate the census. Not the barnacles. The census. Eleven springs of paper.");
+    }
+    if (!c.qActive('sq_census') && !c.qDone('sq_census')) {
+      const i = yield c.ask("Three barnacles for a fresh ledger, and then a word with His Majesty?", ['Count me in.', 'Why is he called king?', 'Not now.']);
+      if (i === 2) { yield c.say("Eh? ...Not now. Very well. I'll be counting."); return; }
+      if (i === 1) yield c.say("A crown of orange coral. Mostly glue. But he rolls the whole palace down the hall like a boulder, and one does not argue a title with a boulder.");
+      yield c.say("Three fat barnacles — prise them off the ledges and the pool walls — then through the big doorway east. You will hear him. He announces himself.");
+      c.quest('sq_census'); return;
+    }
+    if (c.qActive('sq_census')) {
+      if (c.count('tide_barnacle') >= 3 && c.boss('hermit_king') && !c.flag('census_done')) {
+        c.take('tide_barnacle', 3); c.set('census_done'); c.gain(120); c.give('mut_census');
+        yield c.say("Three... and the hall is quiet. Hm. You have done a counting I never could. Take this: the eye I had when I was young. It sees what is hidden in the numbers.");
+        yield c.say("Three hundred and eleven. Three hundred and twelve, now. You count too.");
+        return;
+      }
+      if (c.boss('hermit_king')) { yield c.say("I hear the hall is quiet. Bring me the barnacles, and the ledger will be whole."); return; }
+      yield c.say("Three barnacles. Then the King, east. When he curls into the shell, don't bother: wait until he rolls into the wall, and hit HIM.");
+      return;
+    }
+    yield c.say("The pools are quiet. I like it. The barnacles are... countable again.");
+  },
+
   *cowrie(c) {
     if (!c.flag('met_cowrie')) { c.set('met_cowrie'); yield c.say("Darling! A customer! Or a thief — but you've the face for honest trade. Madame Cowrie, purveyor of the finest and the nearly finest."); }
     while (true) {

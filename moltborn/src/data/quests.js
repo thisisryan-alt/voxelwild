@@ -66,5 +66,10 @@ export const QUESTS = {
   sq_lantern: { name: 'The Lantern Pact', type: 'side', giver: 'glimmer', steps: [{ text: 'Light the three braziers of the Lantern Cavern with Lantern Stones.', done: f('lanterns_lit') }], desc: 'The Lantern Folk once lit the whole cavern. Their braziers are cold and the stones are scattered.' },
   sq_siblings: { name: 'Brothers of the Clutch', type: 'side', giver: 'thessaly', steps: [{ text: 'Break the Seals in the Temple and wake the sleeping hatchlings.', done: f('hatchlings_freed') }], desc: 'The Tithe was not lost. It was stored. Somewhere behind the old seals, very small things are sleeping.' },
   sq_pearls: { name: 'Seven Memories', type: 'side', hidden: true, steps: [{ text: 'Gather the seven Memory Pearls hidden across the sea.', done: (g) => [1, 2, 3, 4, 5, 6, 7].every((n) => g.hasItem('mp' + n)) }, { text: 'Find the door that opens to seven pearls.', done: f('sanctum_opened') }], desc: 'Seven pearls remember the first sea. When together, they remember something else.' },
+  sq_census: { name: 'The Tidepool Census', type: 'side', giver: 'brack', steps: [
+    { text: 'Collect 3 Tide Barnacles from the Sunken Tidepools.', done: (g) => g.itemCount('tide_barnacle') >= 3 || g.flag('census_done') },
+    { text: 'Deal with the self-crowned Hermit King at the end of the pools.', done: boss('hermit_king') },
+    { text: 'Report back to Brack.', done: f('census_done') },
+  ], desc: 'Brack has counted the pools every spring. A king moved in and ate the census. Not the barnacles. The census.' },
   sq_tyrant: { name: 'The Pearl Tyrant', type: 'side', giver: 'pip', steps: [{ text: 'Defeat the Pearl Tyrant, the giant clam beneath the garden.', done: boss('pearl_tyrant') }], desc: 'Pip’s pearl was swallowed by something enormous.' },
 };

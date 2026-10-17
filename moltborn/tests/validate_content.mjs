@@ -13,7 +13,7 @@ import { BRANCHES, FORMS, EVOLUTIONS } from '../src/data/forms.js';
 import { INTERACTABLES_KEYS } from './interactable_keys.mjs';
 
 let bad = 0; const err = (m) => { console.log('✗', m); bad++; };
-const bossKeys = ['grumbold', 'mother_moray', 'aurelia', 'captain_rust', 'lurelord', 'krael', 'kyros', 'hollow_maw', 'poseidon', 'pearl_tyrant'];
+const bossKeys = ['grumbold', 'mother_moray', 'aurelia', 'captain_rust', 'lurelord', 'krael', 'kyros', 'hollow_maw', 'poseidon', 'pearl_tyrant', 'hermit_king', 'sporemother', 'brass_colossus', 'magmaw'];
 const propKnown = new Set(['coin', 'pearl', 'item', 'orb', 'npc', ...INTERACTABLES_KEYS]);
 for (const id of Object.keys(ZONE_INFO)) {
   const z = buildZone(id);
