@@ -3,7 +3,8 @@
 import { CutsceneScene } from '../ui/screens.js';
 
 const BIOME_STORY = { forest: 'enter_forest', kingdom: 'enter_kingdom', graveyard: 'enter_graveyard', abyss: 'enter_abyss', trench: 'enter_trench', domain: 'enter_domain' };
-const BOSS_STORY = { grumbold: 'won_grumbold', mother_moray: 'won_moray', aurelia: 'won_aurelia', captain_rust: 'won_captain', lurelord: 'won_lurelord', krael: 'won_krael', kyros: 'won_kyros', hollow_maw: 'won_maw' };
+const BOSS_STORY = { grumbold: 'won_grumbold', mother_moray: 'won_moray', aurelia: 'won_aurelia', captain_rust: 'won_captain', lurelord: 'won_lurelord', krael: 'won_krael', kyros: 'won_kyros', hollow_maw: 'won_maw', hermit_king: 'won_brun', sporemother: 'won_sporemother', brass_colossus: 'won_colossus', magmaw: 'won_magmaw' };
+const ZONE_STORY = { reef_tidepools: 'enter_tidepools', forest_grotto: 'enter_grotto', kingdom_vaults: 'enter_vaults', abyss_vents: 'enter_vents' };
 
 // music: undefined = a calm theme, null = keep what is playing
 export const STORIES = {
@@ -61,6 +62,35 @@ export const STORIES = {
     { art: 'boss:hollow_maw', title: 'THE HOLLOW MAW', text: 'It folds into itself like an eye closing. It was never wicked. It was hungry, and for four thousand years the king had been feeding it the only thing it could keep down: other people\'s children.' },
   ] },
 
+  enter_tidepools: { music: null, panels: [
+    { art: 'ocean', title: 'THE SUNKEN TIDEPOOLS', text: 'Behind the hairline cracks the reef keeps its other secret: a stair of pools, counted every spring by someone who loved counting more than being counted.' },
+    { art: 'ocean', text: 'Somewhere ahead a very small king is wearing a very large shell. You can hear it humming from here.' },
+  ] },
+  enter_grotto: { music: null, panels: [
+    { art: 'forest', title: 'THE GLOWCAP GROTTO', text: 'Past the stone the air turns soft and sweet. Toadstools climb the walls in their hundreds, lit from inside like tiny lamps, and every one of them is asleep.' },
+    { art: 'forest', text: 'Somewhere above, a lullaby is being sung to something that will not wake. Tread lightly. They are very small and everywhere.' },
+  ] },
+  enter_vaults: { music: null, panels: [
+    { art: 'kingdom', title: 'THE PEARL VAULTS', text: 'A stair under the plaza. A brass plaque, an inventory of the Court\'s treasure, and a long gallery of statues that have forgotten what they are guarding.' },
+    { art: 'kingdom', text: 'Every drawer here was counted. Every drawer but the last. The Court did not like to look at the last one.' },
+  ] },
+  enter_vents: { music: null, panels: [
+    { art: 'abyss', title: 'THE EMBER VENTS', text: 'The cold breaks. Orange breath curls up out of the floor in slow, even pulses, and the water is so warm you can taste the minerals. Something below keeps the time.' },
+    { art: 'abyss', text: 'Count four. Move on three. Whatever is down in the pit has been counting a great deal longer than you.' },
+  ] },
+  won_brun: { delay: 3, panels: [
+    { art: 'boss:hermit_king', title: 'BRUN, THE HERMIT KING', text: 'The crown was only orange coral, glued on with kelp-sap. The shell under it still hums a lullaby in a voice that was never his. He holds it to where an ear would be, and listens, and for once says nothing at all.' },
+  ] },
+  won_sporemother: { delay: 3, panels: [
+    { art: 'boss:sporemother', title: 'THE SPOREMOTHER', text: 'The lullaby stops. Across the grotto the little lights dim, one by one, not extinguished, only put to bed. Nobody in the dark was afraid of anything any more.' },
+  ] },
+  won_colossus: { delay: 3, panels: [
+    { art: 'boss:brass_colossus', title: 'THE BRASS COLOSSUS', text: 'It lowers its trident and the whole gallery rings like a bell. Behind it, the last drawer slides out on its own. Inside is a single page: a list of every name, and at the bottom, in the Queen\'s own hand, two words. NOT WORTH IT.' },
+  ] },
+  won_magmaw: { delay: 3, panels: [
+    { art: 'boss:magmaw', title: 'MAGMAW', text: 'The glow in the pit settles from orange to a banked, steady red. It was never trying to scald anyone. It was only trying to be the warmth that kept the dark from freezing, and nobody had ever told it that was enough.' },
+  ] },
+
   molt_warrior: { music: 'ending_good', delay: 0.2, panels: [{ art: 'form:warrior', title: 'THE HARDSHELL MOLT', text: 'You split along an old seam and step out. You are not bigger, exactly. You are harder, and the world has started to look at you instead of past you.' }] },
   molt_abyssal: { music: 'ending_sad', delay: 0.2, panels: [{ art: 'form:abyssal', title: 'THE ABYSSAL MOLT', text: 'The deep has been waiting to meet you. It wears your shape now, and it glows in the places where you used to be afraid.' }] },
   molt_leviathan: { music: 'ending_good', delay: 0.2, panels: [{ art: 'form:leviathan', title: 'THE ANCIENT MOLT', text: 'Old Brine said the sea remembers every shell that ever outgrew its seam. You can hear it now, humming in your claws, glad to be asked.' }] },
@@ -81,6 +111,7 @@ export class Story {
     const w = this.g.world; if (!w) return;
     const b = BIOME_STORY[w.zone.biome]; if (b) this.add(b);
     if (zoneId === 'domain_throne') this.add('throne');
+    if (ZONE_STORY[zoneId]) this.add(ZONE_STORY[zoneId]);
   }
   // called every play frame; shows the next queued story when nothing else is going on
   pump(dt) {

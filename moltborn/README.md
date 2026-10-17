@@ -45,21 +45,25 @@ Molting happens at shrines once you have the level and Evolution Points, and pla
 28-node tree of passives and mutations. Loot, shells, claws, charms, upgrades at the forge, and
 cosmetic dyes.
 
-**Combat.** Three-hit combos, charged heavy, dash with i-frames, block and parry with riposte,
-three abilities per form, an ultimate, poise and armour on enemies, status effects, hit-stop and
-screen shake. About thirty enemy types with distinct AI (chargers, swarmers, ambushers, turrets,
-shield-bearers, kiters, mimics...).
+**Combat.** Three-hit combos, charged heavy, dash with i-frames, block and parry with riposte, an ultimate, poise and armour on
+enemies, status effects, hit-stop, screen shake and camera kicks. Every strike leaves a crescent in the water and a starburst on the
+target; kills shatter the enemy's own sprite pixels; a combo counter rewards unbroken streaks. Seventeen abilities (four more sit at
+the end of the skill tree: Crescent Wave, Aegis Bubble, Tide Step, Storm Call) and a 36-node tree with capstone passives. About forty
+enemy types with distinct AI (chargers, swarmers, ambushers, turrets, shield-bearers, kiters, mimics, and the newer three-strike
+flurry shrimp, healing menders, brood spawners, splitting jellies, hooking pikes, wall-stunning rams and cloud-laying fungi).
 
-**World.** Twenty-five zones in seven biomes: the Reef, Sunken Forest, Coral Kingdom, Ship
-Graveyard, Abyss, Trench of the Forgotten and Poseidon's Domain. Each has its own palette, music,
-enemies and hazards. Doors and tide gates are tied to body size and form; hidden passages and
-breakable walls hide secrets.
+**World.** Twenty-nine zones in seven biomes: the Reef, Sunken Forest, Coral Kingdom, Ship Graveyard, Abyss, Trench of the
+Forgotten and Poseidon's Domain. Each has its own palette, music, enemies and hazards (timed vent plumes, currents, pressure). Doors and
+tide gates are tied to body size and form; hidden passages and breakable walls hide secrets, including four optional zones: the Sunken
+Tidepools, Glowcap Grotto, Pearl Vaults and Ember Vents. The world breathes: drifting caustics, parallax plankton, schools of fish,
+jellies and wisps behind the terrain, and soft foreground silhouettes at the screen edges.
 
 **Bosses.** Grumbold, the Moray Twins, Aurelia, Captain Rust, the Lurelord, Krael, Kyros, the
 hidden Maw, the optional Pearl Tyrant, and Poseidon in four phases: Judgment, Wrath, Drowned God,
-Last Tide. Telegraphed attacks, armour-break phases, arena barriers.
+Last Tide. Telegraphed attacks, armour-break phases, arena barriers. Four optional mini-bosses guard the hidden zones: Brun the Hermit King, the
+Sporemother, the Brass Colossus and Magmaw.
 
-**Story.** Told through murals, memory pearls, NPCs and boss dialogue, plus twenty illustrated story
+**Story.** Told through murals, memory pearls, NPCs and boss dialogue, plus twenty-eight illustrated story
 cutscenes (`src/systems/story.js`): the intro, each realm's first entry, every boss's fall, each molt and the Throne. Several quests end in
 moral choices (spare or slay Krael, redeem Aurelia, free the hatchlings), and these feed four
 endings: Slay, Trident, Mercy, and a secret one.
@@ -75,8 +79,8 @@ index.html            canvas shell
 src/main.js           boot
 src/game.js           Game: owns systems, zone changes, save/load
 src/core/             engine + scene stack, input, save, utils
-src/gfx/              procedural Painter, crab kit + hero forms, boss/enemy/NPC painters, cutscene scenes, tiles/bg/particles/font
-src/world/            zone builder DSL, tile baking, physics, world update/draw/lighting
+src/gfx/              procedural Painter, crab kit + hero forms, boss/enemy/NPC painters, cutscene scenes, tiles/bg/ambience/particles/font
+src/world/            zone builder DSL, scatter placement, tile baking, physics, world update/draw/lighting
 src/entities/         player, enemies, AI library, boss base, interactables
 src/bosses/           one file per boss + registry
 src/combat/           abilities and ultimates
@@ -108,5 +112,10 @@ TRACKS=reef,boss1 node tools/run.mjs tests/scripts/music_render.mjs   # offline 
 node tools/run.mjs tests/scripts/cuts.mjs    # screenshots of every cutscene scene
 node tools/run.mjs tests/scripts/fuzz.mjs    # random-input fuzz of all 25 zones (exceptions, NaN, runaway entities)
 node tools/run.mjs tests/scripts/aiprobe.mjs # how each enemy type behaves against a standing player
-node tools/run.mjs tests/scripts/models.mjs  # contact sheets of every model (also heroes.mjs, bossview.mjs)
+node tools/run.mjs tests/scripts/models.mjs  # contact sheets of every model (also heroes.mjs, bossview.mjs, newenemies.mjs)
+node tools/run.mjs tests/scripts/newai.mjs   # spot checks of the newer enemy behaviours (clouds, hooks, rams, healers, splits)
+node tools/run.mjs tests/scripts/newzones.mjs # breaks the hidden walls with real heavy attacks and walks through
+node tools/run.mjs tests/scripts/combatshots.mjs   # frames of a combo (also fxshots.mjs, abilityshots.mjs, bossdeath.mjs)
+ZONE=forest_grotto node tools/run.mjs tests/scripts/bossdps.mjs   # idealised DPS against one boss (also bosslog.mjs, fair.mjs)
+node tests/ascii.mjs reef_tidepools          # ASCII map of any zone
 ```

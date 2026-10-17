@@ -52,7 +52,7 @@ export function forest_roots() {
   b.surface(T.GROUND, 1); b.smooth(1);
   b.exitW(49, 53, 'forest_edge', 'east'); b.entryFloor('west', 5, { facing: 1, from: 40 });
   b.exitE(48, 52, 'forest_heart', 'west'); b.entryFloor('east', 118, { facing: -1, from: 40 });
-  b.rect(98, 11, 2, 7, T.CRACKED); b.exitN(110, 114, 'forest_grotto', 'door'); b.platform(109, 4, 6); b.entry('grotto', 112, 3); b.keep(96, 0, 22, 20);
+  b.rect(98, 11, 2, 9, T.CRACKED); b.rect(94, 18, 8, 2, T.GROUND); b.exitN(110, 114, 'forest_grotto', 'door'); b.platform(109, 4, 6); b.entry('grotto', 112, 3); b.keep(96, 0, 22, 20);
   b.sign(94, 'The air tastes of mushrooms past the crack in the wall. Someone left a lamp here, a long time ago.', { from: 8 });
   b.shrine('rest', 54, { from: 20 });
   // bulbs in the upper loop (low, high, middle)

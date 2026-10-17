@@ -3,7 +3,7 @@ import { buildZone } from '../src/data/zones.js';
 import { ZONE_INFO } from '../src/data/zoneinfo.js';
 import { ENEMIES } from '../src/data/enemies.js';
 import { xpToNext } from '../src/data/forms.js';
-const bossXp = { grumbold: 160, mother_moray: 320, aurelia: 520, captain_rust: 700, lurelord: 900, krael: 1100, kyros: 1300, hollow_maw: 2000, poseidon: 5000, pearl_tyrant: 220 };
+const bossXp = { grumbold: 160, mother_moray: 320, aurelia: 520, captain_rust: 700, lurelord: 900, krael: 1100, kyros: 1300, hollow_maw: 2000, poseidon: 5000, pearl_tyrant: 220, hermit_king: 240, sporemother: 260, brass_colossus: 420, magmaw: 520 };
 const questXp = { reef_garden: 20, forest_heart: 140 };
 const lvAt = (xp) => { let l = 1; while (xp >= xpToNext(l)) { xp -= xpToNext(l); l++; } return l; };
 let cum = 0, ep = 0, coins = 0;

@@ -17,7 +17,8 @@ export default async (page, H) => {
         for (let f = 0; f < 420; f++) { if (f % 25 === 0) { for (const k of keys) g.input.inject(k, Math.random() < 0.35); } p.hp = Math.max(p.hp, 5); g.engine.step(1 / 60); if (!isFinite(p.x) || !isFinite(p.y)) { nan = true; break; } }
         for (const k of keys) g.input.inject(k, false);
         g.engine.render();
-        out.push({ id, ok: !nan, enemies: g.world.enemies.length, x: Math.round(p.x), y: Math.round(p.y), inside: !g.world.grid.solidPx(p.x, p.y) });
+        const w2 = g.world, pl2 = w2.player; // random walks often leave through an exit: judge the world we are actually in
+        out.push({ id, ok: !nan, enemies: w2.enemies.length, x: Math.round(pl2.x), y: Math.round(pl2.y), left: w2.zone.id !== id, inside: !w2.grid.solidPx(pl2.x, pl2.y) });
       } catch (e) { out.push({ id, err: e.message + ' ' + (e.stack || '').split('\n')[1] }); }
     }
     return out;

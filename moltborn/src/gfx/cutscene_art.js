@@ -5,6 +5,7 @@ import { playerFrame, variantFor } from './sprites_player.js';
 import { enemyFrame } from './sprites_enemies.js';
 import { propSprite } from './sprites_world.js';
 import './sprites_bosses.js';
+import './sprites_bosses2.js';
 import './sprites_hero.js';
 import { morayHead, moraySeg } from './sprites_bosses.js';
 import { Painter, Ramp } from './painter.js';
@@ -379,6 +380,10 @@ const BOSS_ART = {
   lurelord: { sp: { plan: 'lurelord', w: 150, h: 120, ax: 76, ay: 62, frames: 4 }, z: 2, y: 132, bg: ['#0e0a30', '#020208'], aura: '#ffe890' },
   krael: { sp: { plan: 'krael', w: 320, h: 226, ax: 150, ay: 106, frames: 4 }, z: 1, y: 150, bg: ['#2a0a3a', '#030106'], aura: '#ff7a3a' },
   kyros: { sp: { plan: 'kyros', w: 176, h: 156, ax: 52, ay: 124, frames: 4 }, z: 1, y: 190, bg: ['#0a5a7a', '#031620'], aura: '#9af0ff' },
+  hermit_king: { sp: { plan: 'hermitking', w: 150, h: 100, ax: 62, ay: 88, frames: 4 }, z: 2, y: 214, bg: ['#3ab8d8', '#0a4a72'], aura: '#ffd84a' },
+  sporemother: { sp: { plan: 'sporemother', w: 140, h: 104, ax: 70, ay: 100, frames: 4 }, z: 2, y: 212, bg: ['#1a6a4a', '#041a10'], aura: '#c8ff90' },
+  brass_colossus: { sp: { plan: 'colossus', w: 120, h: 128, ax: 60, ay: 120, frames: 4 }, z: 2, y: 224, bg: ['#4a3a98', '#12104a'], aura: '#ffe890' },
+  magmaw: { sp: { plan: 'magmaw', w: 80, h: 64, ax: 40, ay: 32, frames: 1 }, z: 4, y: 150, bg: ['#5a1a0a', '#0a0202'], aura: '#ff9a3a' },
   hollow_maw: { sp: { plan: 'maw', w: 180, h: 150, ax: 88, ay: 70, frames: 4 }, z: 1, y: 130, bg: ['#12041c', '#010003'], aura: '#c070ff' },
 };
 function bossScene(ctx, key, t) {
