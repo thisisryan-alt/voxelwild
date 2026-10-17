@@ -45,7 +45,20 @@ export const DIALOGUE = {
       yield c.say("You're the best! Pearl Tyrant, they call him. He's very grumpy. And very, very round.");
       c.quest('sq_tyrant'); return;
     }
-    if (c.qDone('sq_tyrant')) { yield c.say("MAMA'S PEARL! You did it you did it! I'm going to tell everybody! I'm going to tell the CLAMS!"); return; }
+    if (c.qDone('sq_tyrant')) {
+      if (!c.flag('pip_thanks')) { c.set('pip_thanks'); yield c.say("MAMA'S PEARL! You did it you did it! I'm going to tell everybody! I'm going to tell the CLAMS!"); }
+      if (c.qDone('sq_surge')) { yield c.say("I WAS RIGHT. The sea gives things back! I am going to write a book. It will be called 'Things The Sea Gives Back'. It will have a chapter about you."); return; }
+      if (c.qActive('sq_surge')) {
+        const n = c.g.state.records.surges || 0, sold = c.g.state.records.sold || 0;
+        if (n < 3) yield c.say(`Sometimes the whole sea gets pushed, all at once, and then it stops and leaves things on the floor! Shiny things! You have ridden ${n} so far. Stand in the open, wait for the water to draw back, and see what turns up.`);
+        else yield c.say(`Three surges! And now sell some of it, so I can see how much the sea is worth. You are at ${sold} out of ten.`);
+        return;
+      }
+      yield c.say("Have you ever seen the sea pull back, all at once, and then come rushing in? I have a THEORY about what it leaves behind.");
+      const j = yield c.ask("Will you test my theory?", ['Yes!', 'Later']);
+      if (j === 0) { yield c.say("YES. Stand somewhere open and wait. The water goes quiet, then it pushes, and afterwards there are things on the floor. Ten sales, three surges. Then I'll know."); c.quest('sq_surge'); }
+      return;
+    }
     yield c.say("The Pearl Tyrant's behind the cracked wall at the east end of the Garden. You'll need a heavy hit — a big charged one, you know?");
   },
 
@@ -349,11 +362,16 @@ export const DIALOGUE = {
       yield c.say("You came at night. Good. Most people try the passage at noon, get a mouthful of reef, and decide I am a rumour.");
       yield c.say("I keep the pool. It is not hard work. I sit here and I let the moon look at itself, and sometimes something comes up to see what the fuss is.");
     }
+    if (c.qDone('sq_moon') && !c.flag('selene_thanks')) { c.set('selene_thanks'); yield c.say("You held the line. I felt the pool let go of its koi. Keep what the moon gave you; I only ever lent it."); }
     const i = yield c.ask("What do you need, little tide?", ['Tell me about the pool', 'A blessing, please', 'Goodbye']);
     if (i === 0) {
       yield c.say("It is the deepest basin on the reef, and the stillest. The moon falls in at night and does not come out again until morning. Things that are drawn to the moon are drawn here.");
       yield c.say("There is a koi. White, with gold along the spine. It rises only in the dark, only in the pool, and only when it chooses. Cast from the stone by the water. Bring patience. Bring something warm to drink.");
       c.g.systems.codex.unlock('moon_koi_tale');
+      if (!c.qActive('sq_moon') && !c.qDone('sq_moon')) {
+        yield c.say("If you want to try for it properly, I will set you an errand. Catch something that likes the dark, cook it well, and then cast from the stone by the water. If the koi still declines, at least you will have eaten.");
+        c.quest('sq_moon');
+      }
     } else if (i === 1) {
       const last = c.g.state.flags.selene_blessed_at, now = c.g.state.playtime;
       if (last !== undefined && now - last < 600) yield c.say("I gave you my light not long ago. It is still on you. Do not be greedy: the moon does not like to be asked twice in a night.");

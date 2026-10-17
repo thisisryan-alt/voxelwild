@@ -69,6 +69,13 @@ export default async (page, H) => {
 
 Anything the script prints with a `[t]` prefix is echoed; console errors and page errors fail the run.
 
+### Running many at once
+
+`npm run suite` (`tools/suite.mjs`) runs a default set of 25 browser scripts one after another and prints a table. A script
+passes when it exits with code 0 and prints no page error or script error; the scripts also print what they observed (lines
+beginning `[t]`), which is worth reading when a change touches the system they cover. `node tools/suite.mjs bounties fishing`
+runs just those; `node tools/suite.mjs --list` lists every script.
+
 ### The important ones
 
 | script | what it does |

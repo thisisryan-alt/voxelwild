@@ -93,6 +93,17 @@ export const QUESTS = {
     { text: 'Sell a fish to Old Tunny.', done: (g) => (g.state.records?.fishSold || 0) >= 1 },
     { text: 'Bring Old Tunny a Gilt Sunfish (it only rises by day).', done: (g) => g.flag('tunny_sunfish') },
   ], desc: 'Old Tunny has been fishing the reef for forty years and caught everything but the one he wants to talk about. He thinks you might fare better.' },
+  sq_moon: { name: "The Moon's Errand", type: 'side', giver: 'selene', steps: [
+    { text: 'Visit Selene at Moonpool Cove (it opens at night).', done: (g) => g.flag('met_selene') },
+    { text: 'Catch a Glassfin or a Pearlfin.', done: (g) => { const s = g.state.fish?.species || {}; return !!(s.glassfin || s.pearlfin); } },
+    { text: 'Cook a Lantern Stew or a Glassfin Carpaccio.', done: (g) => { const c = g.state.records?.craftedBy || {}; return (c.angler_stew || 0) + (c.glass_carpaccio || 0) > 0; } },
+    { text: 'Catch the Moon Koi from the Moonpool.', done: (g) => !!g.state.fish?.species?.moon_koi },
+  ], desc: 'Selene keeps the pool, and the pool keeps a secret. She will tell it to someone who has shown they can wait.' },
+  sq_surge: { name: 'Washed Up', type: 'side', giver: 'pip', steps: [
+    { text: 'Ride out a tidal surge in an open realm.', done: (g) => (g.state.records?.surges || 0) >= 1 },
+    { text: 'Ride out three surges in all.', done: (g) => (g.state.records?.surges || 0) >= 3 },
+    { text: 'Sell ten things to Old Tunny or Marlin.', done: (g) => (g.state.records?.sold || 0) >= 10 },
+  ], desc: 'Pip has a theory about where the sea puts things. He would like you to test it, and tell him what turns up.' },
   sq_board: { name: 'Notices on the Tide', type: 'side', giver: 'marlin', steps: [
     { text: 'Read the Tide Board.', done: f('board_read') },
     { text: 'Clear a Tidal Rift (any depth, all the way down).', done: (g) => (g.state.records?.rifts || 0) >= 1 },

@@ -40,3 +40,18 @@ test('the fishing quest is wired to a dialogue and its steps are checkable', () 
   const g = { state: { records: newRecords(), fish: { species: {} }, flags: {} }, flag: (f) => !!g.state.flags[f], hasItem: () => false }; eq(q.steps.filter((s) => s.done(g)).length, 0);
   g.state.records.fished = 5; g.state.fish.species = { a: 1, b: 1, c: 1 }; g.state.records.fishSold = 1; eq(q.steps.filter((s) => s.done(g)).length, 3); g.state.flags.tunny_sunfish = true; eq(q.steps.filter((s) => s.done(g)).length, 4);
 });
+
+// ---- the newer side quests -----------------------------------------------------------------------------------------------------------------------
+import { REWARDS } from '../../src/systems/quests.js';
+test('every side quest has a giver who exists, steps that can be checked, and a reward', () => {
+  for (const id of ['sq_catch', 'sq_moon', 'sq_surge']) { const q = QUESTS[id]; ok(q && q.type === 'side' && q.name && q.desc.length > 40, id); ok(NPCS[q.giver], id + ' giver'); ok(DIALOGUE[q.giver], id + ' dialogue'); ok(q.steps.length >= 3, id); for (const s of q.steps) { ok(typeof s.done === 'function' && s.text.length > 12, id); } ok(REWARDS[id] && (REWARDS[id].xp || REWARDS[id].coins), id + ' reward'); }
+});
+test('the moon quest follows the fish log, the kitchen and the first visit', () => {
+  const q = QUESTS.sq_moon, g = { flag: (f) => !!g.state.flags[f], state: { flags: {}, fish: { species: {} }, records: { craftedBy: {} } } }, done = () => q.steps.map((s) => s.done(g)).join();
+  eq(done(), 'false,false,false,false'); g.state.flags.met_selene = true; g.state.fish.species.glassfin = { n: 1 }; g.state.records.craftedBy.angler_stew = 1; eq(done(), 'true,true,true,false'); g.state.fish.species.moon_koi = { n: 1 }; eq(done(), 'true,true,true,true');
+  const h = { ...g, state: { flags: { met_selene: true }, fish: { species: { pearlfin: {} } }, records: { craftedBy: { glass_carpaccio: 2 } } } }; ok(q.steps[1].done(h) && q.steps[2].done(h));
+});
+test('the surge quest counts surges and sales from the records', () => {
+  const q = QUESTS.sq_surge, g = { state: { records: { surges: 0, sold: 0 } } }; eq(q.steps.filter((s) => s.done(g)).length, 0); g.state.records.surges = 1; eq(q.steps.filter((s) => s.done(g)).length, 1); g.state.records.surges = 3; g.state.records.sold = 10; eq(q.steps.filter((s) => s.done(g)).length, 3);
+});
+test('quest rewards only name items that exist', () => { for (const [id, r] of Object.entries(REWARDS)) for (const item of Object.keys(r.items || {})) ok(ITEMS[item], `${id}:${item}`); });

@@ -151,4 +151,5 @@ node tests/ascii.mjs reef_tidepools          # ASCII map of any zone
 * `docs/ARCHITECTURE.md` - how the engine, world, entities, systems, saves and rendering fit together.
 * `docs/CONTENT_GUIDE.md` - how to add a creature, boss, zone, NPC, quest, item, fish, relic, trophy or setting.
 * `docs/SYSTEMS.md` - the rules and numbers of the newer systems.
-* `docs/TESTING.md` - the test layers, conventions and every script.
+* `docs/TESTING.md` - the test layers, conventions and every script (`npm run suite` runs the browser scripts together).
+* `docs/CHANGELOG.md` - what changed in this push.

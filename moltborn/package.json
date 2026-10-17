@@ -10,6 +10,7 @@
     "economy": "node tests/economy.mjs",
     "smoke": "node tools/run.mjs tests/scripts/smoke.mjs",
     "test": "node tests/unit/run.mjs",
-    "check": "npm run test && npm run validate && npm run smoke"
+    "check": "npm run test && npm run validate && npm run smoke",
+    "suite": "node tools/suite.mjs"
   }
 }
