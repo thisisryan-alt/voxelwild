@@ -17,7 +17,7 @@ export function abyss_descent() {
   b.path([[34, 46], [52, 50], [64, 58], [70, 70]], 3.4, { wobble: 0.9 }); b.ellipse(72, 74, 8, 7);
   b.path([[28, 62], [12, 66], [10, 76]], 3, { wobble: 0.6 }); b.ellipse(10, 80, 6, 6);
   b.surface(T.GROUND, 1); b.smooth(1);
-  b.area('pressure', 3 * 16, 74 * 16, 16 * 16, 14 * 16, { level: 4 });
+  b.area('pressure', 3, 74, 16, 14, { level: 4 });
   b.exitN(22, 27, 'grave_captain', 'south'); b.entry('north', 24, 6); b.carve(21, 0, 8, 8);
   b.exitW(92, 96, 'abyss_lanterns', 'east'); b.entryFloor('west', 4, { facing: 1, from: 80 });
   b.shrine('rest', 26, { from: 14 }); b.shrine('rest2', 38, { from: 74 });
@@ -177,8 +177,8 @@ export function domain_halls() {
   // gauntlet: statues, vents, spikes, currents
   for (const x of [20, 34, 48, 62]) { b.pillar(x, 12, 22, 3, T.DIVINE); }
   b.spikes(26, 49, 5); b.spikes(52, 49, 5);
-  b.area('vent', 38 * 16, 30 * 16, 3 * 16, 20 * 16, { period: 4, on: 1.4, dmg: 24, phase: 0 }); b.area('vent', 56 * 16, 30 * 16, 3 * 16, 20 * 16, { period: 4, on: 1.4, dmg: 24, phase: 2 });
-  b.area('current', 66 * 16, 14 * 16, 24 * 16, 36 * 16, { vx: 110, vy: 0 });
+  b.area('vent', 38, 30, 3, 20, { period: 4, on: 1.4, dmg: 24, phase: 0 }); b.area('vent', 56, 30, 3, 20, { period: 4, on: 1.4, dmg: 24, phase: 2 });
+  b.area('current', 66, 14, 24, 36, { vx: 110, vy: 0 });
   // boss arena beyond
   b.carve(92, 8, 40, 42); b.rect(100, 36, 6, 14, T.DIVINE); b.rect(120, 36, 6, 14, T.DIVINE); b.platform(108, 30, 10); b.platform(96, 22, 8); b.platform(122, 22, 8);
   b.surface(T.DIVINE, 1);

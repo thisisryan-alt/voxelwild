@@ -6,6 +6,7 @@ import { Enemy } from '../entities/enemy.js';
 import { Projectile, Pickup } from '../entities/entity.js';
 import { INTERACTABLES } from '../entities/interactables.js';
 import { Particles } from '../gfx/particles.js';
+import { Ambience } from '../gfx/ambience.js';
 import { propSprite } from '../gfx/sprites_world.js';
 import { getBackground } from '../gfx/background.js';
 import { BIOMES } from '../data/biomes.js';
@@ -20,7 +21,7 @@ export class World {
     this.game = game; this.zone = zone; this.grid = zone.grid; this.biome = BIOMES[zone.biome];
     this.t = 0; this.fx = new Particles();
     this.layer = new TileLayer(zone); this.applyBroken(); this.layer.renderAll();
-    this.bg = getBackground(zone.biome, zone.seed);
+    this.bg = getBackground(zone.biome, zone.seed); this.amb = new Ambience(zone, this.biome);
     this.enemies = []; this.projectiles = []; this.pickups = []; this.hitboxes = []; this.interactables = []; this.decor = []; this.fields = []; this.beams = [];
     this.boss = null; this.cinematic = false; this.slowT = 0; this.slowFactor = 1; this.flash = 0; this.hurtFlash = 0; this.shakeAmt = 0; this.kickX = 0; this.kickY = 0; this.camLock = null;
     this.exitsDisabled = false; this.drawExtra = []; this.overlayExtra = []; this.extraLights = []; this.lightCv = null; this.exiting = false; this.difficulty = 0;
@@ -139,7 +140,7 @@ export class World {
     this.fx.update(dt);
     this.flash = Math.max(0, this.flash - dt); this.hurtFlash = Math.max(0, this.hurtFlash - dt); this.shakeAmt *= Math.exp(-9 * dt);
     this.kickX *= Math.exp(-11 * dt); this.kickY *= Math.exp(-11 * dt);
-    this.ambientFx(dt);
+    this.ambientFx(dt); this.amb.update(dt, this);
     this.updateCamera(dt);
     // nearest interactable
     this.near = null; if (pl.alive && !pl.locked) { let bd = 1e9; for (const i of this.interactables) { if (!i.prompt() || !i.canInteract(pl)) continue; const d = Math.abs(i.x - pl.x) + Math.abs(i.y - pl.y); if (d < bd) { bd = d; this.near = i; } } }
@@ -242,6 +243,7 @@ export class World {
     if (this.shakeAmt > 0.3) { sx = Math.round((rand() - 0.5) * this.shakeAmt * 2); sy = Math.round((rand() - 0.5) * this.shakeAmt * 2); }
     const cam = { x: Math.round(c.x + this.kickX) + sx, y: Math.round(c.y + this.kickY) + sy };
     this.bg.draw(ctx, cam, this.zone, this.t);
+    this.amb.drawBehind(ctx, cam, this.t, clamp(cam.y / Math.max(1, this.zone.h * TS - 270), 0, 1));
     // tiles
     const cvw = this.layer.canvas.width, cvh = this.layer.canvas.height;
     const sx0 = Math.max(0, cam.x), sy0 = Math.max(0, cam.y), sw = Math.min(480, cvw - sx0), sh = Math.min(270, cvh - sy0);
@@ -265,6 +267,7 @@ export class World {
     for (const b of this.beams) { const k = 1 - b.t / b.life; ctx.globalAlpha = k; ctx.fillStyle = b.color; const x = b.dir > 0 ? b.x : b.x - b.len; ctx.fillRect(Math.round(x - cam.x), Math.round(b.y - cam.y) - 4 * k - 1, b.len, Math.max(2, Math.round(8 * k))); ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(x - cam.x), Math.round(b.y - cam.y) - 1, b.len, 2); ctx.globalAlpha = 1; }
     for (const fn of this.drawExtra) fn(ctx, cam);
     drawDecor('front');
+    this.amb.drawAhead(ctx, cam, this.t);
     this.fx.draw(ctx, cam);
     this.drawAtmosphere(ctx, cam);
     this.drawLighting(ctx, cam);
@@ -293,7 +296,7 @@ export class World {
   lightList() {
     const L = [], pl = this.player, st = pl.stats;
     const stage = pl.form.stage;
-    L.push({ x: pl.x, y: pl.y, r: 66 + st.light + (stage >= 3 ? 26 : 0) + (stage >= 5 ? 40 : 0), a: 1 });
+    L.push({ x: pl.x, y: pl.y, r: 66 + ((this.zone.dark ?? this.biome.dark) > 0.3 ? 22 : 0) + st.light + (stage >= 3 ? 26 : 0) + (stage >= 5 ? 40 : 0), a: 1 });
     for (const l of this.zone.lights) L.push(l);
     for (const d of this.decor) if (d.spr.glow) L.push({ x: d.x, y: d.y - 12, r: 38, a: 0.8, color: d.spr.glow });
     for (const e of this.enemies) if (e.def.glow || e.def.sprite.o?.glow || e.type === 'lanternfish') L.push({ x: e.x, y: e.y - 4, r: 34, a: 0.8 });

@@ -77,7 +77,7 @@ export class Particles {
       ctx.fillStyle = q.color;
       if (q.kind === 'bubble') { ctx.fillRect(x, y, s, s); if (s > 1) { ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, 1, 1); } }
       else if (q.kind === 'star') { ctx.fillRect(x, y - 1, 1, 3); ctx.fillRect(x - 1, y, 3, 1); }
-      else if (q.kind === 'streak') { const n = Math.max(1, Math.round(Math.hypot(q.vx, q.vy) * 0.03)), ux = q.vx / (Math.hypot(q.vx, q.vy) || 1), uy = q.vy / (Math.hypot(q.vx, q.vy) || 1); for (let i = 0; i < n; i++) ctx.fillRect(Math.round(x - ux * i), Math.round(y - uy * i), 1, 1); }
+      else if (q.kind === 'streak') { const n = Math.max(1, Math.round(Math.hypot(q.vx, q.vy) * (q.len ?? 0.03))), ux = q.vx / (Math.hypot(q.vx, q.vy) || 1), uy = q.vy / (Math.hypot(q.vx, q.vy) || 1); for (let i = 0; i < n; i++) ctx.fillRect(Math.round(x - ux * i), Math.round(y - uy * i), 1, 1); }
       else ctx.fillRect(x - (s >> 1), y - (s >> 1), s, s);
     }
     ctx.globalAlpha = 1;
