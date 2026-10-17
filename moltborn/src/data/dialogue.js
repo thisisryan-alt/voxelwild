@@ -343,5 +343,31 @@ export const DIALOGUE = {
     yield c.say("Break the old seals, in the vault below. You will need to be very old, and very large, to do it. That is what the Ancient Molt is for.");
   },
 
+  *marlin(c) {
+    if (!c.flag('met_marlin')) {
+      c.set('met_marlin');
+      yield c.say("Ah! A customer. Not a customer, I give everything away. A reader. Welcome to the Tide Board, the only honest noticeboard between the shallows and the Throne.");
+      yield c.say("Rifts, they are. The sea tears now and then, and what is on the other side is a chamber of something that wants to eat you. I pin up the dares. Nobody takes them. It is very bad for business, and I have no business.");
+      const i = yield c.ask("Will you take one?", ['What is a rift?', 'What else is on the board?', 'Maybe later']);
+      if (i === 0) yield c.say("A cave that is only there once. You go in, you clear it, the way opens, you choose a relic, you go deeper. Foes get nastier. So do the relics, if you are lucky. If you fall, you keep what you earned, not what you carried.");
+      else if (i === 1) yield c.say("Kitchen orders: three a day, from folk who would never ask you to your face. Cook what they want, bring it here, get paid. And the Pearl Gauntlet, if you want to see how long you last against a crowd.");
+      c.quest('sq_board'); return;
+    }
+    if (c.qActive('sq_board')) {
+      const r = c.g.state.records;
+      if (!c.flag('board_read')) { yield c.say("Go on, read the board. It is the thing with the notices on it. Press E in front of it. I will wait. I have always waited."); return; }
+      if ((r.rifts || 0) < 1) { yield c.say("Have you cleared a rift yet? Shallow ones are very forgiving. Mostly."); return; }
+      if ((r.crafted || 0) < 3) { yield c.say("A rift is only half of it. Cook something. Three dishes, from the CRAFT tab. Ingredients from creatures, from forage patches, from me if you must."); return; }
+      yield c.say("Last one: bring me a kitchen order. Any one. Deliver it from the board and I will be a very happy octopus.");
+      return;
+    }
+    if (c.qDone('sq_board') && !c.flag('marlin_thanks')) { c.set('marlin_thanks'); yield c.say("You did all of it! The board has never looked so... used. Keep the shard. It is a rift that refused to close. Nobody else wanted it."); return; }
+    const hello = [
+      "The board is behind me. The octopus is in front. Choose wisely.", "Eight arms, and not one of them can cook. That is what the orders are for.",
+      "I keep a list of everyone who came back from a rift. It is a short list. It is getting longer.", "Ingredients, if you are short. Prices are fair. The prices are always fair.",
+    ];
+    const j = yield c.ask(hello[Math.floor(Math.random() * hello.length)], ['Buy ingredients', 'Never mind']);
+    if (j === 0) yield c.shop('marlin');
+  },
   *krael_ally(c) { yield c.say("I am not what I was. Thank you.", 'Krael'); },
 };

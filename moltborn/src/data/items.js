@@ -62,6 +62,7 @@ export const ITEMS = {
   charm_spore: { name: 'Spore Sachet', type: 'equip', slot: 'charm', desc: 'Poison harms you half as much, and you recover a little with every kill.', fx: { poisonResist: 0.5, lifeOnKill: 2 } },
   charm_archivist: { name: "Archivist's Loupe", type: 'equip', slot: 'charm', desc: 'Coins and pearls come from farther away, hidden things shimmer, and foes drop 20% more coin.', fx: { magnet: 50, sense: 1, coinBonus: 0.2 } },
   charm_emberglass: { name: 'Emberglass Locket', type: 'equip', slot: 'charm', desc: 'A steady orange glow, +20% Tide regen, and the vents hurt 30% less.', fx: { light: 44, tideRegen: 0.2, heatResist: 0.3 } },
+  charm_riftshard: { name: 'Rift Shard', type: 'equip', slot: 'charm', desc: 'A sliver of a rift that never closed. Blows land harder, shells hold firmer, coins find you.', fx: { dmg: 0.06, hp: 0.06, coinBonus: 0.1 } },
   charm_kingsigil: { name: "Regent's Signet", type: 'equip', slot: 'charm', desc: 'Court favour: shops are 20% cheaper.', fx: { discount: 0.2 } },
   // mutations (passive traits)
   mut_barbed: { name: 'Barbed Shell', type: 'mutation', desc: 'Spines grow through the plating. Attackers that hit you take damage.', fx: { thorns: 0.12 } },
@@ -88,6 +89,7 @@ export const ITEMS = {
 export const SHOP = {
   cowrie: ['hatchling_egg', 'kelp_wrap', 'brine_tonic', 'shell_driftwood', 'claw_rusty', 'charm_pearlstring', 'shell_barnacle', 'claw_urchin'],
   smuggler: ['fury_ink', 'kelp_wrap', 'brine_tonic'],
+  marlin: ['kelp_frond', 'brine_salt', 'urchin_spine', 'shell_chip', 'glow_spore', 'fin_scale'],
 };
 export const DYES = {
   default: null,

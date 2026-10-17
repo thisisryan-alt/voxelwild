@@ -7,6 +7,7 @@ export const NPCS = {
   pip: { name: 'Pip', color: '#ffe65a', sprite: { kind: 'fish', k: 'pip', o: { ramp: R.fishYellow, h: 7, belly: R.belly } } },
   cowrie: { name: 'Madame Cowrie', color: '#ff9ad8', sprite: { kind: 'fish', k: 'cowrie', o: { ramp: R.coralPink, h: 9, belly: R.pearl, scarf: R.crimson, bag: true } } },
   tessa: { name: 'Tessa', color: '#d8a0ff', sprite: { kind: 'hermit', k: 'tessa', o: { shell: R.coralBlue, body: R.shore } } },
+  marlin: { name: 'Marlin the Board-Keeper', color: '#9ae8ff', sprite: { kind: 'octopus', k: 'marlin', o: { ramp: R.steel.tint(0.02, 0.9, 1.15), hat: true } } },
   brack: { name: 'Brack the Counter', color: '#ffb060', sprite: { kind: 'hermit', k: 'brack', o: { shell: R.coralOrange, body: R.shoreFar, beard: true } } },
   morel: { name: 'Dr. Morel', color: '#d8ff90', sprite: { kind: 'octopus', k: 'morel', o: { ramp: R.venom.tint(0.1, 0.9, 1.1), hat: true } } },
   tallow: { name: 'Tallow the Archivist', color: '#ffe08a', sprite: { kind: 'seahorse', k: 'tallow', o: { ramp: R.gold.tint(0, 0.7, 0.9), robe: R.rust, crest: R.pearl } } },

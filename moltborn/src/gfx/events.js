@@ -11,13 +11,13 @@ const W = 480, H = 270;
 
 // weights per realm: which event may occur where
 const WEIGHTS = {
-  reef:      { whale: 3, stream: 5, sun: 4 },
-  forest:    { stream: 3, sun: 3, whale: 1, drift: 4 },
-  kingdom:   { stream: 3, sun: 4, whale: 2 },
-  graveyard: { ghost: 3, snow: 3, stream: 1 },
-  abyss:     { snow: 3, whale: 2, tremor: 2 },
-  trench:    { tremor: 3, snow: 3 },
-  domain:    { sun: 2, stream: 2, whale: 3 },
+  reef:      { whale: 3, stream: 5, sun: 4, turtle: 3, manta: 2, bubbles: 2 },
+  forest:    { stream: 3, sun: 3, whale: 1, drift: 4, turtle: 2, bubbles: 2, jellybloom: 2 },
+  kingdom:   { stream: 3, sun: 4, whale: 2, manta: 3, bubbles: 2 },
+  graveyard: { ghost: 3, snow: 3, stream: 1, bubbles: 1 },
+  abyss:     { snow: 3, whale: 2, tremor: 2, jellybloom: 4, glowpulse: 3 },
+  trench:    { tremor: 3, snow: 3, glowpulse: 2, jellybloom: 2 },
+  domain:    { sun: 2, stream: 2, whale: 3, manta: 3, glowpulse: 3 },
 };
 
 const shade = (c, k, a = 1) => { const n = parseInt(c.slice(1), 16); return `rgba(${Math.round((n >> 16) * k)},${Math.round(((n >> 8) & 255) * k)},${Math.round((n & 255) * k)},${a})`; };
@@ -126,6 +126,79 @@ const KINDS = {
     },
   },
 
+
+  // a sea turtle, seen from the side, paddling slowly through mid-water
+  turtle: {
+    layer: 'back', life: 60,
+    spawn(e, r) { e.dir = r() < 0.5 ? -1 : 1; e.x = e.dir > 0 ? -60 : W + 60; e.y = 70 + r() * 110; e.sp = 16 + r() * 8; e.sc = 0.8 + r() * 0.5; e.par = 0.3; },
+    step(e, dt) { e.x += e.dir * e.sp * dt; e.done = e.dir > 0 ? e.x > W + 80 : e.x < -80; },
+    draw(c, e, cam, t, B) {
+      const x = e.x - cam.x * e.par, y = e.y + Math.sin(t * 0.7 + e.x * 0.02) * 4 - cam.y * e.par * 0.3, flap = Math.sin(t * 2.4) * 0.5;
+      c.save(); c.translate(x, y); c.scale(e.dir * e.sc, e.sc); c.fillStyle = shade(B.bottom, 0.45, 0.45);
+      c.beginPath(); c.ellipse(0, 0, 22, 14, 0, 0, 6.3); c.fill(); c.beginPath(); c.ellipse(24, -2, 7, 5, 0, 0, 6.3); c.fill();
+      c.save(); c.translate(6, 8); c.rotate(0.6 + flap); c.beginPath(); c.ellipse(0, 6, 4, 14, 0, 0, 6.3); c.fill(); c.restore();
+      c.save(); c.translate(-8, 9); c.rotate(-0.4 - flap); c.beginPath(); c.ellipse(0, 5, 3, 10, 0, 0, 6.3); c.fill(); c.restore();
+      c.fillStyle = hex(B.top, 0.18); c.beginPath(); c.ellipse(-2, -5, 14, 6, 0, 0, 6.3); c.fill(); c.restore();
+    },
+  },
+
+  // a manta ray gliding overhead as a wide shadow, wingtips rippling
+  manta: {
+    layer: 'back', life: 60,
+    spawn(e, r) { e.dir = r() < 0.5 ? -1 : 1; e.x = e.dir > 0 ? -90 : W + 90; e.y = 30 + r() * 60; e.sp = 20 + r() * 10; e.sc = 0.9 + r() * 0.6; e.par = 0.2; },
+    step(e, dt) { e.x += e.dir * e.sp * dt; e.done = e.dir > 0 ? e.x > W + 110 : e.x < -110; },
+    draw(c, e, cam, t, B) {
+      const x = e.x - cam.x * e.par, y = e.y - cam.y * e.par * 0.3 + Math.sin(t * 0.8) * 3, w = Math.sin(t * 2) * 6;
+      c.save(); c.translate(x, y); c.scale(e.dir * e.sc, e.sc); c.fillStyle = shade(B.bottom, 0.38, 0.38);
+      c.beginPath(); c.moveTo(34, 0); c.quadraticCurveTo(10, -10 - w, -26, -26 + w); c.quadraticCurveTo(-14, -4, -22, 2); c.quadraticCurveTo(-14, 6, -26, 26 - w); c.quadraticCurveTo(10, 10 + w, 34, 0); c.fill();
+      c.beginPath(); c.moveTo(-22, 2); c.lineTo(-52, 4 + w * 0.5); c.lineTo(-22, 5); c.fill(); c.restore();
+    },
+  },
+
+  // a column of bubbles rising from the floor of the view
+  bubbles: {
+    layer: 'front', life: 14,
+    spawn(e, r) { e.t = 0; e.x0 = 40 + r() * (W - 80); e.bits = Array.from({ length: 40 }, () => ({ ph: r() * 6.3, y: r() * H, v: 26 + r() * 30, s: r() < 0.25 ? 2 : 1, dx: (r() - 0.5) * 22 })); },
+    step(e, dt) { e.t += dt; for (const b of e.bits) { b.y -= b.v * dt; if (b.y < -4) b.y += H + 8; } e.done = e.t > this.life; },
+    draw(c, e, cam, t) {
+      const k = Math.min(1, e.t / 2, (this.life - e.t) / 3); c.save();
+      for (const b of e.bits) { const x = Math.round(e.x0 + b.dx + Math.sin(t * 2 + b.ph) * 4 - cam.x * 0.4), y = Math.round(b.y); c.globalAlpha = 0.55 * k; c.fillStyle = '#d8f4ff'; c.fillRect(x, y, b.s, b.s); c.globalAlpha = 0.9 * k; c.fillStyle = '#ffffff'; c.fillRect(x, y, 1, 1); }
+      c.restore();
+    },
+  },
+
+  // a slow drift of jellyfish, glowing bells pulsing, tentacles trailing
+  jellybloom: {
+    layer: 'glow', life: 34,
+    spawn(e, r, world) { e.t = 0; e.col = world.zone.biome === 'forest' ? '#9affc0' : world.zone.biome === 'trench' ? '#ff9ac8' : '#9ad8ff'; e.js = Array.from({ length: 9 }, () => ({ x: r() * W, y: H * (0.2 + r() * 0.9), v: 8 + r() * 10, s: 0.7 + r() * 0.8, ph: r() * 6.3, dx: (r() - 0.5) * 8 })); },
+    step(e, dt) { e.t += dt; for (const j of e.js) { j.y -= j.v * dt; j.x += j.dx * dt; if (j.y < -40) { j.y = H + 30; } } e.done = e.t > this.life; },
+    draw(c, e, cam, t) {
+      const k = Math.min(1, e.t / 4, (this.life - e.t) / 5); c.save(); c.globalCompositeOperation = 'lighter';
+      for (const j of e.js) {
+        const x = j.x - cam.x * 0.55, y = j.y, p = 0.5 + 0.5 * Math.sin(t * 2.2 + j.ph), w = (9 + p * 3) * j.s, h = (7 - p * 2) * j.s;
+        c.globalAlpha = 0.85 * k; c.fillStyle = e.col; c.beginPath(); c.ellipse(x, y, w, h, 0, Math.PI, 0); c.fill();
+        c.globalAlpha = 0.22 * k; c.fillRect(Math.round(x - w * 0.6), Math.round(y - h * 0.4), Math.round(w * 1.2), 1);
+        c.globalAlpha = 0.5 * k; c.strokeStyle = e.col; c.lineWidth = 1; for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(x + i * w * 0.4, y); c.quadraticCurveTo(x + i * w * 0.4 + Math.sin(t * 3 + i + j.ph) * 4, y + 12 * j.s, x + i * w * 0.4 + Math.sin(t * 2.2 + i) * 5, y + 22 * j.s); c.stroke(); }
+        const g = c.createRadialGradient(x, y, 0, x, y, 28 * j.s); g.addColorStop(0, e.col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.globalAlpha = 0.26 * k; c.fillStyle = g; c.fillRect(x - 28 * j.s, y - 28 * j.s, 56 * j.s, 56 * j.s);
+      }
+      c.restore();
+    },
+  },
+
+  // a wave of bioluminescence rolling across the whole view, left to right or right to left
+  glowpulse: {
+    layer: 'glow', life: 6,
+    spawn(e, r, world) { e.dir = r() < 0.5 ? -1 : 1; e.t = 0; e.col = world.zone.biome === 'trench' ? '#ff7ab0' : world.zone.biome === 'domain' ? '#7affe8' : '#5ad8ff'; },
+    step(e, dt) { e.t += dt; e.done = e.t > this.life; },
+    draw(c, e, cam, t) {
+      const f = e.t / this.life, cx = e.dir > 0 ? -80 + f * (W + 160) : W + 80 - f * (W + 160), k = Math.sin(f * Math.PI);
+      c.save(); c.globalCompositeOperation = 'lighter'; const g = c.createLinearGradient(cx - 90, 0, cx + 90, 0); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.5, e.col); g.addColorStop(1, 'rgba(0,0,0,0)');
+      c.globalAlpha = 0.16 * k; c.fillStyle = g; c.fillRect(cx - 90, 0, 180, H); c.globalAlpha = 0.5 * k; c.fillStyle = e.col;
+      for (let i = 0; i < 26; i++) { const y = ((i * 53 + t * 20) % H), x = cx + Math.sin(i * 7.1) * 70; c.fillRect(Math.round(x), Math.round(y), 2, 2); }
+      c.restore();
+    },
+  },
+
   tremor: {
     layer: 'none', life: 4.5,
     spawn(e) { e.t = 0; e.dust = false; },
@@ -160,7 +233,7 @@ export class AmbientEvents {
   }
   // start an event now; `mid` puts travellers in the middle of the screen (used by tests and photo mode)
   force(kind, o = {}) {
-    const e = this.start(kind); if (e && o.mid) { if (e.x !== undefined) e.x = W / 2 + (e.dir || 1) * -30; if (e.t !== undefined && kind === 'sun') e.t = 6; }
+    const e = this.start(kind); if (e && o.mid) { if (e.x !== undefined) e.x = W / 2 + (e.dir || 1) * -30; if (e.t !== undefined && kind !== 'tremor') e.t = kind === 'glowpulse' ? 3 : 6; }
     return e;
   }
 

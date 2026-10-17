@@ -12,7 +12,7 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 export class BoardScene {
   constructor(game) { this.g = game; this.opaque = false; this.sel = 0; this.t = 0; this.msg = ''; this.msgT = 0; }
-  onEnter() { this.g.audio.sfx('select'); this.g.audio.setMuffle?.(0.4); }
+  onEnter() { this.g.audio.sfx('select'); this.g.audio.setMuffle?.(0.4); this.g.setFlag('board_read'); }
   onExit() { this.g.audio.setMuffle?.(0); }
   entries() {
     const R = this.g.systems.rifts, s = this.g.state, list = R.tiers().map((t) => ({ kind: 'rift', tier: t, name: t.name, open: t.open, why: t.needs ? `Defeat ${bossName(t.needs)} first.` : '' }));

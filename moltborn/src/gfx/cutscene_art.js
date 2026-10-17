@@ -423,6 +423,57 @@ function formScene(ctx, id, t, info) {
   ctx.restore(); motes(ctx, t, { n: 40, color: cols[2], a: 0.7, speed: 6, seed: 28 }); vignette(ctx, 0.5);
 }
 
+
+// ---- scenes for the newer systems: rifts, the gauntlet, the kitchen and the hatchling ---------------------------------------
+Object.assign(SCENES, {
+  // a tear in the sea: a spinning mouth of violet and cyan with shards of other water drifting out of it
+  rift(ctx, t) {
+    grad(ctx, [[0, '#0a1a3a'], [1, '#03060f']]); glow(ctx, 240, 128, 200, '#7a3aff', 0.3);
+    const cx = 240, cy = 128;
+    ctx.save(); ctx.translate(cx, cy);
+    for (let k = 0; k < 9; k++) {
+      const rr = 18 + k * 13, ang = t * (0.5 - k * 0.04) + k * 0.7;
+      ctx.save(); ctx.rotate(ang); ctx.scale(1, 0.72); ctx.lineWidth = 3 - k * 0.2; ctx.globalAlpha = 0.85 - k * 0.07;
+      ctx.strokeStyle = k % 2 ? '#7af0ff' : '#c07aff'; ctx.beginPath(); ctx.arc(0, 0, rr, 0.2, 4.9 + Math.sin(t + k) * 0.4); ctx.stroke(); ctx.restore();
+    }
+    ctx.globalAlpha = 1; ctx.fillStyle = '#02030a'; ctx.beginPath(); ctx.ellipse(0, 0, 16, 12, 0, 0, TAU); ctx.fill(); ctx.restore();
+    const r = rng(77); ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 26; i++) { const a = r() * TAU + t * 0.15, d = 40 + ((r() * 160 + t * 22) % 170), x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d * 0.7; ctx.globalAlpha = 0.5 * (1 - d / 210); ctx.fillStyle = i % 3 ? '#9ae8ff' : '#e0a0ff'; ctx.fillRect(Math.round(x), Math.round(y), 2 + (i % 3), 2); }
+    ctx.restore(); motes(ctx, t, { n: 30, color: '#c8f0ff', a: 0.5, speed: 6, seed: 12 }); vignette(ctx, 0.7);
+  },
+  // an arena of pale columns lit from above, pearls glowing on the floor
+  gauntlet(ctx, t) {
+    grad(ctx, [[0, '#2a2a5a'], [1, '#0a0a1e']]); glow(ctx, 240, 40, 260, '#ffe8a0', 0.26); rays(ctx, t, { n: 6, color: '#fff2c8', a: 0.1, seed: 9 });
+    ctx.fillStyle = '#06060f'; ctx.fillRect(0, 214, W, 56); ctx.fillStyle = '#1a1a3a'; ctx.fillRect(0, 214, W, 3);
+    for (const x of [30, 110, 370, 450]) { ctx.fillStyle = '#4a4a7a'; ctx.fillRect(x - 12, 60, 24, 154); ctx.fillStyle = '#7a7ab0'; ctx.fillRect(x - 12, 60, 6, 154); ctx.fillStyle = '#9a9ad0'; ctx.fillRect(x - 16, 54, 32, 8); ctx.fillRect(x - 16, 208, 32, 8); }
+    const r = rng(5); for (let i = 0; i < 14; i++) { const x = 60 + r() * 360, y = 224 + r() * 36, p = 0.5 + 0.5 * Math.sin(t * 2 + i); glow(ctx, x, y, 14 + p * 6, '#fff6e0', 0.35); ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3); }
+    for (let i = 0; i < 5; i++) { const a = t * 0.4 + i * 1.26; ctx.fillStyle = '#c8c8f0'; ctx.fillRect(Math.round(240 + Math.cos(a) * 80), Math.round(150 + Math.sin(a) * 18), 3, 3); }
+    motes(ctx, t, { n: 24, color: '#ffe8a0', a: 0.5, speed: 5, seed: 31 }); vignette(ctx, 0.6);
+  },
+  // a cooking pot over a driftwood fire with steam rising, lanterns above
+  kitchen(ctx, t) {
+    grad(ctx, [[0, '#3a2a2a'], [1, '#120a0a']]); glow(ctx, 240, 190, 200, '#ff9a3a', 0.4);
+    ctx.fillStyle = '#2a1a14'; ctx.fillRect(0, 214, W, 56); ctx.fillStyle = '#4a2a1a'; ctx.fillRect(0, 214, W, 3);
+    for (const x of [90, 390]) { ctx.fillStyle = '#05030a'; ctx.fillRect(x - 1, 0, 2, 54); glow(ctx, x, 62, 54, '#ffd070', 0.5); ctx.fillStyle = '#ffd070'; ctx.fillRect(x - 6, 54, 12, 14); ctx.fillStyle = '#fff4c8'; ctx.fillRect(x - 3, 58, 6, 6); }
+    ctx.fillStyle = '#05030a'; ctx.beginPath(); ctx.ellipse(240, 188, 56, 34, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#3a3a48'; ctx.beginPath(); ctx.ellipse(240, 186, 52, 30, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#7a4a2a'; ctx.beginPath(); ctx.ellipse(240, 164, 46, 9, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#c8803a'; ctx.beginPath(); ctx.ellipse(240, 164, 40, 6, 0, 0, TAU); ctx.fill();
+    for (let i = 0; i < 7; i++) { const f = (i * 0.37 + t * 1.2) % 1; ctx.fillStyle = f < 0.5 ? '#ffd070' : '#ff7a3a'; ctx.fillRect(210 + i * 10 + Math.round(Math.sin(t * 5 + i) * 2), 222 - Math.round(f * 14), 4, 6); }
+    const r = rng(3); ctx.save(); for (let i = 0; i < 18; i++) { const f = (r() + t * 0.18) % 1, x = 240 + (r() - 0.5) * 60 + Math.sin(f * 6 + i) * 8, y = 156 - f * 120; ctx.globalAlpha = 0.28 * (1 - f); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, 3 + f * 8, 0, TAU); ctx.fill(); } ctx.restore();
+    motes(ctx, t, { n: 20, color: '#ffb070', a: 0.4, speed: 6, seed: 8 }); vignette(ctx, 0.65);
+  },
+  // a speckled egg on warm sand, a crack of light running down it, a small claw pushing through
+  hatch(ctx, t) {
+    grad(ctx, [[0, '#6ad4ea'], [0.55, '#2a8ab8'], [1, '#0a3a62']]); rays(ctx, t, { n: 8, color: '#fff6c8', a: 0.1, seed: 4 });
+    ctx.fillStyle = '#c89c5e'; ctx.fillRect(0, 204, W, 66); ctx.fillStyle = '#eecb94'; ctx.fillRect(0, 204, W, 3);
+    const k = clamp((t % 6) / 3, 0, 1), wob = Math.sin(t * 9) * (1 - k) * 2;
+    ctx.save(); ctx.translate(240 + wob, 176); ctx.fillStyle = '#05030a'; ctx.beginPath(); ctx.ellipse(0, 0, 28, 34, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#f2e4cc'; ctx.beginPath(); ctx.ellipse(0, 0, 25, 31, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#d8a8a0'; for (const [x, y] of [[-12, -14], [8, -20], [14, 4], [-6, 12], [-16, 4], [4, 18]]) ctx.fillRect(x, y, 3, 3);
+    ctx.strokeStyle = '#ffe08a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6, -30); ctx.lineTo(2, -18); ctx.lineTo(-4, -8); ctx.lineTo(5, 4 + k * 8); ctx.stroke(); ctx.restore();
+    glow(ctx, 240, 176, 90 + k * 40, '#ffe8b0', 0.2 + k * 0.3);
+    if (k > 0.7) { ctx.fillStyle = '#e88a9a'; ctx.fillRect(228, 160, 4, 8); ctx.fillRect(248, 162, 4, 8); ctx.fillStyle = '#ffffff'; ctx.fillRect(229, 161, 1, 1); }
+    motes(ctx, t, { n: 36, color: '#ffffff', a: 0.6, speed: 5, seed: 19 }); vignette(ctx, 0.45);
+  },
+});
+
 export const hasScene = (name) => !!SCENES[name] || name.startsWith('boss:') || name.startsWith('form:');
 export function drawScene(ctx, name, t, info, lift = 0) {
   ctx.save(); if (lift) { ctx.fillStyle = '#02060e'; ctx.fillRect(0, 0, W, H); ctx.translate(0, -lift); }

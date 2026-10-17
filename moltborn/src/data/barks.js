@@ -72,6 +72,11 @@ export const BARKS = {
     { when: done('sq_lantern'), text: 'The lanterns are lit again. The deep looks brighter.' },
     'Lights out down there. Take a lantern.', 'You can follow a glow into a lot of trouble.',
   ],
+  marlin: [
+    { when: done('sq_board'), text: 'The board looks so well used now. I could weep. Eight ways.' },
+    { when: rifts(1), text: 'A rift cleared! Pin it up! Oh, there is no space. There is never any space.' },
+    'Dares for the daring! Rifts for the restless!', 'Read the board. Read it. It is lonely.', 'Three orders a day. Somebody is always hungry.',
+  ],
   thessaly: [
     { when: boss('poseidon'), text: 'It is finished. And it is not. It never is.' },
     'The old gods are not gone. They only sleep with one eye open.', 'There is a door below the sea. Do not knock.',

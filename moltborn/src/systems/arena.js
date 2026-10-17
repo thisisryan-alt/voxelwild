@@ -42,7 +42,7 @@ export class Arena {
     const w = g.world, p = w.player, seed = Math.floor(Math.random() * 90000 + 10000);
     this.run = { seed, wave: 0, kills: 0, state: 'wait', left: 0, bonus: 0, pearls: 0, hub: { zone: w.zone.id, x: p.x, y: p.y }, hp0: p.hp, t0: g.state.playtime, pending: 0, picking: false, done: false };
     g.state.riftRelics = []; this.timers = [];
-    g.events.emit('rift', 'enter');
+    g.events.emit('arena', 'enter');
     g.playScene.fadeOut(0.5, () => { g.buildWorld(arenaId(seed), 'start', { silentBanner: true }); g.playScene.fadeIn(0.5); });
     return true;
   }

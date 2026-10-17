@@ -20,6 +20,7 @@ export const SCHEMA = [
   { group: 'Video', key: 'showFps', label: 'Show FPS', type: 'toggle', def: 0 },
 
   { group: 'Gameplay', key: 'difficulty', label: 'Difficulty', type: 'cycle', options: DIFFICULTIES, def: 'tide', hint: 'Calm: forgiving. Tide: as designed. Rip: tougher foes. Maelstrom: unforgiving.' },
+  { group: 'Gameplay', key: 'packTactics', label: 'Pack tactics', type: 'toggle', def: 1, hint: 'Foes take turns attacking instead of piling on all at once.' },
   { group: 'Gameplay', key: 'shake', label: 'Screen shake', type: 'slider', min: 0, max: 1, step: 0.1, def: 1 },
   { group: 'Gameplay', key: 'damageNumbers', label: 'Damage numbers', type: 'cycle', options: ['off', 'small', 'normal'], def: 'normal' },
   { group: 'Gameplay', key: 'minimap', label: 'Minimap', type: 'cycle', options: ['off', 'small', 'large'], def: 'small', hint: 'Press N in game to cycle it.' },

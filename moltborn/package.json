@@ -6,8 +6,10 @@
   "private": true,
   "scripts": {
     "start": "node tools/serve.mjs",
-    "validate": "node tests/validate_zones.mjs && node tests/validate_links.mjs && node tests/validate_content.mjs && node tests/interactable_keys.mjs && node tests/music_compose.mjs",
+    "validate": "node tests/validate_zones.mjs && node tests/validate_links.mjs && node tests/validate_content.mjs && node tests/interactable_keys.mjs && node tests/music_compose.mjs && node tests/validate_rifts.mjs 4",
     "economy": "node tests/economy.mjs",
-    "smoke": "node tools/run.mjs tests/scripts/smoke.mjs"
+    "smoke": "node tools/run.mjs tests/scripts/smoke.mjs",
+    "test": "node tests/unit/run.mjs",
+    "check": "npm run test && npm run validate && npm run smoke"
   }
 }

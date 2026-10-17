@@ -49,6 +49,7 @@ export class AudioFeel {
     ev.on('recipe', () => sfx('recipe'));
     ev.on('hitdealt', () => this.comboChime());
     ev.on('rift', (what) => { if (what === 'enter') sfx('rift'); });
+    ev.on('arena', (what) => { if (what === 'enter') sfx('rift'); });
     ev.on('photo', () => sfx('shutter'));
     ev.on('travel', () => sfx('travel'));
   }

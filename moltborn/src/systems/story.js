@@ -34,6 +34,20 @@ export const STORIES = {
     { art: 'throne', title: 'THE THRONE OF TIDES', text: 'He is not hiding. He has never hidden. He is waiting, the way a lock waits, for the thing it was made to stop.' },
   ] },
 
+  // the newer systems introduce themselves once
+  first_rift: { music: null, delay: 1.5, panels: [
+    { art: 'rift', title: 'A TEAR IN THE TIDE', text: 'The sea is not one thing. Sometimes it folds, and what is on the other side is a chamber that was never meant to be reached.' },
+    { art: 'rift', text: 'Clear each room. Take what the rift offers. It will always cost more to go deeper, and it will always pay more to come back.' },
+  ] },
+  rift_won: { delay: 2, panels: [{ art: 'rift', title: 'THE RIFT QUIETS', text: 'The tear knits shut behind you with a sound like a long exhale. You keep the coins, the memory, and a very good story.' }] },
+  first_gauntlet: { music: null, delay: 1, panels: [{ art: 'gauntlet', title: 'THE PEARL GAUNTLET', text: 'The Court held games here once, for pearls and honour. The honour has gone. The pearls are still on the floor.' }] },
+  first_cook: { delay: 1.5, panels: [{ art: 'kitchen', title: 'A HOT MEAL', text: 'The first dish is always a little wrong. By the tenth, the sea starts to taste like something you made on purpose.' }] },
+  hatch: { delay: 1.2, panels: [{ art: 'hatch', title: 'SOMETHING TAPS BACK', text: 'The shell splits, and a very small crab looks up at you as though you were the sea itself. It has already decided to follow you.' }] },
+  ng_plus: { music: 'title', delay: 1, panels: [
+    { art: 'ocean', title: 'THE TIDE TURNS AGAIN', text: 'You wake in the shallows with the shape you earned and nothing else. The sea has the same names, and it has been practising.' },
+    { art: 'stars', text: 'Everything you fought is waiting where you left it, stronger, and a little glad to see you.' },
+  ] },
+
   won_grumbold: { delay: 3, panels: [
     { art: 'boss:grumbold', title: 'GRUMBOLD THE ROCKCLAW', text: 'The hoard rattles to the floor: glass, pearls, a hundred shiny rocks. Among them a pink stone hums, very low, like someone remembering a name.' },
     { art: 'ocean', text: 'It was never treasure. It was cargo from a Tithe-boat, and it was warm because it still remembered being alive.' },
@@ -104,6 +118,10 @@ export class Story {
     game.events.on('zone', (id) => this.onZone(id));
     game.events.on('boss', (key) => { const id = BOSS_STORY[key]; if (id) this.add(id); });
     game.events.on('evolved', (to) => this.add('molt_' + to));
+    game.events.on('rift', (what) => { if (what === 'enter') this.add('first_rift'); else if (what === 'won') this.add('rift_won'); });
+    game.events.on('arena', (what) => { if (what === 'enter') this.add('first_gauntlet'); });
+    game.events.on('crafted', () => this.add('first_cook'));
+    game.events.on('companion', (what) => { if (what === 'adopt') this.add('hatch'); });
   }
   seen(id) { return !!this.g.state.flags['cs_' + id]; }
   add(id) { if (!STORIES[id] || this.seen(id) || this.queue.some((q) => q.id === id)) return; this.queue.push({ id, wait: STORIES[id].delay ?? 0.8 }); }

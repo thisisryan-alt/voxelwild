@@ -5,16 +5,16 @@
 //   { id, dur?, power? } applied to the player's status set, use.cleanse removes that many harmful effects.
 export const CRAFT_ITEMS = {
   // ---- ingredients ----------------------------------------------------------------------------------------------------------------
-  kelp_frond:  { name: 'Kelp Frond', type: 'ingredient', icon: ['drop', 'green'], desc: 'A supple green ribbon. Chewy, salty, good for you.' },
-  brine_salt:  { name: 'Brine Salt', type: 'ingredient', icon: ['drop', 'white'], desc: 'Coarse crystals scraped from a shell. Every kitchen on the reef runs on this.' },
-  urchin_spine: { name: 'Urchin Spine', type: 'ingredient', icon: ['drop', 'purple'], desc: 'A hollow spine, still tingling. It adds a sharp kick to anything.' },
-  jelly_gel:   { name: 'Jelly Gel', type: 'ingredient', icon: ['drop', 'cyan'], desc: 'Cool, clear and faintly glowing. Do not think about where it came from.' },
-  ink_sac:     { name: 'Ink Sac', type: 'ingredient', icon: ['drop', 'black'], desc: 'Dark and glossy. It stains everything, including the taste.' },
-  fin_scale:   { name: 'Fin Scale', type: 'ingredient', icon: ['drop', 'blue'], desc: 'A bright, thin scale. Crunches pleasantly when fried.' },
-  glow_spore:  { name: 'Glow Spore', type: 'ingredient', icon: ['drop', 'orange'], desc: 'A pinch of living light. The soup will glow for an hour.' },
-  bone_dust:   { name: 'Bone Dust', type: 'ingredient', icon: ['drop', 'bone'], desc: 'Fine grey powder from the old wrecks. Makes a surprisingly rich stock.' },
-  ember_ash:   { name: 'Ember Ash', type: 'ingredient', icon: ['drop', 'red'], desc: 'Warm to the touch, even now. A little goes a long way.' },
-  shell_chip:  { name: 'Shell Chip', type: 'ingredient', icon: ['drop', 'pink'], desc: 'A curl of nacre. Ground fine it seasons and strengthens.' },
+  kelp_frond:  { name: 'Kelp Frond', type: 'ingredient', price: 10, icon: ['drop', 'green'], desc: 'A supple green ribbon. Chewy, salty, good for you.' },
+  brine_salt:  { name: 'Brine Salt', type: 'ingredient', price: 8, icon: ['drop', 'white'], desc: 'Coarse crystals scraped from a shell. Every kitchen on the reef runs on this.' },
+  urchin_spine: { name: 'Urchin Spine', type: 'ingredient', price: 14, icon: ['drop', 'purple'], desc: 'A hollow spine, still tingling. It adds a sharp kick to anything.' },
+  jelly_gel:   { name: 'Jelly Gel', type: 'ingredient', price: 16, icon: ['drop', 'cyan'], desc: 'Cool, clear and faintly glowing. Do not think about where it came from.' },
+  ink_sac:     { name: 'Ink Sac', type: 'ingredient', price: 18, icon: ['drop', 'black'], desc: 'Dark and glossy. It stains everything, including the taste.' },
+  fin_scale:   { name: 'Fin Scale', type: 'ingredient', price: 12, icon: ['drop', 'blue'], desc: 'A bright, thin scale. Crunches pleasantly when fried.' },
+  glow_spore:  { name: 'Glow Spore', type: 'ingredient', price: 16, icon: ['drop', 'orange'], desc: 'A pinch of living light. The soup will glow for an hour.' },
+  bone_dust:   { name: 'Bone Dust', type: 'ingredient', price: 14, icon: ['drop', 'bone'], desc: 'Fine grey powder from the old wrecks. Makes a surprisingly rich stock.' },
+  ember_ash:   { name: 'Ember Ash', type: 'ingredient', price: 20, icon: ['drop', 'red'], desc: 'Warm to the touch, even now. A little goes a long way.' },
+  shell_chip:  { name: 'Shell Chip', type: 'ingredient', price: 15, icon: ['drop', 'pink'], desc: 'A curl of nacre. Ground fine it seasons and strengthens.' },
 
   // ---- dishes ---------------------------------------------------------------------------------------------------------------------------
   kelp_stew:   { name: 'Kelp Stew', type: 'dish', icon: ['potion', 'green'], desc: 'Hot, green and comforting. Heals a third of your health and keeps knitting you together.', use: { heal: 0.35, buffs: [{ id: 'regen', dur: 20 }] } },

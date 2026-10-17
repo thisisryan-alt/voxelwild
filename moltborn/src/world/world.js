@@ -141,7 +141,7 @@ export class World {
     const pl = this.player;
     const edt = this.slowT > 0 ? dt * this.slowFactor : dt;
     if (this.slowT > 0) this.slowT -= dt;
-    pl.update(dt); this.companion?.update(dt);
+    pl.update(dt); this.companion?.update(dt); this.game.systems.director?.update(this);
     for (const e of this.enemies) e.update(edt);
     for (const i of this.interactables) i.update?.(dt);
     for (const p of this.projectiles) p.update(edt);
@@ -292,6 +292,7 @@ export class World {
     this.fx.draw(ctx, cam);
     this.drawAtmosphere(ctx, cam);
     this.drawLighting(ctx, cam);
+    this.sky.draw(ctx, cam, 'glow');     // glowing events are drawn over the darkness
     for (const fn of this.overlayExtra) fn(ctx, cam);
     this.game.systems.post?.apply(ctx, this, cam);
     if (this.flash > 0) { ctx.globalAlpha = Math.min(0.8, this.flash * 5); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 480, 270); ctx.globalAlpha = 1; }

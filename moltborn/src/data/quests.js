@@ -87,4 +87,10 @@ export const QUESTS = {
     { text: 'Bring the cores to Sear.', done: f('vents_done') },
   ], desc: 'Sear forges with vent-glass and has run out. She will make you something nice for three good cores, provided you do not mind her yelling at the eel.' },
   sq_tyrant: { name: 'The Pearl Tyrant', type: 'side', giver: 'pip', steps: [{ text: 'Defeat the Pearl Tyrant, the giant clam beneath the garden.', done: boss('pearl_tyrant') }], desc: 'Pip’s pearl was swallowed by something enormous.' },
+  sq_board: { name: 'Notices on the Tide', type: 'side', giver: 'marlin', steps: [
+    { text: 'Read the Tide Board.', done: f('board_read') },
+    { text: 'Clear a Tidal Rift (any depth, all the way down).', done: (g) => (g.state.records?.rifts || 0) >= 1 },
+    { text: 'Cook three dishes in the CRAFT tab.', done: (g) => (g.state.records?.crafted || 0) >= 3 },
+    { text: 'Deliver a kitchen order from the Board.', done: (g) => (g.state.records?.ordersDone || 0) >= 1 },
+  ], desc: 'Marlin pins dares to a board and nobody takes them. He would like that to change, and he is willing to pay.' },
 };

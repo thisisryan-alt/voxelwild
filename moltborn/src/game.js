@@ -45,6 +45,7 @@ import { Travel } from './systems/travel.js';
 import { Orders } from './systems/orders.js';
 import { Access } from './systems/access.js';
 import { CompanionSys } from './systems/companion.js';
+import { Director } from './systems/director.js';
 import { isProcedural } from './world/rift_gen.js';
 
 const rand = rng(8080);
@@ -61,7 +62,7 @@ export class Game {
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
     this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
-    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this); new Elites(this); new Rifts(this); new Arena(this); new Barks(this); new Travel(this); new Orders(this); new Access(this); new CompanionSys(this);
+    new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this); new Elites(this); new Rifts(this); new Arena(this); new Barks(this); new Travel(this); new Orders(this); new Access(this); new CompanionSys(this); new Director(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }
   start(scene) { this.engine.push(scene); this.engine.start(); }
@@ -96,7 +97,7 @@ export class Game {
     this.slot = slot; this.state = newState(); this.state.settings = ensureSettings(Object.assign(this.state.settings, d.state.settings, Save.settings() || {}));
     this.systems.difficulty.carry(d.state, this.state); ensureRecords(this.state);
     this.audio.settings = this.state.settings; this.state.meta = { started: Date.now(), ng: this.state.ng };
-    return this.enterWorld('reef_nursery', 'start', { newGame: true });
+    const sc = this.enterWorld('reef_nursery', 'start', { newGame: true }); this.systems.story.add('ng_plus'); return sc;
   }
   loadGame(slot) {
     const d = Save.read(slot); if (!d) return false;
@@ -257,7 +258,7 @@ export class Game {
     this.engine.push(new CutsceneScene(this, panels, () => { this.systems.quests.check(); this.audio.music.play(this.world.biome.music); }));
   }
   questMarker(npcId) {
-    const map = { tessa: ['sq_tessa'], fenwick: ['sq_choir', 'sq_atlas'], glimmer: ['sq_lantern'], hobb: ['sq_hobb'], inkwell: ['sq_inkwell'], ruby: ['sq_ledger'], pip: ['sq_tyrant'], brack: ['sq_census'], morel: ['sq_spores'], tallow: ['sq_vaults'], sear: ['sq_vents'], thessaly: ['sq_siblings'], old_brine: ['mq1'] };
+    const map = { marlin: ['sq_board'], tessa: ['sq_tessa'], fenwick: ['sq_choir', 'sq_atlas'], glimmer: ['sq_lantern'], hobb: ['sq_hobb'], inkwell: ['sq_inkwell'], ruby: ['sq_ledger'], pip: ['sq_tyrant'], brack: ['sq_census'], morel: ['sq_spores'], tallow: ['sq_vaults'], sear: ['sq_vents'], thessaly: ['sq_siblings'], old_brine: ['mq1'] };
     const qs = map[npcId]; if (!qs) return null; const q = this.systems.quests;
     if (npcId === 'old_brine' && !this.flag('met_brine')) return '!';
     if (npcId === 'old_brine') return null;
