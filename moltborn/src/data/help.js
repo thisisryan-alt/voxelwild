@@ -8,7 +8,7 @@ export const PAGES = [
     { t: 'Saving', x: ['Shrines save automatically. F5 quick-saves. Three slots, a backup of each, and save codes you can copy and paste (title > SAVE TOOLS).'] },
   ] },
   { id: 'combat', name: 'Combat', entries: [
-    { t: 'Claw and heavy claw', x: ['J or Z is a quick claw; chain it for combos. K or X is a slow heavy claw that breaks guards and fills the stagger meter.'] },
+    { t: 'Claw and heavy claw', x: ['Left click or J is a quick claw: chain it for combos, or hold the button to keep going. Right click or K is a slow heavy claw that breaks guards and fills the stagger meter; hold it to charge. Mouse attacks and middle-click dashes turn toward the pointer (Options > Gameplay turns this off).'] },
     { t: 'Dash', x: ['L or C dashes in the direction you hold. You are untouchable for the first moments of the dash, and dashing through attacks is the safest way to avoid them.'] },
     { t: 'Block and parry', x: ['Hold SHIFT to block. Raising the guard just before a blow lands is a parry: the blow is turned aside, Tide is refunded and the attacker is staggered.'] },
     { t: 'Abilities and Fury', x: ['Keys 1, 2 and 3 fire your slotted abilities; Q or R releases your ultimate when the Fury meter is full. Fury builds as you hit and are hit.'] },

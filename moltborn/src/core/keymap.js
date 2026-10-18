@@ -22,6 +22,7 @@ export function keyLabel(code) {
   if (!code) return '-';
   if (/^Key[A-Z]$/.test(code)) return code.slice(3);
   if (/^Digit\d$/.test(code)) return code.slice(5);
+  if (/^Mouse\d$/.test(code)) return ['LMB', 'MMB', 'RMB'][+code.slice(5)] || 'MOUSE' + (+code.slice(5) + 1);
   const map = { ArrowLeft: 'LEFT', ArrowRight: 'RIGHT', ArrowUp: 'UP', ArrowDown: 'DOWN', Space: 'SPACE', ShiftLeft: 'L-SHIFT', ShiftRight: 'R-SHIFT', ControlLeft: 'L-CTRL', ControlRight: 'R-CTRL', AltLeft: 'L-ALT', AltRight: 'R-ALT', Escape: 'ESC', Backquote: '`', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Minus: '-', Equal: '=', Enter: 'ENTER', Tab: 'TAB', Backspace: 'BKSP' };
   return map[code] || code.replace(/^Numpad/, 'NUM').toUpperCase();
 }

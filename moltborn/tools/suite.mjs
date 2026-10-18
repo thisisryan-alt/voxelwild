@@ -8,7 +8,7 @@ import { readdirSync } from 'node:fs';
 
 const DEFAULT = [
   'smoke', 'rifts', 'riftrooms', 'trial', 'oaths', 'warden', 'riftfoes', 'arena', 'bounties', 'fishing', 'market', 'moonpool', 'surge', 'clock',
-  'helphall', 'tricks', 'audio3', 'newcuts2', 'companion', 'extras', 'forage', 'savetools', 'devconsole', 'devconsole2', 'director', 'affixes', 'ngplus', 'feel',
+  'helphall', 'tricks', 'audio3', 'newcuts2', 'companion', 'extras', 'forage', 'savetools', 'devconsole', 'devconsole2', 'director', 'affixes', 'ngplus', 'feel', 'mouse',
 ];
 const TIMEOUT = 280000;
 const all = readdirSync(new URL('../tests/scripts/', import.meta.url)).filter((f) => f.endsWith('.mjs')).map((f) => f.slice(0, -4)).sort();

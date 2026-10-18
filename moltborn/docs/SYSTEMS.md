@@ -135,3 +135,13 @@ lifetime totals.
 `systems/access.js`, `systems/captions.js`, `core/keymap.js`. Colour-blind palettes are an SVG filter over the canvas plus
 remapped telegraph colours; high-contrast outlines; reduced motion and flashes; a large HUD; sound captions with
 direction arrows; full key rebinding with three slots per action; controller rumble strength.
+
+## Mouse
+
+`core/input.js`, `entities/player.js` (`aimVec`, `aimDir`, `faceAim`). Mouse buttons are folded into the keymap as pseudo key codes
+(`Mouse0` left, `Mouse1` middle, `Mouse2` right), so edges, buffering, rebinding and labels all work as they do for keys. The pointer is
+mapped through the canvas's on-screen box to game pixels (480x270). `Input.via[action]` records whether an action was last pressed by
+`'key'`, `'mouse'` or `'pad'`; the player aims only for actions pressed with the mouse, and only while the pointer has moved or
+clicked in the last few seconds, so a parked pointer never turns a keyboard attack. `Input.mouseHeld(action)` is true once a button has
+outlasted a normal click, which is what makes holding left keep chaining the combo. The `mouseAttack` setting is copied into
+`Input.mouseOn` once per frame.

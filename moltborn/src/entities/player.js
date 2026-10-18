@@ -10,6 +10,7 @@ import { clamp, approach, rng } from '../core/util.js';
 import { StatusSet, applyHitStatuses } from '../systems/status.js';
 import { BodyFx } from './fx_body.js';
 import { statusOverlay, statusFx } from './fx_status.js';
+import { setting } from '../systems/settings.js';
 
 const rand = rng(555);
 
@@ -159,8 +160,8 @@ export class Player extends Entity {
   readCombatInput(dt) {
     const inp = this.game.input, F = this.form, S = this.stats;
     if (inp.buffered('dash', 6) && this.dashCd <= 0) { inp.consume('dash'); this.startDash(false, 1); return; }
-    if (inp.buffered('attack', 7)) { inp.consume('attack'); this.startAttack(this.comboT > 0 ? this.comboIdx : 0); return; }
-    if (inp.buffered('heavy', 7)) { inp.consume('heavy'); if (F.heavy.charge > 0) { this.setState('charge'); this.chargeT = 0; this.sfx('charge'); } else this.startHeavy(1); return; }
+    if (inp.buffered('attack', 7) || inp.mouseHeld('attack')) { inp.consume('attack'); this.startAttack(this.comboT > 0 ? this.comboIdx : 0); return; }
+    if (inp.buffered('heavy', 7)) { inp.consume('heavy'); this.faceAim('heavy'); if (F.heavy.charge > 0) { this.setState('charge'); this.chargeT = 0; this.sfx('charge'); } else this.startHeavy(1); return; }
     if (inp.isDown('block') && this.blockCd <= 0) { this.setState('block'); this.blockT = 0; this.vx *= 0.3; return; }
     if (inp.pressed('ult')) { if (this.fury >= 100 && this.ultCd <= 0) { this.castUlt(); return; } else if (this.fury < 100) { this.world.fx.text(this.x, this.y - 14, 'FURY ' + Math.floor(this.fury) + '%', '#ff9a6a'); } }
     for (let i = 0; i < 3; i++) {
@@ -169,12 +170,25 @@ export class Player extends Entity {
     }
   }
 
+  // ---- mouse aim ----------------------------------------------------------------------------------------
+  // The pointer relative to the player, in screen pixels, when `src` (an action) was pressed with the mouse and the pointer is
+  // in use. Keyboard and pad play is untouched: a stale pointer parked at the edge of the window never turns the crab.
+  aimVec(src) {
+    const inp = this.game.input;
+    if (!setting(this.game, 'mouseAttack') || !setting(this.game, 'mouseAim') || inp.via[src] !== 'mouse' || !inp.mouseActive(300)) return null;
+    const c = this.world.cam, dx = inp.mouse.x - (this.x - c.x), dy = inp.mouse.y - (this.y - c.y), n = Math.hypot(dx, dy);
+    return n < 4 ? null : [dx / n, dy / n];
+  }
+  // -1 / 1: the side of the crab the pointer is on (0 when it is not being used to aim, or is right over the body)
+  aimDir(src) { const v = this.aimVec(src); return v && Math.abs(v[0]) > 0.12 ? Math.sign(v[0]) : 0; }
+  faceAim(src) { const d = this.aimDir(src); if (d) this.face(d); }
+
   // ---- attacks ----------------------------------------------------------------------------------------
   startAttack(i) {
     const F = this.form, list = F.combo; if (!list) return;
     const def = list[i % list.length]; this.comboIdx = i % list.length;
     this.atk = { def, t: 0, i: this.comboIdx, hit: false, fired: false, heavy: false, mult: 1 }; this.setState('attack'); this.queued = false;
-    this.face(this.game.input.axisX() || this.facing); this.animT = 0;
+    this.face(this.aimDir('attack') || this.game.input.axisX() || this.facing); this.animT = 0;
   }
   startHeavy(chargeRatio) {
     const def = this.form.heavy; const mult = 0.75 + 0.5 * chargeRatio;
@@ -188,7 +202,7 @@ export class Player extends Entity {
     const wind = d.wind, act = d.act, rec = d.rec, tt = a.t;
     this.applyWater(dt, 0, 0);
     this.vx *= Math.exp(-4 * dt); if (this.free) this.vy *= Math.exp(-4 * dt);
-    if (ok && inp.buffered('attack', 8) && !a.heavy) this.queued = true;
+    if (ok && (inp.buffered('attack', 8) || inp.mouseHeld('attack')) && !a.heavy) this.queued = true;
     if (ok && inp.buffered('dash', 5) && this.dashCd <= 0 && tt > wind + act * 0.5) { inp.consume('dash'); this.atk = null; this.startDash(false, 1); return; }
     if (tt >= wind && !a.fired) {
       a.fired = true;
@@ -214,7 +228,7 @@ export class Player extends Entity {
   }
   updateCharge(dt, ok) {
     const F = this.form, inp = this.game.input, need = F.heavy.charge / (1 + this.stats.chargeSpeed);
-    this.chargeT += dt; this.applyWater(dt, 0, 0); this.vx *= Math.exp(-6 * dt);
+    this.chargeT += dt; this.applyWater(dt, 0, 0); this.vx *= Math.exp(-6 * dt); this.faceAim('heavy');
     if (this.chargeT > need && !this.chargedFx) { this.chargedFx = true; this.world.fx.ring(this.x, this.y, 20, 4, 0.25, '#ffd84a', 2); this.sfx('charged'); }
     if (this.chargeT < need) this.chargedFx = false;
     if (this.chargeT > 0.1 && Math.random() < 0.3) this.world.fx.add({ x: this.x + (Math.random() - 0.5) * 30, y: this.y + (Math.random() - 0.5) * 20, vx: 0, vy: 0, life: 0.3, size: 1, color: '#ffd88a', shrink: true });
@@ -255,6 +269,7 @@ export class Player extends Entity {
     const M = this.form.move, inp = this.game.input, S = this.stats;
     let dx = inp.axisX(), dy = 0;
     if (M.dash.any || this.free) dy = inp.axisY() + ((inp.isDown('jump') && !dx) ? -0 : 0);
+    if (!dx && !dy) { const v = this.aimVec('dash'); if (v) { dx = Math.abs(v[0]) > 0.12 ? v[0] : 0; dy = Math.abs(v[1]) > 0.35 ? v[1] : 0; } }
     if (!dx && !dy) dx = this.facing;
     if (!M.dash.any && !this.free) dy = 0;
     const n = Math.hypot(dx, dy) || 1; this.dashDir = [dx / n, dy / n]; if (dx) this.face(Math.sign(dx));

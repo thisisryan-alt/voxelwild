@@ -26,7 +26,7 @@ import { Story } from './systems/story.js';
 import { MenuScene } from './ui/menu.js';
 import { PauseScene, OptionsScene, ShopScene, ForgeScene, MoltShrineScene, CutsceneScene, TitleScene } from './ui/screens.js';
 import { rng } from './core/util.js';
-import { ensureSettings } from './systems/settings.js';
+import { ensureSettings, setting } from './systems/settings.js';
 import { Stats, ensureRecords } from './systems/stats.js';
 import { Achievements } from './systems/achievements.js';
 import { PostFX } from './gfx/post.js';
@@ -72,7 +72,8 @@ export class Game {
     applyKeymap(this.input, this.state.settings.keymap);
     this.audio = new AudioSys(this.state.settings);
     this.world = null; this.slot = 0; this.freeze = 0; this.npcs = new Map(); this.popups = []; this.toasts = []; this.systems = {};
-    this.engine.pre = () => this.input.poll(); this.engine.post = () => this.input.endFrame();
+    this.engine.pre = () => { this.input.mouseOn = !!setting(this, 'mouseAttack'); this.input.poll(); }; this.engine.post = () => this.input.endFrame();
+    if (canvas && canvas.addEventListener) this.input.bindMouse(canvas);
     new Quests(this); new Dialogue(this); new Codex(this); new Evolution(this); new Endings(this); new ZoneScripts(this); new Tips(this); new Story(this); new Stats(this); new Achievements(this); new PostFX(this); new BodyReactions(this); new Minimap(this); new Crafting(this); new Difficulty(this); new AudioFeel(this); new Haptics(this); new Elites(this); new Rifts(this); new Arena(this); new Barks(this); new Travel(this); new Orders(this); new Bounties(this); new Clock(this); new Fishing(this); new History(this); new Market(this); new Surge(this); new Journal(this); new Audio2(this); new Access(this); new CompanionSys(this); new Director(this); new Captions(this); new Cosmetics(this);
     window.addEventListener('pointerdown', () => this.audio.unlock()); window.addEventListener('keydown', () => this.audio.unlock());
   }

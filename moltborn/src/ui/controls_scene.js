@@ -7,6 +7,7 @@ import { REBINDABLE, SLOTS, keyLabel, setBinding, clearBinding, resetKeymap, dif
 import { Save } from '../core/save.js';
 
 const PAD = [['Stroke / jump', 'A'], ['Claw', 'X'], ['Heavy claw', 'Y'], ['Dash', 'B'], ['Block', 'RB or RT'], ['Ability 1-2', 'LB / LT'], ['Menu', 'Start'], ['Map', 'Select']];
+const MOUSE = [['Claw', 'Left'], ['Heavy claw', 'Right'], ['Dash', 'Middle']];
 
 export class ControlsScene {
   constructor(game) { this.g = game; this.opaque = false; this.row = 0; this.slot = 0; this.wait = false; this.msg = ''; this.msgT = 0; this.t = 0; }
@@ -57,8 +58,10 @@ export class ControlsScene {
     // gamepad reference and help
     text(ctx, 'GAMEPAD', 318, 36, COL.gold);
     PAD.forEach(([a, b], i) => { text(ctx, a, 318, 50 + i * 12, COL.dim); text(ctx, b, 450 - textWidth(b), 50 + i * 12, COL.text); });
-    text(ctx, 'ENTER  change key', 318, 160, '#9ad8ff'); text(ctx, 'BACKSPACE  clear key', 318, 172, '#9ad8ff'); text(ctx, 'R  restore defaults', 318, 184, '#9ad8ff'); text(ctx, 'ESC  back', 318, 196, '#9ad8ff');
-    if (this.wait) { const s = 'Press the new key  (ESC to cancel)'; panel(ctx, 240 - textWidth(s) / 2 - 8, 214, textWidth(s) + 16, 18, { border: COL.gold }); text(ctx, s, 240 - textWidth(s) / 2, 219, COL.gold); }
-    else if (this.msgT > 0) { text(ctx, this.msg, 240 - textWidth(this.msg) / 2, 238, COL.green); }
+    text(ctx, 'MOUSE', 318, 148, COL.gold);
+    MOUSE.forEach(([a, b], i) => { text(ctx, a, 318, 160 + i * 12, COL.dim); text(ctx, b, 450 - textWidth(b), 160 + i * 12, COL.text); });
+    text(ctx, 'ENTER  change key', 318, 198, '#9ad8ff'); text(ctx, 'BACKSPACE  clear key', 318, 209, '#9ad8ff'); text(ctx, 'R  restore defaults', 318, 220, '#9ad8ff'); text(ctx, 'ESC  back', 318, 231, '#9ad8ff');
+    if (this.wait) { const s = 'Press a key or mouse button  (ESC: cancel)'; panel(ctx, 28, 228, textWidth(s) + 16, 18, { border: COL.gold }); text(ctx, s, 36, 233, COL.gold); }
+    else if (this.msgT > 0) { text(ctx, this.msg, 36, 233, COL.green); }
   }
 }

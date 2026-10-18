@@ -1,7 +1,7 @@
 // Contextual tutorial tips: shown once per save when the player runs into the situation they teach.
 const TIPS = {
   stroke: { msg: 'Blocked? Press SPACE again in mid-air to paddle higher.', test: (c) => c.stuck > 0.5 && c.p.onGround && !c.free },
-  claw: { msg: 'Press J to pinch. Chain J J for a combo; hold K for a heavy strike.', test: (c) => c.nearEnemy < 70 },
+  claw: { msg: 'Click (or press J) to pinch. Chain clicks for a combo; hold right click (or K) for a heavy strike.', test: (c) => c.nearEnemy < 70 },
   tuck: { msg: 'Hold SHIFT to tuck into your shell. Tap it just before a hit to parry.', test: (c) => c.p.state === 'hurt' },
   heal: { msg: 'Low on health? Press F to use a kelp wrap.', test: (c) => c.p.hp < c.p.stats.maxHp * 0.4 && (c.g.state.inv.kelp_wrap > 0 || c.g.state.inv.brine_tonic > 0) },
   dash: { msg: 'Press L to dash. You are untouchable for an instant.', test: (c) => c.g.state.level >= 2 },

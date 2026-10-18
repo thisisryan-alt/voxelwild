@@ -2,6 +2,19 @@
 
 Newest first. Version numbers are not used; each entry is one push of the game.
 
+## Mouse attacks
+
+* **Left click claws, right click is the heavy claw, middle click dashes.** Hold left to keep chaining the combo; hold right to
+  charge a heavy and release to strike. The buttons are ordinary entries in the keymap (`Mouse0`/`Mouse1`/`Mouse2`), so they show as
+  LMB / MMB / RMB on the controls screen and can be rebound, or moved onto another action, like any key.
+* **Attacks aim at the pointer.** A mouse attack turns the crab toward the cursor before it swings, a charging heavy keeps following
+  it, and a middle-click dash heads toward it when no direction is held. Keyboard and pad play never reads the pointer, and a pointer
+  left alone for a few seconds stops counting.
+* **Menus take the same buttons**: left confirms, right goes back. Both are on the same footing as J and K.
+* Two new options under Gameplay, **Mouse attacks** and **Aim with mouse**, both on by default. The context menu and middle-click
+  autoscroll are blocked over the canvas only.
+* Tests: `tests/unit/mouse.test.mjs` (30 cases) and `tests/scripts/mouse.mjs`, which drives real mouse events over the scaled canvas.
+
 ## The big content and polish push
 
 ### New ways to play

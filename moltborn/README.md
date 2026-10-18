@@ -21,8 +21,8 @@ URL flags: `?quick=1` skips the title screen, `?manual=1` stops the real-time lo
 |---|---|
 | Move / swim | Arrows or WASD |
 | Jump / stroke | Space |
-| Attack (combo) / heavy | J or Z / K or X (hold to charge) |
-| Dash | L or C |
+| Attack (combo) / heavy | Left click or J / right click or K (hold to charge; hold left click to keep attacking) |
+| Dash | L or C, or middle click (toward the pointer) |
 | Block, parry on a tight press | Shift or V |
 | Abilities 1-3 / Ultimate | 1 2 3 (or U I O) / Q or R |
 | Interact | E |

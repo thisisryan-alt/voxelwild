@@ -28,7 +28,7 @@ export function reef_nursery() {
   b.exitE(24, 31, 'reef_garden', 'west'); b.entryFloor('east', 94, { facing: -1 });
   // content
   b.npc('old_brine', 26, { facing: -1 });
-  b.sign(14, 'A / D  scuttle    SPACE  paddle up    J  claw    L  dash\nK  heavy    SHIFT  tuck (block)    E  talk / use    TAB  menu', { speaker: 'Tideworn Marker' });
+  b.sign(14, 'A / D  scuttle    SPACE  paddle up    CLICK or J  claw    L  dash\nRIGHT CLICK or K  heavy    SHIFT  tuck (block)    E  talk / use    TAB  menu', { speaker: 'Tideworn Marker' });
   b.spawnFloor('minnow', 30, 0, { count: 3 }); b.spawnFloor('pinchling', 44, 0, { p: { range: 40 } });
   b.spawn('minnow', 56, 18, { count: 4 }); b.spawnFloor('pinchling', 61, 0, { p: { range: 30 } }); b.spawnFloor('urchin', 66, 0);
   b.spawn('minnow', 82, 22, { count: 3 }); b.spawnFloor('pinchling', 85, 0);
