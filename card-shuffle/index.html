@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find the Queen</title>
+<style>
+  :root { --bg:#0f5132; --felt:#146c43; --card:#fff; --back:#8b1e2d; --ink:#111; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; background:radial-gradient(var(--felt),var(--bg)); color:#fff;
+         font-family:system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; padding:16px; }
+  h1 { margin:8px 0 4px; }
+  #status { min-height:1.5em; margin:8px 0 16px; font-size:1.1rem; text-align:center; }
+  #table { position:relative; width:min(420px,100%); height:170px; }
+  .card { position:absolute; top:10px; width:30%; height:150px; border-radius:10px; cursor:pointer;
+          transition:left .3s ease, transform .4s; transform-style:preserve-3d; }
+  .card .face, .card .back { position:absolute; inset:0; border-radius:10px; backface-visibility:hidden;
+          display:flex; align-items:center; justify-content:center; font-size:2.6rem; box-shadow:0 4px 10px #0006; }
+  .card .face { background:var(--card); color:var(--ink); }
+  .card .face.red { color:#c00; }
+  .card .back { background:repeating-linear-gradient(45deg,var(--back) 0 8px,#a8323f 8px 16px); border:4px solid #fff;
+          transform:rotateY(180deg); }
+  .card.down { transform:rotateY(180deg); }
+  .controls { margin-top:20px; display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  button { font-size:1rem; padding:10px 18px; border:0; border-radius:8px; background:#ffc107; color:#000; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  #score { margin-top:14px; opacity:.9; }
+</style>
+</head>
+<body>
+  <h1>Find the Queen</h1>
+  <div id="status">Watch the Queen ♥, then hit Shuffle.</div>
+  <div id="table"></div>
+  <div class="controls">
+    <button id="shuffle">Shuffle</button>
+    <label>Speed
+      <select id="level">
+        <option value="8,380">Easy</option>
+        <option value="12,260" selected>Medium</option>
+        <option value="18,170">Hard</option>
+      </select>
+    </label>
+  </div>
+  <div id="score">Wins 0 · Losses 0 · Streak 0</div>
+<script>
+const table = document.getElementById('table');
+const statusEl = document.getElementById('status');
+const btn = document.getElementById('shuffle');
+const faces = [{t:'Q♥',red:true,queen:true},{t:'J♠'},{t:'K♣'}];
+let slots = [0,1,2], cards = [], busy = false, canPick = false;
+let wins = 0, losses = 0, streak = 0;
+
+faces.forEach((f,i) => {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = `<div class="face ${f.red?'red':''}">${f.t}</div><div class="back"></div>`;
+  el.onclick = () => pick(i);
+  table.appendChild(el);
+  cards.push(el);
+});
+const place = () => cards.forEach((el,i) => el.style.left = (slots[i]*35) + '%');
+place();
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+async function shuffle() {
+  if (busy) return;
+  busy = true; canPick = false; btn.disabled = true;
+  cards.forEach(c => c.classList.add('down'));
+  statusEl.textContent = 'Shuffling...';
+  await wait(500);
+  const [swaps, ms] = document.getElementById('level').value.split(',').map(Number);
+  cards.forEach(c => c.style.transitionDuration = ms/1000 + 's, .4s');
+  for (let n = 0; n < swaps; n++) {
+    const a = Math.floor(Math.random()*3);
+    const b = (a + 1 + Math.floor(Math.random()*2)) % 3;
+    const ia = slots.indexOf(a), ib = slots.indexOf(b);
+    [slots[ia], slots[ib]] = [b, a];
+    place();
+    await wait(ms + 20);
+  }
+  statusEl.textContent = 'Where is the Queen? Click a card.';
+  canPick = true; busy = false;
+}
+
+function pick(i) {
+  if (!canPick) return;
+  canPick = false;
+  cards.forEach(c => c.classList.remove('down'));
+  if (faces[i].queen) { wins++; streak++; statusEl.textContent = 'You found her! 🎉'; }
+  else { losses++; streak = 0; statusEl.textContent = 'Nope! The Queen got away.'; }
+  document.getElementById('score').textContent = `Wins ${wins} · Losses ${losses} · Streak ${streak}`;
+  btn.disabled = false; btn.textContent = 'Play again';
+}
+btn.onclick = shuffle;
+</script>
+</body>
+</html>
