@@ -18,7 +18,7 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { font-variant-emoji: text; margin: 0; background: var(--felt-deep); color: var(--chalk); font-family: var(--body); min-height: 100%;
+body { font-variant-emoji: text; margin: 0; background: radial-gradient(ellipse 90% 60% at 50% -10%, #0f3d2c, #0000 70%), repeating-linear-gradient(45deg, #ffffff05 0 1px, #0000 1px 22px), repeating-linear-gradient(-45deg, #ffffff05 0 1px, #0000 1px 22px), var(--felt-deep); color: var(--chalk); font-family: var(--body); min-height: 100%;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 18px 28px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .top { position: relative; width: min(680px, 100%); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -123,7 +123,8 @@ select { font: 600 .95rem var(--body); padding: 10px 14px; border-radius: 999px;
 .duel { display: flex; justify-content: center; align-items: center; gap: clamp(10px, 4vw, 28px); --cw: clamp(70px, 22vw, 110px); }
 .duel .arrow { font: 400 1.6rem var(--display); color: var(--gold); }
 .odds { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 360px; margin: 0 auto; width: 100%; }
-.odds div { background: #00000033; border-radius: 10px; padding: 6px; text-align: center; font-size: .8rem; }
+.odds div { background: #00000033; border-radius: 10px; padding: 6px; text-align: center; font-size: .8rem; border: 1px solid transparent; transition: border-color .2s, background-color .2s; }
+.odds div.fav { border-color: var(--gold); background: #e2b55614; }
 .odds b { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
 
 /* Memory */
@@ -190,6 +191,8 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
 .ledger li a { color: inherit; text-decoration: none; }
 .ledger li:has(a:hover) { border-color: var(--gold); }
 :root.still *, :root.still *::before, :root.still *::after { animation-duration: .01s !important; animation-delay: 0s !important; transition-duration: .01s !important; }
+.progress { width: min(260px, 70%); height: 5px; margin: 0 auto; border-radius: 3px; background: #00000055; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--gold-lo), var(--gold)); transition: width .12s linear; }
 @media (max-width: 440px) { .board { grid-template-columns: repeat(2, 1fr); } .table { border-width: 9px; padding-inline: 8px; } }
 @media (prefers-reduced-motion: reduce) { .wchip, .mcell.wave .pc, .card, .inner, .dealt, .mcell .pc, .ledger li.new, .delta, .status.anim, .view.anim, .shake, .glow > .inner > .face { transition-duration: .01s !important; animation: none !important; } }
 </style>
@@ -234,6 +237,7 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
     <svg class="print" viewBox="0 0 400 120" aria-hidden="true"><path id="arc-m" d="M20,104 Q200,4 380,104" fill="none"/><text><textPath href="#arc-m" startOffset="50%" text-anchor="middle">FIND THE LADY</textPath></text></svg>
     <p class="status" aria-live="polite" id="m-status">Watch the Queen of Hearts, then deal.</p>
     <div id="m-cards"></div>
+    <div class="progress" id="m-prog" role="progressbar" aria-label="Shuffle progress" aria-valuemin="0" aria-valuemax="100" hidden><i></i></div>
     <div class="controls">
       <select id="m-mode" aria-label="Difficulty">
         <option value="5,500,15">Low · pays 15</option>
@@ -266,8 +270,8 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
     </div>
     <div class="run" id="h-run" aria-label="Cards drawn this round"></div>
     <div class="odds">
-      <div>Higher <b id="h-oh">—</b><span id="h-ph"></span></div>
-      <div>Lower <b id="h-ol">—</b><span id="h-pl"></span></div>
+      <div id="h-boxh">Higher <b id="h-oh">—</b><span id="h-ph"></span></div>
+      <div id="h-boxl">Lower <b id="h-ol">—</b><span id="h-pl"></span></div>
     </div>
     <div class="controls">
       <button class="go" id="h-deal">Deal · 10</button>
@@ -315,10 +319,10 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
     <svg class="print" viewBox="0 0 400 150" aria-hidden="true"><path id="arc-b1" d="M10,90 Q200,-10 390,90" fill="none"/><path id="arc-b2" d="M40,130 Q200,40 360,130" fill="none"/>
       <text><textPath href="#arc-b1" startOffset="50%" text-anchor="middle">BLACKJACK PAYS 3 TO 2</textPath></text>
       <text style="font-size:14px;letter-spacing:2px"><textPath href="#arc-b2" startOffset="50%" text-anchor="middle">DEALER STANDS ON ALL 17s</textPath></text></svg>
-    <div class="seat"><p class="label">Dealer</p><div class="hand" id="b-dealer"></div><div class="total" id="b-dt"></div></div>
+    <div class="seat"><p class="label">Dealer</p><div class="hand" id="b-dealer"><div class="slot"></div><div class="slot"></div></div><div class="total" id="b-dt"></div></div>
     <p class="status" aria-live="polite" id="b-status">Pick a bet and deal. Dealer stands on all 17s.</p>
     <p class="hint" id="b-hint" hidden></p>
-    <div class="seat"><div class="bj-hands" id="b-player"></div><p class="label">You</p></div>
+    <div class="seat"><div class="bj-hands" id="b-player"><div class="seat bj-hand"><div class="total"></div><div class="hand"><div class="slot"></div><div class="slot"></div></div></div></div><p class="label">You</p></div>
     <div class="chips" id="b-chips" role="group" aria-label="Bet">
       <button class="chipbtn" style="--c:#2f6fb0" data-bet="10" aria-pressed="true">10</button>
       <button class="chipbtn" style="--c:#2d8a4e" data-bet="25" aria-pressed="false">25</button>
@@ -586,7 +590,9 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
     const [baseSwaps, baseMs] = $('m-mode').value.split(',').map(Number);
     const n = cards.length, swaps = baseSwaps + round * 2, ms = Math.max(Math.round(baseMs * 0.6), baseMs - round * 20);
     cards.forEach(c => c.style.setProperty('--spd', ms / 1000 + 's'));
+    const prog = $('m-prog'), bar = prog.firstElementChild; prog.hidden = false;
     for (let k = 0; k < swaps; k++) {
+      const pct = Math.round((k + 1) / swaps * 100); bar.style.width = pct + '%'; prog.setAttribute('aria-valuenow', pct);
       const a = Math.floor(Math.random() * n), b = (a + 1 + Math.floor(Math.random() * (n - 1))) % n;
       const ia = slots.indexOf(a), ib = slots.indexOf(b);
       [slots[ia], slots[ib]] = [b, a];
@@ -594,6 +600,7 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
       layout(); sfx.swish(); await sleep(ms + 15);
       cards[ia].classList.remove('lift'); cards[ib].classList.remove('dip');
     }
+    await sleep(150); prog.hidden = true; bar.style.width = '0';
     say(st, 'Where is the Queen? Pick a card.');
     canPick = true; wrap.classList.add('pickable');
   }
@@ -633,9 +640,10 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
       $('h-ph').textContent = o.h ? `pays ×${mult(o.h).toFixed(2)}` : 'impossible';
       $('h-pl').textContent = o.l ? `pays ×${mult(o.l).toFixed(2)}` : 'impossible';
       hi.disabled = busy || !o.h; lo.disabled = busy || !o.l;
+      $('h-boxh').classList.toggle('fav', o.h > o.l); $('h-boxl').classList.toggle('fav', o.l > o.h);
     } else {
       ['h-oh', 'h-ol'].forEach(id => $(id).textContent = '—'); ['h-ph', 'h-pl'].forEach(id => $(id).textContent = '');
-      hi.disabled = lo.disabled = true;
+      hi.disabled = lo.disabled = true; $('h-boxh').classList.remove('fav'); $('h-boxl').classList.remove('fav');
     }
     cash.disabled = !live || busy || steps === 0; deal.disabled = live || busy;
     cash.textContent = live && steps ? `Cash out ${pot}` : 'Cash out'; setLive('hilo', live);
