@@ -591,7 +591,7 @@ function pickBet(groupId, onPick) {
     }
     lock = true; paint();
     await wait(750);
-    [a, b].forEach(x => { x.pc.classList.add('down'); x.setAttribute('aria-label', 'Face-down card'); }); sfx.flip();
+    [a, b].forEach(x => { x.pc.classList.add('down'); x.setAttribute('aria-label', `Card ${[...grid.children].indexOf(x) + 1}, face down`); }); sfx.flip();
     lock = false;
   }
   function finish() {
@@ -702,7 +702,7 @@ function pickBet(groupId, onPick) {
     H.forEach((h, i) => {
       const ps = val(h.cards).s, pBJ = natural(h.cards); let r = 0, m;
       staked += h.stake;
-      if (pBJ && !dBJ) { r = h.stake * 2.5; m = `Blackjack! Paid 3 to 2: +${h.stake * 1.5}`; stats.bj++; }
+      if (pBJ && !dBJ) { const bonus = Math.floor(h.stake * 1.5); r = h.stake + bonus; m = `Blackjack! Paid 3 to 2: +${bonus}`; stats.bj++; }
       else if (ps > 21) m = `Bust with ${ps}`;
       else if (dBJ && !pBJ) m = 'Dealer has blackjack';
       else if (ds > 21) { r = h.stake * 2; m = `Dealer busts. +${h.stake}`; }
