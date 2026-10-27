@@ -2,97 +2,796 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Find the Queen</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rye&family=Libre+Franklin:wght@400;600;800&display=swap">
 <style>
-  :root { --bg:#0f5132; --felt:#146c43; --card:#fff; --back:#8b1e2d; --ink:#111; }
-  * { box-sizing: border-box; }
-  body { margin:0; min-height:100vh; background:radial-gradient(var(--felt),var(--bg)); color:#fff;
-         font-family:system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; padding:16px; }
-  h1 { margin:8px 0 4px; }
-  #status { min-height:1.5em; margin:8px 0 16px; font-size:1.1rem; text-align:center; }
-  #table { position:relative; width:min(420px,100%); height:170px; }
-  .card { position:absolute; top:10px; width:30%; height:150px; border-radius:10px; cursor:pointer;
-          transition:left .3s ease, transform .4s; transform-style:preserve-3d; }
-  .card .face, .card .back { position:absolute; inset:0; border-radius:10px; backface-visibility:hidden;
-          display:flex; align-items:center; justify-content:center; font-size:2.6rem; box-shadow:0 4px 10px #0006; }
-  .card .face { background:var(--card); color:var(--ink); }
-  .card .face.red { color:#c00; }
-  .card .back { background:repeating-linear-gradient(45deg,var(--back) 0 8px,#a8323f 8px 16px); border:4px solid #fff;
-          transform:rotateY(180deg); }
-  .card.down { transform:rotateY(180deg); }
-  .controls { margin-top:20px; display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
-  button { font-size:1rem; padding:10px 18px; border:0; border-radius:8px; background:#ffc107; color:#000; cursor:pointer; }
-  button:disabled { opacity:.5; cursor:default; }
-  #score { margin-top:14px; opacity:.9; }
+/* Layout: a saloon card parlor. Header with the chip bank, a row of table tabs, one felt table per game. Single dark look by choice. */
+:root {
+  --felt: #0d4a33; --felt-hi: #146a49; --felt-deep: #062a1d; --rail: #4a2a14; --rail-hi: #6b3f1f;
+  --gold: #e2b556; --gold-lo: #8f6d22; --paper: #fbf7ee; --ink: #1b1b1b; --red: #b3122b; --red-lo: #8a0d20;
+  --chalk: #e9efe9; --slate: #0b1f17; --slate-line: #1f4a37; --bad: #ff9b9b;
+  --display: "Rye", Georgia, serif; --body: "Libre Franklin", system-ui, sans-serif;
+  --cw: clamp(56px, 16vw, 84px);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { font-variant-emoji: text; margin: 0; background: var(--felt-deep); color: var(--chalk); font-family: var(--body); min-height: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 28px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.top { width: min(680px, 100%); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { min-width: 0; }
+h1 { font-family: var(--display); font-weight: 400; color: var(--gold); margin: 0; font-size: clamp(1.7rem, 6vw, 2.6rem);
+  letter-spacing: .02em; text-shadow: 0 2px 0 #0008; text-wrap: balance; line-height: 1.1; }
+.sub { margin: 2px 0 0; font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; opacity: .7; }
+.bank { display: flex; align-items: center; gap: 8px; }
+.purse { display: flex; align-items: center; gap: 8px; background: var(--slate); border: 2px solid var(--gold); border-radius: 999px; padding: 6px 14px 6px 8px; }
+.coin { width: 26px; height: 26px; border-radius: 50%; background: repeating-conic-gradient(var(--red) 0 30deg, var(--paper) 30deg 60deg);
+  box-shadow: inset 0 0 0 5px var(--red), inset 0 0 0 7px var(--paper); flex: none; }
+.purse b { font: 400 1.35rem var(--display); color: var(--gold); font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+.purse.bump b { animation: bump .35s ease-out; }
+@keyframes bump { 40% { transform: scale(1.25); } }
+.iconbtn { font-size: 1.15rem; width: 44px; height: 44px; border-radius: 50%; background: var(--slate); border: 2px solid var(--gold); cursor: pointer; color: var(--chalk); flex: none; }
+.tabs { width: min(680px, 100%); display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.tabs a { font: 600 .85rem var(--body); letter-spacing: .04em; color: var(--chalk); text-decoration: none; padding: 8px 14px; border-radius: 999px;
+  border: 1px solid var(--slate-line); background: var(--slate); white-space: nowrap; }
+.tabs a:hover { border-color: var(--gold); }
+.tabs a[aria-current="page"] { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+.view { width: min(680px, 100%); display: flex; flex-direction: column; gap: 12px; }
+.table { border-radius: 28px; border: 12px solid var(--rail); outline: 2px solid var(--rail-hi); outline-offset: -14px;
+  background: radial-gradient(ellipse at 50% 35%, var(--felt-hi), var(--felt) 55%, var(--felt-deep));
+  box-shadow: inset 0 0 40px #0009, 0 10px 30px #0008; padding: 18px 12px 20px; display: flex; flex-direction: column; gap: 12px; }
+.status { text-align: center; min-height: 2.6em; font-weight: 600; font-size: 1.02rem; margin: 0; text-wrap: balance; }
+.status.win { color: var(--gold); } .status.lose { color: var(--bad); }
+.label { font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; opacity: .75; text-align: center; margin: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
+button { font-family: var(--body); }
+.go { font: 800 .95rem var(--body); letter-spacing: .06em; text-transform: uppercase; padding: 12px 24px; border-radius: 999px;
+  border: 0; background: var(--gold); color: var(--ink); cursor: pointer; box-shadow: 0 4px 0 var(--gold-lo); }
+.go:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--gold-lo); }
+.alt { font: 700 .9rem var(--body); letter-spacing: .05em; text-transform: uppercase; padding: 10px 18px; border-radius: 999px;
+  background: var(--slate); color: var(--chalk); border: 2px solid var(--gold); cursor: pointer; }
+.go:disabled, .alt:disabled, .chipbtn:disabled { opacity: .4; cursor: default; }
+select { font: 600 .95rem var(--body); padding: 10px 14px; border-radius: 999px; background: var(--slate); color: var(--chalk); border: 2px solid var(--gold); cursor: pointer; }
+:is(a, button, select):focus-visible { outline: 3px solid var(--chalk); outline-offset: 3px; }
+.chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.chipbtn { width: 50px; height: 50px; border-radius: 50%; border: 0; cursor: pointer; font: 800 .85rem var(--body); color: var(--paper);
+  background: radial-gradient(circle, var(--c) 0 50%, var(--paper) 51% 55%, transparent 56%), repeating-conic-gradient(var(--c) 0 30deg, var(--paper) 30deg 60deg);
+  box-shadow: inset 0 0 0 4px var(--c), 0 3px 0 #0007; text-shadow: 0 1px 2px #000; }
+.chipbtn[aria-pressed="true"] { transform: translateY(-4px); box-shadow: inset 0 0 0 4px var(--c), 0 0 0 3px var(--gold), 0 6px 0 #0007; }
+.board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.stat { background: var(--slate); border: 1px solid var(--slate-line); border-radius: 10px; padding: 8px 4px; text-align: center; min-width: 0; }
+.stat b { display: block; font: 400 1.4rem var(--display); color: var(--gold); font-variant-numeric: tabular-nums; }
+.stat span { font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; opacity: .75; }
+.rules { font-size: .85rem; opacity: .78; text-align: center; line-height: 1.55; margin: 0 auto; max-width: 62ch; }
+
+/* Cards */
+.pc, .card { --fs: calc(var(--cw) * .3); }
+.pc { position: relative; width: var(--cw); aspect-ratio: 5/7; perspective: 800px; flex: none; }
+.inner { position: absolute; inset: 0; transition: transform .45s; transform-style: preserve-3d; }
+.down > .inner { transform: rotateY(180deg); }
+.face, .back { position: absolute; inset: 0; border-radius: 9px; backface-visibility: hidden; -webkit-backface-visibility: hidden; box-shadow: 0 5px 12px #0007; }
+.face { background: var(--paper); color: var(--ink); font-family: var(--display); display: grid; place-items: center; font-size: var(--fs); line-height: 1; }
+.face.red { color: var(--red); }
+.face::before, .face::after { content: attr(data-c); position: absolute; font-size: .38em; font-family: var(--body); font-weight: 800; }
+.face::before { top: 6%; left: 8%; } .face::after { bottom: 6%; right: 8%; transform: rotate(180deg); }
+.back { transform: rotateY(180deg); border: 4px solid var(--paper);
+  background: repeating-linear-gradient(45deg, var(--red) 0 7px, var(--red-lo) 7px 14px); }
+.back::after { content: "♛"; position: absolute; inset: 0; display: grid; place-items: center; color: var(--paper); font-size: calc(var(--fs) * .9); opacity: .85; }
+.glow > .inner > .face { box-shadow: 0 0 0 4px var(--gold), 0 0 26px var(--gold); }
+.dim > .inner { filter: brightness(.55); }
+.dealt { animation: dealIn .32s ease-out; }
+@keyframes dealIn { from { transform: translate(40px, -60px) rotate(12deg); opacity: .2; } }
+.slot { width: var(--cw); aspect-ratio: 5/7; border: 2px dashed #ffffff40; border-radius: 9px; flex: none; }
+
+/* Find the Queen */
+#m-cards { position: relative; height: 0; padding-bottom: 46%; container-type: inline-size; }
+.card { position: absolute; top: 0; aspect-ratio: 5/7; perspective: 800px; cursor: pointer; border: 0; padding: 0; background: none;
+  --fs: calc(var(--cwp) * 1cqi * .3);
+  transition: left var(--spd, .3s) ease-in-out, transform var(--spd, .3s) ease-in-out; }
+.card.lift { transform: translateY(-14%) scale(1.05); z-index: 2; }
+.card.dip { transform: translateY(8%); }
+
+/* Higher or Lower */
+.duel { display: flex; justify-content: center; align-items: center; gap: clamp(10px, 4vw, 28px); --cw: clamp(70px, 22vw, 110px); }
+.duel .arrow { font: 400 1.6rem var(--display); color: var(--gold); }
+.odds { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 360px; margin: 0 auto; width: 100%; }
+.odds div { background: #00000033; border-radius: 10px; padding: 6px; text-align: center; font-size: .8rem; }
+.odds b { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+
+/* Memory */
+.mem-grid { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: clamp(6px, 1.6vw, 12px); max-width: 520px; width: 100%; margin: 0 auto; container-type: inline-size; }
+.mcell { border: 0; padding: 0; background: none; cursor: pointer; aspect-ratio: 5/7; }
+.mcell .pc { width: 100%; --fs: calc(100cqi / var(--cols, 4) * .27); }
+.mcell.found .pc { animation: pop .4s ease-out; }
+.mcell.found .face { box-shadow: 0 0 0 3px var(--gold); }
+@keyframes pop { 50% { transform: scale(1.1); } }
+
+/* Blackjack and War */
+.seat { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.hand { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: calc(var(--cw) * 1.4); }
+#v-blackjack { --cw: clamp(52px, 14vw, 76px); }
+.bj-hands { display: flex; gap: 22px; justify-content: center; flex-wrap: wrap; min-height: calc(var(--cw) * 1.4 + 1.6em); }
+.bj-hand { padding: 6px; border-radius: 12px; border: 2px dashed transparent; }
+.bj-hand.active { border-color: var(--gold); }
+.run { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; min-height: 1.5em; }
+.run span { background: var(--paper); color: var(--ink); border-radius: 4px; padding: 1px 6px; font-weight: 800; font-size: .78rem; }
+.run span.red { color: var(--red); }
+.run i { font-style: normal; font-size: .7rem; align-self: center; color: var(--gold); }
+.total { font: 400 1.05rem var(--display); color: var(--gold); min-height: 1.3em; font-variant-numeric: tabular-nums; }
+.war-field { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; --cw: clamp(66px, 20vw, 100px); }
+.burn { display: flex; flex-direction: column; align-items: center; gap: 4px; --cw: 34px; min-width: 40px; }
+.burn .hand { gap: 0; } .burn .hand .pc + .pc { margin-left: -24px; }
+.burn .hand { min-height: 48px; }
+.vs { font: 400 1.3rem var(--display); color: var(--gold); text-align: center; }
+
+.ledger { width: min(680px, 100%); display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ledger ol { list-style: none; margin: 0; padding: 0 0 2px; display: flex; gap: 6px; overflow-x: auto; flex: 1; min-width: 0; scrollbar-width: none; }
+.ledger li { flex: none; font-size: .75rem; padding: 4px 10px; border-radius: 999px; background: var(--slate); border: 1px solid var(--slate-line); white-space: nowrap; }
+.ledger li.empty { white-space: normal; flex: 1; border-radius: 12px; }
+.ledger li b { font-variant-numeric: tabular-nums; }
+.ledger li.new { animation: slideIn .35s ease-out; border-color: var(--gold); }
+@keyframes slideIn { from { transform: translateX(-16px); opacity: .3; } }
+.gain { color: var(--gold); } .loss { color: var(--bad); }
+kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--slate-line); background: var(--slate); color: var(--chalk); }
+#fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+@media (max-width: 440px) { .board { grid-template-columns: repeat(2, 1fr); } .table { border-width: 9px; padding-inline: 8px; } }
+@media (prefers-reduced-motion: reduce) { .card, .inner, .dealt, .mcell .pc, .ledger li.new { transition-duration: .01s !important; animation: none !important; } }
 </style>
 </head>
 <body>
-  <h1>Find the Queen</h1>
-  <div id="status">Watch the Queen ♥, then hit Shuffle.</div>
-  <div id="table"></div>
-  <div class="controls">
-    <button id="shuffle">Shuffle</button>
-    <label>Speed
-      <select id="level">
-        <option value="8,380">Easy</option>
-        <option value="12,260" selected>Medium</option>
-        <option value="18,170">Hard</option>
-      </select>
-    </label>
+
+<header class="top">
+  <div class="brand">
+    <h1>Find the Queen</h1>
+    <p class="sub">A card parlor with five tables</p>
   </div>
-  <div id="score">Wins 0 · Losses 0 · Streak 0</div>
+  <div class="bank">
+    <div class="purse" id="purse" title="Your chips are shared by every table"><span class="coin" aria-hidden="true"></span><b id="chips">200</b></div>
+    <button class="alt" id="rebuy" hidden>Buy back in</button>
+    <button class="iconbtn" id="mute" aria-label="Sound on">🔊</button>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Tables">
+  <a href="#monte" data-v="monte">Find the Queen</a>
+  <a href="#hilo" data-v="hilo">Higher or Lower</a>
+  <a href="#memory" data-v="memory">Memory</a>
+  <a href="#blackjack" data-v="blackjack">Blackjack</a>
+  <a href="#war" data-v="war">War</a>
+</nav>
+
+<div class="ledger"><p class="label">Recent</p><ol id="ledger" aria-label="Recent results"></ol></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<!-- Find the Queen -->
+<section class="view" id="v-monte">
+  <div class="table">
+    <p class="status" aria-live="polite" id="m-status">Watch the Queen of Hearts, then deal.</p>
+    <div id="m-cards"></div>
+    <div class="controls">
+      <select id="m-mode" aria-label="Difficulty">
+        <option value="5,500,15">Low · pays 15</option>
+        <option value="10,320,25" selected>Medium · pays 25</option>
+        <option value="16,210,40">High · pays 40</option>
+        <option value="26,130,70">Insane · pays 70</option>
+        <option value="45,70,150">God · pays 150</option>
+      </select>
+      <button class="go" id="m-deal">Deal · 10</button>
+    </div>
+  </div>
+  <div class="board">
+    <div class="stat"><b id="m-round">1</b><span>Round</span></div>
+    <div class="stat"><b id="m-streak">0</b><span>Streak</span></div>
+    <div class="stat"><b id="m-best">0</b><span>Best streak</span></div>
+    <div class="stat"><b id="m-cardsn">3</b><span>Cards</span></div>
+  </div>
+  <p class="rules">Each deal costs 10 chips. Harder modes shuffle longer and faster, and pay more. Every win adds swaps and speeds the dealer up, and a fourth and fifth card join at rounds 4 and 7. A miss sends you back to round 1.<br>Keys: <kbd>D</kbd> deal, <kbd>1</kbd>–<kbd>5</kbd> pick a spot.</p>
+</section>
+
+<!-- Higher or Lower -->
+<section class="view" id="v-hilo" hidden>
+  <div class="table">
+    <p class="status" aria-live="polite" id="h-status">Bet 10 chips to draw the first card.</p>
+    <div class="duel">
+      <div class="seat"><p class="label">Showing</p><div id="h-cur"><div class="slot"></div></div></div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="seat"><p class="label">Next</p><div id="h-next"><div class="slot"></div></div></div>
+    </div>
+    <div class="run" id="h-run" aria-label="Cards drawn this round"></div>
+    <div class="odds">
+      <div>Higher <b id="h-oh">—</b><span id="h-ph"></span></div>
+      <div>Lower <b id="h-ol">—</b><span id="h-pl"></span></div>
+    </div>
+    <div class="controls">
+      <button class="go" id="h-deal">Deal · 10</button>
+      <button class="alt" id="h-hi" disabled>Higher ▲</button>
+      <button class="alt" id="h-lo" disabled>Lower ▼</button>
+      <button class="go" id="h-cash" disabled>Cash out</button>
+    </div>
+  </div>
+  <div class="board">
+    <div class="stat"><b id="h-pot">—</b><span>Pot</span></div>
+    <div class="stat"><b id="h-steps">0</b><span>Correct calls</span></div>
+    <div class="stat"><b id="h-best">0</b><span>Best cash-out</span></div>
+    <div class="stat"><b id="h-left">52</b><span>Cards left</span></div>
+  </div>
+  <p class="rules">Aces are low and kings are high. Each correct call multiplies the pot by the odds against it, so a long-shot call pays far more than a safe one. A matching rank is a push. Cash out at any time after your first correct call; one wrong call loses the pot.<br>Keys: <kbd>D</kbd> deal, <kbd>H</kbd> higher, <kbd>L</kbd> lower, <kbd>C</kbd> cash out.</p>
+</section>
+
+<!-- Memory -->
+<section class="view" id="v-memory" hidden>
+  <div class="table">
+    <p class="status" aria-live="polite" id="mm-status">Find every pair. Fewer moves earn more chips.</p>
+    <div class="mem-grid" id="mm-grid"></div>
+    <div class="controls">
+      <select id="mm-size" aria-label="Board size">
+        <option value="easy">Easy · 6 pairs</option>
+        <option value="normal" selected>Normal · 8 pairs</option>
+        <option value="hard">Hard · 10 pairs</option>
+      </select>
+      <button class="go" id="mm-new">New board</button>
+    </div>
+  </div>
+  <div class="board">
+    <div class="stat"><b id="mm-moves">0</b><span>Moves</span></div>
+    <div class="stat"><b id="mm-pairs">0/8</b><span>Pairs</span></div>
+    <div class="stat"><b id="mm-time">0:00</b><span>Time</span></div>
+    <div class="stat"><b id="mm-best">—</b><span>Best moves · time</span></div>
+  </div>
+  <p class="rules">Free to play. Turn over two cards per move; a pair must match rank and suit. A perfect board pays 12 chips per pair, and each extra move costs 3, down to a minimum of 5.<br>Keys: <kbd>N</kbd> new board.</p>
+</section>
+
+<!-- Blackjack -->
+<section class="view" id="v-blackjack" hidden>
+  <div class="table">
+    <div class="seat"><p class="label">Dealer</p><div class="hand" id="b-dealer"></div><div class="total" id="b-dt"></div></div>
+    <p class="status" aria-live="polite" id="b-status">Pick a bet and deal. Dealer stands on all 17s.</p>
+    <div class="seat"><div class="bj-hands" id="b-player"></div><p class="label">You</p></div>
+    <div class="chips" id="b-chips" role="group" aria-label="Bet">
+      <button class="chipbtn" style="--c:#2f6fb0" data-bet="10" aria-pressed="true">10</button>
+      <button class="chipbtn" style="--c:#2d8a4e" data-bet="25" aria-pressed="false">25</button>
+      <button class="chipbtn" style="--c:#1b1b1b" data-bet="50" aria-pressed="false">50</button>
+      <button class="chipbtn" style="--c:#7a2fa0" data-bet="100" aria-pressed="false">100</button>
+    </div>
+    <div class="controls">
+      <button class="go" id="b-deal">Deal</button>
+      <button class="alt" id="b-hit" disabled>Hit</button>
+      <button class="alt" id="b-stand" disabled>Stand</button>
+      <button class="alt" id="b-double" disabled>Double</button>
+      <button class="alt" id="b-split" disabled>Split</button>
+    </div>
+  </div>
+  <div class="board">
+    <div class="stat"><b id="b-won">0</b><span>Hands won</span></div>
+    <div class="stat"><b id="b-played">0</b><span>Hands played</span></div>
+    <div class="stat"><b id="b-bj">0</b><span>Blackjacks</span></div>
+    <div class="stat"><b id="b-shoe">208</b><span>Cards in shoe</span></div>
+  </div>
+  <p class="rules">Four-deck shoe, reshuffled below 52 cards. Blackjack pays 3 to 2, other wins pay even money, and ties push. Double down on two cards to double your bet and take exactly one more card. Split any pair of equal value into two hands for a second bet.<br>Keys: <kbd>D</kbd> deal, <kbd>H</kbd> hit, <kbd>S</kbd> stand, <kbd>X</kbd> double, <kbd>P</kbd> split.</p>
+</section>
+
+<!-- War -->
+<section class="view" id="v-war" hidden>
+  <div class="table">
+    <p class="status" aria-live="polite" id="w-status">Pick a bet and flip. High card wins.</p>
+    <div class="war-field">
+      <div class="seat"><p class="label">You</p><div class="hand" id="w-you"><div class="slot"></div></div></div>
+      <div class="burn"><div class="vs">vs</div><div class="hand" id="w-burn"></div></div>
+      <div class="seat"><p class="label">Dealer</p><div class="hand" id="w-them"><div class="slot"></div></div></div>
+    </div>
+    <div class="chips" id="w-chips" role="group" aria-label="Bet">
+      <button class="chipbtn" style="--c:#2f6fb0" data-bet="10" aria-pressed="true">10</button>
+      <button class="chipbtn" style="--c:#2d8a4e" data-bet="25" aria-pressed="false">25</button>
+      <button class="chipbtn" style="--c:#1b1b1b" data-bet="50" aria-pressed="false">50</button>
+      <button class="chipbtn" style="--c:#7a2fa0" data-bet="100" aria-pressed="false">100</button>
+    </div>
+    <div class="controls">
+      <button class="go" id="w-flip">Flip</button>
+      <button class="go" id="w-war" hidden>Go to war</button>
+      <button class="alt" id="w-surrender" hidden>Surrender half</button>
+    </div>
+  </div>
+  <div class="board">
+    <div class="stat"><b id="w-won">0</b><span>Battles won</span></div>
+    <div class="stat"><b id="w-lost">0</b><span>Battles lost</span></div>
+    <div class="stat"><b id="w-wars">0</b><span>Wars fought</span></div>
+    <div class="stat"><b id="w-left">52</b><span>Cards left</span></div>
+  </div>
+  <p class="rules">Aces are high. A higher card wins even money. On a tie you can surrender and take back half your bet, or go to war: match your bet, three cards are burned face down, and the next cards decide it. Winning a war pays the raise; tying a war pays a bonus.<br>Keys: <kbd>F</kbd> flip, <kbd>W</kbd> go to war, <kbd>R</kbd> surrender.</p>
+</section>
+
 <script>
-const table = document.getElementById('table');
-const statusEl = document.getElementById('status');
-const btn = document.getElementById('shuffle');
-const faces = [{t:'Q♥',red:true,queen:true},{t:'J♠'},{t:'K♣'}];
-let slots = [0,1,2], cards = [], busy = false, canPick = false;
-let wins = 0, losses = 0, streak = 0;
-
-faces.forEach((f,i) => {
-  const el = document.createElement('div');
-  el.className = 'card';
-  el.innerHTML = `<div class="face ${f.red?'red':''}">${f.t}</div><div class="back"></div>`;
-  el.onclick = () => pick(i);
-  table.appendChild(el);
-  cards.push(el);
-});
-const place = () => cards.forEach((el,i) => el.style.left = (slots[i]*35) + '%');
-place();
-
+const $ = id => document.getElementById(id);
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-async function shuffle() {
-  if (busy) return;
-  busy = true; canPick = false; btn.disabled = true;
-  cards.forEach(c => c.classList.add('down'));
-  statusEl.textContent = 'Shuffling...';
-  await wait(500);
-  const [swaps, ms] = document.getElementById('level').value.split(',').map(Number);
-  cards.forEach(c => c.style.transitionDuration = ms/1000 + 's, .4s');
-  for (let n = 0; n < swaps; n++) {
-    const a = Math.floor(Math.random()*3);
-    const b = (a + 1 + Math.floor(Math.random()*2)) % 3;
-    const ia = slots.indexOf(a), ib = slots.indexOf(b);
-    [slots[ia], slots[ib]] = [b, a];
-    place();
-    await wait(ms + 20);
+// ---- Storage (per viewer, optional) ----
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('ftq-' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('ftq-' + k, JSON.stringify(v)); } catch (e) {} },
+};
+
+// ---- Sound (Web Audio, synthesized) ----
+let ac = null, muted = !!store.get('mute', false);
+function audioOn() { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) {} }
+function tone(f, dur, type = 'sine', vol = .2, when = 0, slide = 0) {
+  if (muted || !ac) return;
+  const t = ac.currentTime + when, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
+}
+function noise(dur, vol = .15, freq = 2500) {
+  if (muted || !ac) return;
+  const b = ac.createBuffer(1, Math.ceil(ac.sampleRate * dur), ac.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  f.type = 'bandpass'; f.frequency.value = freq; g.gain.value = vol; s.buffer = b;
+  s.connect(f).connect(g).connect(ac.destination); s.start();
+}
+const sfx = {
+  flip: () => noise(.07, .25, 3200),
+  deal: () => noise(.11, .18, 2200),
+  swish: () => noise(.09, .12, 1400 + Math.random() * 900),
+  chip: () => { tone(2100, .08, 'triangle', .12); tone(2800, .06, 'triangle', .08, .05); },
+  good: () => { tone(660, .14, 'triangle', .16); tone(990, .2, 'triangle', .14, .08); },
+  push: () => tone(440, .25, 'sine', .14),
+  win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .25, 'triangle', .18, i * .09)),
+  big: () => [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, .3, 'triangle', .16, i * .08)),
+  lose: () => { tone(220, .35, 'sawtooth', .1, 0, 110); tone(160, .45, 'sawtooth', .08, .15, 80); },
+  drum: () => { for (let i = 0; i < 6; i++) tone(90, .12, 'sine', .3, i * .11, 50); },
+};
+document.addEventListener('pointerdown', audioOn, { once: true });
+document.addEventListener('keydown', audioOn, { once: true });
+const muteBtn = $('mute');
+function showMute() { muteBtn.textContent = muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', muted ? 'Sound off' : 'Sound on'); }
+muteBtn.onclick = () => { muted = !muted; store.set('mute', muted); audioOn(); showMute(); if (!muted) sfx.chip(); };
+showMute();
+
+// ---- Chip bank shared by every table ----
+let chips = store.get('chips', 200);
+function setChips(v) {
+  chips = Math.max(0, Math.round(v)); store.set('chips', chips);
+  const peak = Math.max(chips, store.get('peak', 200)); store.set('peak', peak);
+  $('purse').title = `${chips} chips, shared by every table. Peak bank: ${peak}.`;
+  $('chips').textContent = chips; $('rebuy').hidden = chips >= 10;
+  const p = $('purse'); p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump');
+}
+function pay(n) { if (chips < n) return false; setChips(chips - n); sfx.chip(); return true; }
+function award(n) { if (n > 0) { setChips(chips + n); setTimeout(sfx.chip, 350); } }
+$('rebuy').onclick = () => { setChips(200); sfx.win(); };
+setChips(chips);
+const broke = n => `You need ${n} chips for that. Buy back in at the top.`;
+
+// ---- Ledger of recent results across tables ----
+let ledgerItems = store.get('ledger', []);
+function drawLedger(fresh) {
+  $('ledger').innerHTML = ledgerItems.length
+    ? ledgerItems.map((e, i) => `<li${fresh && i === 0 ? ' class="new"' : ''}>${e.t} <b class="${e.n > 0 ? 'gain' : e.n < 0 ? 'loss' : ''}">${e.n > 0 ? '+' : ''}${e.n}</b></li>`).join('')
+    : '<li class="empty">Nothing played yet. Results from every table show up here.</li>';
+}
+function ledger(table, net) { ledgerItems.unshift({ t: table, n: Math.round(net) }); ledgerItems = ledgerItems.slice(0, 10); store.set('ledger', ledgerItems); drawLedger(true); }
+drawLedger(false);
+
+// ---- Confetti of suits for big wins ----
+const fx = $('fx'), calm = matchMedia('(prefers-reduced-motion: reduce)');
+let parts = [], raf = 0;
+function burst(n = 70) {
+  if (calm.matches) return;
+  const dpr = devicePixelRatio || 1; fx.width = innerWidth * dpr; fx.height = innerHeight * dpr;
+  fx.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (let i = 0; i < n; i++) parts.push({ x: innerWidth / 2 + (Math.random() - .5) * 160, y: innerHeight * .45, vx: (Math.random() - .5) * 13,
+    vy: -Math.random() * 13 - 4, r: Math.random() * 6.3, vr: (Math.random() - .5) * .3, g: '♠♥♦♣●'[i % 5], size: 16 + Math.random() * 18, life: 0 });
+  if (!raf) raf = requestAnimationFrame(step);
+}
+function step() {
+  const ctx = fx.getContext('2d'); ctx.clearRect(0, 0, innerWidth, innerHeight);
+  ctx.textAlign = 'center';
+  for (const p of parts) {
+    p.vy += .35; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life++;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.globalAlpha = Math.max(0, 1 - p.life / 110);
+    ctx.fillStyle = p.g === '♥' || p.g === '♦' ? '#e0314b' : p.g === '●' ? '#e2b556' : '#fbf7ee';
+    ctx.font = `${p.size}px Georgia, serif`; ctx.fillText(p.g, 0, 0); ctx.restore();
   }
-  statusEl.textContent = 'Where is the Queen? Click a card.';
-  canPick = true; busy = false;
+  parts = parts.filter(p => p.life < 110 && p.y < innerHeight + 40);
+  raf = parts.length ? requestAnimationFrame(step) : 0;
+  if (!raf) ctx.clearRect(0, 0, innerWidth, innerHeight);
+}
+const bigWin = () => { sfx.big(); burst(); };
+
+// ---- Cards ----
+const SUITS = [{ s: '♠', red: false }, { s: '♥', red: true }, { s: '♦', red: true }, { s: '♣', red: false }];
+const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const RANK_NAMES = ['Ace', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Jack', 'Queen', 'King'];
+const SUIT_NAMES = { '♠': 'Spades', '♥': 'Hearts', '♦': 'Diamonds', '♣': 'Clubs' };
+function mix(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function deck(n = 1) {
+  const d = [];
+  for (let k = 0; k < n; k++) for (const s of SUITS) RANKS.forEach((r, i) => d.push({ r, v: i + 1, s: s.s, red: s.red }));
+  return mix(d);
+}
+const nameOf = c => `${RANK_NAMES[c.v - 1]} of ${SUIT_NAMES[c.s]}`;
+const short = c => c.r + c.s + (c.s ? '\uFE0E' : '');
+function cardEl(c, down = false, dealt = true) {
+  const el = document.createElement('div');
+  el.className = 'pc' + (down ? ' down' : '') + (dealt ? ' dealt' : '');
+  el.innerHTML = `<div class="inner"><div class="face${c.red ? ' red' : ''}" data-c="${short(c)}"><span>${short(c)}</span></div><div class="back"></div></div>`;
+  el.setAttribute('role', 'img'); el.setAttribute('aria-label', down ? 'Face-down card' : nameOf(c));
+  return el;
+}
+function reveal(el, c) { el.classList.remove('down'); el.setAttribute('aria-label', nameOf(c)); sfx.flip(); }
+function say(el, text, cls = '') { el.textContent = text; el.className = 'status' + (cls ? ' ' + cls : ''); }
+function pickBet(groupId, onPick) {
+  const btns = [...$(groupId).querySelectorAll('.chipbtn')];
+  btns.forEach(b => b.onclick = () => { btns.forEach(x => x.setAttribute('aria-pressed', x === b)); sfx.chip(); onPick(+b.dataset.bet); });
+  return dis => btns.forEach(b => b.disabled = dis);
 }
 
-function pick(i) {
-  if (!canPick) return;
-  canPick = false;
-  cards.forEach(c => c.classList.remove('down'));
-  if (faces[i].queen) { wins++; streak++; statusEl.textContent = 'You found her! 🎉'; }
-  else { losses++; streak = 0; statusEl.textContent = 'Nope! The Queen got away.'; }
-  document.getElementById('score').textContent = `Wins ${wins} · Losses ${losses} · Streak ${streak}`;
-  btn.disabled = false; btn.textContent = 'Play again';
+// ---- Table 1: Find the Queen ----
+(() => {
+  const wrap = $('m-cards'), st = $('m-status'), btn = $('m-deal');
+  const ALL = [{ r: 'Q', s: '♥', red: true, queen: true }, { r: 'J', s: '♠' }, { r: 'K', s: '♣' }, { r: 'J', s: '♦', red: true }, { r: 'K', s: '♠' }];
+  let cards = [], slots = [], round = 1, streak = 0, best = store.get('best', 0), canPick = false, w = 0, cw = 0;
+  const count = () => round >= 7 ? 5 : round >= 4 ? 4 : 3;
+  const layout = () => cards.forEach((c, i) => { c.style.left = (slots[i] * w + w / 2 - cw / 2) + '%'; c.dataset.spot = slots[i] + 1; });
+  function build() {
+    wrap.innerHTML = ''; cards = []; const n = count();
+    slots = [...Array(n).keys()]; w = 100 / n;
+    cw = Math.min(0.88 * 46 * 5 / 7, w * 0.86); // card width as a % of the table width
+    ALL.slice(0, n).forEach((f, i) => {
+      const b = document.createElement('button');
+      b.className = 'card'; b.setAttribute('aria-label', `Card ${i + 1}`);
+      b.innerHTML = `<div class="inner"><div class="face${f.red ? ' red' : ''}" data-c="${f.r}${f.s}"><span>${f.r}${f.s}</span></div><div class="back"></div></div>`;
+      b.style.width = cw + '%'; b.style.marginTop = '5%'; b.style.setProperty('--cwp', cw);
+      b.onclick = () => pick(i);
+      wrap.appendChild(b); cards.push(b);
+    });
+    wrap.style.paddingBottom = (cw * 1.4 + 10) + '%'; // fit the table to the card height
+    layout(); paint();
+  }
+  function paint() {
+    $('m-round').textContent = round; $('m-streak').textContent = streak; $('m-best').textContent = best; $('m-cardsn').textContent = count();
+  }
+  async function shuffle() {
+    if (!pay(10)) { say(st, broke(10), 'lose'); return; }
+    btn.disabled = true; $('m-mode').disabled = true; canPick = false;
+    if (cards.length !== count()) { build(); await wait(500); }
+    cards.forEach(c => c.classList.remove('glow', 'dim', 'down'));
+    say(st, 'Keep your eye on her...');
+    await wait(700);
+    cards.forEach(c => c.classList.add('down')); sfx.flip();
+    await wait(550);
+    const [baseSwaps, baseMs] = $('m-mode').value.split(',').map(Number);
+    const n = cards.length, swaps = baseSwaps + round * 2, ms = Math.max(Math.round(baseMs * 0.6), baseMs - round * 20);
+    cards.forEach(c => c.style.setProperty('--spd', ms / 1000 + 's'));
+    for (let k = 0; k < swaps; k++) {
+      const a = Math.floor(Math.random() * n), b = (a + 1 + Math.floor(Math.random() * (n - 1))) % n;
+      const ia = slots.indexOf(a), ib = slots.indexOf(b);
+      [slots[ia], slots[ib]] = [b, a];
+      cards[ia].classList.add('lift'); cards[ib].classList.add('dip');
+      layout(); sfx.swish(); await wait(ms + 15);
+      cards[ia].classList.remove('lift'); cards[ib].classList.remove('dip');
+    }
+    say(st, 'Where is the Queen? Pick a card.');
+    canPick = true;
+  }
+  async function pick(i) {
+    if (!canPick) return; canPick = false;
+    cards[i].classList.remove('down'); sfx.flip();
+    await wait(500);
+    const q = ALL.findIndex(f => f.queen), prize = +$('m-mode').value.split(',')[2];
+    if (i === q) {
+      award(prize); streak++; round++; cards[i].classList.add('glow'); prize >= 70 ? bigWin() : sfx.win(); ledger('Queen', prize - 10);
+      if (streak > best) { best = streak; store.set('best', best); }
+      say(st, `Found her! +${prize} chips. ` + (round === 4 || round === 7 ? 'Another card joins the table.' : 'The dealer speeds up.'), 'win');
+    } else {
+      cards[q].classList.add('glow'); cards[i].classList.add('dim');
+      say(st, `Not this time. The Queen was in spot ${slots[q] + 1}. Back to round 1.`, 'lose');
+      streak = 0; round = 1; sfx.lose(); ledger('Queen', -10);
+    }
+    cards.forEach(c => c.classList.remove('down'));
+    btn.textContent = 'Deal again · 10'; btn.disabled = false; $('m-mode').disabled = false; paint();
+  }
+  btn.onclick = shuffle;
+  build();
+})();
+
+// ---- Table 2: Higher or Lower ----
+(() => {
+  const st = $('h-status'), curS = $('h-cur'), nextS = $('h-next'), hi = $('h-hi'), lo = $('h-lo'), cash = $('h-cash'), deal = $('h-deal');
+  let d = deck(), cur = null, pot = 0, steps = 0, live = false, busy = false, best = store.get('hilo-best', 0), run = [];
+  const drawRun = () => $('h-run').innerHTML = run.map((x, i) => (i ? `<i>${x.dir > 0 ? '▲' : x.dir < 0 ? '▼' : '='}</i>` : '') + `<span class="${x.c.red ? 'red' : ''}">${short(x.c)}</span>`).join('');
+  const odds = () => ({ h: d.filter(c => c.v > cur.v).length / d.length, l: d.filter(c => c.v < cur.v).length / d.length });
+  const mult = p => p > 0 ? 0.95 / p : 0;
+  function show() {
+    $('h-pot').textContent = live ? pot : '—'; $('h-steps').textContent = steps; $('h-best').textContent = best; $('h-left').textContent = d.length;
+    if (live && cur) {
+      const o = odds();
+      $('h-oh').textContent = Math.round(o.h * 100) + '%'; $('h-ol').textContent = Math.round(o.l * 100) + '%';
+      $('h-ph').textContent = o.h ? `pays ×${mult(o.h).toFixed(2)}` : 'impossible';
+      $('h-pl').textContent = o.l ? `pays ×${mult(o.l).toFixed(2)}` : 'impossible';
+      hi.disabled = busy || !o.h; lo.disabled = busy || !o.l;
+    } else {
+      ['h-oh', 'h-ol'].forEach(id => $(id).textContent = '—'); ['h-ph', 'h-pl'].forEach(id => $(id).textContent = '');
+      hi.disabled = lo.disabled = true;
+    }
+    cash.disabled = !live || busy || steps === 0; deal.disabled = live || busy;
+  }
+  function put(slot, c, down) { slot.innerHTML = ''; const el = cardEl(c, down); slot.appendChild(el); return el; }
+  function start() {
+    if (!pay(10)) { say(st, broke(10), 'lose'); return; }
+    if (d.length < 20) d = deck();
+    cur = d.pop(); pot = 10; steps = 0; live = true;
+    put(curS, cur); nextS.innerHTML = '<div class="slot"></div>'; sfx.deal(); run = [{ c: cur }]; drawRun();
+    say(st, `${nameOf(cur)}. Will the next card be higher or lower?`); show();
+  }
+  async function guess(up) {
+    busy = true; show();
+    const p = up ? odds().h : odds().l, nx = d.pop();
+    const el = put(nextS, nx, true); sfx.deal();
+    await wait(280); reveal(el, nx); run.push({ c: nx, dir: Math.sign(nx.v - cur.v) }); drawRun(); await wait(480);
+    if (nx.v === cur.v) { say(st, `${nameOf(nx)}, the same rank. That's a push, so call again.`); sfx.push(); }
+    else if ((nx.v > cur.v) === up) {
+      pot = Math.max(pot + 1, Math.floor(pot * mult(p))); steps++;
+      say(st, `${nameOf(nx)}. Correct! The pot is ${pot}.`, 'win'); el.classList.add('glow'); sfx.good();
+    } else {
+      say(st, `${nameOf(nx)}. Wrong call, and the pot of ${pot} is lost.`, 'lose'); el.classList.add('dim'); sfx.lose(); ledger('Hi-Lo', -10);
+      live = false; pot = 0; busy = false; deal.textContent = 'Deal again · 10'; show(); return;
+    }
+    await wait(650);
+    cur = nx; put(curS, cur, false); nextS.innerHTML = '<div class="slot"></div>';
+    if (d.length === 0) { d = deck(); say(st, st.textContent + ' A fresh deck is shuffled in.', st.className.includes('win') ? 'win' : ''); }
+    busy = false; show();
+  }
+  function cashOut() {
+    award(pot); if (pot > best) { best = pot; store.set('hilo-best', best); }
+    say(st, `Cashed out ${pot} chips after ${steps} correct call${steps === 1 ? '' : 's'}.`, 'win'); pot >= 50 ? bigWin() : sfx.win(); ledger('Hi-Lo', pot - 10);
+    live = false; deal.textContent = 'Deal again · 10'; show();
+  }
+  deal.onclick = start; hi.onclick = () => guess(true); lo.onclick = () => guess(false); cash.onclick = cashOut;
+  show();
+})();
+
+// ---- Table 3: Memory ----
+(() => {
+  const grid = $('mm-grid'), st = $('mm-status'), sel = $('mm-size');
+  const SIZES = { easy: { pairs: 6, cols: 4 }, normal: { pairs: 8, cols: 4 }, hard: { pairs: 10, cols: 5 } };
+  let size, first = null, lock = false, moves = 0, found = 0, t0 = 0, timer = null, done = false;
+  const bests = store.get('mem-best', {});
+  const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const clock = () => { $('mm-time').textContent = fmt(t0 ? Math.floor((Date.now() - t0) / 1000) : 0); };
+  function paint() {
+    $('mm-moves').textContent = moves; $('mm-pairs').textContent = `${found}/${size.pairs}`; const bt = store.get('mem-time', {})[sel.value]; $('mm-best').textContent = sel.value in bests ? `${bests[sel.value]} · ${fmt(bt ?? 0)}` : '—'; clock();
+  }
+  function start() {
+    size = SIZES[sel.value]; first = null; lock = false; moves = 0; found = 0; t0 = 0; done = false; clearInterval(timer);
+    const picks = deck().slice(0, size.pairs);
+    const cards = mix([...picks, ...picks].map(c => ({ ...c })));
+    grid.style.setProperty('--cols', size.cols); grid.innerHTML = '';
+    cards.forEach((c, i) => {
+      const b = document.createElement('button');
+      b.className = 'mcell'; b.setAttribute('aria-label', `Card ${i + 1}, face down`);
+      const el = cardEl(c, true, false); b.appendChild(el); b.card = c; b.pc = el;
+      b.onclick = () => flip(b); grid.appendChild(b);
+    });
+    say(st, `Find all ${size.pairs} pairs. Fewer moves earn more chips.`); paint();
+  }
+  async function flip(b) {
+    if (lock || done || b.classList.contains('found') || !b.pc.classList.contains('down')) return;
+    if (!t0) { t0 = Date.now(); timer = setInterval(clock, 1000); }
+    b.pc.classList.remove('down'); b.setAttribute('aria-label', nameOf(b.card)); sfx.flip();
+    if (!first) { first = b; return; }
+    moves++; const a = first; first = null;
+    if (a.card.r === b.card.r && a.card.s === b.card.s) {
+      found++; a.classList.add('found'); b.classList.add('found'); sfx.good(); paint();
+      if (found === size.pairs) finish();
+      return;
+    }
+    lock = true; paint();
+    await wait(750);
+    [a, b].forEach(x => { x.pc.classList.add('down'); x.setAttribute('aria-label', 'Face-down card'); }); sfx.flip();
+    lock = false;
+  }
+  function finish() {
+    done = true; clearInterval(timer); clock();
+    const prize = Math.max(5, size.pairs * 12 - (moves - size.pairs) * 3);
+    const isBest = !(sel.value in bests) || moves < bests[sel.value];
+    const secs = Math.floor((Date.now() - t0) / 1000), times = store.get('mem-time', {});
+    if (isBest) { bests[sel.value] = moves; store.set('mem-best', bests); times[sel.value] = secs; store.set('mem-time', times); }
+    award(prize); moves === size.pairs ? bigWin() : sfx.win(); ledger('Memory', prize);
+    say(st, `Board cleared in ${moves} moves and ${$('mm-time').textContent}. +${prize} chips.${isBest ? ' New best!' : ''}`, 'win'); paint();
+  }
+  $('mm-new').onclick = start; sel.onchange = start;
+  start();
+})();
+
+// ---- Table 4: Blackjack ----
+(() => {
+  const st = $('b-status'), pArea = $('b-player'), dH = $('b-dealer'), deal = $('b-deal'), hit = $('b-hit'), stand = $('b-stand'), dbl = $('b-double'), split = $('b-split');
+  let shoe = deck(4), H = [], cur = 0, D = [], hole = null, bet = 10, live = false, busy = false;
+  const stats = store.get('bj-stats', { won: 0, played: 0, bj: 0 });
+  const lockBets = pickBet('b-chips', v => bet = v);
+  const draw = () => { if (shoe.length < 52) { shoe = deck(4); } return shoe.pop(); };
+  const ten = c => Math.min(c.v, 10);
+  function val(h) {
+    let s = 0, aces = 0;
+    h.forEach(c => { s += ten(c); if (c.v === 1) aces++; });
+    const soft = aces > 0 && s + 10 <= 21; return { s: soft ? s + 10 : s, soft };
+  }
+  const natural = h => H.length === 1 && h.length === 2 && val(h).s === 21;
+  const label = (h, nat) => { const v = val(h); return v.s > 21 ? `${v.s} · bust` : nat ? 'Blackjack' : (v.soft ? `soft ${v.s}` : `${v.s}`); };
+  function newHand(stake) {
+    const seat = document.createElement('div'); seat.className = 'seat bj-hand';
+    seat.innerHTML = '<div class="total"></div><div class="hand"></div>'; pArea.appendChild(seat);
+    const h = { cards: [], stake, seat, el: seat.querySelector('.hand'), tot: seat.querySelector('.total') };
+    H.push(h); return h;
+  }
+  function totals() {
+    H.forEach((h, i) => {
+      h.tot.textContent = h.cards.length ? label(h.cards, natural(h.cards)) + (H.length > 1 ? ` · bet ${h.stake}` : '') : '';
+      h.seat.classList.toggle('active', live && H.length > 1 && i === cur);
+    });
+    $('b-dt').textContent = !D.length ? '' : hole ? `${D[0].v === 1 ? 'A' : ten(D[0])} showing` : label(D, D.length === 2 && val(D).s === 21);
+  }
+  function buttons() {
+    const h = H[cur], act = live && !busy && !!h;
+    deal.disabled = live || busy; lockBets(live || busy);
+    hit.disabled = stand.disabled = !act;
+    dbl.disabled = !act || h.cards.length !== 2 || chips < h.stake;
+    split.disabled = !act || H.length !== 1 || h.cards.length !== 2 || ten(h.cards[0]) !== ten(h.cards[1]) || chips < h.stake;
+    $('b-shoe').textContent = shoe.length;
+  }
+  function paint() { $('b-won').textContent = stats.won; $('b-played').textContent = stats.played; $('b-bj').textContent = stats.bj; }
+  async function add(cards, el, down = false) {
+    const c = draw(); cards.push(c); const node = cardEl(c, down); el.appendChild(node); sfx.deal();
+    if (down) hole = { c, node };
+    totals(); buttons(); await wait(320); return c;
+  }
+  const prompt = () => say(st, H.length > 1 ? `Hand ${cur + 1} of ${H.length}: hit, stand, or double?` : 'Hit, stand, or double down?');
+  async function start() {
+    if (!pay(bet)) { say(st, broke(bet), 'lose'); return; }
+    H = []; cur = 0; D = []; hole = null; pArea.innerHTML = ''; dH.innerHTML = ''; busy = true; say(st, 'Dealing...');
+    const h = newHand(bet); buttons();
+    await add(h.cards, h.el); await add(D, dH); await add(h.cards, h.el); await add(D, dH, true);
+    if (val(h.cards).s === 21 || val(D).s === 21) { await flipHole(); return settle(); }
+    live = true; busy = false; prompt(); totals(); buttons();
+  }
+  async function flipHole() { if (hole) { reveal(hole.node, hole.c); hole = null; totals(); await wait(450); } }
+  async function next() {
+    cur++;
+    if (cur < H.length) {
+      busy = true; totals(); buttons();
+      if (H[cur].cards.length < 2) await add(H[cur].cards, H[cur].el);
+      busy = false;
+      if (val(H[cur].cards).s === 21) return next();
+      prompt(); totals(); buttons(); return;
+    }
+    live = false; busy = true; totals(); buttons(); say(st, 'Dealer plays...');
+    await flipHole();
+    if (H.some(h => val(h.cards).s <= 21)) while (val(D).s < 17) { await wait(250); await add(D, dH); }
+    settle();
+  }
+  async function doHit() {
+    const h = H[cur]; busy = true; buttons(); await add(h.cards, h.el); busy = false;
+    const s = val(h.cards).s;
+    if (s >= 21) return next();
+    buttons();
+  }
+  async function doDouble() {
+    const h = H[cur];
+    if (!pay(h.stake)) { say(st, broke(h.stake), 'lose'); return; }
+    h.stake *= 2; busy = true; buttons(); say(st, `Doubled to ${h.stake}. One card only.`);
+    await add(h.cards, h.el); busy = false; next();
+  }
+  async function doSplit() {
+    const h = H[0];
+    if (!pay(h.stake)) { say(st, broke(h.stake), 'lose'); return; }
+    busy = true; buttons();
+    const c = h.cards.pop(); h.el.lastElementChild.remove();
+    const h2 = newHand(h.stake); h2.cards.push(c); h2.el.appendChild(cardEl(c, false, false));
+    say(st, 'Split into two hands.'); totals(); await wait(250);
+    await add(h.cards, h.el); busy = false;
+    if (val(h.cards).s === 21) { cur = -1; return next(); }
+    cur = 0; prompt(); totals(); buttons();
+  }
+  function settle() {
+    const ds = val(D).s, dBJ = D.length === 2 && ds === 21;
+    let ret = 0, staked = 0; const parts = [];
+    H.forEach((h, i) => {
+      const ps = val(h.cards).s, pBJ = natural(h.cards); let r = 0, m;
+      staked += h.stake;
+      if (pBJ && !dBJ) { r = h.stake * 2.5; m = `Blackjack! Paid 3 to 2: +${h.stake * 1.5}`; stats.bj++; }
+      else if (ps > 21) m = `Bust with ${ps}`;
+      else if (dBJ && !pBJ) m = 'Dealer has blackjack';
+      else if (ds > 21) { r = h.stake * 2; m = `Dealer busts. +${h.stake}`; }
+      else if (ps > ds) { r = h.stake * 2; m = `${ps} beats ${ds}. +${h.stake}`; }
+      else if (ps === ds) { r = h.stake; m = `Push at ${ps}`; }
+      else m = `Dealer's ${ds} beats ${ps}`;
+      if (r > h.stake) stats.won++;
+      stats.played++; ret += r; parts.push(H.length > 1 ? `Hand ${i + 1}: ${m}` : m);
+    });
+    const net = ret - staked, cls = net > 0 ? 'win' : net < 0 ? 'lose' : '';
+    H.some(h => natural(h.cards)) && !dBJ ? bigWin() : net > 0 ? sfx.win() : net < 0 ? sfx.lose() : sfx.push();
+    store.set('bj-stats', stats); award(ret); ledger('Blackjack', net);
+    say(st, parts.join('. ') + '.', cls); live = false; busy = false; deal.textContent = 'Deal again'; totals(); buttons(); paint();
+  }
+  deal.onclick = start; hit.onclick = doHit; stand.onclick = next; dbl.onclick = doDouble; split.onclick = doSplit;
+  buttons(); paint();
+})();
+
+// ---- Table 5: War ----
+(() => {
+  const st = $('w-status'), you = $('w-you'), them = $('w-them'), burn = $('w-burn'), flipB = $('w-flip'), warB = $('w-war'), surB = $('w-surrender');
+  let d = deck(), bet = 10, staked = 0, busy = false, tie = false;
+  const stats = store.get('war-stats', { won: 0, lost: 0, wars: 0 });
+  const lockBets = pickBet('w-chips', v => bet = v);
+  const power = c => c.v === 1 ? 14 : c.v;
+  const draw = () => { if (!d.length) d = deck(); return d.pop(); };
+  function paint() {
+    $('w-won').textContent = stats.won; $('w-lost').textContent = stats.lost; $('w-wars').textContent = stats.wars; $('w-left').textContent = d.length;
+    flipB.hidden = tie; warB.hidden = surB.hidden = !tie;
+    flipB.disabled = warB.disabled = surB.disabled = busy; lockBets(busy || tie);
+  }
+  async function battle() {
+    const a = draw(), b = draw();
+    you.innerHTML = ''; them.innerHTML = '';
+    const ea = cardEl(a, true), eb = cardEl(b, true); you.appendChild(ea); them.appendChild(eb); sfx.deal();
+    await wait(380); reveal(ea, a); await wait(260); reveal(eb, b); await wait(420);
+    return { a, b, ea, eb };
+  }
+  async function flip() {
+    if (d.length < 2) d = deck();
+    if (!pay(bet)) { say(st, broke(bet), 'lose'); return; }
+    staked = bet; busy = true; burn.innerHTML = ''; say(st, 'Flipping...'); paint();
+    const { a, b, ea, eb } = await battle();
+    if (power(a) > power(b)) { award(staked * 2); stats.won++; ea.classList.add('glow'); eb.classList.add('dim'); say(st, `Your ${short(a)} beats the dealer's ${short(b)}. You win ${staked}.`, 'win'); sfx.win(); ledger('War', staked); }
+    else if (power(a) < power(b)) { stats.lost++; eb.classList.add('glow'); ea.classList.add('dim'); say(st, `The dealer's ${short(b)} beats your ${short(a)}. You lose ${staked}.`, 'lose'); sfx.lose(); ledger('War', -staked); }
+    else { tie = true; say(st, `Two ${RANK_NAMES[a.v - 1]}s! Go to war for ${staked} more, or surrender half.`); sfx.drum(); }
+    busy = false; store.set('war-stats', stats); paint();
+  }
+  async function goWar() {
+    if (d.length < 8) { d = deck(); }
+    if (!pay(staked)) { say(st, broke(staked), 'lose'); return; }
+    busy = true; stats.wars++; say(st, 'Burning three cards each...'); paint();
+    for (let i = 0; i < 3; i++) { draw(); draw(); burn.appendChild(cardEl({ r: '', s: '', v: 0 }, true)); sfx.deal(); await wait(220); }
+    const { a, b, ea, eb } = await battle();
+    tie = false;
+    if (power(a) > power(b)) { award(staked * 3); stats.won++; ea.classList.add('glow'); eb.classList.add('dim'); say(st, `War won! Your ${short(a)} beats the dealer's ${short(b)}. Your raise pays ${staked}.`, 'win'); bigWin(); ledger('War', staked); }
+    else if (power(a) === power(b)) { award(staked * 4); stats.won++; ea.classList.add('glow'); eb.classList.add('glow'); say(st, `Tied again at war! The bonus pays ${staked * 2}.`, 'win'); bigWin(); ledger('War', staked * 2); }
+    else { stats.lost++; eb.classList.add('glow'); ea.classList.add('dim'); say(st, `War lost. The dealer's ${short(b)} beats your ${short(a)}. You lose ${staked * 2}.`, 'lose'); sfx.lose(); ledger('War', -staked * 2); }
+    busy = false; store.set('war-stats', stats); paint();
+  }
+  function surrender() {
+    tie = false; const back = Math.floor(staked / 2); award(back); stats.lost++; store.set('war-stats', stats);
+    say(st, `You surrender and take back ${back}.`); sfx.push(); ledger('War', back - staked); paint();
+  }
+  flipB.onclick = flip; warB.onclick = goWar; surB.onclick = surrender;
+  paint();
+})();
+
+// ---- Tabs (hash routing) ----
+const VIEWS = ['monte', 'hilo', 'memory', 'blackjack', 'war'];
+let view = 'monte';
+function route() {
+  const h = location.hash.slice(1), v = view = VIEWS.includes(h) ? h : 'monte';
+  VIEWS.forEach(n => $('v-' + n).hidden = n !== v);
+  document.querySelectorAll('.tabs a').forEach(a => a.dataset.v === v ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
 }
-btn.onclick = shuffle;
+addEventListener('hashchange', route); route();
+
+// ---- Keyboard shortcuts for the open table ----
+const KEYS = {
+  monte: { d: 'm-deal' }, hilo: { d: 'h-deal', h: 'h-hi', l: 'h-lo', c: 'h-cash' }, memory: { n: 'mm-new' },
+  blackjack: { d: 'b-deal', h: 'b-hit', s: 'b-stand', x: 'b-double', p: 'b-split' }, war: { f: 'w-flip', w: 'w-war', r: 'w-surrender' },
+};
+addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.matches('select, input, textarea')) return;
+  const id = KEYS[view][e.key.toLowerCase()];
+  const el = id ? $(id) : view === 'monte' && /^[1-5]$/.test(e.key) ? document.querySelector(`#m-cards .card[data-spot="${e.key}"]`) : null;
+  if (el && !el.disabled && !el.hidden) { e.preventDefault(); audioOn(); el.click(); }
+});
 </script>
 </body>
 </html>
