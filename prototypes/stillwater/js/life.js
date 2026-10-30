@@ -14,7 +14,7 @@
 
   // ------------------------------------------------------------------ models
   const mats = new Map();
-  const mat = (c) => { if (!mats.has(c)) mats.set(c, new THREE.MeshLambertMaterial({ color: c })); return mats.get(c); };
+  const mat = (c) => { if (!mats.has(c)) mats.set(c, W.voxelMat(c, { edges: 0.14, shininess: 20 })); return mats.get(c); };
   function part(parent, c, sx, sy, sz, x, y, z, shadow) {
     const m = new THREE.Mesh(W.boxGeo, typeof c === 'number' ? mat(c) : c);
     m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = !!shadow;
@@ -493,7 +493,7 @@
     c.head = pivot(g, 0, 0.32, 0);
     part(c.head, 0x7a6248, 0.22, 0.16, 0.19, 0, 0, 0);
     part(c.head, 0xb8a080, 0.18, 0.12, 0.02, 0, -0.01, 0.1);
-    const eye = new THREE.MeshBasicMaterial({ color: 0xf2d060 });
+    const eye = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xf2d060).multiplyScalar(1.4) });
     c.eyes = [part(c.head, eye, 0.05, 0.05, 0.02, -0.045, 0, 0.11), part(c.head, eye, 0.05, 0.05, 0.02, 0.045, 0, 0.11)];
     part(c.head, 0x5a4634, 0.04, 0.07, 0.04, -0.08, 0.1, 0); part(c.head, 0x5a4634, 0.04, 0.07, 0.04, 0.08, 0.1, 0);
     c.update = (dt, t) => {
@@ -610,7 +610,7 @@
     part(g, 0x6a5040, 0.1, 5.2, 0.1, 0, 2.9, 0.4);
     for (let i = 0; i < 8; i++) { const w = (8 - i) * 0.32; part(g, 0xf4efe0, 0.06, 0.6, w, 0.06, 0.9 + i * 0.6, 0.35 - w / 2); }
     part(g, 0xb8453a, 0.04, 0.2, 0.4, 0, 5.5, 0.25);
-    c.lamp = part(g, new THREE.MeshBasicMaterial({ color: 0xffd08a }), 0.18, 0.18, 0.18, 0, 4.4, 0.5);
+    c.lamp = part(g, new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd08a).multiplyScalar(1.8) }), 0.18, 0.18, 0.18, 0, 4.4, 0.5);
     c.update = (dt, t) => {
       if (c.state === 'wait') {
         fadeTo(c, false, dt);
@@ -1094,12 +1094,13 @@
   L.releaseLantern = function () {
     const I = W.island, d = I.id === 'home' ? W.dock.end : I.shore;
     const g = new THREE.Group();
-    const paper = new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, opacity: 0.95 });
+    const paper = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc070).multiplyScalar(1.6), transparent: true, opacity: 0.95 });
     const box = new THREE.Mesh(W.boxGeo, paper); box.scale.set(0.34, 0.44, 0.34); g.add(box);
     const rim = new THREE.Mesh(W.boxGeo, mat(0x6a4a30)); rim.scale.set(0.36, 0.04, 0.36); rim.position.y = -0.22; g.add(rim);
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: 0xffa850, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     halo.scale.set(1.8, 1.8, 1); g.add(halo);
     g.position.set(d.x, d.y + 0.5, d.z);
+    W.late(g);
     scene.add(g);
     lanterns.push({ g, paper, halo, vy: 0.15, p: rand() * 10, age: 0 });
     while (lanterns.length > 14) { const o = lanterns.shift(); scene.remove(o.g); }

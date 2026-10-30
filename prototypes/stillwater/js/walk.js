@@ -17,7 +17,7 @@
     fig = new THREE.Group();
     const mats = {};
     const box = (parent, c, sx, sy, sz, x, y, z) => {
-      const m = new THREE.Mesh(W.boxGeo, mats[c] || (mats[c] = new THREE.MeshLambertMaterial({ color: c })));
+      const m = new THREE.Mesh(W.boxGeo, mats[c] || (mats[c] = W.voxelMat(c, { edges: 0.12, shininess: 24 })));
       m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m;
     };
     const piv = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };

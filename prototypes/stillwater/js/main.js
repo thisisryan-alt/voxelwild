@@ -631,7 +631,7 @@
   const seg = (name, val) => $$(`[data-${name}]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[name] === String(val))));
   function syncSettings() {
     seg('flow', prefs.flow); seg('season', prefs.season); seg('weather', prefs.weather); seg('quality', prefs.quality);
-    $('optDrift').checked = prefs.drift; $('optCalm').checked = prefs.calm;
+    $('optDrift').checked = prefs.drift; $('optCalm').checked = prefs.calm; $('optDof').checked = prefs.dof !== false;
     syncClock();
   }
   function syncClock() {
@@ -734,9 +734,10 @@
     $$('[data-flow]').forEach((b) => b.addEventListener('click', () => { prefs.flow = b.dataset.flow; seg('flow', prefs.flow); saveSoon(); }));
     $$('[data-season]').forEach((b) => b.addEventListener('click', () => { prefs.season = b.dataset.season; seg('season', prefs.season); saveSoon(); }));
     $$('[data-weather]').forEach((b) => b.addEventListener('click', () => { prefs.weather = b.dataset.weather; W.setWeatherMode(prefs.weather); seg('weather', prefs.weather); saveSoon(); }));
-    $$('[data-quality]').forEach((b) => b.addEventListener('click', () => { prefs.quality = b.dataset.quality; W.setQuality(prefs.quality); seg('quality', prefs.quality); saveSoon(); }));
+    $$('[data-quality]').forEach((b) => b.addEventListener('click', () => { prefs.quality = b.dataset.quality; prefs.qualityChosen = true; W.setQuality(prefs.quality); seg('quality', prefs.quality); saveSoon(); }));
     $('todSlider').addEventListener('input', (e) => { S.tod = U.todOf(e.target.value / 4); syncClock(); });
     $('optDrift').addEventListener('change', (e) => { prefs.drift = e.target.checked; saveSoon(); });
+    $('optDof').addEventListener('change', (e) => { prefs.dof = e.target.checked; SW.post.dof = prefs.dof; saveSoon(); });
     $('optCalm').addEventListener('change', (e) => { prefs.calm = e.target.checked; S.reduceMotion = prefs.calm || reduceMQ; saveSoon(); });
     const resetRow = $('resetRow');
     const resetIdle = () => {
@@ -773,12 +774,13 @@
   }
 
   // -------------------------------------------------------------------- loop
-  let last = performance.now(), clockSync = 0, seasonShown = -1, lastHudH = 0;
+  let last = performance.now(), clockSync = 0, seasonShown = -1, lastHudH = 0, lastW = 0, lastH = 0;
   function frame() {
     const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     S.dt = dt; S.t += dt;
     const t = S.t;
+    if (window.innerWidth !== lastW || window.innerHeight !== lastH) { lastW = window.innerWidth; lastH = window.innerHeight; W.resize(); }
     const rate = prefs.flow === 'slow' ? 0.4 : prefs.flow === 'still' ? 0 : 1, dd = dt * rate / K.DAY_LEN;
     S.tod = (S.tod + dd) % 1; S.day += dd;
     if (prefs.season === 'auto') S.season = (S.season + dd) % 4;
@@ -821,6 +823,7 @@
     }
     updateToast();
     flushSeen(dt);
+    watchFrameRate(now, dt);
     clockSync -= dt;
     if (clockSync <= 0) {
       clockSync = 0.5;
@@ -832,9 +835,26 @@
       seasonShown = si;
     }
     if (S.started && now - lastSave > 8000) { lastSave = now; saveNow(); }
-    W.renderer.render(W.scene, W.camera);
+    W.render();
   }
   const tmpFire = new THREE.Vector3();
+  // If the first seconds run slowly, step the graphics down a level (unless the player picked one).
+  let perfT = 0, perfFrames = 0, perfSlow = 0;
+  function watchFrameRate(now, dt) {
+    if (!S.started || prefs.qualityChosen || prefs.quality === 'low' || document.hidden) return;
+    perfT += dt; perfFrames++;
+    if (perfT < 3) return;
+    const ms = perfT / perfFrames * 1000;
+    perfT = 0; perfFrames = 0;
+    perfSlow = ms > 42 ? perfSlow + 1 : 0;
+    if (perfSlow >= 2) {
+      perfSlow = 0;
+      prefs.quality = prefs.quality === 'high' ? 'balanced' : 'low';
+      W.setQuality(prefs.quality);
+      toast('Switched to ' + (prefs.quality === 'balanced' ? 'Balanced' : 'Light') + ' graphics to keep things smooth. You can change this in Settings.', 6);
+      saveSoon();
+    }
+  }
   const reduceMQ = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // -------------------------------------------------------------------- boot
@@ -851,6 +871,7 @@
     if (ws) { S.tod = ws.tod; S.day = ws.day; S.season = ws.season; S.island = K.ISLAND[ws.island] ? ws.island : 'home'; }
     try { W.init(); } catch (e) { noGL('Stillwater needs WebGL, which this browser has turned off.'); return; }
     GD.init(); L.init(); SW.walk.init();
+    SW.post.dof = prefs.dof !== false;
     A.master = prefs.master;
     A.CHANNELS.forEach((c) => { A.levels[c] = prefs.levels[c] ?? 0.8; });
     W.setWeatherMode(prefs.weather);

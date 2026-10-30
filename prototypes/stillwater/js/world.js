@@ -18,10 +18,12 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0xd5eaee, 70, 240);
-    camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2400);
+    camera = new THREE.PerspectiveCamera(40, 1, 0.3, 2400);
     Object.assign(W, { renderer, scene, camera, canvas, boxGeo: new THREE.BoxGeometry(1, 1, 1) });
     initLights(); initSky(); initTerrain(); initWater(); initMountains(); initLighthouse();
     initClouds(); initDock(); initWeatherFx(); initShootingStar(); initLandings(); initFeatures();
+    scene.traverse((o) => { if (o.isLight) o.layers.enableAll(); });
+    SW.post.init();
     W.setQuality(S.quality);
     window.addEventListener('resize', resize);
   };
@@ -33,14 +35,16 @@
     camera.fov = w / h < 0.8 ? 52 : 40;   // keep the island framed on tall phone screens
     camera.updateProjectionMatrix();
     W.portrait = w / h < 0.8;
+    if (SW.post) SW.post.resize();
   }
   W.resize = resize;
 
   W.setQuality = function (q) {
     S.quality = q;
-    const pr = Math.min(window.devicePixelRatio || 1, q === 'high' ? 2 : q === 'balanced' ? 1.5 : 1);
+    const pr = Math.min(window.devicePixelRatio || 1, q === 'high' ? 1.75 : q === 'balanced' ? 1.25 : 1);
     renderer.setPixelRatio(pr); prU.value = pr; W.pixelRatio = pr;
-    const shadows = q !== 'low', size = q === 'high' ? 2048 : 1024;
+    const shadows = q !== 'low', size = q === 'high' ? 4096 : 2048;
+    sun.shadow.radius = q === 'high' ? 2 : 1;
     if (sun.shadow.mapSize.x !== size) {
       sun.shadow.mapSize.set(size, size);
       if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
@@ -49,6 +53,8 @@
       renderer.shadowMap.enabled = shadows;
       scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); });
     }
+    SW.post.setQuality(q);
+    if (SW.garden && SW.garden.setGrassDensity) SW.garden.setGrassDensity(q);
     resize();
   };
 
@@ -60,6 +66,124 @@
   W.panOf = function (p) {
     tmpV.copy(p).applyMatrix4(camera.matrixWorldInverse);
     return clamp(tmpV.x / Math.max(4, Math.abs(tmpV.z)), -0.9, 0.9);
+  };
+
+  // --------------------------------------------------------------- materials
+  // One patch for every voxel material: per-face shading, darkened block edges, a fine "texel"
+  // grain so surfaces read as crafted blocks, grass that wraps over the top of a block's sides,
+  // leaves that glow when the sun is behind them, and surfaces that darken and shine in rain.
+  const PU = W.uniforms = {
+    uTime: { value: 0 }, uWL: { value: K.WL }, uCaus: { value: new THREE.Color() }, uWet: { value: 0 },
+    uSway: { value: 0 }, uSwayAmp: { value: 1 }, uDirt: { value: hex(0x8d6f50) },
+  };
+  const wetMats = [];
+  W.patch = function (material, o = {}) {
+    const defs = (o.sway ? '#define SWAY\n' : '') + (o.grassSide ? '#define GRASS_SIDE\n' : '') + (o.caustics ? '#define CAUSTICS\n' : '') + (o.trans ? '#define TRANS\n' : '') + (o.wet ? '#define WET\n' : '');
+    if (o.wet && material.isMeshPhongMaterial) wetMats.push(material);
+    // three.js keys cached programs on the patch's source text, so name each variant explicitly
+    material.customProgramCacheKey = () => 'sw-voxel|' + defs.replace(/\n/g, ',');
+    material.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, PU, {
+        uEdge: { value: o.edges == null ? 0.16 : o.edges }, uTexel: { value: o.texel || 0 }, uTexAmt: { value: o.texAmt == null ? 0.07 : o.texAmt },
+        uTrans: { value: o.trans || 0 }, uFaceShade: { value: o.faceShade == null ? 1 : o.faceShade },
+      });
+      sh.vertexShader = defs + `uniform float uSway, uSwayAmp;
+        varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN;
+        #ifdef GRASS_SIDE
+          attribute float aKind; varying float vKind;
+        #endif
+        ` + sh.vertexShader.replace('#include <project_vertex>', `
+        vec4 mvPosition = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          mvPosition = instanceMatrix * mvPosition;
+        #endif
+        #ifdef SWAY
+          float sw = sin(uSway * 0.9 + mvPosition.x * 0.45 + mvPosition.z * 0.3) + 0.5 * sin(uSway * 1.7 + mvPosition.z * 0.8);
+          mvPosition.x += sw * 0.03 * uSwayAmp; mvPosition.z += sw * 0.018 * uSwayAmp;
+        #endif
+        vWPos = (modelMatrix * mvPosition).xyz;
+        vLocal = position; vObjN = normal;
+        #ifdef GRASS_SIDE
+          vKind = aKind;
+        #endif
+        mvPosition = modelViewMatrix * mvPosition;
+        gl_Position = projectionMatrix * mvPosition;`);
+      sh.fragmentShader = defs + `uniform float uTime, uWL, uWet, uEdge, uTexel, uTexAmt, uTrans, uFaceShade; uniform vec3 uCaus, uDirt;
+        varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN;
+        #ifdef GRASS_SIDE
+          varying float vKind;
+        #endif
+        float vxh(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+        ` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        {
+          vec3 an = abs(vObjN), a = abs(vLocal) * 2.0;
+          vec2 f = an.x > 0.5 ? a.yz : an.y > 0.5 ? a.xz : a.xy;
+          vec3 cellP = floor((vWPos - vObjN * 0.002) * max(uTexel, 1.0));
+          #ifdef GRASS_SIDE
+            if (vKind > 1.5 && vKind < 2.5 && vObjN.y < 0.5) {
+              float run = floor((an.x > 0.5 ? vWPos.z : vWPos.x) * 8.0);
+              float band = 0.72 + 0.14 * vxh(vec3(run, floor(vWPos.y), 3.0));
+              if (vLocal.y + 0.5 < band) diffuseColor.rgb = uDirt * (0.92 + 0.16 * vxh(cellP + 7.0));
+            }
+          #endif
+          #ifdef GRASS_SIDE
+            // sand at the waterline stays damp and darker
+            if (vKind > 0.5 && vKind < 1.5 && vWPos.y < 0.05) diffuseColor.rgb *= 0.82 + 0.06 * vxh(cellP + 3.0);
+          #endif
+          float edge = smoothstep(0.8, 1.0, max(f.x, f.y));
+          diffuseColor.rgb *= 1.0 - uEdge * edge;
+          float shade = vObjN.y > 0.5 ? 1.0 : vObjN.y < -0.5 ? 0.72 : (an.x > 0.5 ? 0.92 : 0.87);
+          diffuseColor.rgb *= mix(1.0, shade, uFaceShade);
+          if (uTexel > 0.0) diffuseColor.rgb *= 1.0 + (vxh(cellP) - 0.5) * uTexAmt * 2.0;
+          #ifdef WET
+            diffuseColor.rgb *= 1.0 - 0.2 * uWet;
+          #endif
+        }`).replace('#include <envmap_fragment>', `
+        #if defined(TRANS) && NUM_DIR_LIGHTS > 0
+          {
+            float tr = pow(clamp(dot(normalize(-vViewPosition), directionalLights[0].direction), 0.0, 1.0), 5.0);
+            outgoingLight += diffuseColor.rgb * directionalLights[0].color * tr * uTrans;
+          }
+        #endif
+        #include <envmap_fragment>`).replace('#include <fog_fragment>', `
+        #ifdef CAUSTICS
+          if (vWPos.y < uWL - 0.02) {
+            vec2 ca = vWPos.xz * 0.9 + vec2(sin(uTime * 0.4 + vWPos.z * 0.6), cos(uTime * 0.33 + vWPos.x * 0.5)) * 0.6;
+            float c = abs(sin(ca.x * 2.1 + uTime * 0.7) + sin(ca.y * 2.3 - uTime * 0.6) + sin((ca.x + ca.y) * 1.7 + uTime * 0.5));
+            c = pow(clamp(1.0 - c * 0.45, 0.0, 1.0), 4.0);
+            gl_FragColor.rgb += uCaus * c * (1.0 - clamp((uWL - vWPos.y) / 4.0, 0.0, 1.0));
+          }
+        #endif
+        #include <fog_fragment>`);
+    };
+    return material;
+  };
+  // Phong for per-pixel light (lantern pools, sun glints in the rain), patched as above.
+  W.voxelMat = (color, o = {}) => W.patch(new THREE.MeshPhongMaterial({ color, shininess: o.shininess || 14, specular: o.specular || 0x0b0b0b }), o);
+  // Things drawn after the ambient occlusion: water, particles, glows.
+  W.late = (obj) => { obj.traverse((o) => o.layers.set(1)); return obj; };
+
+  const dummyTex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
+  dummyTex.needsUpdate = true;
+  W.render = function () {
+    const PP = SW.post;
+    if (PP && PP.enabled) { PP.render(); return; }
+    waterU.uPost.value = 0; waterU.uReflOn.value = 0;
+    camera.layers.enableAll();
+    renderer.setRenderTarget(null);
+    renderer.render(scene, camera);
+  };
+  W.setWaterInputs = function (o) {
+    waterU.uPost.value = 1;
+    waterU.uReflOn.value = o.refl ? 1 : 0;
+    waterU.tRefl.value = o.refl || dummyTex; waterU.tScene.value = o.scene; waterU.tDepth.value = o.depth; waterU.tAO.value = o.ao;
+    waterU.uRes.value.copy(o.res); waterU.uTexMat.value.copy(o.texMat); waterU.uNear.value = o.near; waterU.uFar.value = o.far;
+  };
+  W.sunDirection = () => skySun;
+  // How strongly it is golden hour (dusk or dawn), 0..1
+  W.golden = () => {
+    const t = S.tod;
+    return Math.max(smooth(0.46, 0.58, t) * (1 - smooth(0.66, 0.73, t)), 1 - smooth(0.0, 0.12, t), smooth(0.95, 1.0, t)) * (1 - W.env.over);
   };
 
   // ------------------------------------------------------------------ lights
@@ -121,6 +245,7 @@
     uMoonDir: { value: new THREE.Vector3(0, 1, 0) }, uMoonPhase: { value: 0.5 },
     uNight: { value: 0 }, uTime: { value: 0 }, uOvercast: { value: 0 },
     uAurora: { value: 0 }, uRainbow: { value: 0 }, uAurDir: { value: new THREE.Vector2(0, 1) },
+    uGold: { value: 0 }, uCirrus: { value: 0.3 },
   };
   function initSky() {
     sky = new THREE.Mesh(new THREE.SphereGeometry(950, 40, 20), new THREE.ShaderMaterial({
@@ -128,26 +253,49 @@
       vertexShader: `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: `
         uniform vec3 uTop, uHor, uSunCol, uSunDir, uMoonDir;
-        uniform float uNight, uTime, uOvercast, uAurora, uRainbow, uMoonPhase;
+        uniform float uNight, uTime, uOvercast, uAurora, uRainbow, uMoonPhase, uGold, uCirrus;
         uniform vec2 uAurDir;
         varying vec3 vDir;
         float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
         float h21(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
         float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
+        float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { s += a * n2(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return s; }
         void main(){
           vec3 d = normalize(vDir); float h = d.y;
-          vec3 col = mix(uHor, uTop, pow(clamp(h, 0.0, 1.0), 0.55));
+          // sky gradient, with a thin bright band of haze right at the horizon
+          vec3 col = mix(uHor, uTop, pow(clamp(h, 0.0, 1.0), 0.48));
+          col = mix(col, uHor * 1.05 + 0.015, exp(-max(h, 0.0) * 22.0) * 0.55);
           vec3 sd = normalize(uSunDir);
-          float s = max(dot(d, sd), 0.0), sunUp = smoothstep(-0.08, 0.02, sd.y);
-          col += uSunCol * (pow(s, 900.0) * 1.1 * (1.0 - uOvercast) + pow(s, 28.0) * 0.2 * (1.0 - uOvercast * 0.7) + pow(s, 5.0) * 0.07) * sunUp;
-          float starVis = uNight * (1.0 - uOvercast) * smoothstep(0.02, 0.3, h);
+          float mu = dot(d, sd), s = max(mu, 0.0), sunUp = smoothstep(-0.1, 0.02, sd.y);
+          // at golden hour the horizon glows warm on the sun's side of the sky
+          vec2 dh = normalize(d.xz + 1e-5), sh = normalize(sd.xz + 1e-5);
+          float side = pow(max(dot(dh, sh), 0.0), 3.0);
+          col += uSunCol * uGold * side * exp(-abs(h) * 5.0) * 0.5;
+          col = mix(col, col * vec3(0.92, 0.9, 1.05), uGold * (1.0 - side) * smoothstep(0.0, 0.4, h) * 0.6);
+          // sun: an HDR disk for bloom, a tight corona and a wide forward-scattering halo
+          float disk = smoothstep(0.99955, 0.99975, mu);
+          col += uSunCol * (disk * 5.0 * (1.0 - uOvercast) + pow(s, 260.0) * 0.7 * (1.0 - uOvercast * 0.8) + pow(s, 14.0) * 0.2 + pow(s, 3.0) * 0.07) * sunUp;
+          // high, thin cirrus drifting slowly
+          if (uCirrus > 0.01 && h > 0.0) {
+            vec2 cp = d.xz / (h + 0.12) * 0.32 + vec2(uTime * 0.0035, uTime * 0.0012);
+            float c = fbm(cp * vec2(1.2, 3.2)) * (0.6 + 0.6 * fbm(cp * 0.35 + 4.0));
+            c = smoothstep(0.42, 0.78, c) * smoothstep(0.02, 0.22, h) * uCirrus;
+            vec3 cc = mix(vec3(1.0), uSunCol * 1.15, 0.25 + uGold * 0.6) * (1.0 - uNight * 0.8) + uHor * 0.12;
+            cc += uSunCol * pow(s, 6.0) * 0.6 * sunUp;
+            col = mix(col, cc, c * 0.65);
+          }
+          float starVis = smoothstep(0.45, 0.95, uNight) * (1.0 - uOvercast) * smoothstep(0.02, 0.3, h);
           if (starVis > 0.01) {
             float band = 1.0 - smoothstep(0.0, 0.32, abs(dot(d, normalize(vec3(0.5, 0.35, -0.8)))));
-            vec3 c = floor(d * 170.0); float r = hash(c);
-            if (r > 0.9962 - band * 0.004) { float tw = 0.55 + 0.45 * sin(uTime * (0.6 + r * 2.0) + r * 60.0); col += vec3(0.9, 0.94, 1.0) * starVis * tw; }
-            float mw = n2(d.xz * 7.0 + d.y * 3.0) * n2(d.zy * 13.0 + 3.0);
-            col += vec3(0.5, 0.56, 0.8) * band * mw * 0.2 * starVis;
+            vec3 c = floor(d * 220.0); float r = hash(c);
+            if (r > 0.9965 - band * 0.004) {
+              float tw = 0.55 + 0.45 * sin(uTime * (0.6 + r * 2.0) + r * 60.0), big = step(0.9993, r);
+              vec3 sc = mix(vec3(0.8, 0.88, 1.0), vec3(1.0, 0.9, 0.75), fract(r * 731.0));
+              col += sc * starVis * tw * (1.0 + big * 1.5);
+            }
+            float mw = n2(d.xz * 7.0 + d.y * 3.0) * n2(d.zy * 13.0 + 3.0) * (0.6 + 0.8 * fbm(d.xz * 4.0));
+            col += vec3(0.5, 0.56, 0.8) * band * mw * 0.24 * starVis;
           }
           if (uAurora > 0.01 && h > 0.0) {
             vec2 p = vec2(dot(d.xz, vec2(-uAurDir.y, uAurDir.x)), -dot(d.xz, uAurDir)) / (h + 0.2);
@@ -181,7 +329,7 @@
               vec3 n = vec3(q, sqrt(1.0 - rr));
               float ph = uMoonPhase * 6.28318;
               float lit = smoothstep(-0.05, 0.12, dot(n, vec3(sin(ph), 0.0, -cos(ph))));
-              vec3 mcol = vec3(0.95, 0.93, 0.86) * (0.1 + 0.9 * lit) * (0.82 + 0.18 * n2(q * 4.0 + 7.0));
+              vec3 mcol = vec3(1.05, 1.03, 0.95) * (0.1 + 1.15 * lit) * (0.8 + 0.2 * n2(q * 4.0 + 7.0));
               col = mix(col, mcol, (1.0 - smoothstep(0.85, 1.0, rr)) * vis);
             }
           }
@@ -352,10 +500,9 @@
     2: U.pal4([0xa3d073, 0x98c968, 0xadd67c, 0x92c463], [0x8fbc6e, 0x86b468, 0x97c275, 0x80ad64], [0xb3ad62, 0xa8a85c, 0xbfae64, 0x9fa35a], [0xeef3f5, 0xe4ebef, 0xf4f7f8, 0xdfe7ea]),
     5: U.pal4([0x8f948f, 0x9a9f9b, 0x86907f], [0x8f948f, 0x9a9f9b, 0x86907f], [0x8f948f, 0x9a9f9b, 0x8a8c80], [0xe8eef0, 0x9a9f9b, 0xdfe6ea]),
   };
-  TPAL[6] = U.pal4(...Array(4).fill([0xdff1f6, 0xcfe8ef, 0xe8f6fa, 0xd6edf3]));   // glacier ice, the same in every season
+  TPAL[6] = U.pal4(...Array(4).fill([0xd6edf7, 0xc6e3f0, 0xe2f3fa, 0xcfe8f3]));   // glacier ice, the same in every season
   const TSTATIC = { 0: hex(0xbca87f), 3: hex(0x8d6f50), 4: hex(0x9a9f9b), 7: hex(0xb8dbe6) };
   let terrain, tKind, tRand, tJit, lastTerrainS = -99;
-  const terrainU = { uTime: { value: 0 }, uWL: { value: K.WL }, uCaus: { value: new THREE.Color() } };
   W.blocks = [];
   W.cols = { grass: [], sand: [], shallow: [], ring: [] };   // the home island's
   W.islands = K.ISLANDS;
@@ -405,27 +552,10 @@
     }
     Object.assign(K.ISLAND.home.cols, W.cols);
     W.local = W.island.cols;
-    const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    mat.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, terrainU);
-      sh.vertexShader = 'varying vec3 vWPos;\n' + sh.vertexShader.replace('#include <project_vertex>', `
-        vec4 mvPosition = vec4(transformed, 1.0);
-        #ifdef USE_INSTANCING
-          mvPosition = instanceMatrix * mvPosition;
-        #endif
-        vWPos = (modelMatrix * mvPosition).xyz;
-        mvPosition = modelViewMatrix * mvPosition;
-        gl_Position = projectionMatrix * mvPosition;`);
-      sh.fragmentShader = 'varying vec3 vWPos;\nuniform float uTime, uWL;\nuniform vec3 uCaus;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `
-        if (vWPos.y < uWL - 0.02) {
-          vec2 a = vWPos.xz * 0.9 + vec2(sin(uTime * 0.4 + vWPos.z * 0.6), cos(uTime * 0.33 + vWPos.x * 0.5)) * 0.6;
-          float c = abs(sin(a.x * 2.1 + uTime * 0.7) + sin(a.y * 2.3 - uTime * 0.6) + sin((a.x + a.y) * 1.7 + uTime * 0.5));
-          c = pow(clamp(1.0 - c * 0.45, 0.0, 1.0), 4.0);
-          gl_FragColor.rgb += uCaus * c * (1.0 - clamp((uWL - vWPos.y) / 4.0, 0.0, 1.0));
-        }
-        #include <fog_fragment>`);
-    };
-    terrain = new THREE.InstancedMesh(W.boxGeo, mat, blocks.length);
+    const mat = W.voxelMat(0xffffff, { edges: 0.15, texel: 8, texAmt: 0.075, grassSide: true, caustics: true, wet: true, shininess: 10 });
+    const tgeo = new THREE.BoxGeometry(1, 1, 1);
+    tgeo.setAttribute('aKind', new THREE.InstancedBufferAttribute(new Float32Array(blocks.map((b) => b[3])), 1));
+    terrain = new THREE.InstancedMesh(tgeo, mat, blocks.length);
     tKind = new Uint8Array(blocks.length); tRand = new Float32Array(blocks.length); tJit = new Float32Array(blocks.length);
     const m = new THREE.Matrix4();
     blocks.forEach((b, i) => {
@@ -472,6 +602,9 @@
     uFogNear: { value: 70 }, uFogFar: { value: 240 }, uNight: { value: 0 }, uWL: { value: K.WL },
     uRain: { value: 0 }, uBio: { value: 0 },
     uHeight: { value: null }, uHX: { value: new THREE.Vector2(MINX, G) }, uRip: { value: ripples },
+    // inputs from the post-processing pipeline
+    uClear: { value: 1 }, uWind: { value: 0.4 }, uPost: { value: 0 }, uReflOn: { value: 0 }, tRefl: { value: null }, tScene: { value: null }, tDepth: { value: null }, tAO: { value: null },
+    uRes: { value: new THREE.Vector2(1, 1) }, uTexMat: { value: new THREE.Matrix4() }, uNear: { value: 0.3 }, uFar: { value: 2400 },
   };
   const WAVE = `
     uniform float uTime, uBreath, uAmp;
@@ -484,14 +617,15 @@
     }`;
   function initWater() {
     waterU.uHeight.value = W.heightTex;
+    for (const k of ['tRefl', 'tScene', 'tDepth', 'tAO']) waterU[k].value = dummyTex;
     const geo = new THREE.PlaneGeometry(900, 900, 300, 300);
     geo.rotateX(-Math.PI / 2);
     const vtex = renderer.capabilities.vertexTextures ? '#define VTEX\n' : '';
     const water = new THREE.Mesh(geo, new THREE.ShaderMaterial({
-      uniforms: waterU, transparent: true, depthWrite: false,
+      uniforms: waterU, transparent: true, depthWrite: true,
       vertexShader: vtex + WAVE + `
-        uniform sampler2D uHeight; uniform vec2 uHX; uniform float uWL;
-        varying vec3 vW;
+        uniform sampler2D uHeight; uniform vec2 uHX; uniform float uWL; uniform mat4 uTexMat;
+        varying vec3 vW; varying vec4 vRefl;
         void main(){
           vec4 w = modelMatrix * vec4(position, 1.0);
           float damp = 1.0;
@@ -501,22 +635,26 @@
           #endif
           w.y += waveH(w.xz) * damp + (uBreath - 0.5) * 0.07;
           vW = w.xyz;
+          vRefl = uTexMat * vec4(w.xyz, 1.0);
           gl_Position = projectionMatrix * viewMatrix * w;
         }`,
       fragmentShader: WAVE + `
         uniform vec3 uSunDir, uSunCol, uTop, uHor, uFog, uCam, uShallow, uDeep, uBioCol;
-        uniform float uFogNear, uFogFar, uNight, uWL, uRain, uBio;
-        uniform sampler2D uHeight; uniform vec2 uHX; uniform vec4 uRip[10];
-        varying vec3 vW;
+        uniform float uFogNear, uFogFar, uNight, uWL, uRain, uBio, uPost, uReflOn, uNear, uFar, uClear, uWind;
+        uniform sampler2D uHeight, tRefl, tScene, tDepth, tAO; uniform vec2 uHX, uRes; uniform vec4 uRip[10];
+        varying vec3 vW; varying vec4 vRefl;
         float h12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
         float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(h12(i), h12(i + vec2(1, 0)), f.x), mix(h12(i + vec2(0, 1)), h12(i + vec2(1, 1)), f.x), f.y); }
+        float linZ(float d){ return uNear * uFar / (uFar - d * (uFar - uNear)); }
         void main(){
           vec2 p = vW.xz;
           float e = 0.15, hc = waveH(p);
           vec3 n = vec3(hc - waveH(p + vec2(e, 0.0)), e, hc - waveH(p + vec2(0.0, e)));
+          // two drifting layers of fine ripples on top of the swell
           float d1 = vn(p * 1.3 + vec2(uTime * 0.25, uTime * 0.12)) - vn(p * 1.3 + vec2(-uTime * 0.18, uTime * 0.2));
-          n.xz += vec2(d1, -d1) * 0.05;
+          float d2 = vn(p * 4.1 + vec2(-uTime * 0.6, uTime * 0.35)) - vn(p * 3.7 + vec2(uTime * 0.45, -uTime * 0.5));
+          n.xz += vec2(d1, -d1) * 0.05 + vec2(d2, d2 * 0.7) * 0.025;
           float ring = 0.0;
           for (int i = 0; i < 10; i++) {
             vec4 r = uRip[i];
@@ -543,25 +681,50 @@
             }
           }
           n = normalize(n);
-          vec3 V = normalize(uCam - vW);
+          vec3 V = normalize(uCam - vW), L = normalize(uSunDir);
           float bed = texture2D(uHeight, (p - vec2(uHX.x) + 0.5) / uHX.y).r * 255.0 / 16.0 - 8.0;
           float depth = uWL - bed;
-          vec3 col = mix(uShallow, uDeep, smoothstep(0.0, 3.6, depth));
-          float fres = pow(1.0 - max(dot(n, V), 0.0), 4.0);
+          float ndv = max(dot(n, V), 0.0);
           vec3 Rf = reflect(-V, n);
-          col = mix(col, mix(uHor, uTop, clamp(Rf.y * 1.6, 0.0, 1.0)), 0.12 + 0.68 * fres);
-          col += uSunCol * pow(max(dot(reflect(-normalize(uSunDir), n), V), 0.0), 140.0) * 1.2;
+          vec3 skyc = mix(uHor, uTop, clamp(Rf.y * 1.6, 0.0, 1.0));
+          float spec = pow(max(dot(reflect(-L, n), V), 0.0), 220.0);
+          float glint = pow(h12(floor(p * 16.0) + floor(uTime * 5.0)), 30.0) * pow(max(dot(reflect(-L, n), V), 0.0), 10.0);
+          vec3 col; float alpha = 1.0;
+          if (uPost > 0.5) {
+            // refraction of the opaque scene, coloured by how much water the light passes through
+            vec2 suv = gl_FragCoord.xy / uRes;
+            float surfZ = linZ(gl_FragCoord.z), thick = max(linZ(texture2D(tDepth, suv).r) - surfZ, 0.0);
+            vec2 ruv = clamp(suv + n.xz * 0.05 * clamp(thick * 0.5, 0.0, 1.0), vec2(0.001), vec2(0.999));
+            if (linZ(texture2D(tDepth, ruv).r) < surfZ) ruv = suv;
+            vec3 refr = texture2D(tScene, ruv).rgb * texture2D(tAO, ruv).r;
+            vec3 tint = mix(vec3(1.0), uShallow * 1.35, 0.6);
+            vec3 body = mix(refr * tint, uDeep, 1.0 - exp(-thick * 0.3));
+            vec3 refl = skyc;
+            if (uReflOn > 0.5) refl = texture2D(tRefl, clamp(vRefl.xy / vRefl.w + n.xz * 0.04, vec2(0.001), vec2(0.999))).rgb;
+            float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+            col = mix(body, refl, clamp(fres * 1.1 + 0.06, 0.0, 1.0));
+            col += uSunCol * (spec * 3.5 + glint * 2.5 * uClear) * (1.0 - uNight * 0.6) * (0.3 + 0.7 * uClear);
+          } else {
+            col = mix(uShallow, uDeep, smoothstep(0.0, 3.6, depth));
+            col = mix(col, skyc, 0.12 + 0.68 * pow(1.0 - ndv, 4.0));
+            col += uSunCol * spec * 1.2;
+          }
           col += uSunCol * ring * 0.08 + vec3(rr * 0.05);
           float line = 0.5 + 0.3 * uBreath + 0.07 * sin(uTime * 0.7 + p.x * 0.4 + p.y * 0.3);
           float foam = (1.0 - smoothstep(0.05, line, depth)) * smoothstep(0.3, 0.7, vn(p * 2.6 + uTime * 0.12));
-          col = mix(col, vec3(0.95, 0.97, 0.96) * (1.0 - 0.45 * uNight), foam * 0.7);
-          col += uBioCol * uBio * (ring * 1.1 + foam * 0.55 + rr * 0.4);
-          float alpha = max(mix(0.48, 1.0, smoothstep(0.3, 4.5, depth)), foam * 0.85);
+          foam = max(foam, (1.0 - smoothstep(0.0, 0.25, depth)) * 0.6 * vn(p * 6.0 - uTime * 0.3));
+          // whitecaps on the crests when the wind is up
+          float crest = smoothstep(0.55, 0.95, hc / max(uAmp, 0.001)) * smoothstep(0.55, 1.0, uWind) * smoothstep(1.0, 4.0, depth);
+          foam = max(foam, crest * smoothstep(0.55, 0.8, vn(p * 3.0 + uTime * 0.5)) * 0.8);
+          col = mix(col, vec3(0.95, 0.97, 0.96) * (1.0 - 0.45 * uNight), foam * 0.75);
+          col += uBioCol * uBio * (ring * 1.4 + foam * 0.7 + rr * 0.5);
+          if (uPost < 0.5) alpha = max(mix(0.48, 1.0, smoothstep(0.3, 4.5, depth)), foam * 0.85);
           float f = smoothstep(uFogNear, uFogFar, length(uCam - vW));
           gl_FragColor = vec4(mix(col, uFog, f), mix(alpha, 1.0, f));
         }`,
     }));
     water.renderOrder = 1;
+    W.late(water);
     scene.add(water);
     W.water = water;
   }
@@ -580,6 +743,7 @@
 
   // ------------------------------------------------------------- scenery
   let mountainNear, mountainFar;
+  const hillSnow = { value: 0 };
   function initMountains() {
     const rng = mulberry32(404), near = [], far = [];
     for (let a = 0; a < Math.PI * 2; a += 0.026) {
@@ -592,6 +756,13 @@
     }
     const build = (list, color) => {
       const mat = new THREE.MeshBasicMaterial({ color, fog: false });
+      mat.onBeforeCompile = (sh) => {
+        sh.uniforms.uSnow = hillSnow;
+        sh.vertexShader = 'varying float vY;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vY = position.y + 0.5;');
+        sh.fragmentShader = 'varying float vY; uniform float uSnow;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+          diffuseColor.rgb *= mix(1.06, 0.9, vY);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.95, 0.98), smoothstep(0.82, 0.9, vY) * uSnow);`);
+      };
       const mesh = new THREE.InstancedMesh(W.boxGeo, mat, list.length * 2);
       const m = new THREE.Matrix4();
       list.forEach(([a, r, h, w], i) => {
@@ -611,7 +782,7 @@
     const g = new THREE.Group();
     g.position.set(I.x, base, I.z);
     scene.add(g);
-    const white = new THREE.MeshLambertMaterial({ color: 0xf2efe8 }), red = new THREE.MeshLambertMaterial({ color: 0xb8453a }), dark = new THREE.MeshLambertMaterial({ color: 0x3a3f46 });
+    const white = W.voxelMat(0xf2efe8, { edges: 0.1, texel: 10, texAmt: 0.04 }), red = W.voxelMat(0xb8453a, { edges: 0.1, texel: 10, texAmt: 0.05 }), dark = W.voxelMat(0x3a3f46, { edges: 0.1 });
     const add = (mat, sx, sy, sz, x, y, z) => { const m = new THREE.Mesh(W.boxGeo, mat); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
     for (let i = 0; i < 9; i++) add(Math.floor(i / 2) % 2 ? red : white, 1.5 - i * 0.06, 0.8, 1.5 - i * 0.06, 0, 0.4 + i * 0.8, 0);
     const top = 7.2;
@@ -636,33 +807,64 @@
     const c1 = new THREE.Mesh(coneGeo, beamMat), c2 = new THREE.Mesh(coneGeo, beamMat);
     c2.rotation.y = Math.PI;
     beam.add(c1, c2);
+    W.late(beam);
     g.add(beam);
     W.lighthouse = { g, lampMat, beam, beamMat, top: new THREE.Vector3(I.x, base + top + 0.55, I.z) };
   }
 
   // ------------------------------------------------------------------- clouds
   const clouds = [];
+  // Clouds: puffy voxel heaps with their own shading. Sunlit tops, cool undersides, and a bright
+  // silver lining around the edges when the sun is behind them.
+  const cloudU = {
+    uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color() }, uLit: { value: new THREE.Color() }, uShade: { value: new THREE.Color() },
+    uCam: { value: new THREE.Vector3() }, uFog: { value: new THREE.Color() }, uFogNear: { value: 70 }, uFogFar: { value: 240 }, uNight: { value: 0 },
+  };
   function initClouds() {
     const rng = mulberry32(99);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: cloudU,
+      vertexShader: `varying vec3 vN, vW, vL;
+        void main(){
+          vec4 w = modelMatrix * instanceMatrix * vec4(position, 1.0);
+          vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal); vW = w.xyz; vL = position;
+          gl_Position = projectionMatrix * viewMatrix * w;
+        }`,
+      fragmentShader: `uniform vec3 uSunDir, uSunCol, uLit, uShade, uCam, uFog; uniform float uFogNear, uFogFar, uNight;
+        varying vec3 vN, vW, vL;
+        void main(){
+          vec3 n = normalize(vN), L = normalize(uSunDir), V = normalize(uCam - vW);
+          float up = n.y * 0.5 + 0.5, lit = max(dot(n, L), 0.0);
+          vec3 col = mix(uShade, uLit, clamp(0.2 + 0.45 * up + 0.45 * lit, 0.0, 1.0));
+          // light through the thin edges when the sun is behind: strongest on faces seen edge-on
+          float back = pow(max(dot(-V, L), 0.0), 5.0), rim = 1.0 - abs(dot(n, V));
+          col += uSunCol * back * (0.3 + 0.7 * rim * rim) * 0.9 * (1.0 - uNight);
+          gl_FragColor = vec4(mix(col, uFog, smoothstep(uFogNear, uFogFar, length(uCam - vW))), 1.0);
+        }`,
+    });
     for (let c = 0; c < 16; c++) {
-      const vox = [], v = 1.7, sx = 4 + ((rng() * 3) | 0), sz = 2 + ((rng() * 2) | 0);
-      for (let x = -sx; x <= sx; x++) for (let z = -sz; z <= sz; z++) for (let y = 0; y <= 2; y++) {
-        const e = (x / (sx + 0.5)) ** 2 + (z / (sz + 0.5)) ** 2 + ((y - 0.4) / 1.7) ** 2;
-        if (e < 0.55 + fbm(x * 0.5 + c * 9, z * 0.5 + y * 3, 77, 2) * 0.55) vox.push([x * v, y * v * 0.7, z * v]);
+      const vox = [], v = 1.4, sx = 5 + ((rng() * 3) | 0), sz = 3 + ((rng() * 2) | 0);
+      for (let x = -sx; x <= sx; x++) for (let z = -sz; z <= sz; z++) for (let y = 0; y <= 3; y++) {
+        const e = (x / (sx + 0.5)) ** 2 + (z / (sz + 0.5)) ** 2 + ((y - 0.3) / 2.2) ** 2;
+        const bump = fbm(x * 0.45 + c * 9, z * 0.45 + y * 3, 77, 3);
+        if (e < 0.45 + bump * 0.6 - y * 0.06) vox.push([x * v, y * v * 0.75, z * v]);
       }
-      const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x6f7680 });
       const im = new THREE.InstancedMesh(W.boxGeo, mat, vox.length);
       const m = new THREE.Matrix4();
-      vox.forEach((p, i) => { m.makeScale(v, v * 0.7, v); m.setPosition(p[0], p[1], p[2]); im.setMatrixAt(i, m); });
+      vox.forEach((p, i) => { m.makeScale(v, v * 0.75, v); m.setPosition(p[0], p[1], p[2]); im.setMatrixAt(i, m); });
       const a = rng() * Math.PI * 2, r = 12 + rng() * 140;
       im.position.set(Math.cos(a) * r, 26 + rng() * 10, Math.sin(a) * r);
-      clouds.push({ mesh: im, mat, speed: 0.5 + rng() * 0.4, th: (c / 16) * 0.92 });
+      clouds.push({ mesh: im, speed: 0.5 + rng() * 0.4, th: (c / 16) * 0.92 });
       scene.add(im);
     }
   }
   function updateClouds(dt) {
-    const wx = S.weather, E = W.env;
-    tmpC.setRGB(1, 1, 1).lerp(E.hor, 0.35).lerp(E.top, S.night * 0.5).multiplyScalar(1 - 0.4 * Math.max(wx.rain, wx.snow * 0.5));
+    const wx = S.weather, E = W.env, gloom = Math.max(wx.rain, wx.snow * 0.5);
+    cloudU.uSunDir.value.copy(lightDir); cloudU.uSunCol.value.copy(E.sun).multiplyScalar(1 - E.over * 0.7);
+    cloudU.uLit.value.setRGB(1, 1, 1).lerp(E.sun, 0.25 + W.golden() * 0.45).lerp(E.top, S.night * 0.55).multiplyScalar((1 - 0.38 * gloom) * (1 - S.night * 0.55));
+    cloudU.uShade.value.copy(E.hor).lerp(E.top, 0.55).multiplyScalar(0.8 * (1 - 0.35 * gloom));
+    cloudU.uCam.value.copy(camera.position); cloudU.uFog.value.copy(scene.fog.color);
+    cloudU.uFogNear.value = scene.fog.near; cloudU.uFogFar.value = scene.fog.far; cloudU.uNight.value = S.night;
     const amount = clamp(wx.cloud + wx.rain * 0.2, 0, 1), speed = 0.4 + wx.wind * 1.2;
     for (const c of clouds) {
       const vis = smooth(c.th, c.th + 0.12, amount);
@@ -670,8 +872,6 @@
       c.mesh.visible = vis > 0.02;
       c.mesh.scale.setScalar(Math.max(0.02, U.smooth(0, 1, vis)));
       c.mesh.castShadow = vis > 0.5;
-      c.mat.color.copy(tmpC);
-      c.mat.emissive.copy(E.hor).multiplyScalar(0.3 + 0.2 * (1 - S.night));
       const p = c.mesh.position;
       p.x += 0.6 * c.speed * speed * dt; p.z += 0.22 * c.speed * speed * dt;
       if (p.x > 170) { p.x -= 340; p.z = (Math.random() - 0.5) * 260; }
@@ -685,7 +885,7 @@
     const angle = 0.65 + Math.PI / 2 + 0.35, dir = new THREE.Vector2(Math.cos(angle), Math.sin(angle));
     let r0 = 2;
     while (r0 < 26 && W.heightAt(dir.x * r0, dir.y * r0) > 0) r0 += 0.5;
-    const wood = new THREE.MeshLambertMaterial({ color: 0x9a7a5a }), woodDark = new THREE.MeshLambertMaterial({ color: 0x7a5d44 });
+    const wood = W.voxelMat(0x9a7a5a, { edges: 0.2, texel: 10, texAmt: 0.08, wet: true }), woodDark = W.voxelMat(0x7a5d44, { edges: 0.2, texel: 10, texAmt: 0.08, wet: true });
     const add = (mat, sx, sy, sz, x, y, z) => { const m = new THREE.Mesh(W.boxGeo, mat); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; dock.add(m); return m; };
     const len = 7, start = r0 - 1.5;
     for (let i = 0; i < len / 0.45; i++) add(i % 3 === 1 ? woodDark : wood, 0.38, 0.14, 2.1, start + i * 0.45, 0.12, 0);
@@ -693,7 +893,7 @@
     const end = start + len - 0.4;
     add(woodDark, 0.14, 1.5, 0.14, end, 0.9, 0.85);
     add(woodDark, 0.5, 0.1, 0.1, end - 0.2, 1.6, 0.85);
-    const lanternMat = new THREE.MeshLambertMaterial({ color: 0xffe2b0, emissive: 0xffa95c, emissiveIntensity: 0.4 });
+    const lanternMat = W.patch(new THREE.MeshPhongMaterial({ color: 0xffe2b0, emissive: 0xffa95c, emissiveIntensity: 0.4, shininess: 30 }), { edges: 0.25 });
     add(lanternMat, 0.3, 0.36, 0.3, end - 0.4, 1.32, 0.85);
     add(woodDark, 0.38, 0.08, 0.38, end - 0.4, 1.53, 0.85);
     dock.rotation.y = -angle;
@@ -714,7 +914,7 @@
   // ------------------------------------------------------------- islands
   // Each island gets a landing for the rowboat, facing home, and most get a small jetty.
   function initLandings() {
-    const wood = new THREE.MeshLambertMaterial({ color: 0x9a7a5a }), dark = new THREE.MeshLambertMaterial({ color: 0x7a5d44 });
+    const wood = W.voxelMat(0x9a7a5a, { edges: 0.2, texel: 10, texAmt: 0.08, wet: true }), dark = W.voxelMat(0x7a5d44, { edges: 0.2, texel: 10, texAmt: 0.08, wet: true });
     for (const I of K.ISLANDS) {
       let peak = 0;
       for (const c of [].concat(I.cols.grass, I.cols.sand, I.cols.rock)) peak = Math.max(peak, c[2]);
@@ -769,6 +969,7 @@
       const mat = new THREE.ShaderMaterial({ uniforms: { uTime: poolU.uTime, uCol: { value: new THREE.Color(p.warm ? 0x8fd8d0 : 0x6cc0d8) } }, vertexShader: W_VS, fragmentShader: POOL_FS, transparent: true, depthWrite: false });
       const m = new THREE.Mesh(new THREE.PlaneGeometry(p.r * 2 + 0.4, p.r * 2 + 0.4), mat);
       m.rotation.x = -Math.PI / 2; m.position.set(p.x, p.level - 0.25, p.z); m.renderOrder = 2;
+      W.late(m);
       scene.add(m);
       if (p.warm) W.seats.push({ x: p.x, y: p.level - 1, z: p.z, angle: Math.atan2(p.z - K.ISLAND.springs.z, p.x - K.ISLAND.springs.x), kind: 'soak' });
     }
@@ -776,6 +977,7 @@
     const F = FALLS, len = Math.hypot(F.bx - F.ax, F.bz - F.az), ang = Math.atan2(F.bz - F.az, F.bx - F.ax);
     const stream = new THREE.Mesh(new THREE.PlaneGeometry(len + 0.6, 1.3), new THREE.ShaderMaterial({ uniforms: { uTime: poolU.uTime, uCol: { value: new THREE.Color(0x6cc0d8) } }, vertexShader: W_VS, fragmentShader: POOL_FS, transparent: true, depthWrite: false }));
     stream.rotation.set(-Math.PI / 2, 0, -ang); stream.position.set((F.ax + F.bx) / 2, F.level - 0.25, (F.az + F.bz) / 2); stream.renderOrder = 2;
+    W.late(stream);
     scene.add(stream);
     const top = F.level - 0.25, hgt = top - K.WL + 0.2;
     fallsMat = new THREE.ShaderMaterial({
@@ -795,6 +997,7 @@
     falls.position.set(F.edge.x + F.out.x * 0.35, top - hgt / 2, F.edge.z + F.out.z * 0.35);
     falls.rotation.y = Math.atan2(F.out.x, F.out.z);
     falls.renderOrder = 2;
+    W.late(falls);
     scene.add(falls);
     W.waterfall = new THREE.Vector3(F.edge.x + F.out.x * 0.6, K.WL, F.edge.z + F.out.z * 0.6);
     W.waterfallTop = top;
@@ -810,7 +1013,7 @@
         blocks.push([AR.x + ca * u - sa * v, y + 0.5, AR.z + sa * u + ca * v]);
       }
     }
-    const arch = new THREE.InstancedMesh(W.boxGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), blocks.length), m4 = new THREE.Matrix4();
+    const arch = new THREE.InstancedMesh(W.boxGeo, W.voxelMat(0xffffff, { edges: 0.16, texel: 8, texAmt: 0.08, caustics: true, wet: true }), blocks.length), m4 = new THREE.Matrix4();
     blocks.forEach((b, i) => { m4.makeTranslation(b[0], b[1], b[2]); arch.setMatrixAt(i, m4); arch.setColorAt(i, hex(U.pick(rng, [0x8f948f, 0x9a9f9b, 0x86907f, 0xa7aba6]))); });
     arch.castShadow = arch.receiveShadow = true;
     scene.add(arch);
@@ -873,6 +1076,7 @@
     });
     const pts = new THREE.Points(geo, mat);
     pts.frustumCulled = false; pts.renderOrder = 3;
+    W.late(pts);
     scene.add(pts);
     return {
       pts, pos, col, al, sz, max,
@@ -926,6 +1130,7 @@
     rainMat = new THREE.LineBasicMaterial({ color: 0xd8e4ec, transparent: true, opacity: 0, depthWrite: false });
     const lines = new THREE.LineSegments(rainGeo, rainMat);
     lines.frustumCulled = false; lines.renderOrder = 4;
+    W.late(lines);
     scene.add(lines);
     rainDrops = Array.from({ length: RAIN_N }, () => ({ x: 0, y: -99, z: 0, v: 13 + Math.random() * 5 }));
     snowPts = W.makePoints(SNOW_N, 'soft', false, 75);
@@ -1072,6 +1277,8 @@
     skyU.uTop.value.copy(E.top); skyU.uHor.value.copy(E.hor); skyU.uSunCol.value.copy(P.sun);
     skyU.uSunDir.value.copy(skySun); skyU.uMoonDir.value.copy(moonDir); skyU.uMoonPhase.value = W.moonPhase();
     skyU.uOvercast.value = clamp(over * 1.15, 0, 1); skyU.uAurora.value = wx.aurora; skyU.uRainbow.value = wx.rainbow;
+    skyU.uGold.value = W.golden();
+    skyU.uCirrus.value = clamp(0.2 + 0.5 * fbm(S.day * 3.1, 2.2, 88, 2) + wx.cloud * 0.35 - wx.rain * 0.6 - wx.fog * 0.5, 0, 1);
     sky.position.copy(camera.position);
 
     const si = U.seasonIndex(S.season), winter = si === 3 ? smooth(3, 3.3, S.season % 4) : 0;
@@ -1084,18 +1291,24 @@
     waterU.uNight.value = P.night; waterU.uCam.value.copy(camera.position);
     waterU.uFogNear.value = scene.fog.near; waterU.uFogFar.value = scene.fog.far;
     waterU.uRain.value = wx.rain * 0.85;
+    waterU.uClear.value = 1 - over;
+    waterU.uWind.value = wx.wind;
     waterU.uBio.value = smooth(0.5, 0.9, P.night) * [0.6, 1, 0.7, 0.15][si] * (1 - wx.snow);
-    terrainU.uTime.value = t;
-    terrainU.uCaus.value.copy(P.sun).multiplyScalar(P.si * (1 - over) * S.dayness * 0.55);
+    PU.uTime.value = t;
+    PU.uCaus.value.copy(P.sun).multiplyScalar(P.si * (1 - over) * S.dayness * 0.55);
+    // surfaces darken and shine while it rains, and dry slowly afterwards
+    PU.uWet.value += ((wx.rain > 0.2 ? 1 : 0) - PU.uWet.value) * (1 - Math.exp(-S.dt / (wx.rain > 0.2 ? 20 : 60)));
+    for (const m of wetMats) { m.specular.setScalar(0.045 + 0.22 * PU.uWet.value); m.shininess = 14 + 40 * PU.uWet.value; }
 
     tmpC.copy(E.hor).lerp(E.top, 0.12).multiplyScalar(0.94); mountainFar.material.color.copy(tmpC);
     tmpC.copy(E.hor).lerp(E.top, 0.3).multiplyScalar(0.86); mountainNear.material.color.copy(tmpC);
+    hillSnow.value = 0.45 + 0.55 * winter;
 
     const LH = W.lighthouse, on = smooth(0.25, 0.7, S.glow);
     LH.beam.rotation.y = t * 0.45;
     LH.beamMat.uniforms.uA.value = on * (0.7 + 0.8 * wx.fog + 0.3 * wx.rain);
-    LH.lampMat.color.setRGB(0.75 + 0.35 * on, 0.72 + 0.3 * on, 0.6 + 0.25 * on);
-    W.dock.lanternMat.emissiveIntensity = 0.25 + 0.75 * S.breath.b * (0.4 + 0.6 * S.glow);
+    LH.lampMat.color.setRGB(0.75 + 1.6 * on, 0.72 + 1.4 * on, 0.6 + 1.0 * on);
+    W.dock.lanternMat.emissiveIntensity = 0.3 + 1.6 * S.breath.b * (0.3 + 0.7 * S.glow);
   }
 
   // ---------------------------------------------------------------- sightings

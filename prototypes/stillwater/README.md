@@ -62,8 +62,34 @@ The garden, tidied wild plants, current island, journal, settings and time of da
 | `js/garden.js` | Voxel growth system, seasonal recolouring, plant and building catalog, wild island growth, placement rules |
 | `js/life.js` | Creatures, the rowboat, windmill sails, particles, sky lanterns, skipping stones |
 | `js/audio.js` | Synthesised soundscape and mixer |
+| `js/post.js` | The rendering pipeline: sea reflections, ambient occlusion, bloom, sun shafts, mist, grading, depth of field, FXAA |
 | `js/walk.js` | The walking figure, footing, A* pathfinding, sitting and soaking |
 | `js/main.js` | Input, camera views, breathing patterns, journal, rituals, saving and UI |
+
+## Graphics
+
+Everything is drawn with three.js r128 and hand-written shaders; there are no image textures.
+
+- **Pipeline** (`js/post.js`): the opaque world renders into an HDR target with a depth texture.
+  Ambient occlusion is computed from depth and blurred with depth-aware weights, then the transparent
+  layer (sea, particles, glows) is drawn on top. Bloom uses a six-level mip chain; sun shafts are a
+  radial blur of the visible sky; haze toward the sun, low dawn mist, a soft highlight roll-off,
+  time-of-day and seasonal colour grading, vignette and fine grain follow; then depth of field and
+  FXAA.
+- **Sea:** planar reflections from a mirrored camera with an oblique clip plane, refraction of the
+  sea floor tinted by how much water the light passes through, sun glints, whitecaps in wind, shore
+  foam, rain rings, ripples and night glow.
+- **Blocks:** per-pixel lighting, per-face shading, darkened block edges, a fine procedural grain,
+  grass that wraps over the top of a block's sides, damp sand at the waterline, wet sheen in rain,
+  and leaves that glow when the sun is behind them.
+- **Sky:** a horizon haze band, a warm glow on the sun's side at golden hour, an HDR sun disk,
+  drifting high cirrus, varied stars, a phased moon, aurora and rainbows. Voxel clouds have their own
+  shader with sunlit tops, cool undersides and silver linings.
+- **Meadow grass:** about ten thousand swaying blade tufts that change with the seasons and part
+  around paths and buildings.
+- **Quality:** Sharp (everything), Balanced (no reflections or depth of field, half the grass) and
+  Light (no post-processing or grass). If the first seconds run slowly, the game steps down a level
+  on its own unless you chose one.
 
 ## Design choices and their sources
 

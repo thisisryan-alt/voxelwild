@@ -58,7 +58,6 @@
 
   // ---------------------------------------------------------------- growers
   let woodG, leafG, glowG, glowMat;
-  const swayU = { value: 0 }, swayAmpU = { value: 1 };
   function makeGrower(cap, mat, shadow) {
     const mesh = new THREE.InstancedMesh(W.boxGeo, mat, cap);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -903,26 +902,108 @@
     woodG.base = woodG.n; leafG.base = leafG.n; glowG.base = glowG.n;
   }
 
-  GD.init = function () {
-    W = SW.world;
-    const leafMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    leafMat.onBeforeCompile = (sh) => {
-      sh.uniforms.uSway = swayU; sh.uniforms.uSwayAmp = swayAmpU;
-      sh.vertexShader = 'uniform float uSway, uSwayAmp;\n' + sh.vertexShader.replace('#include <project_vertex>', `
-        vec4 mvPosition = vec4(transformed, 1.0);
-        #ifdef USE_INSTANCING
-          mvPosition = instanceMatrix * mvPosition;
-        #endif
-        float sw = sin(uSway * 0.9 + mvPosition.x * 0.45 + mvPosition.z * 0.3) + 0.5 * sin(uSway * 1.7 + mvPosition.z * 0.8);
-        mvPosition.x += sw * 0.03 * uSwayAmp; mvPosition.z += sw * 0.018 * uSwayAmp;
+  // ------------------------------------------------------------- meadow grass
+  // Thin blades over every grass block. They sway with the wind, turn gold in autumn, vanish under
+  // snow, and part around paths and buildings.
+  const GRASS_PAL = pal4([0x9ccc6a, 0xa8d476, 0x8fc460], [0x7fb062, 0x8ab86a, 0x74a65a, 0x6fa452], [0xbfae64, 0xb09a54, 0xc8b870, 0xa89a50], null);
+  const CLEAR = { stones: 0.95, cabin: 1.45, pavilion: 1.3, windmill: 0.9, campfire: 0.55, bench: 0.6, lantern: 0.4, cairn: 0.35, wreck: 2.4, birdhouse: 0.2, chime: 0.2 };
+  let grass = null, gData = null, grassS = -99, grassVer = -1, grassDensity = 4;
+  function bladeGeometry() {
+    const pos = [], hs = [], nrm = [];
+    for (let b = 0; b < 3; b++) {
+      const a = b * Math.PI / 3 + 0.4, wx = Math.cos(a), wz = Math.sin(a), bx = -wz, bz = wx, lean = (b - 1) * 0.15;
+      const P = (u, v) => { const w = 0.05 * (1 - v * 0.85), bend = v * v * 0.25 + lean * v; return [wx * u * w + bx * bend, v, wz * u * w + bz * bend]; };
+      const tri = [[-1, 0], [1, 0], [1, 0.55], [-1, 0], [1, 0.55], [-1, 0.55], [-1, 0.55], [1, 0.55], [0, 1]];
+      // each triangle twice, once per side, all with an upward normal so blades light like the ground
+      for (const order of [tri, tri.slice().reverse()]) for (const [u, v] of order) { pos.push(...P(u, v)); hs.push(v); nrm.push(0, 1, 0); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    g.setAttribute('aH', new THREE.Float32BufferAttribute(hs, 1));
+    return g;
+  }
+  function initGrass() {
+    const cols = K.ISLANDS.flatMap((I) => I.cols.grass), rng = mulberry32(4242), MAX = 4, n = cols.length * MAX;
+    const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    m.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, { uSway: W.uniforms.uSway, uSwayAmp: W.uniforms.uSwayAmp });
+      sh.vertexShader = 'attribute float aH; varying float vH; uniform float uSway, uSwayAmp;\n' + sh.vertexShader.replace('#include <project_vertex>', `
+        vec4 mvPosition = instanceMatrix * vec4(transformed, 1.0);
+        float ph = uSway * 1.3 + mvPosition.x * 0.5 + mvPosition.z * 0.35;
+        mvPosition.x += sin(ph) * aH * aH * 0.12 * uSwayAmp;
+        mvPosition.z += cos(ph * 0.8) * aH * aH * 0.07 * uSwayAmp;
+        vH = aH;
         mvPosition = modelViewMatrix * mvPosition;
         gl_Position = projectionMatrix * mvPosition;`);
+      sh.fragmentShader = 'varying float vH;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb *= mix(0.72, 1.12, vH);');
     };
-    glowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    woodG = makeGrower(40000, new THREE.MeshLambertMaterial({ color: 0xffffff }), true);
+    grass = new THREE.InstancedMesh(bladeGeometry(), m, n);
+    grass.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    grass.castShadow = false; grass.receiveShadow = true; grass.frustumCulled = false;
+    gData = { x: new Float32Array(n), y: new Float32Array(n), z: new Float32Array(n), rot: new Float32Array(n), sc: new Float32Array(n), r: new Float32Array(n), hide: new Uint8Array(n) };
+    // one blade tuft per block per pass, so lowering the density keeps every island covered
+    for (let pass = 0, i = 0; pass < MAX; pass++) for (const [x, z, h] of cols) {
+      gData.x[i] = x + (rng() - 0.5) * 0.95; gData.z[i] = z + (rng() - 0.5) * 0.95; gData.y[i] = h;
+      gData.rot[i] = rng() * Math.PI * 2; gData.sc[i] = 0.22 + rng() * 0.22; gData.r[i] = rng();
+      grass.setColorAt(i, tmpC.setRGB(1, 1, 1));
+      i++;
+    }
+    grass.layers.set(2);   // drawn in the main view but left out of the sea's reflection
+    W.scene.add(grass);
+    GD.setGrassDensity(S.quality);
+  }
+  GD.setGrassDensity = function (q) {
+    grassDensity = q === 'high' ? 4 : q === 'balanced' ? 2 : 0;
+    if (!grass) return;
+    grass.count = Math.floor(grass.instanceMatrix.count * grassDensity / 4);
+    grass.visible = grassDensity > 0;
+    grassS = -99;
+  };
+  const gq = new THREE.Quaternion(), gUp = new THREE.Vector3(0, 1, 0), gPos = new THREE.Vector3(), gScale = new THREE.Vector3();
+  function updateGrass() {
+    if (!grass || !grass.visible) return;
+    const verChanged = grassVer !== GD.version, seasonChanged = Math.abs(S.season - grassS) > 0.01;
+    if (!verChanged && !seasonChanged) return;
+    if (verChanged) {
+      grassVer = GD.version;
+      const cells = new Map();
+      for (const it of GD.items) {
+        const r = CLEAR[it.k];
+        if (!r) continue;
+        for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+          const key = (Math.round(it.x) + dx) + ',' + (Math.round(it.z) + dz);
+          (cells.get(key) || cells.set(key, []).get(key)).push([it.x, it.z, r]);
+        }
+      }
+      for (let i = 0; i < grass.count; i++) {
+        const list = cells.get(Math.round(gData.x[i]) + ',' + Math.round(gData.z[i]));
+        gData.hide[i] = list && list.some(([x, z, r]) => Math.hypot(gData.x[i] - x, gData.z[i] - z) < r) ? 1 : 0;
+      }
+    }
+    grassS = S.season;
+    for (let i = 0; i < grass.count; i++) {
+      const vis = gData.hide[i] ? 0 : U.seasonColor(GRASS_PAL, gData.r[i], S.season, tmpC);
+      grass.setColorAt(i, tmpC.multiplyScalar(0.88 + ((gData.r[i] * 13.7) % 1) * 0.24));
+      const s = gData.sc[i] * vis;
+      gq.setFromAxisAngle(gUp, gData.rot[i]);
+      const k = Math.max(s, 0.0001);
+      M4.compose(gPos.set(gData.x[i], gData.y[i], gData.z[i]), gq, gScale.set(k * 2.2, k * (0.75 + gData.r[i] * 0.6) * 1.15, k * 2.2));
+      grass.setMatrixAt(i, M4);
+    }
+    grass.instanceMatrix.needsUpdate = true;
+    if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
+  }
+
+  GD.init = function () {
+    W = SW.world;
+    const leafMat = W.voxelMat(0xffffff, { edges: 0.24, texel: 12, texAmt: 0.06, sway: true, trans: 0.55, wet: true, shininess: 18 });
+    glowMat = W.patch(new THREE.MeshBasicMaterial({ color: 0xffffff }), { edges: 0.12, faceShade: 0 });
+    woodG = makeGrower(40000, W.voxelMat(0xffffff, { edges: 0.2, texel: 12, texAmt: 0.07, wet: true }), true);
     leafG = makeGrower(100000, leafMat, true);
     glowG = makeGrower(4000, glowMat, false);
     scatter();
+    initGrass();
     rebuildFeatures();
   };
 
@@ -930,12 +1011,13 @@
   GD.update = function (t, dt) {
     const wind = S.weather.wind;
     swayPhase += dt * (0.6 + wind * 0.8);
-    swayU.value = S.reduceMotion ? 0 : swayPhase;
-    swayAmpU.value = 0.6 + wind * 0.9;
+    W.uniforms.uSway.value = S.reduceMotion ? 0 : swayPhase;
+    W.uniforms.uSwayAmp.value = 0.6 + wind * 0.9;
     updateGrower(woodG, t); updateGrower(leafG, t); updateGrower(glowG, t);
     sweep(leafG, S.season, 2600);
-    glowMat.color.setScalar(0.62 + 0.55 * S.glow);
+    glowMat.color.setScalar(0.75 + 1.5 * S.glow);
     if (featVersion !== GD.version) rebuildFeatures();
+    updateGrass();
     lightTimer -= dt;
     if (lightTimer <= 0) {
       lightTimer = 0.5;
