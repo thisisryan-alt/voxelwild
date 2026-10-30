@@ -908,6 +908,7 @@
   const GRASS_PAL = pal4([0x9ccc6a, 0xa8d476, 0x8fc460], [0x7fb062, 0x8ab86a, 0x74a65a, 0x6fa452], [0xbfae64, 0xb09a54, 0xc8b870, 0xa89a50], null);
   const CLEAR = { stones: 0.95, cabin: 1.45, pavilion: 1.3, windmill: 0.9, campfire: 0.55, bench: 0.6, lantern: 0.4, cairn: 0.35, wreck: 2.4, birdhouse: 0.2, chime: 0.2 };
   let grass = null, gData = null, grassS = -99, grassVer = -1, grassDensity = 4;
+  const grassWalker = { value: new THREE.Vector3(0, -99, 0) };
   function bladeGeometry() {
     const pos = [], hs = [], nrm = [];
     for (let b = 0; b < 3; b++) {
@@ -927,12 +928,15 @@
     const cols = K.ISLANDS.flatMap((I) => I.cols.grass), rng = mulberry32(4242), MAX = 4, n = cols.length * MAX;
     const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uSway: W.uniforms.uSway, uSwayAmp: W.uniforms.uSwayAmp });
-      sh.vertexShader = 'attribute float aH; varying float vH; uniform float uSway, uSwayAmp;\n' + sh.vertexShader.replace('#include <project_vertex>', `
+      Object.assign(sh.uniforms, { uSway: W.uniforms.uSway, uSwayAmp: W.uniforms.uSwayAmp, uWalker: grassWalker });
+      sh.vertexShader = 'attribute float aH; varying float vH; uniform float uSway, uSwayAmp; uniform vec3 uWalker;\n' + sh.vertexShader.replace('#include <project_vertex>', `
         vec4 mvPosition = instanceMatrix * vec4(transformed, 1.0);
         float ph = uSway * 1.3 + mvPosition.x * 0.5 + mvPosition.z * 0.35;
         mvPosition.x += sin(ph) * aH * aH * 0.12 * uSwayAmp;
         mvPosition.z += cos(ph * 0.8) * aH * aH * 0.07 * uSwayAmp;
+        // blades lean away from the walker's feet
+        vec2 away = mvPosition.xz - uWalker.xz; float near = 1.0 - smoothstep(0.15, 0.75, length(away));
+        mvPosition.xz += normalize(away + 1e-4) * near * aH * 0.22 * step(abs(mvPosition.y - uWalker.y), 0.6);
         vH = aH;
         mvPosition = modelViewMatrix * mvPosition;
         gl_Position = projectionMatrix * mvPosition;`);
@@ -1018,6 +1022,7 @@
     glowMat.color.setScalar(0.75 + 1.5 * S.glow);
     if (featVersion !== GD.version) rebuildFeatures();
     updateGrass();
+    if (SW.life && SW.life.walker) grassWalker.value.copy(SW.life.walker); else grassWalker.value.y = -99;
     lightTimer -= dt;
     if (lightTimer <= 0) {
       lightTimer = 0.5;

@@ -114,6 +114,8 @@
           varying float vKind;
         #endif
         float vxh(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+        float vn2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(vxh(vec3(i, 0.0)), vxh(vec3(i + vec2(1.0, 0.0), 0.0)), f.x), mix(vxh(vec3(i + vec2(0.0, 1.0), 0.0)), vxh(vec3(i + vec2(1.0, 1.0), 0.0)), f.x), f.y); }
         ` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
         {
           vec3 an = abs(vObjN), a = abs(vLocal) * 2.0;
@@ -127,6 +129,11 @@
             }
           #endif
           #ifdef GRASS_SIDE
+            // meadows drift between lusher and sun-faded patches over tens of blocks
+            if (vKind > 1.5 && vKind < 2.5) {
+              float m = vn2(vWPos.xz * 0.11) * 0.65 + vn2(vWPos.xz * 0.37 + 7.0) * 0.35;
+              diffuseColor.rgb *= mix(vec3(0.88, 0.94, 0.86), vec3(1.07, 1.04, 0.92), m);
+            }
             // sand at the waterline stays damp and darker
             if (vKind > 0.5 && vKind < 1.5 && vWPos.y < 0.05) diffuseColor.rgb *= 0.82 + 0.06 * vxh(cellP + 3.0);
           #endif
@@ -716,8 +723,8 @@
           // whitecaps on the crests when the wind is up
           float crest = smoothstep(0.55, 0.95, hc / max(uAmp, 0.001)) * smoothstep(0.55, 1.0, uWind) * smoothstep(1.0, 4.0, depth);
           foam = max(foam, crest * smoothstep(0.55, 0.8, vn(p * 3.0 + uTime * 0.5)) * 0.8);
-          col = mix(col, vec3(0.95, 0.97, 0.96) * (1.0 - 0.45 * uNight), foam * 0.75);
-          col += uBioCol * uBio * (ring * 1.4 + foam * 0.7 + rr * 0.5);
+          col = mix(col, vec3(0.95, 0.97, 0.96) * (1.0 - 0.72 * uNight), foam * 0.75);
+          col += uBioCol * uBio * (ring * 1.2 + foam * 0.42 + rr * 0.4);
           if (uPost < 0.5) alpha = max(mix(0.48, 1.0, smoothstep(0.3, 4.5, depth)), foam * 0.85);
           float f = smoothstep(uFogNear, uFogFar, length(uCam - vW));
           gl_FragColor = vec4(mix(col, uFog, f), mix(alpha, 1.0, f));
@@ -761,7 +768,7 @@
         sh.vertexShader = 'varying float vY;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vY = position.y + 0.5;');
         sh.fragmentShader = 'varying float vY; uniform float uSnow;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
           diffuseColor.rgb *= mix(1.06, 0.9, vY);
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.95, 0.98), smoothstep(0.82, 0.9, vY) * uSnow);`);
+          diffuseColor.rgb = mix(diffuseColor.rgb, min(diffuseColor.rgb * 1.3 + 0.05, vec3(1.0)), smoothstep(0.82, 0.9, vY) * uSnow);`);
       };
       const mesh = new THREE.InstancedMesh(W.boxGeo, mat, list.length * 2);
       const m = new THREE.Matrix4();
@@ -1151,6 +1158,13 @@
       rainGeo.attributes.position.needsUpdate = true;
     }
     rainMat.opacity = 0.32 * clamp(wx.rain * 1.3, 0, 1);
+    // drops splashing on the ground near you
+    if (wx.rain > 0.25 && W.mist) for (let k = 0; k < 2; k++) {
+      if (Math.random() > dt * 40 * wx.rain) continue;
+      const x = cx + (Math.random() - 0.5) * 30, z = cz + (Math.random() - 0.5) * 30, h = W.heightAt(x, z);
+      if (h < 0) continue;
+      for (let j = 0; j < 3; j++) W.mist.emit({ x, y: h + 0.03, z, vx: (Math.random() - 0.5) * 0.8, vy: 0.8 + Math.random() * 0.6, vz: (Math.random() - 0.5) * 0.8, grav: 7, life: 0.35, size: 0.35, size2: 0.15, alpha: 0.7, r: 0.9, g: 0.94, b: 1 });
+    }
     rainMat.color.copy(W.env.hor).lerp(WHITE, 0.45);
     const nSnow = Math.floor(SNOW_N * clamp(wx.snow, 0, 1));
     if (nSnow || snowPts.al[0] > 0) {
@@ -1263,7 +1277,10 @@
     tmpC.copy(fogDay).lerp(fogNight, P.night); E.hor.lerp(tmpC, wx.fog * 0.6); E.top.lerp(tmpC, wx.fog * 0.4);
     E.sun.copy(P.sun);
     const L = computeSunMoon(S.tod, P.night), full = 1 - Math.abs(W.moonPhase() - 0.5) * 2;
-    sun.position.copy(L).multiplyScalar(100).add(W.focus); sun.target.position.copy(W.focus);
+    sun.position.copy(L).multiplyScalar(160).add(W.focus); sun.target.position.copy(W.focus);
+    // the shadowed area grows when the camera pulls back, so distant islands keep their shadows
+    const span = clamp(camera.position.distanceTo(W.focus) * 0.75, 30, 210), sc = sun.shadow.camera;
+    if (Math.abs(sc.right - span) > span * 0.1) { sc.left = sc.bottom = -span; sc.right = sc.top = span; sc.far = 340; sc.updateProjectionMatrix(); }
     sun.color.copy(P.sun);
     sun.intensity = P.si * (1 - 0.62 * over) * (P.night > 0.5 ? 0.55 + 0.45 * full : 1);
     hemi.color.copy(P.hs).lerp(E.hor, over * 0.4); hemi.groundColor.copy(P.hg); hemi.intensity = P.hi * (1 + over * 0.15);

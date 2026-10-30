@@ -24,7 +24,8 @@
   const COMMON = `
     uniform float uNear, uFar;
     float linZ(float d){ return uNear * uFar / (uFar - d * (uFar - uNear)); }
-    float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }`;
+    float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+    float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x), mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x), f.y); }`;
   const mat = (fs, uniforms, extra) => new THREE.ShaderMaterial(Object.assign({
     uniforms: Object.assign({ uNear: { value: 0.3 }, uFar: { value: 2400 } }, uniforms), vertexShader: VS, fragmentShader: COMMON + fs,
     depthTest: false, depthWrite: false,
@@ -152,7 +153,8 @@
         // low mist lying on the sea in the early morning, thickest just above the water
         float along = dist / max(dot(rd, uCamFwd), 0.05);
         vec3 wp = uCamPos + rd * min(along, 600.0);
-        float lowness = exp(-max(wp.y - uWL, 0.0) * 0.35), thick = 1.0 - exp(-min(along, 600.0) * 0.012);
+        float banks = 0.45 + 0.9 * vnoise(wp.xz * 0.035 + vec2(uTime * 0.012, uTime * 0.005)) * vnoise(wp.xz * 0.011 - uTime * 0.004);
+        float lowness = exp(-max(wp.y - uWL, 0.0) * 0.35) * banks, thick = 1.0 - exp(-min(along, 600.0) * 0.012);
         vec3 mc = uMistCol + uSunCol * mie * 0.6;
         c = mix(c, mc, clamp(uMist * lowness * thick, 0.0, 0.85));
       }
