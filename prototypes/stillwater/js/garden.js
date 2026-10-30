@@ -16,6 +16,7 @@
     birch: pal4([0xc2e28a, 0xb0d97a], [0x8dc06a, 0x9ccb73, 0x86b864], [0xf0c84a, 0xe8b83a, 0xf5d76a], null),
     cherry: pal4([0xf4c1cf, 0xf7d3dc, 0xeeadc0, 0xfbe6ec, 0xf0b7c8], [0x7aa860, 0x6c9a55, 0x86b466], [0xd8774a, 0xc9603c, 0xe39b5a], null),
     pine: pal4([0x426f4c, 0x4a7a56, 0x3a6344], [0x3f6b4a, 0x47775a, 0x365e40], [0x3f6b4a, 0x47775a, 0x365e40], [0x3c6447, 0xe9eff2, 0xf3f6f8, 0x456e50]),
+    pineSnow: pal4(...Array(4).fill([0x3c6447, 0xe9eff2, 0xf3f6f8, 0x456e50, 0xe4ecef])),
     willow: pal4([0xb9dc84, 0xa6d276, 0xc4e290], [0x8cbc68, 0x7caf5c, 0x98c672], [0xd9c35a, 0xcbb04a, 0xe2cf72], null),
     palm: pal4([0x5f9a4e, 0x6aa857, 0x4f8a44], [0x5f9a4e, 0x6aa857, 0x4f8a44], [0x6a9a4e, 0x7aa457, 0x5f8a44], [0x58884a, 0x648f50]),
     bush: pal4([0x8fc46a, 0x7fb860], [0x5f9450, 0x6a9e58, 0x578a4a], [0x9a8a3e, 0xa86a34, 0x8a7a3a], [0x5d7552, 0xe6edf0, 0x66805a]),
@@ -204,7 +205,7 @@
     },
   };
 
-  function pine(o, rng) {
+  function pine(o, rng, rec, pal = 'pine') {
     const TS = 0.34, H = 15 + ((rng() * 6) | 0), wood = woodC(0x5a4434);
     for (let y = 0; y < H; y++) o.vox('w', 0, y * TS + TS / 2, 0, TS, wood(rng), y);
     for (let y = 3; y <= H + 1; y++) {
@@ -215,7 +216,7 @@
       for (let x = -n; x <= n; x++) for (let z = -n; z <= n; z++) {
         const d = Math.hypot(x, z);
         if (d > r || rng() < 0.12 || (x === 0 && z === 0 && y < H)) continue;
-        o.vox('l', x * TS, y * TS + TS / 2, z * TS, TS * 0.97, 'pine', y * 1.2 + d);
+        o.vox('l', x * TS, y * TS + TS / 2, z * TS, TS * 0.97, pal, y * 1.2 + d);
       }
     }
     o.feature('perch', { x: 0, y: (H + 2.2) * TS, z: 0, tree: true });
@@ -419,6 +420,8 @@
     for (let z = -3; z <= 3; z++) { put(-1, 3, z, 5); put(-1, 4, z, 6); }
     const [px, pz] = rot(-1, 2, k);
     o.feature('perch', { x: px * s, y: s * 5.1, z: pz * s });
+    const [sx, sz] = rot(-0.4, 0, k);
+    o.feature('seat', { x: sx * s, y: s * 3, z: sz * s, angle: k * Math.PI / 2, kind: 'bench' });
   }
   function campfire(o, rng) {
     const s = 0.14;
@@ -574,6 +577,8 @@
     P(0, 6, 0, 'g', hex(0xffd59a), 18, s * 0.9);
     o.feature('light', { x: 0, y: s * 6, z: 0, color: 0xffc98a, base: 0.9, distance: 10 });
     o.feature('perch', { x: 0, y: s * (9 + half + 3), z: 0 });
+    const [fx, fz] = rot(1.5, 0, k);
+    o.feature('seat', { x: fx * s, y: s, z: fz * s, angle: k * Math.PI / 2, kind: 'floor' });
   }
   function windmill(o, rng, rec) {
     const s = 0.3, k = faceK(rec.x, rec.z), wall = hex(0xece6d8), roofC = hex(0x6a4a3a);
@@ -647,6 +652,7 @@
     windmill: { cat: 'decor', label: 'Windmill', swatch: '#ece6d8', on: 'land', rad: 1.2, solid: true, span: 12, footprint: 0.65, build: windmill },
     coral: { cat: 'water', label: 'Coral', swatch: '#f28aa0', on: 'reef', rad: 0.7, span: 8, build: coral },
     wreck: { cat: 'scenery', label: 'Shipwreck', swatch: '#7a6650', on: 'land', rad: 2.6, solid: true, span: 1, build: wreck },
+    snowpine: { cat: 'scenery', label: 'Snowy pine', swatch: '#e9eff2', on: 'land', rad: 1.1, solid: true, tree: true, span: 30, build: (o, rng, rec) => pine(o, rng, rec, 'pineSnow') },
     grat: { cat: 'rituals', label: 'Gratitude flower', swatch: '#faf3e0', on: 'grass', rad: 0.4, span: 6, build: grat },
   };
 
@@ -683,7 +689,7 @@
     return true;
   }
   function rebuildFeatures() {
-    const F = { perch: [], nectar: [], light: [], fire: [], smoke: [], pad: [], chime: [], leafSrc: [], tree: [], birdhouse: [], grat: [], reed: [], porch: [] };
+    const F = { perch: [], nectar: [], light: [], fire: [], smoke: [], pad: [], chime: [], leafSrc: [], tree: [], birdhouse: [], grat: [], reed: [], porch: [], seat: [], windmill: [], reef: [] };
     for (const rec of GD.items) for (const f of rec._f || []) (F[f.type] = F[f.type] || []).push(f);
     GD.feat = F;
     featVersion = GD.version;
@@ -723,6 +729,9 @@
       for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const h = W.heightAt(x + dx * def.footprint, z + dz * def.footprint); lo = Math.min(lo, h); hi = Math.max(hi, h); }
       if (lo < 0 || hi - lo > 2) return { ok: false, msg: 'The cabin needs a flatter, drier spot.' };
       y = hi;
+    }
+    if (def.solid || def.footprint) for (const p of W.pools || []) {
+      if (Math.hypot(p.x - x, p.z - z) < p.r + 0.8 + def.rad * 0.6) return { ok: false, msg: 'Too close to the pool.' };
     }
     for (const it of GD.items) {
       const od = CAT[it.k];
@@ -777,6 +786,10 @@
     atoll: [['palm', 8], ['dune', 6], ['coral', 10]],
     rocks: [['cairn', 1]],
     wreck: [['wreck', 1], ['dune', 3]],
+    falls: [['pine', 6], ['birch', 3], ['willow', 1], ['fern', 6], ['mushroom', 3], ['flowers', 3], ['bench', 1]],
+    springs: [['cabin', 1], ['lantern', 3], ['pine', 3], ['bush', 2], ['stones', 2], ['fern', 2]],
+    glacier: [['snowpine', 8], ['cairn', 2]],
+    marsh: [['willow', 3], ['lily', 9], ['reeds', 10], ['flowers', 3], ['fern', 3], ['mushroom', 2], ['birdhouse', 1]],
   };
   const CENTRAL = new Set(['pavilion', 'windmill', 'wreck']);
   let wildLayout = null;
@@ -791,7 +804,7 @@
       let n = 0;
       for (const [k, count] of specs) {
         const on = CAT[k].on, C = I.cols;
-        let pool = on === 'grass' ? C.grass : on === 'sand' ? C.sand : on === 'reef' || on === 'water' ? C.shallow.concat(C.ring) : C.grass.concat(C.sand, C.rock);
+        let pool = on === 'grass' ? C.grass : on === 'sand' ? C.sand : on === 'reef' || on === 'water' ? C.shallow.concat(C.ring) : on === 'shore' ? C.shallow.concat(C.sand, C.grass) : C.grass.concat(C.sand, C.rock);
         if (CENTRAL.has(k)) pool = pool.slice().sort((a, b) => Math.hypot(a[0] - I.x, a[1] - I.z) - Math.hypot(b[0] - I.x, b[1] - I.z));
         for (let placed = 0, tries = 0; placed < count && tries < 300 && pool.length; tries++) {
           const p = CENTRAL.has(k) ? pool[tries] : U.pick(rng, pool);

@@ -5,7 +5,7 @@ window.SW = window.SW || {};
 
   SW.K = {
     WL: -0.35,                 // water level; block tops sit on whole numbers
-    G: 200, MINX: -100,        // terrain grid
+    G: 300, MINX: -150,        // terrain grid
     R: 15,                     // home island radius
     DAY_LEN: 960,              // seconds per day at the normal pace; one season lasts one day
     POND: { x: 4.5, z: 5, r: 2.4 },
@@ -20,7 +20,13 @@ window.SW = window.SW || {};
       { id: 'atoll', name: 'Palm Atoll', x: 50, z: 48, r: 10, line: 'A ring of sand and palms around a coral lagoon.' },
       { id: 'rocks', name: 'Seal Rocks', x: 6, z: -62, r: 7, line: 'Bare rocks where seals bask and puffins nest.' },
       { id: 'wreck', name: 'Wreck Bar', x: 26, z: 30, r: 5, line: 'A sandbar with an old boat half buried in it.' },
+      { id: 'falls', name: 'Waterfall Isle', x: -100, z: 2, r: 13, h: 9, line: 'A high mesa with a waterfall spilling into the sea.' },
+      { id: 'springs', name: 'Hot Spring Isle', x: 96, z: -62, r: 11, h: 4, line: 'Warm, steaming pools among the rocks. Walk in to soak.' },
+      { id: 'glacier', name: 'Glacier Isle', x: -30, z: -105, r: 13, h: 6, line: 'Ice and snowy pines all year round. Arctic foxes.' },
+      { id: 'marsh', name: 'Marsh Isle', x: 10, z: 100, r: 14, line: 'Reeds, lily pools, willows, frogs and otters.' },
     ],
+    SPRING_POOLS: [[-2.5, 1, 1.7], [3, -1.5, 1.4], [0.5, -4.5, 1.2]],   // [dx, dz, radius] from Hot Spring Isle
+    ARCH: { x: -14, z: 66, span: 6, dir: 0.3 },                         // a rock arch you can row under
   };
   SW.K.ISLAND = Object.fromEntries(SW.K.ISLANDS.map((i) => [i.id, i]));
 

@@ -21,7 +21,7 @@
     camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2400);
     Object.assign(W, { renderer, scene, camera, canvas, boxGeo: new THREE.BoxGeometry(1, 1, 1) });
     initLights(); initSky(); initTerrain(); initWater(); initMountains(); initLighthouse();
-    initClouds(); initDock(); initLandings(); initWeatherFx(); initShootingStar();
+    initClouds(); initDock(); initWeatherFx(); initShootingStar(); initLandings(); initFeatures();
     W.setQuality(S.quality);
     window.addEventListener('resize', resize);
   };
@@ -275,9 +275,35 @@
         const c = Math.cos(0.6), sn = Math.sin(0.6), u = (dx * c + dz * sn) / (I.r * 1.5), v = (-dx * sn + dz * c) / (I.r * 0.6), e = 1 - u * u - v * v;
         return e > 0 ? e * 1.4 - 0.1 + n * 0.6 : e * 3 + 0.2;
       }
+      case 'falls': {
+        // a mesa with a sheer cliff on the side facing home, where the waterfall drops
+        const h = base > 0 ? Math.min(I.h, base * 14) + n * 1.2 * Math.min(1, base * 3) : base * 4 + 0.4;
+        if (d > 0.62 && Math.abs(U.angDiff(ang, Math.atan2(-I.z, -I.x))) < 0.5) return Math.min(h, (1 - d) * 3 - 0.6 + n);
+        return h;
+      }
+      case 'glacier': return base > 0 ? Math.pow(base, 0.7) * I.h + n * 2 * base + 0.5 : base * 4 + 0.4;
+      case 'marsh': return base > 0 ? base * 1.8 + n * 2.4 + 0.1 : base * 4 + 0.2;
       default: return base > 0 ? base * I.h + n * 1.6 * base + 0.6 : base * 4 + 0.4;
     }
   }
+  // Pools that sit above sea level: the hot springs, and the pool and stream that feed the waterfall.
+  const POOLS = [];   // { x, z, r, level, warm }
+  let FALLS = null;   // { ax, az, bx, bz, level, edge: { x, z, top }, out }
+  function planPools() {
+    const S = K.ISLAND.springs;
+    for (const [dx, dz, r] of K.SPRING_POOLS) POOLS.push({ x: S.x + dx, z: S.z + dz, r, level: Math.round(islandHeight(S, S.x + dx, S.z + dz)), warm: true });
+    const F = K.ISLAND.falls, a = Math.atan2(-F.z, -F.x), ox = Math.cos(a), oz = Math.sin(a);
+    const px = F.x + ox * F.r * 0.35, pz = F.z + oz * F.r * 0.35, level = Math.round(islandHeight(F, px, pz));
+    let d = F.r * 0.35;
+    while (d < F.r * 1.3 && Math.round(islandHeight(F, F.x + ox * d, F.z + oz * d)) >= level - 1) d += 0.25;
+    const ex = F.x + ox * d, ez = F.z + oz * d;
+    POOLS.push({ x: px, z: pz, r: 1.6, level, warm: false });
+    FALLS = { ax: px, az: pz, bx: ex - ox * 0.6, bz: ez - oz * 0.6, level, edge: { x: ex - ox * 0.45, z: ez - oz * 0.45 }, out: { x: ox, z: oz } };
+  }
+  const segDist = (x, z, ax, az, bx, bz) => {
+    const vx = bx - ax, vz = bz - az, k = clamp(((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz || 1), 0, 1);
+    return Math.hypot(x - ax - vx * k, z - az - vz * k);
+  };
   function rawHeight(x, z) {
     let best = -7, owner = -1;
     for (const I of K.ISLANDS) {
@@ -291,7 +317,20 @@
       if (pd < P.r + 7) h = Math.min(h, 1 + Math.max(0, Math.floor((pd - P.r - 1.4) * 0.9)));
       if (pd < P.r) h = pd < P.r - 0.9 ? -2 : -1;
     }
-    if (isl && (isl.id === 'rocks' || (isl.id === 'pine' && h >= 6))) rock = 1;
+    if (isl && (isl.id === 'rocks' || (isl.id === 'pine' && h >= 6) || (isl.id === 'springs' && h >= 3))) rock = 1;
+    if (isl && isl.id === 'glacier' && h >= 0) rock = 2;   // ice
+    for (const p of POOLS) {
+      const pd = Math.hypot(x - p.x, z - p.z);
+      if (pd < p.r) { h = p.level - 1; if (p.warm) rock = 1; }
+      else if (p.warm && pd < p.r + 1.1 && h >= p.level - 1) { h = p.level; rock = 1; }
+    }
+    if (FALLS && isl && isl.id === 'falls' && segDist(x, z, FALLS.ax, FALLS.az, FALLS.bx, FALLS.bz) < 0.75 && h >= FALLS.level - 1) h = FALLS.level - 1;
+    const AR = K.ARCH;
+    for (const sgn of [-1, 1]) {
+      const ax = AR.x + Math.cos(AR.dir) * AR.span * sgn, az = AR.z + Math.sin(AR.dir) * AR.span * sgn;
+      if (Math.hypot(x - ax, z - az) < 1.6) { h = Math.max(h, 7); rock = 1; }
+      else if (Math.hypot(x - ax, z - az) < 2.6) { h = Math.max(h, -1 + Math.round(fbm(x, z, 5, 2) * 2)); rock = 1; }
+    }
     const I = K.ISLET, id = Math.hypot(x - I.x, z - I.z) / I.r;
     if (id < 1.3) { const hi = Math.round((1 - id * id) * 3.4 + 0.2); if (hi > h) { h = hi; rock = 1; } }
     for (const s of K.STACKS) if (Math.hypot(x - s[0], z - s[1]) < s[2] && s[3] > h) { h = s[3]; rock = 1; }
@@ -313,7 +352,8 @@
     2: U.pal4([0xa3d073, 0x98c968, 0xadd67c, 0x92c463], [0x8fbc6e, 0x86b468, 0x97c275, 0x80ad64], [0xb3ad62, 0xa8a85c, 0xbfae64, 0x9fa35a], [0xeef3f5, 0xe4ebef, 0xf4f7f8, 0xdfe7ea]),
     5: U.pal4([0x8f948f, 0x9a9f9b, 0x86907f], [0x8f948f, 0x9a9f9b, 0x86907f], [0x8f948f, 0x9a9f9b, 0x8a8c80], [0xe8eef0, 0x9a9f9b, 0xdfe6ea]),
   };
-  const TSTATIC = { 0: hex(0xbca87f), 3: hex(0x8d6f50), 4: hex(0x9a9f9b) };
+  TPAL[6] = U.pal4(...Array(4).fill([0xdff1f6, 0xcfe8ef, 0xe8f6fa, 0xd6edf3]));   // glacier ice, the same in every season
+  const TSTATIC = { 0: hex(0xbca87f), 3: hex(0x8d6f50), 4: hex(0x9a9f9b), 7: hex(0xb8dbe6) };
   let terrain, tKind, tRand, tJit, lastTerrainS = -99;
   const terrainU = { uTime: { value: 0 }, uWL: { value: K.WL }, uCaus: { value: new THREE.Color() } };
   W.blocks = [];
@@ -322,12 +362,15 @@
 
   function initTerrain() {
     K.ISLANDS.forEach((I, idx) => { I.idx = idx; I.cols = { grass: [], sand: [], shallow: [], ring: [], rock: [] }; });
+    planPools();
     for (let ix = 0; ix < G; ix++) for (let iz = 0; iz < G; iz++) {
       const x = ix + MINX, z = iz + MINX, [h, rock, own] = rawHeight(x, z), i = ix * G + iz;
       heights[i] = h; rocky[i] = rock; owner[i] = own;
       const kind = own >= 0 ? K.ISLANDS[own].id : '';
       const nearPond = Math.hypot(x - K.POND.x, z - K.POND.z) < K.POND.r + 3;
-      const meadowy = kind === 'home' || kind === 'pine' ? h >= 2 || (h === 1 && (nearPond || fbm(x * 0.3, z * 0.3, 41, 2) > 0.42)) : kind === 'blossom' || kind === 'meadow' ? h >= 1 : false;
+      const meadowy = kind === 'home' || kind === 'pine' ? h >= 2 || (h === 1 && (nearPond || fbm(x * 0.3, z * 0.3, 41, 2) > 0.42))
+        : kind === 'blossom' || kind === 'meadow' || kind === 'springs' || kind === 'falls' ? h >= 1
+        : kind === 'marsh' ? h >= 1 || (h === 0 && fbm(x * 0.4, z * 0.4, 52, 2) > 0.45) : false;
       grassy[i] = !rock && meadowy ? 1 : 0;
     }
     const blocks = W.blocks, rng = mulberry32(7);
@@ -337,7 +380,8 @@
       const minN = Math.min(colH(ix - 1, iz), colH(ix + 1, iz), colH(ix, iz - 1), colH(ix, iz + 1));
       for (let lv = Math.max(-7, Math.min(h, minN + 1)); lv <= h; lv++) {
         let kind;
-        if (lv === h) kind = h <= -1 ? 0 : rocky[i] ? 5 : grassy[i] ? 2 : 1;
+        if (lv === h) kind = h <= -1 ? 0 : rocky[i] === 2 ? 6 : rocky[i] ? 5 : grassy[i] ? 2 : 1;
+        else if (rocky[i] === 2) kind = 7;
         else if (rocky[i]) kind = 4;
         else if (h <= 1) kind = h <= -1 ? 0 : 1;
         else kind = h - lv <= 1 ? 3 : 4;
@@ -680,6 +724,8 @@
         const a = W.dock.angle;
         I.out = new THREE.Vector2(Math.cos(a), Math.sin(a));
         I.landing = new THREE.Vector3(W.dock.end.x + I.out.x * 1.8, K.WL, W.dock.end.z + I.out.y * 1.8);
+        W.decks.push({ ax: W.dock.start.x - I.out.x * 1.2, az: W.dock.start.z - I.out.y * 1.2, bx: W.dock.end.x + I.out.x * 0.4, bz: W.dock.end.z + I.out.y * 0.4, hw: 0.95, y: 0.19 });
+        W.seats.push({ x: W.dock.end.x + I.out.x * 0.25, y: 0.19, z: W.dock.end.z + I.out.y * 0.25, angle: a, kind: 'edge' });
         continue;
       }
       const a = Math.atan2(-I.z, -I.x), ox = Math.cos(a), oz = Math.sin(a);
@@ -695,11 +741,101 @@
       g.rotation.y = -a;
       const add = (mat, sx2, sy, sz2, x, y, z) => { const m = new THREE.Mesh(W.boxGeo, mat); m.scale.set(sx2, sy, sz2); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; g.add(m); };
       const deck = sh + 0.12;
+      W.decks.push({ ax: sx - ox * 0.6, az: sz - oz * 0.6, bx: sx + ox * 2.5, bz: sz + oz * 2.5, hw: 0.7, y: deck + 0.06 });
+      W.seats.push({ x: sx + ox * 2.3, y: deck + 0.06, z: sz + oz * 2.3, angle: a, kind: 'edge' });
       for (let i = 0; i < 7; i++) add(i % 3 === 1 ? dark : wood, 0.38, 0.12, 1.5, -0.4 + i * 0.45, deck, 0);
       for (const x of [0.9, 2.3]) for (const z of [-0.65, 0.65]) add(dark, 0.16, deck + 1.4, 0.16, x, (deck - 1.4) / 2, z);
       W.scene.add(g);
     }
   }
+  W.decks = [];   // walkable planks: { ax, az, bx, bz, hw (half width), y }
+  W.seats = [];   // places to sit or soak: { x, y, z, angle, kind }
+  W.deckAt = function (x, z) {
+    for (const d of W.decks) if (segDist(x, z, d.ax, d.az, d.bx, d.bz) < d.hw) return d.y;
+    return null;
+  };
+
+  // ------------------------------------------- springs, waterfall and sea arch
+  const poolU = { uTime: { value: 0 } };
+  const POOL_FS = `uniform float uTime; uniform vec3 uCol; varying vec3 vW;
+    void main(){
+      float r = sin(vW.x * 3.1 + uTime * 1.3) * sin(vW.z * 2.7 - uTime * 1.1) + 0.5 * sin((vW.x + vW.z) * 5.0 + uTime * 2.0);
+      gl_FragColor = vec4(uCol * (0.92 + 0.12 * r), 0.82);
+    }`;
+  const W_VS = `varying vec3 vW; varying vec2 vUv; void main(){ vUv = uv; vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+  let fallsMat, mistTimer = 0;
+  function initFeatures() {
+    for (const p of POOLS) {
+      const mat = new THREE.ShaderMaterial({ uniforms: { uTime: poolU.uTime, uCol: { value: new THREE.Color(p.warm ? 0x8fd8d0 : 0x6cc0d8) } }, vertexShader: W_VS, fragmentShader: POOL_FS, transparent: true, depthWrite: false });
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(p.r * 2 + 0.4, p.r * 2 + 0.4), mat);
+      m.rotation.x = -Math.PI / 2; m.position.set(p.x, p.level - 0.25, p.z); m.renderOrder = 2;
+      scene.add(m);
+      if (p.warm) W.seats.push({ x: p.x, y: p.level - 1, z: p.z, angle: Math.atan2(p.z - K.ISLAND.springs.z, p.x - K.ISLAND.springs.x), kind: 'soak' });
+    }
+    // the stream across the mesa, and the falls themselves
+    const F = FALLS, len = Math.hypot(F.bx - F.ax, F.bz - F.az), ang = Math.atan2(F.bz - F.az, F.bx - F.ax);
+    const stream = new THREE.Mesh(new THREE.PlaneGeometry(len + 0.6, 1.3), new THREE.ShaderMaterial({ uniforms: { uTime: poolU.uTime, uCol: { value: new THREE.Color(0x6cc0d8) } }, vertexShader: W_VS, fragmentShader: POOL_FS, transparent: true, depthWrite: false }));
+    stream.rotation.set(-Math.PI / 2, 0, -ang); stream.position.set((F.ax + F.bx) / 2, F.level - 0.25, (F.az + F.bz) / 2); stream.renderOrder = 2;
+    scene.add(stream);
+    const top = F.level - 0.25, hgt = top - K.WL + 0.2;
+    fallsMat = new THREE.ShaderMaterial({
+      uniforms: { uTime: poolU.uTime }, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      vertexShader: W_VS,
+      fragmentShader: `uniform float uTime; varying vec2 vUv; varying vec3 vW;
+        float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+        void main(){
+          float col = floor(vUv.x * 14.0);
+          float streak = fract(vUv.y * 3.0 + uTime * (1.2 + h(vec2(col, 1.0)) * 0.8) + h(vec2(col, 7.0)));
+          float edge = smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
+          vec3 c = mix(vec3(0.62, 0.82, 0.9), vec3(0.96, 0.99, 1.0), smoothstep(0.5, 1.0, streak));
+          gl_FragColor = vec4(c, (0.55 + 0.4 * streak) * edge);
+        }`,
+    });
+    const falls = new THREE.Mesh(new THREE.PlaneGeometry(1.5, hgt), fallsMat);
+    falls.position.set(F.edge.x + F.out.x * 0.35, top - hgt / 2, F.edge.z + F.out.z * 0.35);
+    falls.rotation.y = Math.atan2(F.out.x, F.out.z);
+    falls.renderOrder = 2;
+    scene.add(falls);
+    W.waterfall = new THREE.Vector3(F.edge.x + F.out.x * 0.6, K.WL, F.edge.z + F.out.z * 0.6);
+    W.waterfallTop = top;
+    W.springs = new THREE.Vector3(K.ISLAND.springs.x, 2, K.ISLAND.springs.z);
+    W.pools = POOLS;
+    W.mist = W.makeEmitter(260, 'soft', false, 320);
+    // the sea arch: a span of rock between two pillars
+    const AR = K.ARCH, ca = Math.cos(AR.dir), sa = Math.sin(AR.dir), blocks = [], rng = mulberry32(61);
+    for (let u = -AR.span; u <= AR.span; u += 1) {
+      const under = 1.2 + 4.8 * Math.cos(Math.PI * u / (2 * AR.span + 2)), topY = 8 + Math.round(rng() * 0.8);
+      for (let v = -1; v <= 1; v++) for (let y = Math.max(0, Math.round(under)); y < topY; y++) {
+        if (Math.abs(v) === 1 && y === topY - 1 && rng() < 0.5) continue;
+        blocks.push([AR.x + ca * u - sa * v, y + 0.5, AR.z + sa * u + ca * v]);
+      }
+    }
+    const arch = new THREE.InstancedMesh(W.boxGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), blocks.length), m4 = new THREE.Matrix4();
+    blocks.forEach((b, i) => { m4.makeTranslation(b[0], b[1], b[2]); arch.setMatrixAt(i, m4); arch.setColorAt(i, hex(U.pick(rng, [0x8f948f, 0x9a9f9b, 0x86907f, 0xa7aba6]))); });
+    arch.castShadow = arch.receiveShadow = true;
+    scene.add(arch);
+    W.arch = new THREE.Vector3(AR.x, 4, AR.z);
+  }
+  function updateFeatures(dt, t) {
+    poolU.uTime.value = t;
+    const F = W.focus;
+    mistTimer -= dt;
+    if (mistTimer <= 0) {
+      mistTimer = 0.08;
+      if (W.waterfall.distanceTo(F) < 70) {
+        const p = W.waterfall;
+        W.mist.emit({ x: p.x + (Math.random() - 0.5) * 1.6, y: K.WL + 0.2, z: p.z + (Math.random() - 0.5) * 1.6, vx: (Math.random() - 0.5) * 0.6, vy: 0.5 + Math.random() * 0.6, vz: (Math.random() - 0.5) * 0.6, life: 2.5, size: 2, size2: 7, alpha: 0.35, r: 0.95, g: 0.97, b: 1, wind: 0.5 });
+        if (Math.random() < 0.15) W.addRipple(p.x + W.waterfallOut().x * 1.2, p.z + W.waterfallOut().z * 1.2, 0.5);
+      }
+      if (W.springs.distanceTo(F) < 60) for (const p of POOLS) {
+        if (!p.warm || Math.random() > 0.55) continue;
+        const a = Math.random() * Math.PI * 2, r = Math.random() * p.r;
+        W.mist.emit({ x: p.x + Math.cos(a) * r, y: p.level - 0.2, z: p.z + Math.sin(a) * r, vy: 0.35 + Math.random() * 0.25, life: 4, size: 1.5, size2: 6, alpha: 0.22 + 0.12 * S.night, r: 0.97, g: 0.97, b: 0.97, wind: 0.6 });
+      }
+    }
+    W.mist.update(dt);
+  }
+  W.waterfallOut = () => FALLS.out;
   W.islandAt = function (x, z) {
     let best = K.ISLAND.home, bd = Infinity;
     for (const I of K.ISLANDS) { const d = Math.hypot(x - I.x, z - I.z) / (I.r + 8); if (d < bd) { bd = d; best = I; } }
@@ -986,6 +1122,7 @@
     updateWeatherFx(dt, t);
     updateShootingStar(dt);
     updateLights(t);
+    updateFeatures(dt, t);
     if (Math.abs(S.season - lastTerrainS) > 0.004) recolorTerrain(S.season);
     sightings(dt);
   };

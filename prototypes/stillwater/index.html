@@ -216,6 +216,31 @@
   .sit.awake { opacity: 1; }
   .sit span { color: var(--ink-soft); font-variant-numeric: tabular-nums; text-shadow: 0 1px 12px rgba(10, 26, 33, 0.7); }
   .pop.wide { width: min(27rem, calc(100vw - 32px)); }
+  .handpan {
+    position: fixed; z-index: 18; left: 50%; transform: translateX(-50%); bottom: calc(var(--hud-h) + 12px);
+    width: min(20rem, calc(100vw - 32px)); display: grid; gap: 10px; justify-items: center;
+  }
+  .pan {
+    position: relative; width: 100%; aspect-ratio: 1; max-width: 100%; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, rgba(150, 165, 175, 0.55), rgba(40, 52, 60, 0.85) 70%);
+    border: 1px solid var(--line-strong); box-shadow: 0 10px 40px rgba(10, 26, 33, 0.45), inset 0 2px 12px rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .pad {
+    position: absolute; width: 22%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; cursor: pointer;
+    border: 1px solid rgba(238, 244, 240, 0.28); background: radial-gradient(circle at 45% 40%, rgba(220, 230, 235, 0.32), rgba(60, 74, 82, 0.6));
+    box-shadow: inset 0 -3px 8px rgba(0, 0, 0, 0.25); display: grid; place-items: center; touch-action: manipulation;
+  }
+  .pad.ding { width: 27%; }
+  .pad span { font-size: 0.78rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .pad.hit { animation: padhit 1.6s ease-out; }
+  @keyframes padhit {
+    0% { box-shadow: 0 0 0 0 rgba(143, 211, 199, 0.65), inset 0 -3px 8px rgba(0, 0, 0, 0.25); background-color: rgba(143, 211, 199, 0.25); }
+    100% { box-shadow: 0 0 0 22px rgba(143, 211, 199, 0), inset 0 -3px 8px rgba(0, 0, 0, 0.25); }
+  }
+  .pan-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .pan-foot p { margin: 0; font-size: 0.88rem; color: var(--ink-soft); text-shadow: 0 1px 12px rgba(10, 26, 33, 0.7); }
+  body.sitting .handpan, body.zen .handpan { display: none; }
   .isles { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .isle { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); }
   .isle.here { border-color: rgba(143, 211, 199, 0.5); background: rgba(143, 211, 199, 0.08); }
@@ -231,6 +256,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .intro, .hud, .breath, .toast, .sit, .zen-show { transition-duration: 0.01s; }
+    .pad.hit { animation: none; }
   }
 </style>
 
@@ -259,6 +285,8 @@
     <button id="btnSound" class="chip" data-pop="popSound" aria-expanded="false">Sound</button>
     <button id="btnView" class="chip" data-pop="popView" aria-expanded="false">View</button>
     <button id="btnIslands" class="chip" aria-expanded="false" data-popid="popIslands">Islands</button>
+    <button id="btnWalk" class="chip" aria-pressed="false">Walk</button>
+    <button id="btnPlay" class="chip" aria-pressed="false">Play</button>
     <button id="btnSit" class="chip" data-pop="popSit" aria-expanded="false">Sit</button>
     <button id="btnJournal" class="chip">Journal</button>
     <button id="btnSettings" class="chip">Settings</button>
@@ -297,7 +325,7 @@
 <div id="popIslands" class="pop wide" hidden role="dialog" aria-labelledby="popIslandsTitle">
   <h2 id="popIslandsTitle">Islands</h2>
   <ul id="islandList" class="isles"></ul>
-  <p class="pop-note">Rowing takes a slow half minute or so. You can plant, build and sit on any island.</p>
+  <p class="pop-note">Rowing takes a slow half minute or so; Arrive now skips ahead. Tap the moored boat while walking to come here.</p>
 </div>
 
 <div id="popSit" class="pop" hidden role="dialog" aria-labelledby="popSitTitle">
@@ -346,9 +374,9 @@
         <cite>White et al. (2010), J. Environmental Psychology · Ulrich et al. (1991), J. Environmental Psychology · Valdez &amp; Mehrabian (1994), J. Experimental Psychology: General</cite>
       </li>
       <li>
-        <span class="spec">seven islands · seasons · weather</span>
+        <span class="spec">eleven islands · seasons · weather</span>
         <h3>Soft fascination, and a world to explore</h3>
-        <p>Attention Restoration Theory holds that gently interesting things hold attention without effort and let tired, effortful attention recover. It also names being away, a sense of a place apart from daily demands, and extent, a coherent world big enough to wander. Seven islands, a slow row between them, seasons, weather and visitors give the world that depth without asking anything of you.</p>
+        <p>Attention Restoration Theory holds that gently interesting things hold attention without effort and let tired, effortful attention recover. It also names being away, a sense of a place apart from daily demands, and extent, a coherent world big enough to wander. Eleven islands, a slow row between them, paths to walk, seasons, weather and visitors give the world that depth without asking anything of you.</p>
         <cite>Kaplan (1995), J. Environmental Psychology · Berman, Jonides &amp; Kaplan (2008), Psychological Science</cite>
       </li>
       <li>
@@ -368,6 +396,24 @@
         <h3>Natural sound</h3>
         <p>After a stressor, nature sounds bring skin conductance back to baseline faster than traffic noise, and they shift brain activity toward relaxed, outward-directed attention. Each layer has its own slider.</p>
         <cite>Alvarsson, Wiens &amp; Nilsson (2010), Int. J. Environmental Research and Public Health · Gould van Praag et al. (2017), Scientific Reports</cite>
+      </li>
+      <li>
+        <span class="spec">walk · wade · sit</span>
+        <h3>A short walk outdoors</h3>
+        <p>An analysis of ten studies found that even five minutes of activity in nature improved mood and self-esteem, and that being near water added to the effect. Walk lets you wander the islands at a stroll, wade the shallows and sit where you like.</p>
+        <cite>Barton &amp; Pretty (2010), Environmental Science &amp; Technology</cite>
+      </li>
+      <li>
+        <span class="spec">hot spring</span>
+        <h3>Warm water</h3>
+        <p>A meta-analysis found that a warm bath an hour or two before bed helped people fall asleep faster. The hot springs are a gentle stand-in: walk into one and the view settles with steam rising around you.</p>
+        <cite>Haghayegh et al. (2019), Sleep Medicine Reviews</cite>
+      </li>
+      <li>
+        <span class="spec">handpan · d major pentatonic</span>
+        <h3>Making music</h3>
+        <p>In a trial of weekly group drumming, anxiety and low mood fell compared with a control group. The handpan has no wrong notes, so there is nothing to get right.</p>
+        <cite>Fancourt et al. (2016), PLOS ONE</cite>
       </li>
       <li>
         <span class="spec">campfire</span>
@@ -469,7 +515,7 @@
   </section>
   <section class="set">
     <h3>Keys</h3>
-    <p class="set-note">B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close</p>
+    <p class="set-note">W A S D or arrows walk · B breath guide · M sound · I islands · H hide controls · J journal · V next view · 1–9 handpan (when open) · Esc close</p>
   </section>
   <section class="set">
     <div id="resetRow" class="reset"></div>
@@ -496,6 +542,14 @@
   </div>
 </div>
 
+<div id="handpan" class="handpan" hidden role="dialog" aria-label="Handpan">
+  <div id="pan" class="pan"></div>
+  <div class="pan-foot">
+    <p>Every note fits with every other. Keys 1–9 play too.</p>
+    <button id="panClose" class="btn small">Close</button>
+  </div>
+</div>
+
 <div id="tripBar" class="sit awake" hidden>
   <span id="tripText"></span>
   <button id="tripSkip" class="btn">Arrive now</button>
@@ -509,7 +563,7 @@
 <section id="intro" class="intro" aria-labelledby="introTitle">
   <div class="intro-inner">
     <h1 id="introTitle">Stillwater</h1>
-    <p class="lede">A small island that breathes with you. Grow a garden through the seasons, watch the weather turn, and meet whoever comes to visit.</p>
+    <p class="lede">A small archipelago that breathes with you. Row between eleven islands, wander them on foot, grow a garden through the seasons, and meet whoever comes to visit.</p>
     <div class="actions">
       <button id="beginSound" class="btn primary">Begin with sound</button>
       <button id="beginQuiet" class="btn">Begin in silence</button>
@@ -524,4 +578,5 @@
 <script src="js/garden.js"></script>
 <script src="js/life.js"></script>
 <script src="js/audio.js"></script>
+<script src="js/walk.js"></script>
 <script src="js/main.js"></script>

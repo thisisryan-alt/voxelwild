@@ -6,10 +6,21 @@ fonts from Google Fonts; everything else is in `js/`.
 
 ## What is out there
 
-- **Seven islands:** Home Island (your garden, the pond and the dock), Pine Isle (steep, rocky, deer),
+- **Eleven islands:** Home Island (your garden, the pond and the dock), Pine Isle (steep, rocky, deer),
   Blossom Isle (cherry trees around a pavilion), Meadow Isle (sheep, wildflowers and a turning windmill),
-  Palm Atoll (a sand ring around a coral lagoon with reef fish), Seal Rocks (seals and puffins) and Wreck
-  Bar (a sandbar with an old boat). Each has its own wild plants, which you can tidy away like your own.
+  Palm Atoll (a sand ring around a coral lagoon with reef fish), Seal Rocks (seals and puffins), Wreck
+  Bar (a sandbar with an old boat), Waterfall Isle (a mesa whose stream falls off a sheer cliff), Hot
+  Spring Isle (steaming pools you can soak in), Glacier Isle (ice, snowy pines and arctic foxes) and Marsh
+  Isle (lily pools, reeds, willows and otters). A rock sea arch stands north of home. Each island has
+  its own wild plants, which you can tidy away like your own.
+- **Walking:** press **Walk** to step off the boat as a small figure in a straw hat. Tap where to go
+  (pathfinding climbs one block at a time) or use WASD or the arrow keys. Wade the shallows, sit on
+  benches, pavilions and the ends of jetties, and walk into a hot spring to soak. Footsteps change with
+  the ground, rabbits, deer, foxes, crabs, puffins and otters keep their distance, and the cat purrs
+  when you pass. In walk mode the tray plants and builds right in front of you, and tapping open water
+  throws a pebble. Tap the moored boat to choose where to row.
+- **Handpan:** press **Play** for a nine-note handpan in D major pentatonic (keys 1–9). Every note
+  ripples the water nearby.
 - **Rowing:** a rowboat waits at whichever island you are on. Open **Islands** and choose *Row there*
   for a slow trip with a follow camera, or *Look now* to glide the camera over. Visitors, weather, shadows
   and lights follow you.
@@ -34,13 +45,13 @@ fonts from Google Fonts; everything else is in `js/`.
 - **Views:** island orbit, the shore of the current island, Home's sunset beach and pond, the whole
   archipelago from above, and a slow drifting camera.
 - **Sound:** all synthesised live, with a mixer for waves, wind, rain, wildlife, frogs and crickets, fire,
-  chimes and music.
-- **Journal:** field notes for 39 visitors, sights and places, the good things you have written, and the research
+  chimes, music, the waterfall and springs, and footsteps.
+- **Journal:** field notes for 47 visitors, sights and places, the good things you have written, and the research
   behind each design choice.
 
 The garden, tidied wild plants, current island, journal, settings and time of day are saved in the browser's local storage.
 
-**Keys:** B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
+**Keys:** WASD or arrows walk · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
 
 ## Files
 
@@ -51,6 +62,7 @@ The garden, tidied wild plants, current island, journal, settings and time of da
 | `js/garden.js` | Voxel growth system, seasonal recolouring, plant and building catalog, wild island growth, placement rules |
 | `js/life.js` | Creatures, the rowboat, windmill sails, particles, sky lanterns, skipping stones |
 | `js/audio.js` | Synthesised soundscape and mixer |
+| `js/walk.js` | The walking figure, footing, A* pathfinding, sitting and soaking |
 | `js/main.js` | Input, camera views, breathing patterns, journal, rituals, saving and UI |
 
 ## Design choices and their sources
@@ -60,10 +72,13 @@ The garden, tidied wild plants, current island, journal, settings and time of da
 | Paced breathing near 6/min, long exhale | The world follows the breathing pattern; optional on-screen guide | Lehrer & Gevirtz 2014, *Front. Psychol.*; Zaccaro et al. 2018, *Front. Hum. Neurosci.* |
 | Cyclic sighing | One of the breathing patterns | Balban et al. 2023, *Cell Rep. Med.* |
 | Water and nature scenes | Island in a calm sea, plants, slow day–night cycle; night is deep blue | White et al. 2010, *J. Environ. Psychol.*; Ulrich et al. 1991, *J. Environ. Psychol.* |
-| Soft fascination, being away, extent | Clouds, koi, fireflies, falling leaves; seven islands and a slow row between them give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
-| Watching animals | Koi, reef fish, seals, turtle, ducks, whale | Cracknell et al. 2016, *Environ. Behav.* |
+| Soft fascination, being away, extent | Clouds, koi, fireflies, falling leaves; eleven islands, a slow row between them and paths to walk give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
+| Watching animals | Koi, reef fish, seals, otters, turtle, ducks, whale | Cracknell et al. 2016, *Environ. Behav.* |
 | Mid-complexity fractals | Recursive tree branching; layered-noise clouds | Taylor et al. 2011, *Front. Hum. Neurosci.*; Hagerhall et al. 2008, *Perception* |
 | Natural sound | Surf, rain, wind, birds, frogs, crickets | Alvarsson, Wiens & Nilsson 2010, *IJERPH*; Gould van Praag et al. 2017, *Sci. Rep.* |
+| A short walk outdoors | Walk mode: wander, wade and sit | Barton & Pretty 2010, *Environ. Sci. Technol.* |
+| Warm water | Hot springs you can soak in | Haghayegh et al. 2019, *Sleep Med. Rev.* |
+| Making music | A handpan with no wrong notes | Fancourt et al. 2016, *PLOS ONE* |
 | Firelight | Campfire with crackle | Lynn 2014, *Evol. Psychol.* |
 | Slow consonant music with rests | Pentatonic pads with 5 s attacks and silences; sparse melodies | Bernardi, Porta & Sleight 2006, *Heart* |
 | Awe | Aurora, whale, shooting stars | Sturm et al. 2022, *Emotion* |

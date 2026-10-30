@@ -6,7 +6,7 @@
   const S = SW.S;
   const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
   const rand = Math.random;
-  const CHANNELS = ['waves', 'wind', 'rain', 'wildlife', 'insects', 'fire', 'chimes', 'music'];
+  const CHANNELS = ['waves', 'wind', 'rain', 'wildlife', 'insects', 'fire', 'chimes', 'music', 'falls', 'steps'];
 
   const A = SW.audio = {
     ctx: null, on: false, master: 0.7, levels: Object.fromEntries(CHANNELS.map((c) => [c, 0.8])),
@@ -47,6 +47,10 @@
       // fire: a low roar under the crackles
       this.fireLP = filt('lowpass', 180); this.fire = gain();
       src(brown, 4.1).connect(this.fireLP); this.fireLP.connect(this.fire); this.fire.connect(this.ch.fire);
+      // the waterfall's roar and the springs' simmer, louder the closer you are
+      const fhp = filt('highpass', 250); this.fallsBP = filt('bandpass', 700, 0.4); this.falls = gain();
+      src(pink, 4.6).connect(fhp); fhp.connect(this.fallsBP); this.fallsBP.connect(this.falls); this.falls.connect(this.ch.falls);
+      this.nextBubble = 0;
       // pads
       this.padBus = filt('lowpass', 1100); const padGain = gain(0.9);
       this.padBus.connect(padGain); padGain.connect(this.ch.music); padGain.connect(this.verbIn);
@@ -299,6 +303,29 @@
         t += 0.32;
       }
     },
+    step(kind, pan) {
+      if (!this.ready()) return;
+      const t = this.ctx.currentTime, out = this.ch.steps;
+      const v = 0.8 + rand() * 0.4;
+      if (kind === 'grass') this.noiseBurst(t, 0.09, 900 + rand() * 300, 0.8, 0.028 * v, out, pan);
+      else if (kind === 'sand') this.noiseBurst(t, 0.11, 2400 + rand() * 600, 1.1, 0.024 * v, out, pan);
+      else if (kind === 'snow') { this.noiseBurst(t, 0.16, 1700, 0.6, 0.03 * v, out, pan); this.noiseBurst(t + 0.04, 0.1, 3200, 1.5, 0.012 * v, out, pan); }
+      else if (kind === 'stone') { this.noiseBurst(t, 0.04, 3000, 2, 0.02 * v, out, pan); this.tone(380 + rand() * 60, t, 0.04, 0.012, this.pan(pan, out)); }
+      else if (kind === 'wood') { this.tone(150 + rand() * 30, t, 0.09, 0.05 * v, this.pan(pan, out), 'triangle', 0.003); this.noiseBurst(t, 0.03, 1500, 1, 0.012, out, pan); }
+      else if (kind === 'water') this.noiseBurst(t, 0.22, 1000 + rand() * 300, 0.7, 0.04 * v, out, pan);
+    },
+    // A handpan in D major pentatonic: a soft strike, an octave and a fifth above it, long decay.
+    handpan(m, pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, t = ctx.currentTime, f = midi(m), out = this.pan(pan || 0, this.out);
+      for (const [mul, amp, dec] of [[1, 0.11, 3.4], [2, 0.05, 1.8], [3.01, 0.022, 0.9], [4.2, 0.008, 0.35]]) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.setValueAtTime(f * mul * 1.006, t); o.frequency.exponentialRampToValueAtTime(f * mul, t + 0.06);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(amp, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dec);
+        o.connect(g); g.connect(out); g.connect(this.verbIn); o.start(t); o.stop(t + dec + 0.05);
+      }
+      this.noiseBurst(t, 0.02, 3000, 1, 0.01, this.out);
+    },
     chord(notes, t, soft) {
       const ctx = this.ctx;
       for (const m of notes) for (const [type, det, v] of [['sine', 0, 0.034], ['triangle', 5, 0.014]]) {
@@ -327,6 +354,14 @@
         this.nextDrip = now + 0.02 + rand() * 0.12 / wx.rain;
       }
       this.fire.gain.setTargetAtTime(e.fire * 0.09, now, 0.4);
+      this.falls.gain.setTargetAtTime((e.falls || 0) * 0.22, now, 0.4);
+      if ((e.springs || 0) > 0.05 && now > this.nextBubble) {
+        const o = ctx.createOscillator(), g = ctx.createGain(), f0 = 300 + rand() * 500, out = this.pan(rand() * 0.8 - 0.4, this.ch.falls);
+        o.frequency.setValueAtTime(f0, now); o.frequency.exponentialRampToValueAtTime(f0 * 1.8, now + 0.05);
+        this.env(g, now, 0.03 * e.springs, 0.005, 0.06);
+        o.connect(g); g.connect(out); o.start(now); o.stop(now + 0.1);
+        this.nextBubble = now + 0.08 + rand() * 0.5 / e.springs;
+      }
       if (e.fire > 0.02 && now > this.nextCrackle) {
         this.noiseBurst(now + 0.01, 0.006 + rand() * 0.02, 1500 + rand() * 3000, 1.5, (0.02 + rand() * 0.05) * e.fire, this.ch.fire, rand() * 0.4 - 0.2);
         this.nextCrackle = now + 0.04 + rand() * 0.25;

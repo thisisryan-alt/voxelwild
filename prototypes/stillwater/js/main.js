@@ -79,6 +79,10 @@
     ['fog', 'Fog', 'The island turns quiet and close.', 'Some days are misty.'],
     ['snow', 'Snow', 'Slow flakes and a white island.', 'Wait for winter.'],
     ['sheep', 'Sheep', 'They graze Meadow Isle and call to each other now and then.', 'Row to Meadow Isle.'],
+    ['fox', 'Arctic foxes', 'White foxes trotting over the ice. They keep their distance.', 'Row to Glacier Isle.'],
+    ['otter', 'Otters', 'They float on their backs in the marsh pools.', 'Row to Marsh Isle.'],
+    ['arch', 'Sea arch', 'A span of rock you can row beneath.', 'It stands north of Home Island.'],
+    ['soak', 'A long soak', 'Warm water up to your shoulders, steam rising.', 'Walk into a hot spring.'],
     ['deer', 'Deer', 'Shy deer among the pines. Tap one and it bounds away.', 'Row to Pine Isle.'],
     ['seal', 'Seals', 'They bask on Seal Rocks and slip into the sea to swim.', 'Row to Seal Rocks.'],
     ['puffin', 'Puffins', 'Small seabirds with bright beaks, looping over the rocks.', 'Row to Seal Rocks by day.'],
@@ -128,9 +132,10 @@
     yaw: 0, pitch: 0, tYaw: 0, tPitch: 0, fYaw: 0, eye: new THREE.Vector3(), view: 'island', blend: 0, poi: 0, poiT: 0,
   };
   const curPos = new THREE.Vector3(), curLook = new THREE.Vector3(), wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3();
-  let lastInteract = -100;
+  let lastInteract = -100, lastDrag = -100;
   const VIEWS = { island: 'Island', dock: 'Shore', beach: 'Beach', pond: 'Pond', sky: 'The whole archipelago', drift: 'Drift' };
   function setView(v, instant) {
+    if (SW.walk.active) stopWalking();
     cam.view = v; cam.blend = instant ? 0 : 4;
     const d = W.dock;
     if ((v === 'beach' || v === 'pond') && W.island.id !== 'home') W.setIsland('home');
@@ -138,7 +143,7 @@
     if (v === 'island' || v === 'sky' || v === 'drift') {
       cam.mode = v === 'drift' ? 'drift' : 'orbit';
       if (v === 'sky') cam.tTarget.set(0, 0, 0); else cam.tTarget.copy(I.center);
-      cam.tR = v === 'sky' ? 210 : (I.id === 'home' ? 46 : Math.max(26, I.r * 3.1)) * (W.portrait ? 1.6 : 1);
+      cam.tR = v === 'sky' ? 290 : (I.id === 'home' ? 46 : Math.max(26, I.r * 3.1)) * (W.portrait ? 1.6 : 1);
       cam.tPhi = v === 'sky' ? 0.5 : 1.1;
     } else {
       cam.mode = 'look';
@@ -192,7 +197,15 @@
         if (trees.length) { const tr = U.pick(Math.random, trees); pois.push([tr.x, tr.y * 0.6, tr.z]); }
         cam.tTarget.set(...pois[cam.poi++ % pois.length]);
       }
-    } else if (cam.mode === 'orbit' && prefs.drift && !S.reduceMotion && t - lastInteract > 12) cam.tTheta += dt * 0.012 * U.smooth(12, 18, t - lastInteract);
+    } else if ((cam.mode === 'orbit' || (cam.mode === 'walk' && !SW.walk.moving)) && prefs.drift && !S.reduceMotion && t - lastInteract > 12) cam.tTheta += dt * 0.012 * U.smooth(12, 18, t - lastInteract);
+    if (cam.mode === 'walk') {
+      const p = SW.walk.pos;
+      cam.tTarget.set(p.x, p.y + (SW.walk.pose === 'stand' ? 0.9 : 0.5), p.z);
+      if (SW.walk.moving && t - lastDrag > 1.5) {
+        const f = SW.walk.facing, behind = Math.atan2(-Math.cos(f), -Math.sin(f));
+        cam.tTheta += U.angDiff(cam.tTheta, behind) * Math.min(1, dt * 1.2);
+      }
+    }
     const trip = L.trip();
     if (cam.mode === 'follow' && trip) {
       const b = L.boat().position, f = trip.fwd, c = Math.cos(cam.fYaw), sn = Math.sin(cam.fYaw);
@@ -209,9 +222,10 @@
       cam.yaw += U.angDiff(cam.yaw, cam.tYaw) * k; cam.pitch += (cam.tPitch - cam.pitch) * k;
     } else {
       cam.theta += (cam.tTheta - cam.theta) * k; cam.phi += (cam.tPhi - cam.phi) * k; cam.r += (cam.tR - cam.r) * k;
-      cam.target.lerp(cam.tTarget, 1 - Math.exp(-dt * (cam.mode === 'drift' ? 0.3 : 1.5)));
+      cam.target.lerp(cam.tTarget, 1 - Math.exp(-dt * (cam.mode === 'drift' ? 0.3 : cam.mode === 'walk' ? 8 : 1.5)));
     }
     computeWant();
+    if (cam.mode === 'walk') wantPos.y = Math.max(wantPos.y, W.heightAt(wantPos.x, wantPos.z) + 0.8, K.WL + 0.6);
     cam.blend = Math.max(0, cam.blend - dt);
     const kb = cam.blend > 0 ? 1 - Math.exp(-dt * 1.6) : 1;
     curPos.lerp(wantPos, kb); curLook.lerp(wantLook, kb);
@@ -244,14 +258,14 @@
           else if (cam.mode === 'look') { cam.tYaw -= dx * 0.004; cam.tPitch = U.clamp(cam.tPitch + dy * 0.003, -0.7, 0.6); }
           else {
             if (cam.mode === 'drift') { cam.mode = 'orbit'; cam.view = 'island'; setViewButtons(); }
-            cam.tTheta += dx * 0.005; cam.tPhi = U.clamp(cam.tPhi - dy * 0.004, 0.45, 1.42);
+            cam.tTheta += dx * 0.005; cam.tPhi = U.clamp(cam.tPhi - dy * 0.004, 0.45, 1.42); lastDrag = S.t;
           }
         }
       }
       prev.x = e.clientX; prev.y = e.clientY;
       if (pointers.size === 2 && cam.mode !== 'look') {
         const [a, b] = [...pointers.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (pinchD > 0) cam.tR = U.clamp(cam.tR * pinchD / d, 16, 100);
+        if (pinchD > 0) cam.tR = U.clamp(cam.tR * pinchD / d, cam.mode === 'walk' ? 3.5 : 16, cam.mode === 'walk' ? 30 : 100);
         pinchD = d;
       }
       lastInteract = S.t;
@@ -265,7 +279,7 @@
     canvas.addEventListener('pointercancel', end);
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      if (cam.mode !== 'look') cam.tR = U.clamp(cam.tR * (1 + e.deltaY * 0.001), 16, 100);
+      if (cam.mode !== 'look') cam.tR = U.clamp(cam.tR * (1 + e.deltaY * 0.001), cam.mode === 'walk' ? 3.5 : 16, cam.mode === 'walk' ? 30 : 100);
       lastInteract = S.t;
     }, { passive: false });
   }
@@ -280,6 +294,7 @@
     ndc.set((cx / window.innerWidth) * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
     raycaster.setFromCamera(ndc, W.camera);
     if (W.tryWish(cx, cy)) return;
+    if (SW.walk.active && !L.trip()) { walkTap(); return; }
     if (tool !== 'tidy' && L.tapAt(raycaster)) return;
     const hit = raycaster.intersectObject(W.terrain, false)[0];
     const wHit = raycaster.ray.intersectPlane(waterPlane, wp);
@@ -287,6 +302,62 @@
     if (hit && hit.point.y > K.WL && hit.distance <= wDist) onLand(hit);
     else if (wHit && Math.hypot(wp.x, wp.z) < 200) onWater(wp.x, wp.z);
   }
+  // While walking, a tap is somewhere to go: a spot on land or in the shallows, a seat, the boat,
+  // or open water to throw a pebble into.
+  function walkTap() {
+    const WK = SW.walk;
+    if (L.tapBoat(raycaster)) { renderIslands(); togglePop('popIslands'); return; }
+    if (L.tapAt(raycaster)) return;
+    const hit = raycaster.intersectObject(W.terrain, false)[0];
+    const wHit = raycaster.ray.intersectPlane(waterPlane, wp);
+    const land = hit && hit.point.y > K.WL && (!wHit || hit.distance <= raycaster.ray.origin.distanceTo(wp));
+    const pt = land ? hit.point : wHit ? wp : null;
+    if (!pt) return;
+    const st = WK.seatNear(pt.x, pt.z, 1.3);
+    if (st) { if (!WK.goSit(st)) toast('You can’t quite get there from here.', 3, true); return; }
+    if (land) { const g = GD.nearest(pt.x, pt.z, 0.7, (it) => it.k === 'grat'); if (g && Math.hypot(g.x - WK.pos.x, g.z - WK.pos.z) < 3) { showNote(g); return; } }
+    if (land || W.heightAt(pt.x, pt.z) === -1 || W.deckAt(pt.x, pt.z) != null) {
+      if (!WK.goTo(pt.x, pt.z)) toast('You can’t quite get there from here.', 3, true);
+      return;
+    }
+    if (Math.hypot(pt.x - WK.pos.x, pt.z - WK.pos.z) < 16) {
+      WK.facing = Math.atan2(pt.x - WK.pos.x, pt.z - WK.pos.z);
+      L.throwPebble(WK.pos, pt.x, pt.z);
+      pebbles++;
+    } else toast('That is too far to throw a pebble.', 3, true);
+  }
+  function startWalking() {
+    if (L.trip()) { toast('Wait until you land.', 3, true); return; }
+    if (cam.view === 'sky' || cam.mode === 'look' || cam.mode === 'drift') setView('island', true);
+    SW.walk.enter();
+    cam.mode = 'walk'; cam.view = 'walk'; cam.tR = 9; cam.tPhi = 1.18; cam.blend = 3;
+    cam.tTheta = Math.atan2(-Math.cos(SW.walk.facing), -Math.sin(SW.walk.facing));
+    setViewButtons();
+    $('btnWalk').setAttribute('aria-pressed', 'true');
+    if (!prefs.walkTips) { prefs.walkTips = true; toast('Tap where to go, or use the arrow keys. Tap a bench, a jetty’s end or a hot spring to sit.', 8, true); }
+  }
+  function stopWalking() {
+    SW.walk.exit();
+    $('btnWalk').setAttribute('aria-pressed', 'false');
+    cam.mode = 'orbit'; cam.view = 'island';
+    cam.tTarget.copy(W.island.center); cam.tR = W.island.id === 'home' ? 46 : Math.max(26, W.island.r * 3.1); cam.tPhi = 1.1; cam.blend = 3;
+  }
+  // In walk mode the tray acts right where you stand.
+  function actHere(k) {
+    const WK = SW.walk, f = WK.front(1.3);
+    if (k === 'pebble' || k === 'skip') {
+      const tgt = WK.front(k === 'pebble' ? 7 : 5);
+      if (W.heightAt(tgt.x, tgt.z) >= -1) { toast('Face the open water first.', 3, true); return; }
+      if (k === 'pebble') L.throwPebble(WK.pos, tgt.x, tgt.z); else L.skipStone(tgt.x, tgt.z);
+      return;
+    }
+    if (k === 'tidy') { tidyAt(f.x, f.z); return; }
+    const def = GD.CAT[k];
+    let kind = k;
+    if (def.cat === 'plants' && def.on === 'grass' && !W.isGrass(f.x, f.z) && W.heightAt(f.x, f.z) >= 0 && W.heightAt(f.x, f.z) <= 2) kind = 'dune';
+    if (plantAt(kind, f.x, f.z)) WK.kneel();
+  }
+
   function onLand(hit) {
     const b = W.blocks[hit.instanceId];
     if (!b || b[6] !== W.heightAt(b[0], b[2])) return;
@@ -315,13 +386,14 @@
   }
   function plantAt(k, x, z) {
     const r = GD.tryPlace(k, x, z);
-    if (!r.ok) { if (r.msg) toast(r.msg, 4, true); return; }
+    if (!r.ok) { if (r.msg) toast(r.msg, 4, true); return false; }
     A.plantNote();
     planted++;
     saveSoon();
     const def = GD.CAT[k];
     if (def.tree || def.span >= 8) growing.push({ at: S.t + def.span + 1.5, x: r.rec.x, y: r.rec.y + (def.tree ? 4 : 0.6), z: r.rec.z });
     if (prefs.tutorial === 0) tutorialStep(1);
+    return true;
   }
   function tidyAt(x, z) {
     const it = GD.nearest(x, z, 1.4);
@@ -364,6 +436,7 @@
   }
   function chooseTool(k) {
     if (k === 'letgo' || k === 'grateful') { openComposer(k); return; }
+    if (SW.walk.active) { actHere(k); return; }
     tool = k;
     renderDrawer(); renderCats();
     const hints = {
@@ -439,6 +512,7 @@
     if (cam.mode === 'look' || cam.view === 'sky') { setView('island'); }
     const tr = L.travel(id);
     if (!tr) return;
+    if (SW.walk.active) { SW.walk.hide(true); L.setRower(true); }
     cam.mode = 'follow'; cam.view = 'follow'; cam.fYaw = 0; setViewButtons();
     $('tripText').textContent = 'Rowing to ' + tr.to.name;
     $('tripBar').hidden = false;
@@ -448,11 +522,41 @@
     const I = K.ISLAND[id];
     $('tripBar').hidden = true;
     cam.tTheta = cam.theta = Math.atan2(W.camera.position.z - I.z, W.camera.position.x - I.x);
-    setView('island');
+    if (SW.walk.active) {
+      SW.walk.spawn(); SW.walk.hide(false); L.setRower(false);
+      cam.mode = 'walk'; cam.view = 'walk'; cam.tR = 9; cam.tPhi = 1.18; cam.blend = 3;
+    } else setView('island');
     toast(I.name + '.', 4, true);
     saveSoon();
   });
   SW.on('island', (id) => { if (id !== 'home') SW.emit('see', 'isle-' + id); });
+
+  // ------------------------------------------------------------------- handpan
+  const PAN_NOTES = [50, 57, 59, 62, 64, 66, 69, 71, 74];
+  const PAN_ANGLES = [90, 135, 45, 180, 0, 225, 315, 270];
+  function buildHandpan() {
+    $('pan').innerHTML = PAN_NOTES.map((n, i) => {
+      const a = i ? PAN_ANGLES[i - 1] * Math.PI / 180 : 0, r = i ? 35 : 0;
+      return `<button class="pad${i ? '' : ' ding'}" data-pad="${i}" style="left:${50 + Math.cos(a) * r}%;top:${50 + Math.sin(a) * r}%" aria-label="Note ${i + 1}"><span>${i + 1}</span></button>`;
+    }).join('');
+    $$('[data-pad]').forEach((b) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); playPad(+b.dataset.pad); }));
+  }
+  function toggleHandpan(open) {
+    const el = $('handpan'), show = open == null ? el.hidden : open;
+    el.hidden = !show;
+    $('btnPlay').setAttribute('aria-pressed', String(show));
+    if (show && !A.on) { setSound(true); toast('Sound is on so you can hear it.', 3, true); }
+  }
+  function playPad(i) {
+    const n = PAN_NOTES[i], a = i ? PAN_ANGLES[i - 1] * Math.PI / 180 : 0;
+    A.handpan(n, i ? Math.cos(a) * 0.5 : 0);
+    const b = document.querySelector(`[data-pad="${i}"]`);
+    if (b) { b.classList.remove('hit'); void b.offsetWidth; b.classList.add('hit'); }
+    const F = SW.walk.active ? SW.walk.pos : W.focus;
+    W.addRipple(F.x + (Math.random() - 0.5) * 12, F.z + (Math.random() - 0.5) * 12, 0.45);
+    L.bloomSparkle(F.x + (Math.random() - 0.5) * 2, F.y + 0.5, F.z + (Math.random() - 0.5) * 2);
+    lastInteract = S.t;
+  }
 
   // -------------------------------------------------------------------- sitting
   let sit = null;
@@ -461,7 +565,8 @@
     sit = { end: S.t + min * 60, start: S.t, min };
     document.body.classList.add('sitting');
     $('sitOverlay').hidden = false;
-    if (!L.trip()) setView('dock');
+    if (SW.walk.active) { const st = SW.walk.seatNear(SW.walk.pos.x, SW.walk.pos.z, 4); if (st) SW.walk.goSit(st); }
+    else if (!L.trip()) setView('dock');
     A.bowl(1);
   }
   function endSit(done) {
@@ -542,7 +647,7 @@
     $('optGuide').checked = prefs.guide;
   }
   function renderSoundPop() {
-    const names = { waves: 'Waves', wind: 'Wind', rain: 'Rain', wildlife: 'Birds and animals', insects: 'Frogs and crickets', fire: 'Fire', chimes: 'Chimes', music: 'Music' };
+    const names = { waves: 'Waves', wind: 'Wind', rain: 'Rain', wildlife: 'Birds and animals', insects: 'Frogs and crickets', fire: 'Fire', chimes: 'Chimes', music: 'Music', falls: 'Waterfall and springs', steps: 'Footsteps' };
     $('mixer').innerHTML = A.CHANNELS.map((c) => `<label class="mix"><span>${names[c]}</span><input type="range" min="0" max="100" value="${Math.round((prefs.levels[c] ?? 0.8) * 100)}" data-ch="${c}" aria-label="${names[c]} volume"></label>`).join('');
     $$('[data-ch]').forEach((r) => r.addEventListener('input', () => { const v = r.value / 100; prefs.levels[r.dataset.ch] = v; A.setChannel(r.dataset.ch, v); saveSoon(); }));
     $('master').value = Math.round(prefs.master * 100);
@@ -586,7 +691,8 @@
     $('breath').classList.toggle('off', !prefs.guide);
     if (prefs.tutorial === 0) setTimeout(() => toast('Tap the grass to plant. Choose what to plant from the tray below.', 8, true), 1800);
     else setTimeout(() => toast('Welcome back. ' + U.seasonName(S.season + 0.15) + ', ' + U.clockLabel(S.tod) + '.', 4), 1500);
-    if (prefs.tutorial > 0 && !prefs.islandsHint) { prefs.islandsHint = true; setTimeout(() => toast('The sea has opened up. Six more islands are out there; open Islands to row to one.', 8), 6000); }
+    if (prefs.tutorial > 0 && !prefs.islandsHint) { prefs.islandsHint = true; prefs.walkHint = true; setTimeout(() => toast('The sea has opened up. Ten more islands are out there; open Islands to row to one, and Walk to explore on foot.', 9), 6000); }
+    else if (prefs.tutorial > 0 && !prefs.walkHint) { prefs.walkHint = true; setTimeout(() => toast('New: four more islands, and you can walk them. Try Walk.', 8), 6000); }
   }
 
   function bindUI() {
@@ -604,6 +710,10 @@
     $('btnJournal').addEventListener('click', () => openPanel('panelJournal'));
     $('btnIslands').addEventListener('click', () => { renderIslands(); togglePop('popIslands'); });
     $('tripSkip').addEventListener('click', () => L.arriveNow());
+    $('btnWalk').addEventListener('click', () => { closePops(); if (SW.walk.active) stopWalking(); else startWalking(); });
+    $('btnPlay').addEventListener('click', () => { closePops(); toggleHandpan(); });
+    $('panClose').addEventListener('click', () => toggleHandpan(false));
+    buildHandpan();
     $('btnSettings').addEventListener('click', () => openPanel('panelSettings'));
     $$('.panel-close').forEach((b) => b.addEventListener('click', () => { closePanels(); }));
     $$('#panelJournal [role=tab]').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
@@ -657,6 +767,7 @@
       if (key === 'h') { if (document.body.classList.toggle('zen')) { closePops(); closePanels(); } }
       if (key === 'j') openPanel('panelJournal');
       if (key === 'i') { renderIslands(); togglePop('popIslands'); }
+      if (!$('handpan').hidden && /^[1-9]$/.test(key)) { playPad(+key - 1); return; }
       if (key === 'v') { const vs = Object.keys(VIEWS); setView(vs[(vs.indexOf(cam.view) + 1) % vs.length]); toast(VIEWS[cam.view], 2, true); }
     });
   }
@@ -683,7 +794,10 @@
     updateCamera(dt, t);
     let fire = 0;
     for (const f of GD.feat.fire) fire = Math.max(fire, U.clamp(1 - (W.camera.position.distanceTo(tmpFire.set(f.x, f.y, f.z)) - 8) / 45, 0, 1));
-    A.update({ fire, chimes: GD.feat.chime.length, trees: GD.feat.tree.length });
+    const ear = SW.walk.active ? SW.walk.pos : W.camera.position;
+    const falls = U.clamp(1 - (ear.distanceTo(W.waterfall) - 6) / 55, 0, 1), springs = U.clamp(1 - (ear.distanceTo(W.springs) - 5) / 28, 0, 1);
+    A.update({ fire, chimes: GD.feat.chime.length, trees: GD.feat.tree.length, falls, springs });
+    SW.walk.update(dt, t, cam.theta);
     for (let i = growing.length - 1; i >= 0; i--) {
       const g = growing[i];
       if (t < g.at) continue;
@@ -736,7 +850,7 @@
     const ws = (data && data.world) || SW.store.get('world', null);
     if (ws) { S.tod = ws.tod; S.day = ws.day; S.season = ws.season; S.island = K.ISLAND[ws.island] ? ws.island : 'home'; }
     try { W.init(); } catch (e) { noGL('Stillwater needs WebGL, which this browser has turned off.'); return; }
-    GD.init(); L.init();
+    GD.init(); L.init(); SW.walk.init();
     A.master = prefs.master;
     A.CHANNELS.forEach((c) => { A.levels[c] = prefs.levels[c] ?? 0.8; });
     W.setWeatherMode(prefs.weather);
@@ -753,7 +867,7 @@
     W.renderer.setAnimationLoop(frame);
     if (data && data.started) begin(false);
   }
-  SW.ui = { setView: (v, instant) => setView(v, instant), toast, camera: cam, rowTo: (id) => rowTo(id), tick: (dt) => updateCamera(dt, S.t) };
+  SW.ui = { setView: (v, instant) => setView(v, instant), toast, camera: cam, rowTo: (id) => rowTo(id), tick: (dt) => updateCamera(dt, S.t), walk: () => startWalking(), handpan: (i) => playPad(i) };
   const hot = window.claude && window.claude.hot;
   if (hot && hot.snapshot) hot.snapshot(() => ({ items: GD ? GD.serialize() : null, wildGone: GD ? GD.wildGone() : null, world: { tod: S.tod, day: S.day, season: S.season, island: S.island }, started: S.started }));
   const start = (data) => { try { boot(data || {}); } catch (e) { console.error(e); noGL('Something went wrong while starting. Reload to try again.'); } };
