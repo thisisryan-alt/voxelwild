@@ -269,6 +269,36 @@
         t += dur + 0.8;
       }
     },
+    oar() {
+      if (!this.ready()) return;
+      const t = this.ctx.currentTime;
+      this.noiseBurst(t, 0.35, 700, 0.7, 0.05, this.ch.waves, -0.3);
+      this.noiseBurst(t + 0.03, 0.35, 760, 0.7, 0.05, this.ch.waves, 0.3);
+      this.noiseBurst(t + 0.25, 0.6, 1800, 0.5, 0.025, this.ch.waves, 0);
+    },
+    bleat(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, t = ctx.currentTime + 0.02, o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(330, t); o.frequency.linearRampToValueAtTime(300, t + 0.6);
+      lfo.frequency.value = 9; lg.gain.value = 18; lfo.connect(lg); lg.connect(o.frequency);
+      f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 2.5;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.03, t + 0.08); g.gain.linearRampToValueAtTime(0, t + 0.65);
+      o.connect(f); f.connect(g); g.connect(this.pan(pan, this.ch.wildlife)); g.connect(this.verbIn);
+      o.start(t); lfo.start(t); o.stop(t + 0.7); lfo.stop(t + 0.7);
+    },
+    bark(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, out = this.pan(pan, this.ch.wildlife);
+      let t = ctx.currentTime + 0.02;
+      for (let i = 0; i < 2 + ((rand() * 2) | 0); i++) {
+        const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(260, t); o.frequency.exponentialRampToValueAtTime(170, t + 0.2);
+        f.type = 'lowpass'; f.frequency.value = 900;
+        this.env(g, t, 0.035, 0.02, 0.22);
+        o.connect(f); f.connect(g); g.connect(out); g.connect(this.verbIn); o.start(t); o.stop(t + 0.3);
+        t += 0.32;
+      }
+    },
     chord(notes, t, soft) {
       const ctx = this.ctx;
       for (const m of notes) for (const [type, det, v] of [['sine', 0, 0.034], ['triangle', 5, 0.014]]) {

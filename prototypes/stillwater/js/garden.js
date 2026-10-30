@@ -513,6 +513,108 @@
     o.feature('nectar', { x: 0, y: hy + 0.15, z: 0 });
   }
 
+  const CORAL = [0xf28aa0, 0xf2a05a, 0xa88ad8, 0xf2d35a, 0x5fc0b0, 0xe86a5a];
+  function coral(o, rng, rec) {
+    const s = 0.12, top = K.WL - 0.15 - rec.y, n = 3 + ((rng() * 4) | 0);
+    for (let i = 0; i < n; i++) {
+      const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * 0.8;
+      const fx = Math.round(Math.cos(a) * r / s) * s, fz = Math.round(Math.sin(a) * r / s) * s;
+      const col = hex(U.pick(rng, CORAL)), kind = rng();
+      if (kind < 0.4) {
+        const hgt = Math.min(Math.floor(top / s), 3 + ((rng() * 5) | 0));
+        for (let j = 0; j < hgt; j++) {
+          o.vox('l', fx, s * (j + 0.5), fz, s * 0.9, col, j);
+          if (j > 1 && rng() < 0.5) {
+            const [bx, bz] = U.pick(rng, [[1, 0], [-1, 0], [0, 1], [0, -1]]);
+            o.vox('l', fx + bx * s, s * (j + 0.5), fz + bz * s, s * 0.8, col, j + 0.5);
+            if (j + 1 < hgt && rng() < 0.5) o.vox('l', fx + bx * s, s * (j + 1.5), fz + bz * s, s * 0.8, col, j + 1);
+          }
+        }
+      } else if (kind < 0.75) {
+        for (let x = -1; x <= 1; x++) for (let y = 0; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+          if (y === 1 && Math.abs(x) + Math.abs(z) > 1) continue;
+          o.vox('w', fx + x * s, s * (y + 0.5), fz + z * s, s, col.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.08), y);
+        }
+      } else {
+        for (let v = 0; v < 4; v++) for (let u = -2; u <= 2; u++) {
+          if (Math.abs(u) > v * 0.8 + 0.5 || s * (v + 0.5) > top) continue;
+          o.vox('l', fx + u * s * 0.8, s * (v + 0.5), fz, s * 0.7, col, v);
+        }
+      }
+    }
+    o.feature('reef', { x: 0, y: 0.3, z: 0 });
+  }
+  // Stone foundation down to the ground under a square footprint, so buildings sit on slopes.
+  function foundation(o, rng, rec, s, half, k, P) {
+    for (let x = -half; x <= half; x++) for (let z = -half; z <= half; z++) {
+      const [wx, wz] = rot(x, z, k), gh = W.heightAt(rec.x + wx * s, rec.z + wz * s);
+      for (let y = -Math.ceil((rec.y - gh) / s); y < 0; y++) P(x, y, z, 'w', stoneC(rng), 0);
+    }
+  }
+  function pavilion(o, rng, rec) {
+    const s = 0.25, half = 4, k = faceK(rec.x, rec.z), red = hex(0x8a3a30), roofC = hex(0x4a5560);
+    const P = (x, y, z, layer, c, ord, size) => { const [wx, wz] = rot(x, z, k); o.vox(layer, wx * s, s * (y + 0.5), wz * s, size || s, c, ord); };
+    foundation(o, rng, rec, s, half, k, P);
+    for (let x = -half; x <= half; x++) for (let z = -half; z <= half; z++) P(x, 0, z, 'w', hex(0xd8d4c8).offsetHSL(0, 0, (rng() - 0.5) * 0.05), 1);
+    for (const x of [-half + 1, half - 1]) for (const z of [-half + 1, half - 1]) for (let y = 1; y <= 7; y++) P(x, y, z, 'w', red, 1 + y);
+    for (let x = -half + 1; x <= half - 1; x++) for (let z = -half + 1; z <= half - 1; z++) {
+      if (Math.max(Math.abs(x), Math.abs(z)) === half - 1) P(x, 8, z, 'w', red, 9);
+    }
+    for (let y = 9; y <= 9 + half + 1; y++) {
+      const r = half + 1 - (y - 9);
+      for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) {
+        const ring = Math.max(Math.abs(x), Math.abs(z));
+        if (ring < r - (y === 9 ? 1 : 0) && r > 0) continue;
+        P(x, y, z, 'w', roofC.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.04), 10 + y);
+      }
+    }
+    for (const x of [-half - 1, half + 1]) for (const z of [-half - 1, half + 1]) P(x, 10, z, 'w', roofC, 20);
+    P(0, 9 + half + 2, 0, 'w', hex(0xd8b04a), 21);
+    P(0, 7, 0, 'w', red, 18, s * 0.4);
+    P(0, 6, 0, 'g', hex(0xffd59a), 18, s * 0.9);
+    o.feature('light', { x: 0, y: s * 6, z: 0, color: 0xffc98a, base: 0.9, distance: 10 });
+    o.feature('perch', { x: 0, y: s * (9 + half + 3), z: 0 });
+  }
+  function windmill(o, rng, rec) {
+    const s = 0.3, k = faceK(rec.x, rec.z), wall = hex(0xece6d8), roofC = hex(0x6a4a3a);
+    const P = (x, y, z, layer, c, ord, size) => { const [wx, wz] = rot(x, z, k); o.vox(layer, wx * s, s * (y + 0.5), wz * s, size || s, c, ord); };
+    foundation(o, rng, rec, s, 2, k, P);
+    for (let y = 0; y < 10; y++) {
+      const r = y < 4 ? 2 : y < 8 ? 1 : 1;
+      for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) {
+        if (r === 2 && Math.abs(x) === 2 && Math.abs(z) === 2) continue;
+        const door = x === r && z === 0 && y >= 1 && y <= 2, win = x === r && z === 0 && y === 6;
+        if (win) P(x, y, z, 'g', hex(0xffc77a), y);
+        else P(x, y, z, 'w', y === 0 ? stoneC(rng) : door ? hex(DARK) : wall.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.04), y);
+      }
+    }
+    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) if (Math.abs(x) + Math.abs(z) < 4) P(x, 10, z, 'w', roofC, 11);
+    for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) P(x, 11, z, 'w', roofC, 12);
+    P(0, 12, 0, 'w', roofC, 13);
+    P(1.7, 9, 0, 'w', hex(DARK), 14, s * 0.6);
+    const [hx, hz] = rot(2.1, 0, k);
+    o.feature('windmill', { x: hx * s, y: s * 9.5, z: hz * s, angle: k * Math.PI / 2 });
+    o.feature('perch', { x: 0, y: s * 13.2, z: 0 });
+  }
+  function wreck(o, rng) {
+    const s = 0.3, L = 16, ca = Math.cos(0.6), sa = Math.sin(0.6);
+    const woods = [0x7a6650, 0x6a5844, 0x8a7660].map(hex), rib = hex(0x5a4a3a);
+    const put = (u, v, y, c, ord) => o.vox('w', ((u - L / 2) * ca - v * sa) * s, s * (y - 1.5), ((u - L / 2) * sa + v * ca) * s, s, c, ord);
+    for (let u = 0; u <= L; u++) {
+      const w = Math.max(0.6, 3 * Math.sin(Math.PI * Math.pow(u / L, 0.8))), hgt = 2 + Math.round(2 * (1 - u / L));
+      put(u, 0, 0, rib, u);
+      for (const side of [-1, 1]) for (let y = 0; y <= hgt; y++) {
+        const v = Math.round(side * w * (0.55 + 0.45 * Math.min(1, y / 2)));
+        const isRib = u % 3 === 0;
+        if (!isRib && y >= 2 && rng() < 0.45) continue;
+        put(u, v, y, isRib ? rib : U.pick(rng, woods), u + y);
+      }
+    }
+    for (let y = 0; y < 5; y++) put(6, 0, y + 1, rib, 20 + y);
+    for (let i = 0; i < 7; i++) put(7 + i, 3 + Math.round(i * 0.3), 1, rib, 26 + i);
+    o.feature('perch', { x: ((6 - L / 2) * ca) * s, y: s * 4.6, z: ((6 - L / 2) * sa) * s });
+  }
+
   // ---------------------------------------------------------------- catalog
   const tree = (pal, label, swatch, extra) => Object.assign({ cat: 'trees', label, swatch, on: 'grass', rad: 1.2, solid: true, tree: true, span: 32, build: (o, rng) => branchTree(o, rng, TREES[pal]) }, extra);
   const CAT = GD.CAT = {
@@ -541,6 +643,10 @@
     birdhouse: { cat: 'decor', label: 'Birdhouse', swatch: '#8fb7c9', on: 'land', rad: 0.4, solid: true, span: 4, build: birdhouse },
     stones: { cat: 'decor', label: 'Stepping stones', swatch: '#a7aba6', on: 'land', rad: 0.9, span: 3, build: stones },
     cabin: { cat: 'decor', label: 'Cabin', swatch: '#8a4a3a', on: 'land', rad: 1.6, solid: true, span: 10, footprint: 1.15, build: cabin },
+    pavilion: { cat: 'decor', label: 'Pavilion', swatch: '#8a3a30', on: 'land', rad: 1.6, solid: true, span: 12, footprint: 1.1, build: pavilion },
+    windmill: { cat: 'decor', label: 'Windmill', swatch: '#ece6d8', on: 'land', rad: 1.2, solid: true, span: 12, footprint: 0.65, build: windmill },
+    coral: { cat: 'water', label: 'Coral', swatch: '#f28aa0', on: 'reef', rad: 0.7, span: 8, build: coral },
+    wreck: { cat: 'scenery', label: 'Shipwreck', swatch: '#7a6650', on: 'land', rad: 2.6, solid: true, span: 1, build: wreck },
     grat: { cat: 'rituals', label: 'Gratitude flower', swatch: '#faf3e0', on: 'grass', rad: 0.4, span: 6, build: grat },
   };
 
@@ -573,7 +679,6 @@
     }
     const ready = t0 + (def.span || 6) + 2;
     rec._f = out.f.map((f) => Object.assign({}, f, { x: rec.x + f.x, y: rec.y + f.y, z: rec.z + f.z, rec, ready }));
-    rec._lights = rec._f.filter((f) => f.type === 'light').map((f) => W.claimLight(f.x, f.y, f.z, f));
     GD.version++;
     return true;
   }
@@ -603,6 +708,11 @@
         const d = K.WL - c.h;
         if (d < 0.5 || d > 3.2) return { ok: false, msg: 'Lily pads float in calm water near the shore or on the pond.' };
         y = K.WL; break;
+      }
+      case 'reef': {
+        const d = K.WL - c.h;
+        if (d < 0.9 || d > 3.2) return { ok: false, msg: 'Coral grows on the sea floor in clear, shallow water.' };
+        y = c.h; break;
       }
       case 'shore':
         if (c.h > 1 || c.h < -1) return { ok: false, msg: 'Reeds grow right at the water’s edge.' };
@@ -636,8 +746,7 @@
       const r = rec._r && rec._r[layer];
       if (r && r[1] > r[0]) g.shrinking.push({ a: r[0], b: r[1], t0: S.t });
     }
-    (rec._lights || []).forEach((e) => W.releaseLight(e));
-    rec._lights = [];
+    if (rec.wild) wildGone.add(rec.id);
     GD.items.splice(GD.items.indexOf(rec), 1);
     GD.version++;
   };
@@ -651,22 +760,68 @@
     return best;
   };
   GD.findFreeGrass = function (cx, cz, k = 'grat') {
-    const spots = W.cols.grass.map(([x, z]) => [x + (Math.random() - 0.5) * 0.7, z + (Math.random() - 0.5) * 0.7])
+    const spots = K.ISLANDS.flatMap((I) => I.cols.grass).map(([x, z]) => [x + (Math.random() - 0.5) * 0.7, z + (Math.random() - 0.5) * 0.7])
       .sort((a, b) => Math.hypot(a[0] - cx, a[1] - cz) + Math.random() * 3 - Math.hypot(b[0] - cx, b[1] - cz) - Math.random() * 3);
     for (const [x, z] of spots) if (GD.check(k, x, z).ok) return [x, z];
     return null;
   };
-  GD.serialize = () => GD.items.map(({ id, k, x, y, z, seed, note, at }) => ({ id, k, x, y, z, seed, note, at }));
-  GD.reset = function (list) {
-    for (const it of GD.items) (it._lights || []).forEach((e) => W.releaseLight(e));
+  GD.serialize = () => GD.items.filter((i) => !i.wild).map(({ id, k, x, y, z, seed, note, at }) => ({ id, k, x, y, z, seed, note, at }));
+  GD.wildGone = () => [...wildGone];
+
+  // Wild growth on the other islands. Laid out once, the same for everyone; anything you
+  // tidy away is remembered by id.
+  const WILD = {
+    pine: [['pine', 11], ['birch', 2], ['fern', 5], ['mushroom', 4], ['bush', 2], ['cairn', 1]],
+    blossom: [['pavilion', 1], ['cherry', 6], ['flowers', 5], ['tulips', 4], ['lavender', 3], ['lantern', 2], ['stones', 2]],
+    meadow: [['windmill', 1], ['oak', 2], ['flowers', 8], ['sunflower', 4], ['bush', 3], ['birdhouse', 1], ['bench', 1]],
+    atoll: [['palm', 8], ['dune', 6], ['coral', 10]],
+    rocks: [['cairn', 1]],
+    wreck: [['wreck', 1], ['dune', 3]],
+  };
+  const CENTRAL = new Set(['pavilion', 'windmill', 'wreck']);
+  let wildLayout = null;
+  const wildGone = new Set();
+  function layoutWild() {
+    const keep = GD.items, acc = [];
+    GD.items = acc;
+    for (const I of K.ISLANDS) {
+      const specs = WILD[I.id];
+      if (!specs) continue;
+      const rng = mulberry32(900 + I.idx * 31);
+      let n = 0;
+      for (const [k, count] of specs) {
+        const on = CAT[k].on, C = I.cols;
+        let pool = on === 'grass' ? C.grass : on === 'sand' ? C.sand : on === 'reef' || on === 'water' ? C.shallow.concat(C.ring) : C.grass.concat(C.sand, C.rock);
+        if (CENTRAL.has(k)) pool = pool.slice().sort((a, b) => Math.hypot(a[0] - I.x, a[1] - I.z) - Math.hypot(b[0] - I.x, b[1] - I.z));
+        for (let placed = 0, tries = 0; placed < count && tries < 300 && pool.length; tries++) {
+          const p = CENTRAL.has(k) ? pool[tries] : U.pick(rng, pool);
+          if (!p) break;
+          const x = p[0] + (rng() - 0.5) * 0.6, z = p[1] + (rng() - 0.5) * 0.6, chk = GD.check(k, x, z);
+          if (!chk.ok) continue;
+          acc.push({ id: 'w:' + I.id + ':' + n++, k, x: +x.toFixed(2), y: chk.y, z: +z.toFixed(2), seed: (rng() * 1e9) | 0, wild: true });
+          placed++;
+        }
+      }
+    }
+    GD.items = keep;
+    return acc;
+  }
+  GD.reset = function (list, gone) {
     clearGrower(woodG); clearGrower(leafG); clearGrower(glowG);
     GD.items = [];
+    if (gone) { wildGone.clear(); gone.forEach((id) => wildGone.add(id)); }
+    if (!wildLayout) wildLayout = layoutWild();
+    for (const w of wildLayout) {
+      if (wildGone.has(w.id)) continue;
+      const rec = Object.assign({}, w);
+      if (plant(rec, true)) GD.items.push(rec);
+    }
     const MIGRATE = { blossom: 'cherry' };
     for (const raw of list || []) {
       const rec = Object.assign({}, raw);
       rec.k = MIGRATE[rec.k] || rec.k;
       if (!CAT[rec.k]) continue;
-      if (!rec.id) rec.id = nextId;
+      if (!rec.id || typeof rec.id !== 'number') rec.id = nextId;
       nextId = Math.max(nextId, rec.id + 1);
       if (plant(rec, true)) GD.items.push(rec);
     }
@@ -715,6 +870,23 @@
         addVoxel(woodG, x + (dx - 0.5) * s, h + s * (dy + 0.5), z + (dz - 0.5) * s, s, 1, c, t0, 1, 0);
       }
     }
+    const rng2 = mulberry32(78);
+    for (const I of K.ISLANDS) {
+      if (I.id === 'home') continue;
+      for (const [x, z, h] of I.cols.grass) {
+        if (rng2() > (I.id === 'meadow' ? 0.22 : 0.12)) continue;
+        const s = 0.09, n = 3 + ((rng2() * 4) | 0);
+        for (let i = 0; i < n; i++) {
+          const sx = x + (rng2() - 0.5) * 0.9, sz = z + (rng2() - 0.5) * 0.9, hgt = 2 + ((rng2() * 3) | 0);
+          for (let j = 0; j < hgt; j++) addVoxel(leafG, sx, h + s * (j + 0.5), sz, s, 1, PAL_INDEX.tuft, t0, 1, rng2());
+        }
+      }
+      for (const [x, z, h] of I.cols.sand.concat(I.cols.rock)) {
+        if (rng2() > 0.06) continue;
+        const s = 0.1 + rng2() * 0.1;
+        addVoxel(woodG, x + (rng2() - 0.5) * 0.8, h + s * 0.25, z + (rng2() - 0.5) * 0.8, s, 0.5, stoneC(rng2), t0, 1, 0);
+      }
+    }
     woodG.base = woodG.n; leafG.base = leafG.n; glowG.base = glowG.n;
   }
 
@@ -734,9 +906,9 @@
         gl_Position = projectionMatrix * mvPosition;`);
     };
     glowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    woodG = makeGrower(16000, new THREE.MeshLambertMaterial({ color: 0xffffff }), true);
-    leafG = makeGrower(52000, leafMat, true);
-    glowG = makeGrower(2400, glowMat, false);
+    woodG = makeGrower(40000, new THREE.MeshLambertMaterial({ color: 0xffffff }), true);
+    leafG = makeGrower(100000, leafMat, true);
+    glowG = makeGrower(4000, glowMat, false);
     scatter();
     rebuildFeatures();
   };
@@ -751,6 +923,13 @@
     sweep(leafG, S.season, 2600);
     glowMat.color.setScalar(0.62 + 0.55 * S.glow);
     if (featVersion !== GD.version) rebuildFeatures();
+    lightTimer -= dt;
+    if (lightTimer <= 0) {
+      lightTimer = 0.5;
+      const F = W.focus;
+      W.setDynamicLights(GD.feat.light.filter((l) => t > l.ready - 2).sort((a, b) => Math.hypot(a.x - F.x, a.z - F.z) - Math.hypot(b.x - F.x, b.z - F.z)));
+    }
   };
+  let lightTimer = 0;
   GD.capacity = () => ({ leaf: leafG.n / leafG.cap, wood: woodG.n / woodG.cap });
 })(window.SW);

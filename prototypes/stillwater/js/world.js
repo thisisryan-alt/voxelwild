@@ -8,6 +8,7 @@
 
   let renderer, scene, camera, hemi, sun;
   const prU = { value: 1 };
+  W.focus = new THREE.Vector3(0, 1.4, 0);   // where the camera is looking; shadows and weather follow it
   const tmpC = new THREE.Color(), tmpV = new THREE.Vector3(), WHITE = new THREE.Color(1, 1, 1);
 
   W.init = function () {
@@ -17,10 +18,10 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0xd5eaee, 70, 240);
-    camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1600);
+    camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2400);
     Object.assign(W, { renderer, scene, camera, canvas, boxGeo: new THREE.BoxGeometry(1, 1, 1) });
     initLights(); initSky(); initTerrain(); initWater(); initMountains(); initLighthouse();
-    initClouds(); initDock(); initWeatherFx(); initShootingStar();
+    initClouds(); initDock(); initLandings(); initWeatherFx(); initShootingStar();
     W.setQuality(S.quality);
     window.addEventListener('resize', resize);
   };
@@ -83,11 +84,22 @@
   W.claimLight = function (x, y, z, o = {}) {
     const e = lightPool.find((l) => !l.used);
     if (!e) return null;
-    Object.assign(e, { used: true, base: o.base || 1, flicker: o.flicker || 0, breath: !!o.breath });
+    Object.assign(e, { used: true, fixed: true, base: o.base || 1, flicker: o.flicker || 0, breath: !!o.breath });
     e.light.position.set(x, y, z);
     e.light.color.set(o.color || 0xffb36b);
     e.light.distance = o.distance || 12;
     return e;
+  };
+  // Pooled lights not claimed for good go to the light features nearest the camera.
+  W.setDynamicLights = function (feats) {
+    let j = 0;
+    for (const e of lightPool) {
+      if (e.fixed) continue;
+      const f = feats[j++];
+      if (!f) { e.used = false; e.light.intensity = 0; e.light.position.y = -60; continue; }
+      Object.assign(e, { used: true, base: f.base || 1, flicker: f.flicker || 0, breath: false });
+      e.light.position.set(f.x, f.y, f.z); e.light.color.set(f.color || 0xffb36b); e.light.distance = f.distance || 12;
+    }
   };
   W.releaseLight = function (e) { if (!e) return; e.used = false; e.light.intensity = 0; e.light.position.y = -60; };
   function updateLights(t) {
@@ -111,7 +123,7 @@
     uAurora: { value: 0 }, uRainbow: { value: 0 }, uAurDir: { value: new THREE.Vector2(0, 1) },
   };
   function initSky() {
-    sky = new THREE.Mesh(new THREE.SphereGeometry(600, 40, 20), new THREE.ShaderMaterial({
+    sky = new THREE.Mesh(new THREE.SphereGeometry(950, 40, 20), new THREE.ShaderMaterial({
       uniforms: skyU, side: THREE.BackSide, depthWrite: false,
       vertexShader: `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: `
@@ -225,20 +237,65 @@
 
   // ----------------------------------------------------------------- terrain
   const G = K.G, MINX = K.MINX;
-  const heights = new Int8Array(G * G), grassy = new Uint8Array(G * G), rocky = new Uint8Array(G * G);
+  const heights = new Int8Array(G * G), grassy = new Uint8Array(G * G), rocky = new Uint8Array(G * G), owner = new Int8Array(G * G);
+  // Stacks of rock that make up Seal Rocks, relative to its centre: [dx, dz, radius, height]
+  const SEAL_STACKS = [[0, 0, 3.2, 3], [4, 2.5, 2, 2], [-3.5, 3, 2.2, 1.6], [2, -4, 2.4, 2.2], [-4, -3, 1.6, 1]];
+  function islandHeight(I, x, z) {
+    const dx = x - I.x, dz = z - I.z, r = Math.hypot(dx, dz);
+    if (I.id !== 'home' && r > I.r * 2.2) return null;
+    const ang = Math.atan2(dz, dx);
+    if (I.id === 'home') {
+      // unchanged from the single-island version, so saved gardens still fit
+      const warp = 1 + (fbm(Math.cos(ang) * 1.8 + 5, Math.sin(ang) * 1.8 + 5, 3, 3) - 0.5) * 1.1;
+      const d = r / (K.R * warp), base = 1 - d * d;
+      return base > 0 ? base * 5.2 + (fbm(x * 0.11 + 20, z * 0.11 - 7, 11) - 0.5) * 3.4 * base + 0.4 : base * 4 + 0.4;
+    }
+    const seed = I.idx * 13 + 2;
+    const warp = 1 + (fbm(Math.cos(ang) * 1.8 + seed, Math.sin(ang) * 1.8 + seed, 3, 3) - 0.5) * 0.9;
+    const d = r / (I.r * warp), base = 1 - d * d, n = fbm(x * 0.11 + seed * 3, z * 0.11 - seed, 11) - 0.5;
+    switch (I.id) {
+      case 'pine': return base > 0 ? Math.pow(base, 0.8) * I.h + n * 3 * base + 0.4 : base * 4 + 0.4;
+      case 'atoll': {
+        // a ring of sand around a lagoon, cut by two channels
+        const ring = 1 - Math.pow((d - 0.82) / 0.17, 2);
+        const gap = Math.min(Math.abs(U.angDiff(ang, 2.6)), Math.abs(U.angDiff(ang, -0.9))) < 0.16;
+        if (d < 0.82 && ring <= 0) return -1.6 + n * 1.2;
+        if (ring > 0) return gap ? -1 : ring * 1.7 + n * 0.8 + 0.1;
+        return base * 4 + 0.6;
+      }
+      case 'rocks': {
+        let h = base * 2.5 - 2;
+        for (const st of SEAL_STACKS) {
+          const sd = Math.hypot(x - I.x - st[0], z - I.z - st[1]);
+          if (sd < st[2]) h = Math.max(h, st[3] * (1 - (sd / st[2]) ** 2) + 0.5 + n * 0.6);
+        }
+        return h;
+      }
+      case 'wreck': {
+        const c = Math.cos(0.6), sn = Math.sin(0.6), u = (dx * c + dz * sn) / (I.r * 1.5), v = (-dx * sn + dz * c) / (I.r * 0.6), e = 1 - u * u - v * v;
+        return e > 0 ? e * 1.4 - 0.1 + n * 0.6 : e * 3 + 0.2;
+      }
+      default: return base > 0 ? base * I.h + n * 1.6 * base + 0.6 : base * 4 + 0.4;
+    }
+  }
   function rawHeight(x, z) {
-    const r = Math.hypot(x, z), ang = Math.atan2(z, x);
-    const warp = 1 + (fbm(Math.cos(ang) * 1.8 + 5, Math.sin(ang) * 1.8 + 5, 3, 3) - 0.5) * 1.1;
-    const d = r / (K.R * warp), base = 1 - d * d;
-    let h = Math.round(base > 0 ? base * 5.2 + (fbm(x * 0.11 + 20, z * 0.11 - 7, 11) - 0.5) * 3.4 * base + 0.4 : base * 4 + 0.4);
-    const P = K.POND, pd = Math.hypot(x - P.x, z - P.z);
-    if (pd < P.r + 7) h = Math.min(h, 1 + Math.max(0, Math.floor((pd - P.r - 1.4) * 0.9)));
-    if (pd < P.r) h = pd < P.r - 0.9 ? -2 : -1;
-    let rock = 0;
+    let best = -7, owner = -1;
+    for (const I of K.ISLANDS) {
+      const v = islandHeight(I, x, z);
+      if (v != null && v > best) { best = v; owner = I.idx; }
+    }
+    let h = Math.round(best), rock = 0;
+    const isl = K.ISLANDS[owner];
+    if (isl && isl.id === 'home') {
+      const P = K.POND, pd = Math.hypot(x - P.x, z - P.z);
+      if (pd < P.r + 7) h = Math.min(h, 1 + Math.max(0, Math.floor((pd - P.r - 1.4) * 0.9)));
+      if (pd < P.r) h = pd < P.r - 0.9 ? -2 : -1;
+    }
+    if (isl && (isl.id === 'rocks' || (isl.id === 'pine' && h >= 6))) rock = 1;
     const I = K.ISLET, id = Math.hypot(x - I.x, z - I.z) / I.r;
     if (id < 1.3) { const hi = Math.round((1 - id * id) * 3.4 + 0.2); if (hi > h) { h = hi; rock = 1; } }
     for (const s of K.STACKS) if (Math.hypot(x - s[0], z - s[1]) < s[2] && s[3] > h) { h = s[3]; rock = 1; }
-    return [clamp(h, -7, 9), rock];
+    return [clamp(h, -7, 9), rock, owner];
   }
   const colH = (ix, iz) => (ix < 0 || iz < 0 || ix >= G || iz >= G) ? -7 : heights[ix * G + iz];
   W.heightAt = (x, z) => colH(Math.round(x - MINX), Math.round(z - MINX));
@@ -260,14 +317,18 @@
   let terrain, tKind, tRand, tJit, lastTerrainS = -99;
   const terrainU = { uTime: { value: 0 }, uWL: { value: K.WL }, uCaus: { value: new THREE.Color() } };
   W.blocks = [];
-  W.cols = { grass: [], sand: [], shallow: [], ring: [] };
+  W.cols = { grass: [], sand: [], shallow: [], ring: [] };   // the home island's
+  W.islands = K.ISLANDS;
 
   function initTerrain() {
+    K.ISLANDS.forEach((I, idx) => { I.idx = idx; I.cols = { grass: [], sand: [], shallow: [], ring: [], rock: [] }; });
     for (let ix = 0; ix < G; ix++) for (let iz = 0; iz < G; iz++) {
-      const x = ix + MINX, z = iz + MINX, [h, rock] = rawHeight(x, z), i = ix * G + iz;
-      heights[i] = h; rocky[i] = rock;
+      const x = ix + MINX, z = iz + MINX, [h, rock, own] = rawHeight(x, z), i = ix * G + iz;
+      heights[i] = h; rocky[i] = rock; owner[i] = own;
+      const kind = own >= 0 ? K.ISLANDS[own].id : '';
       const nearPond = Math.hypot(x - K.POND.x, z - K.POND.z) < K.POND.r + 3;
-      grassy[i] = !rock && (h >= 2 || (h === 1 && (nearPond || fbm(x * 0.3, z * 0.3, 41, 2) > 0.42))) ? 1 : 0;
+      const meadowy = kind === 'home' || kind === 'pine' ? h >= 2 || (h === 1 && (nearPond || fbm(x * 0.3, z * 0.3, 41, 2) > 0.42)) : kind === 'blossom' || kind === 'meadow' ? h >= 1 : false;
+      grassy[i] = !rock && meadowy ? 1 : 0;
     }
     const blocks = W.blocks, rng = mulberry32(7);
     for (let ix = 0; ix < G; ix++) for (let iz = 0; iz < G; iz++) {
@@ -282,12 +343,24 @@
         else kind = h - lv <= 1 ? 3 : 4;
         blocks.push([x, lv - 0.5, z, kind, ix, iz, lv]);
       }
-      const r = Math.hypot(x, z);
-      if (grassy[i]) W.cols.grass.push([x, z, h]);
-      else if (!rocky[i] && h >= 0 && h <= 1 && r < 26) W.cols.sand.push([x, z, h]);
-      else if (h === -1 && r < 26) W.cols.shallow.push([x, z, h]);
-      else if (h <= -2 && h >= -3 && r < 26) W.cols.ring.push([x, z, h]);
+      const r = Math.hypot(x, z), col = [x, z, h], isl = K.ISLANDS[owner[i]];
+      if (r < 26) {
+        if (grassy[i]) W.cols.grass.push(col);
+        else if (!rocky[i] && h >= 0 && h <= 1) W.cols.sand.push(col);
+        else if (h === -1) W.cols.shallow.push(col);
+        else if (h <= -2 && h >= -3) W.cols.ring.push(col);
+      }
+      if (isl && isl.id !== 'home' && Math.hypot(x - isl.x, z - isl.z) < isl.r * 1.7) {
+        const C = isl.cols;
+        if (grassy[i]) C.grass.push(col);
+        else if (rocky[i] && h >= 0) C.rock.push(col);
+        else if (h >= 0 && h <= 2) C.sand.push(col);
+        else if (h === -1) C.shallow.push(col);
+        else if (h <= -2 && h >= -3) C.ring.push(col);
+      }
     }
+    Object.assign(K.ISLAND.home.cols, W.cols);
+    W.local = W.island.cols;
     const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
     mat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, terrainU);
@@ -367,7 +440,7 @@
     }`;
   function initWater() {
     waterU.uHeight.value = W.heightTex;
-    const geo = new THREE.PlaneGeometry(440, 440, 220, 220);
+    const geo = new THREE.PlaneGeometry(900, 900, 300, 300);
     geo.rotateX(-Math.PI / 2);
     const vtex = renderer.capabilities.vertexTextures ? '#define VTEX\n' : '';
     const water = new THREE.Mesh(geo, new THREE.ShaderMaterial({
@@ -468,10 +541,10 @@
     for (let a = 0; a < Math.PI * 2; a += 0.026) {
       const n = fbm(Math.cos(a) * 2 + 9, Math.sin(a) * 2 + 9, 21, 4);
       const h = Math.max(0, (n - 0.44) * 150);
-      if (h > 3) far.push([a, 340 + (rng() - 0.5) * 30, h, 11 + rng() * 5]);
+      if (h > 3) far.push([a, 500 + (rng() - 0.5) * 40, h * 1.4, 15 + rng() * 6]);
       const n2 = fbm(Math.cos(a) * 3 + 2, Math.sin(a) * 3 - 4, 33, 3);
       const h2 = Math.max(0, (n2 - 0.52) * 90);
-      if (h2 > 2) near.push([a, 255 + (rng() - 0.5) * 20, h2, 9 + rng() * 4]);
+      if (h2 > 2) near.push([a, 400 + (rng() - 0.5) * 30, h2 * 1.3, 13 + rng() * 5]);
     }
     const build = (list, color) => {
       const mat = new THREE.MeshBasicMaterial({ color, fog: false });
@@ -537,7 +610,7 @@
       const im = new THREE.InstancedMesh(W.boxGeo, mat, vox.length);
       const m = new THREE.Matrix4();
       vox.forEach((p, i) => { m.makeScale(v, v * 0.7, v); m.setPosition(p[0], p[1], p[2]); im.setMatrixAt(i, m); });
-      const a = rng() * Math.PI * 2, r = 12 + rng() * 90;
+      const a = rng() * Math.PI * 2, r = 12 + rng() * 140;
       im.position.set(Math.cos(a) * r, 26 + rng() * 10, Math.sin(a) * r);
       clouds.push({ mesh: im, mat, speed: 0.5 + rng() * 0.4, th: (c / 16) * 0.92 });
       scene.add(im);
@@ -557,8 +630,8 @@
       c.mat.emissive.copy(E.hor).multiplyScalar(0.3 + 0.2 * (1 - S.night));
       const p = c.mesh.position;
       p.x += 0.6 * c.speed * speed * dt; p.z += 0.22 * c.speed * speed * dt;
-      if (p.x > 110) { p.x -= 220; p.z = (Math.random() - 0.5) * 160; }
-      if (p.z > 110) p.z -= 220;
+      if (p.x > 170) { p.x -= 340; p.z = (Math.random() - 0.5) * 260; }
+      if (p.z > 170) p.z -= 340;
     }
   }
 
@@ -593,6 +666,53 @@
     const lw = W.dock.lantern;
     W.dock.light = W.claimLight(lw.x, lw.y - 0.05, lw.z, { color: 0xffb36b, base: 1.1, breath: true, distance: 16 });
   }
+
+  // ------------------------------------------------------------- islands
+  // Each island gets a landing for the rowboat, facing home, and most get a small jetty.
+  function initLandings() {
+    const wood = new THREE.MeshLambertMaterial({ color: 0x9a7a5a }), dark = new THREE.MeshLambertMaterial({ color: 0x7a5d44 });
+    for (const I of K.ISLANDS) {
+      let peak = 0;
+      for (const c of [].concat(I.cols.grass, I.cols.sand, I.cols.rock)) peak = Math.max(peak, c[2]);
+      I.center = new THREE.Vector3(I.x, clamp(peak * 0.35, 0.5, 3), I.z);
+      if (I.id === 'home') {
+        I.center.y = 1.4;
+        const a = W.dock.angle;
+        I.out = new THREE.Vector2(Math.cos(a), Math.sin(a));
+        I.landing = new THREE.Vector3(W.dock.end.x + I.out.x * 1.8, K.WL, W.dock.end.z + I.out.y * 1.8);
+        continue;
+      }
+      const a = Math.atan2(-I.z, -I.x), ox = Math.cos(a), oz = Math.sin(a);
+      let r = I.r * 2.2;
+      while (r > 0 && W.heightAt(I.x + ox * r, I.z + oz * r) < 0) r -= 0.25;
+      const sx = I.x + ox * r, sz = I.z + oz * r, sh = Math.max(0, W.heightAt(sx, sz));
+      I.out = new THREE.Vector2(ox, oz);
+      I.landing = new THREE.Vector3(sx + ox * 3.6, K.WL, sz + oz * 3.6);
+      I.shore = new THREE.Vector3(sx, sh, sz);
+      if (I.id === 'rocks') continue;
+      const g = new THREE.Group();
+      g.position.set(sx, 0, sz);
+      g.rotation.y = -a;
+      const add = (mat, sx2, sy, sz2, x, y, z) => { const m = new THREE.Mesh(W.boxGeo, mat); m.scale.set(sx2, sy, sz2); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; g.add(m); };
+      const deck = sh + 0.12;
+      for (let i = 0; i < 7; i++) add(i % 3 === 1 ? dark : wood, 0.38, 0.12, 1.5, -0.4 + i * 0.45, deck, 0);
+      for (const x of [0.9, 2.3]) for (const z of [-0.65, 0.65]) add(dark, 0.16, deck + 1.4, 0.16, x, (deck - 1.4) / 2, z);
+      W.scene.add(g);
+    }
+  }
+  W.islandAt = function (x, z) {
+    let best = K.ISLAND.home, bd = Infinity;
+    for (const I of K.ISLANDS) { const d = Math.hypot(x - I.x, z - I.z) / (I.r + 8); if (d < bd) { bd = d; best = I; } }
+    return best;
+  };
+  W.island = K.ISLAND.home;
+  W.local = null;   // set once the terrain has been built
+  W.setIsland = function (id) {
+    const I = K.ISLAND[id] || K.ISLAND.home;
+    if (I === W.island) return;
+    W.island = I; W.local = I.cols; S.island = I.id;
+    SW.emit('island', I.id);
+  };
 
   // ------------------------------------------------------------ points
   const PT_VS = `
@@ -676,7 +796,7 @@
     snowData = Array.from({ length: SNOW_N }, () => ({ x: 0, y: -99, z: 0, s: Math.random() * 100, v: 0.55 + Math.random() * 0.6 }));
   }
   function updateWeatherFx(dt, t) {
-    const wx = S.weather, c = camera.position, cx = c.x * 0.6, cz = c.z * 0.6, wind = wx.wind;
+    const wx = S.weather, cx = W.focus.x, cz = W.focus.z, wind = wx.wind;
     const nRain = Math.floor(RAIN_N * clamp(wx.rain, 0, 1));
     if (nRain || rainMat.opacity > 0) {
       for (let i = 0; i < RAIN_N; i++) {
@@ -802,14 +922,15 @@
     tmpC.copy(fogDay).lerp(fogNight, P.night); E.hor.lerp(tmpC, wx.fog * 0.6); E.top.lerp(tmpC, wx.fog * 0.4);
     E.sun.copy(P.sun);
     const L = computeSunMoon(S.tod, P.night), full = 1 - Math.abs(W.moonPhase() - 0.5) * 2;
-    sun.position.copy(L).multiplyScalar(100); sun.target.position.set(0, 0, 0);
+    sun.position.copy(L).multiplyScalar(100).add(W.focus); sun.target.position.copy(W.focus);
     sun.color.copy(P.sun);
     sun.intensity = P.si * (1 - 0.62 * over) * (P.night > 0.5 ? 0.55 + 0.45 * full : 1);
     hemi.color.copy(P.hs).lerp(E.hor, over * 0.4); hemi.groundColor.copy(P.hg); hemi.intensity = P.hi * (1 + over * 0.15);
     scene.fog.color.copy(E.hor);
     const wet = clamp(wx.rain + wx.snow * 0.5, 0, 1);
-    scene.fog.near = lerp(70, 14, wx.fog) * lerp(1, 0.6, wet);
-    scene.fog.far = lerp(240, 60, wx.fog) * lerp(1, 0.55, wet);
+    const extra = Math.max(0, camera.position.distanceTo(W.focus) - 50);   // see the whole archipelago from high up
+    scene.fog.near = lerp(70, 14, wx.fog) * lerp(1, 0.6, wet) + extra * 0.9;
+    scene.fog.far = lerp(240, 60, wx.fog) * lerp(1, 0.55, wet) + extra * 1.3;
 
     Object.assign(skyU.uNight, { value: P.night }); skyU.uTime.value = t;
     skyU.uTop.value.copy(E.top); skyU.uHor.value.copy(E.hor); skyU.uSunCol.value.copy(P.sun);

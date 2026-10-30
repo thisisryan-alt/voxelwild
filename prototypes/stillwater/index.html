@@ -215,6 +215,15 @@
   }
   .sit.awake { opacity: 1; }
   .sit span { color: var(--ink-soft); font-variant-numeric: tabular-nums; text-shadow: 0 1px 12px rgba(10, 26, 33, 0.7); }
+  .pop.wide { width: min(27rem, calc(100vw - 32px)); }
+  .isles { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .isle { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); }
+  .isle.here { border-color: rgba(143, 211, 199, 0.5); background: rgba(143, 211, 199, 0.08); }
+  .isle-here { font-size: 0.82rem; color: var(--tide); letter-spacing: 0.04em; }
+  .isle-go { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .btn.small { font-size: 0.9rem; padding: 0.4em 0.95em; }
+  .btn.ghost { background: transparent; }
+  body.sitting #tripBar { display: none; }
   .zen-show { position: fixed; z-index: 15; top: calc(16px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); opacity: 0; transition: opacity 1.4s ease; display: none; }
   body.zen .zen-show { display: inline-flex; }
   .zen-show.awake { opacity: 1; }
@@ -249,6 +258,7 @@
     <button id="btnBreath" class="chip" data-pop="popBreath" aria-expanded="false">Breathe</button>
     <button id="btnSound" class="chip" data-pop="popSound" aria-expanded="false">Sound</button>
     <button id="btnView" class="chip" data-pop="popView" aria-expanded="false">View</button>
+    <button id="btnIslands" class="chip" aria-expanded="false" data-popid="popIslands">Islands</button>
     <button id="btnSit" class="chip" data-pop="popSit" aria-expanded="false">Sit</button>
     <button id="btnJournal" class="chip">Journal</button>
     <button id="btnSettings" class="chip">Settings</button>
@@ -275,13 +285,19 @@
   <h2 id="popViewTitle">View</h2>
   <div class="optrow">
     <button class="opt" data-view="island" aria-pressed="true"><span class="opt-name">Island</span><span class="opt-sub">Orbit the whole island</span></button>
-    <button class="opt" data-view="dock" aria-pressed="false"><span class="opt-name">Dock</span><span class="opt-sub">Sit at the end, facing out</span></button>
-    <button class="opt" data-view="beach" aria-pressed="false"><span class="opt-name">Beach</span><span class="opt-sub">Toward the lighthouse</span></button>
+    <button class="opt" data-view="dock" aria-pressed="false"><span class="opt-name">Shore</span><span class="opt-sub">At the water’s edge, facing out</span></button>
+    <button class="opt" data-view="beach" aria-pressed="false"><span class="opt-name">Beach</span><span class="opt-sub">Home, facing the sunset</span></button>
     <button class="opt" data-view="pond" aria-pressed="false"><span class="opt-name">Pond</span><span class="opt-sub">Lily pads and frogs</span></button>
-    <button class="opt" data-view="sky" aria-pressed="false"><span class="opt-name">High above</span><span class="opt-sub">The island from the clouds</span></button>
+    <button class="opt" data-view="sky" aria-pressed="false"><span class="opt-name">High above</span><span class="opt-sub">The whole archipelago</span></button>
     <button class="opt" data-view="drift" aria-pressed="false"><span class="opt-name">Drift</span><span class="opt-sub">A slow, wandering camera</span></button>
   </div>
   <p class="pop-note">Drag to look around in any view.</p>
+</div>
+
+<div id="popIslands" class="pop wide" hidden role="dialog" aria-labelledby="popIslandsTitle">
+  <h2 id="popIslandsTitle">Islands</h2>
+  <ul id="islandList" class="isles"></ul>
+  <p class="pop-note">Rowing takes a slow half minute or so. You can plant, build and sit on any island.</p>
 </div>
 
 <div id="popSit" class="pop" hidden role="dialog" aria-labelledby="popSitTitle">
@@ -330,15 +346,15 @@
         <cite>White et al. (2010), J. Environmental Psychology · Ulrich et al. (1991), J. Environmental Psychology · Valdez &amp; Mehrabian (1994), J. Experimental Psychology: General</cite>
       </li>
       <li>
-        <span class="spec">clouds · koi · fireflies · seasons</span>
+        <span class="spec">seven islands · seasons · weather</span>
         <h3>Soft fascination, and a world to explore</h3>
-        <p>Attention Restoration Theory holds that gently interesting things hold attention without effort and let tired, effortful attention recover. It also asks for extent: a coherent world big enough to wander. Seasons, weather and visitors give the island that depth without asking anything of you.</p>
+        <p>Attention Restoration Theory holds that gently interesting things hold attention without effort and let tired, effortful attention recover. It also names being away, a sense of a place apart from daily demands, and extent, a coherent world big enough to wander. Seven islands, a slow row between them, seasons, weather and visitors give the world that depth without asking anything of you.</p>
         <cite>Kaplan (1995), J. Environmental Psychology · Berman, Jonides &amp; Kaplan (2008), Psychological Science</cite>
       </li>
       <li>
-        <span class="spec">koi · turtle · whale · ducks</span>
+        <span class="spec">koi · seals · reef fish · whale</span>
         <h3>Watching animals</h3>
-        <p>In an aquarium study, heart rate dropped and mood improved as more fish were added to the tank. The sea here has koi, a turtle, leaping fish and the occasional whale.</p>
+        <p>In an aquarium study, heart rate dropped and mood improved as more fish were added to the tank. The sea here has koi, reef fish, seals, a turtle, leaping fish and the occasional whale.</p>
         <cite>Cracknell et al. (2016), Environment and Behavior</cite>
       </li>
       <li>
@@ -453,7 +469,7 @@
   </section>
   <section class="set">
     <h3>Keys</h3>
-    <p class="set-note">B breath guide · M sound · H hide controls · J journal · V next view · Esc close</p>
+    <p class="set-note">B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close</p>
   </section>
   <section class="set">
     <div id="resetRow" class="reset"></div>
@@ -480,6 +496,10 @@
   </div>
 </div>
 
+<div id="tripBar" class="sit awake" hidden>
+  <span id="tripText"></span>
+  <button id="tripSkip" class="btn">Arrive now</button>
+</div>
 <div id="sitOverlay" class="sit" hidden>
   <span id="sitLeft"></span>
   <button id="sitEnd" class="btn">End early</button>

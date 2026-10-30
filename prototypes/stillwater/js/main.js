@@ -42,7 +42,8 @@
     SW.store.set('garden2', GD.serialize());
     SW.store.set('journal', journal);
     SW.store.set('prefs2', prefs);
-    SW.store.set('world', { tod: S.tod, day: S.day, season: S.season });
+    SW.store.set('world', { tod: S.tod, day: S.day, season: S.season, island: S.island });
+    SW.store.set('wildGone', GD.wildGone());
   }
   window.addEventListener('pagehide', () => { if (S.started) saveNow(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.started) saveNow(); });
@@ -77,7 +78,13 @@
     ['rain', 'Rain', 'Rings on the water and a soft hiss.', 'Rain comes and goes on its own.'],
     ['fog', 'Fog', 'The island turns quiet and close.', 'Some days are misty.'],
     ['snow', 'Snow', 'Slow flakes and a white island.', 'Wait for winter.'],
+    ['sheep', 'Sheep', 'They graze Meadow Isle and call to each other now and then.', 'Row to Meadow Isle.'],
+    ['deer', 'Deer', 'Shy deer among the pines. Tap one and it bounds away.', 'Row to Pine Isle.'],
+    ['seal', 'Seals', 'They bask on Seal Rocks and slip into the sea to swim.', 'Row to Seal Rocks.'],
+    ['puffin', 'Puffins', 'Small seabirds with bright beaks, looping over the rocks.', 'Row to Seal Rocks by day.'],
+    ['reeffish', 'Reef fish', 'Bright schools circling the lagoon.', 'Look into the lagoon at Palm Atoll.'],
   ].map(([id, name, line, hint]) => ({ id, name, line, hint }));
+  for (const I of K.ISLANDS) if (I.id !== 'home') JOURNAL.push({ id: 'isle-' + I.id, name: I.name, line: I.line, hint: 'Row there from the Islands menu.' });
   const JBY = Object.fromEntries(JOURNAL.map((j) => [j.id, j]));
   let pendingSeen = [], seenFlush = 0;
   SW.on('see', (id) => {
@@ -118,22 +125,28 @@
   const cam = {
     mode: 'orbit', theta: 0.65, phi: 1.1, r: 46, tTheta: 0.65, tPhi: 1.1, tR: 46,
     target: new THREE.Vector3(0, 1.4, 0), tTarget: new THREE.Vector3(0, 1.4, 0),
-    yaw: 0, pitch: 0, tYaw: 0, tPitch: 0, eye: new THREE.Vector3(), view: 'island', blend: 0, poi: 0, poiT: 0,
+    yaw: 0, pitch: 0, tYaw: 0, tPitch: 0, fYaw: 0, eye: new THREE.Vector3(), view: 'island', blend: 0, poi: 0, poiT: 0,
   };
   const curPos = new THREE.Vector3(), curLook = new THREE.Vector3(), wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3();
   let lastInteract = -100;
-  const VIEWS = { island: 'Island', dock: 'End of the dock', beach: 'Beach', pond: 'Pond', sky: 'High above', drift: 'Drift' };
+  const VIEWS = { island: 'Island', dock: 'Shore', beach: 'Beach', pond: 'Pond', sky: 'The whole archipelago', drift: 'Drift' };
   function setView(v, instant) {
     cam.view = v; cam.blend = instant ? 0 : 4;
     const d = W.dock;
+    if ((v === 'beach' || v === 'pond') && W.island.id !== 'home') W.setIsland('home');
+    const I = W.island;
     if (v === 'island' || v === 'sky' || v === 'drift') {
       cam.mode = v === 'drift' ? 'drift' : 'orbit';
-      cam.tTarget.set(0, v === 'sky' ? 0 : 1.4, 0);
-      cam.tR = v === 'sky' ? 95 : W.portrait ? 74 : 46;
-      cam.tPhi = v === 'sky' ? 0.55 : 1.1;
+      if (v === 'sky') cam.tTarget.set(0, 0, 0); else cam.tTarget.copy(I.center);
+      cam.tR = v === 'sky' ? 210 : (I.id === 'home' ? 46 : Math.max(26, I.r * 3.1)) * (W.portrait ? 1.6 : 1);
+      cam.tPhi = v === 'sky' ? 0.5 : 1.1;
     } else {
       cam.mode = 'look';
-      if (v === 'dock') {
+      if (v === 'dock' && I.id !== 'home') {
+        // the shore of whichever island you are on, facing out to sea
+        cam.eye.set(I.shore.x - I.out.x * 0.6, I.shore.y + 1.4, I.shore.z - I.out.y * 0.6);
+        cam.tYaw = Math.atan2(I.out.x, I.out.y); cam.tPitch = 0.03;
+      } else if (v === 'dock') {
         const back = new THREE.Vector3(Math.cos(d.angle), 0, Math.sin(d.angle));
         cam.eye.copy(d.end).addScaledVector(back, -1.7); cam.eye.y = d.end.y + 1.3;
         cam.tYaw = Math.atan2(back.x, back.z); cam.tPitch = 0.02;
@@ -174,11 +187,24 @@
       cam.poiT -= dt;
       if (cam.poiT <= 0) {
         cam.poiT = 35;
-        const trees = GD.feat.tree, pois = [[0, 1.4, 0], [K.POND.x, 0.5, K.POND.z], [W.dock.end.x, 0.5, W.dock.end.z]];
+        const I = W.island, trees = GD.feat.tree.filter((tr) => Math.hypot(tr.x - I.x, tr.z - I.z) < I.r + 6);
+        const pois = I.id === 'home' ? [[0, 1.4, 0], [K.POND.x, 0.5, K.POND.z], [W.dock.end.x, 0.5, W.dock.end.z]] : [[I.center.x, I.center.y, I.center.z], [I.shore.x, 0.5, I.shore.z]];
         if (trees.length) { const tr = U.pick(Math.random, trees); pois.push([tr.x, tr.y * 0.6, tr.z]); }
         cam.tTarget.set(...pois[cam.poi++ % pois.length]);
       }
     } else if (cam.mode === 'orbit' && prefs.drift && !S.reduceMotion && t - lastInteract > 12) cam.tTheta += dt * 0.012 * U.smooth(12, 18, t - lastInteract);
+    const trip = L.trip();
+    if (cam.mode === 'follow' && trip) {
+      const b = L.boat().position, f = trip.fwd, c = Math.cos(cam.fYaw), sn = Math.sin(cam.fYaw);
+      const dx = f.x * c - f.z * sn, dz = f.x * sn + f.z * c;
+      wantPos.set(b.x - dx * 7.5, b.y + 3.3, b.z - dz * 7.5);
+      wantLook.set(b.x + dx * 5, b.y + 0.7, b.z + dz * 5);
+      const kf = 1 - Math.exp(-dt * 2.2);
+      curPos.lerp(wantPos, kf); curLook.lerp(wantLook, kf);
+      W.camera.position.copy(curPos); W.camera.lookAt(curLook);
+      W.focus.copy(b);
+      return;
+    }
     if (cam.mode === 'look') {
       cam.yaw += U.angDiff(cam.yaw, cam.tYaw) * k; cam.pitch += (cam.tPitch - cam.pitch) * k;
     } else {
@@ -191,6 +217,8 @@
     curPos.lerp(wantPos, kb); curLook.lerp(wantLook, kb);
     W.camera.position.copy(curPos);
     W.camera.lookAt(curLook);
+    if (cam.mode === 'look') W.focus.copy(curLook).sub(curPos).setY(0).normalize().multiplyScalar(8).add(curPos);
+    else W.focus.copy(cam.view === 'sky' ? W.island.center : cam.target);
   }
 
   // ------------------------------------------------------------------- input
@@ -212,7 +240,8 @@
         if (!dragMoved && Math.hypot(e.clientX - downX, e.clientY - downY) > 7) dragMoved = true;
         if (dragMoved) {
           const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
-          if (cam.mode === 'look') { cam.tYaw -= dx * 0.004; cam.tPitch = U.clamp(cam.tPitch + dy * 0.003, -0.7, 0.6); }
+          if (cam.mode === 'follow') cam.fYaw = U.clamp(cam.fYaw - dx * 0.004, -2.6, 2.6);
+          else if (cam.mode === 'look') { cam.tYaw -= dx * 0.004; cam.tPitch = U.clamp(cam.tPitch + dy * 0.003, -0.7, 0.6); }
           else {
             if (cam.mode === 'drift') { cam.mode = 'orbit'; cam.view = 'island'; setViewButtons(); }
             cam.tTheta += dx * 0.005; cam.tPhi = U.clamp(cam.tPhi - dy * 0.004, 0.45, 1.42);
@@ -269,13 +298,13 @@
     const def = GD.CAT[tool];
     if (!def) return;
     let k = tool;
-    if (def.on === 'water') { toast(def.label + ' go on the water.', 3, true); return; }
+    if (def.on === 'water' || def.on === 'reef') { toast(def.label + (def.on === 'reef' ? ' grows on the sea floor. Tap clear, shallow water.' : ' go on the water.'), 3, true); return; }
     if (def.cat === 'plants' && def.on === 'grass' && !W.isGrass(x, z) && W.heightAt(x, z) <= 2) k = 'dune';
     plantAt(k, x, z);
   }
   function onWater(x, z) {
     if (tool === 'tidy') { tidyAt(x, z); return; }
-    if (tool === 'lily' || tool === 'reeds') { plantAt(tool, x, z); return; }
+    if (tool === 'lily' || tool === 'reeds' || tool === 'coral') { plantAt(tool, x, z); return; }
     if (tool === 'skip') { L.skipStone(x, z); return; }
     W.addRipple(x, z, 1);
     A.plop();
@@ -304,8 +333,8 @@
   const TOOLS = {
     trees: ['oak', 'maple', 'birch', 'cherry', 'willow', 'pine', 'palm'],
     plants: ['flowers', 'tulips', 'lavender', 'sunflower', 'fern', 'mushroom', 'bush'],
-    water: ['lily', 'reeds', 'pebble', 'skip'],
-    decor: ['lantern', 'chime', 'bench', 'campfire', 'cairn', 'birdhouse', 'stones', 'cabin'],
+    water: ['lily', 'reeds', 'coral', 'pebble', 'skip'],
+    decor: ['lantern', 'chime', 'bench', 'campfire', 'cairn', 'birdhouse', 'stones', 'cabin', 'pavilion', 'windmill'],
     rituals: ['letgo', 'grateful', 'tidy'],
   };
   const SPECIAL = {
@@ -394,6 +423,37 @@
     $('noteCard').hidden = false;
   }
 
+  // -------------------------------------------------------------------- islands
+  function renderIslands() {
+    $('islandList').innerHTML = K.ISLANDS.map((I) => {
+      const here = I === W.island;
+      return `<li class="isle${here ? ' here' : ''}"><span class="opt-name">${I.name}</span><span class="opt-sub">${I.line}</span>` +
+        (here ? '<span class="isle-here">You are here</span>' : `<span class="isle-go"><button class="btn small" data-row="${I.id}">Row there</button><button class="btn small ghost" data-look="${I.id}">Look now</button></span>`) + '</li>';
+    }).join('');
+    $$('[data-row]').forEach((b) => b.addEventListener('click', () => rowTo(b.dataset.row)));
+    $$('[data-look]').forEach((b) => b.addEventListener('click', () => { closePops(); W.setIsland(b.dataset.look); setView('island'); }));
+  }
+  function rowTo(id) {
+    closePops();
+    if (L.trip()) return;
+    if (cam.mode === 'look' || cam.view === 'sky') { setView('island'); }
+    const tr = L.travel(id);
+    if (!tr) return;
+    cam.mode = 'follow'; cam.view = 'follow'; cam.fYaw = 0; setViewButtons();
+    $('tripText').textContent = 'Rowing to ' + tr.to.name;
+    $('tripBar').hidden = false;
+    toast('A slow row across. Drag to look around.', 4, true);
+  }
+  SW.on('arrive', (id) => {
+    const I = K.ISLAND[id];
+    $('tripBar').hidden = true;
+    cam.tTheta = cam.theta = Math.atan2(W.camera.position.z - I.z, W.camera.position.x - I.x);
+    setView('island');
+    toast(I.name + '.', 4, true);
+    saveSoon();
+  });
+  SW.on('island', (id) => { if (id !== 'home') SW.emit('see', 'isle-' + id); });
+
   // -------------------------------------------------------------------- sitting
   let sit = null;
   function startSit(min) {
@@ -401,7 +461,7 @@
     sit = { end: S.t + min * 60, start: S.t, min };
     document.body.classList.add('sitting');
     $('sitOverlay').hidden = false;
-    setView('dock');
+    if (!L.trip()) setView('dock');
     A.bowl(1);
   }
   function endSit(done) {
@@ -418,11 +478,12 @@
   }
 
   // ----------------------------------------------------------------- panels
-  function closePops() { $$('.pop').forEach((p) => { p.hidden = true; }); $$('[data-pop]').forEach((b) => b.setAttribute('aria-expanded', 'false')); }
+  function closePops() { $$('.pop').forEach((p) => { p.hidden = true; }); $$('[data-pop], [data-popid]').forEach((b) => b.setAttribute('aria-expanded', 'false')); }
   function togglePop(id) {
     const p = $(id), open = p.hidden;
     closePops();
-    if (open) { p.hidden = false; document.querySelector(`[data-pop="${id}"]`).setAttribute('aria-expanded', 'true'); }
+    const btn = document.querySelector(`[data-pop="${id}"], [data-popid="${id}"]`);
+    if (open) { p.hidden = false; if (btn) btn.setAttribute('aria-expanded', 'true'); }
   }
   function closePanels() { $$('.panel').forEach((p) => { p.hidden = true; }); }
   function openPanel(id) {
@@ -499,7 +560,7 @@
   function tutorialStep(n) {
     prefs.tutorial = n; saveSoon();
     if (n === 1) toast('Now tap the water to drop a pebble. The koi come to look.', 6, true);
-    if (n === 2) { toast('Visitors you meet are kept in your Journal. Rituals has a few quiet things to try.', 7, true); prefs.tutorial = 3; }
+    if (n === 2) { toast('Visitors you meet are kept in your Journal. When you feel like it, open Islands and row somewhere new.', 8, true); prefs.tutorial = 3; prefs.islandsHint = true; }
   }
 
   // ---------------------------------------------------------------------- HUD
@@ -525,6 +586,7 @@
     $('breath').classList.toggle('off', !prefs.guide);
     if (prefs.tutorial === 0) setTimeout(() => toast('Tap the grass to plant. Choose what to plant from the tray below.', 8, true), 1800);
     else setTimeout(() => toast('Welcome back. ' + U.seasonName(S.season + 0.15) + ', ' + U.clockLabel(S.tod) + '.', 4), 1500);
+    if (prefs.tutorial > 0 && !prefs.islandsHint) { prefs.islandsHint = true; setTimeout(() => toast('The sea has opened up. Six more islands are out there; open Islands to row to one.', 8), 6000); }
   }
 
   function bindUI() {
@@ -540,6 +602,8 @@
       togglePop(b.dataset.pop);
     }));
     $('btnJournal').addEventListener('click', () => openPanel('panelJournal'));
+    $('btnIslands').addEventListener('click', () => { renderIslands(); togglePop('popIslands'); });
+    $('tripSkip').addEventListener('click', () => L.arriveNow());
     $('btnSettings').addEventListener('click', () => openPanel('panelSettings'));
     $$('.panel-close').forEach((b) => b.addEventListener('click', () => { closePanels(); }));
     $$('#panelJournal [role=tab]').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
@@ -569,7 +633,7 @@
       resetRow.innerHTML = '<button id="resetAsk" class="btn">Start a fresh island</button>';
       $('resetAsk').addEventListener('click', () => {
         resetRow.innerHTML = '<span>Clear every plant and decoration and start again from the first few trees? Your field notes stay.</span><button id="resetYes" class="btn">Clear the island</button><button id="resetNo" class="btn">Keep my garden</button>';
-        $('resetYes').addEventListener('click', () => { GD.reset(GD.starter()); saveNow(); resetIdle(); toast('A fresh island.', 3, true); });
+        $('resetYes').addEventListener('click', () => { GD.reset(GD.starter(), []); saveNow(); resetIdle(); toast('A fresh start.', 3, true); });
         $('resetNo').addEventListener('click', resetIdle);
         $('resetNo').focus();
       });
@@ -592,6 +656,7 @@
       if (key === 'm') setSound(!A.on);
       if (key === 'h') { if (document.body.classList.toggle('zen')) { closePops(); closePanels(); } }
       if (key === 'j') openPanel('panelJournal');
+      if (key === 'i') { renderIslands(); togglePop('popIslands'); }
       if (key === 'v') { const vs = Object.keys(VIEWS); setView(vs[(vs.indexOf(cam.view) + 1) % vs.length]); toast(VIEWS[cam.view], 2, true); }
     });
   }
@@ -669,7 +734,7 @@
     W = SW.world; GD = SW.garden; L = SW.life; A = SW.audio;
     S.quality = prefs.quality; S.reduceMotion = reduceMQ || prefs.calm;
     const ws = (data && data.world) || SW.store.get('world', null);
-    if (ws) { S.tod = ws.tod; S.day = ws.day; S.season = ws.season; }
+    if (ws) { S.tod = ws.tod; S.day = ws.day; S.season = ws.season; S.island = K.ISLAND[ws.island] ? ws.island : 'home'; }
     try { W.init(); } catch (e) { noGL('Stillwater needs WebGL, which this browser has turned off.'); return; }
     GD.init(); L.init();
     A.master = prefs.master;
@@ -678,7 +743,8 @@
     let items = data && data.items;
     if (!items) items = SW.store.get('garden2', null);
     if (!items) { const v1 = SW.store.get('garden.v1', null); if (Array.isArray(v1) && v1.length) items = v1.map((r, i) => Object.assign({ id: i + 1 }, r)); }
-    GD.reset(items && items.length ? items : GD.starter());
+    GD.reset(items && items.length ? items : GD.starter(), (data && data.wildGone) || SW.store.get('wildGone', []));
+    W.setIsland(S.island);
     bindInput(); bindUI();
     renderCats();
     $('btnBreath').setAttribute('aria-pressed', String(prefs.guide));
@@ -687,9 +753,9 @@
     W.renderer.setAnimationLoop(frame);
     if (data && data.started) begin(false);
   }
-  SW.ui = { setView: (v, instant) => setView(v, instant), toast, camera: cam };
+  SW.ui = { setView: (v, instant) => setView(v, instant), toast, camera: cam, rowTo: (id) => rowTo(id), tick: (dt) => updateCamera(dt, S.t) };
   const hot = window.claude && window.claude.hot;
-  if (hot && hot.snapshot) hot.snapshot(() => ({ items: GD ? GD.serialize() : null, world: { tod: S.tod, day: S.day, season: S.season }, started: S.started }));
+  if (hot && hot.snapshot) hot.snapshot(() => ({ items: GD ? GD.serialize() : null, wildGone: GD ? GD.wildGone() : null, world: { tod: S.tod, day: S.day, season: S.season, island: S.island }, started: S.started }));
   const start = (data) => { try { boot(data || {}); } catch (e) { console.error(e); noGL('Something went wrong while starting. Reload to try again.'); } };
   if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});
 })(window.SW);

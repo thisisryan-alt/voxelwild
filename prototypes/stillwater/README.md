@@ -1,47 +1,55 @@
 # Stillwater
 
-A small voxel island built to be as calming as the research allows. It is a browser prototype, separate
+A small voxel archipelago built to be as calming as the research allows. It is a browser prototype, separate
 from the Unity project: open `index.html` in a browser. The page loads three.js r128 from cdnjs and its
 fonts from Google Fonts; everything else is in `js/`.
 
-## What is on the island
+## What is out there
 
+- **Seven islands:** Home Island (your garden, the pond and the dock), Pine Isle (steep, rocky, deer),
+  Blossom Isle (cherry trees around a pavilion), Meadow Isle (sheep, wildflowers and a turning windmill),
+  Palm Atoll (a sand ring around a coral lagoon with reef fish), Seal Rocks (seals and puffins) and Wreck
+  Bar (a sandbar with an old boat). Each has its own wild plants, which you can tidy away like your own.
+- **Rowing:** a rowboat waits at whichever island you are on. Open **Islands** and choose *Row there*
+  for a slow trip with a follow camera, or *Look now* to glide the camera over. Visitors, weather, shadows
+  and lights follow you.
 - **Garden:** 7 trees (oak, maple, birch, cherry, willow, pine, palm), 8 plants (wildflowers, tulips,
   lavender, sunflowers, ferns, mushrooms, berry bush, dune grass) and 2 water plants (lily pads with lotus,
   reeds). Trees grow by recursive branching over about 30 seconds.
 - **Build:** stone lantern, wind chime, bench, campfire, stone stack, birdhouse, stepping stones, cabin
-  with a smoking chimney and lit windows.
+  with a smoking chimney and lit windows, pavilion and windmill. Coral can be planted on the sea floor.
 - **Seasons:** one season per in-game day. Leaves turn and fall, cherry petals drift in spring, flowers rest
   in winter, snow settles on the ground and the pines.
 - **Weather:** clear, cloudy, rain (with rings on the water), fog and snow, changing on its own or set by
   hand. Rainbows after rain when the sun is low. Aurora on some nights, a moon with an eight-day cycle,
   shooting stars you can tap to make a wish, and glowing water at night.
 - **Visitors:** koi, pond goldfish, butterflies, gulls, songbirds, ducks with ducklings, frogs, rabbits,
-  crabs, a heron, dragonflies, an owl, a cat asleep on the dock, a sea turtle, leaping fish, a whale and a
-  passing sailboat. Many can be tapped. A lighthouse turns its beam at dusk.
+  crabs, a heron, dragonflies, an owl, a cat asleep on the dock, a sea turtle, leaping fish, sheep, deer,
+  seals, puffins, reef fish, a whale and a passing sailboat. Many can be tapped. A lighthouse turns its beam at dusk.
 - **Rituals:** drop a pebble, skip a stone, let a thought go on a sky lantern (the words are never saved),
   plant a glowing flower for something good (kept in the journal), or sit for 3–20 minutes with a singing
   bowl at each end.
 - **Breathing:** five patterns (six a minute, even, cyclic sigh, box, 4-7-8). The tide, foam line, dock
   lantern, the cat and the surf all follow the chosen pattern.
-- **Views:** island orbit, end of the dock, beach at sunset, pond, high above, and a slow drifting camera.
+- **Views:** island orbit, the shore of the current island, Home's sunset beach and pond, the whole
+  archipelago from above, and a slow drifting camera.
 - **Sound:** all synthesised live, with a mixer for waves, wind, rain, wildlife, frogs and crickets, fire,
   chimes and music.
-- **Journal:** field notes for 28 visitors and sights, the good things you have written, and the research
+- **Journal:** field notes for 39 visitors, sights and places, the good things you have written, and the research
   behind each design choice.
 
-The garden, journal, settings and time of day are saved in the browser's local storage.
+The garden, tidied wild plants, current island, journal, settings and time of day are saved in the browser's local storage.
 
-**Keys:** B breath guide · M sound · H hide controls · J journal · V next view · Esc close.
+**Keys:** B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
 
 ## Files
 
 | File | Contents |
 |---|---|
-| `js/core.js` | Constants, noise, seasonal palettes, storage, shared state |
-| `js/world.js` | Renderer, sky (sun, moon, stars, aurora, rainbow), weather, terrain, water, lighthouse, clouds, dock |
-| `js/garden.js` | Voxel growth system, seasonal recolouring, plant and building catalog, placement rules |
-| `js/life.js` | Creatures, particles, sky lanterns, skipping stones |
+| `js/core.js` | Constants and the island list, noise, seasonal palettes, storage, shared state |
+| `js/world.js` | Renderer, sky (sun, moon, stars, aurora, rainbow), weather, archipelago terrain, water, lighthouse, clouds, dock and jetties |
+| `js/garden.js` | Voxel growth system, seasonal recolouring, plant and building catalog, wild island growth, placement rules |
+| `js/life.js` | Creatures, the rowboat, windmill sails, particles, sky lanterns, skipping stones |
 | `js/audio.js` | Synthesised soundscape and mixer |
 | `js/main.js` | Input, camera views, breathing patterns, journal, rituals, saving and UI |
 
@@ -52,8 +60,8 @@ The garden, journal, settings and time of day are saved in the browser's local s
 | Paced breathing near 6/min, long exhale | The world follows the breathing pattern; optional on-screen guide | Lehrer & Gevirtz 2014, *Front. Psychol.*; Zaccaro et al. 2018, *Front. Hum. Neurosci.* |
 | Cyclic sighing | One of the breathing patterns | Balban et al. 2023, *Cell Rep. Med.* |
 | Water and nature scenes | Island in a calm sea, plants, slow day–night cycle; night is deep blue | White et al. 2010, *J. Environ. Psychol.*; Ulrich et al. 1991, *J. Environ. Psychol.* |
-| Soft fascination and extent | Clouds, koi, fireflies, falling leaves; seasons and weather give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
-| Watching animals | Fish, turtle, ducks, whale | Cracknell et al. 2016, *Environ. Behav.* |
+| Soft fascination, being away, extent | Clouds, koi, fireflies, falling leaves; seven islands and a slow row between them give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
+| Watching animals | Koi, reef fish, seals, turtle, ducks, whale | Cracknell et al. 2016, *Environ. Behav.* |
 | Mid-complexity fractals | Recursive tree branching; layered-noise clouds | Taylor et al. 2011, *Front. Hum. Neurosci.*; Hagerhall et al. 2008, *Perception* |
 | Natural sound | Surf, rain, wind, birds, frogs, crickets | Alvarsson, Wiens & Nilsson 2010, *IJERPH*; Gould van Praag et al. 2017, *Sci. Rep.* |
 | Firelight | Campfire with crackle | Lynn 2014, *Evol. Psychol.* |

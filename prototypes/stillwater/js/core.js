@@ -5,13 +5,24 @@ window.SW = window.SW || {};
 
   SW.K = {
     WL: -0.35,                 // water level; block tops sit on whole numbers
-    G: 84, MINX: -42,          // terrain grid
-    R: 15,                     // island radius
+    G: 200, MINX: -100,        // terrain grid
+    R: 15,                     // home island radius
     DAY_LEN: 960,              // seconds per day at the normal pace; one season lasts one day
     POND: { x: 4.5, z: 5, r: 2.4 },
     ISLET: { x: 29, z: -23, r: 3.4 },
     STACKS: [[-24, 14, 1.1, 1], [21, 17, 0.8, 0], [-19, -21, 1.3, 1], [8, -25, 0.7, 0]],
+    // The archipelago. r is the island's radius; h its peak height.
+    ISLANDS: [
+      { id: 'home', name: 'Home Island', x: 0, z: 0, r: 15, line: 'Your garden, the pond and the dock.' },
+      { id: 'pine', name: 'Pine Isle', x: -54, z: -36, r: 11, h: 8.5, line: 'A steep, rocky island of pines. Deer live here.' },
+      { id: 'blossom', name: 'Blossom Isle', x: -48, z: 46, r: 10, h: 4, line: 'Soft hills of cherry trees around a pavilion.' },
+      { id: 'meadow', name: 'Meadow Isle', x: 62, z: -8, r: 12, h: 3, line: 'Open grass, wildflowers, sheep and a windmill.' },
+      { id: 'atoll', name: 'Palm Atoll', x: 50, z: 48, r: 10, line: 'A ring of sand and palms around a coral lagoon.' },
+      { id: 'rocks', name: 'Seal Rocks', x: 6, z: -62, r: 7, line: 'Bare rocks where seals bask and puffins nest.' },
+      { id: 'wreck', name: 'Wreck Bar', x: 26, z: 30, r: 5, line: 'A sandbar with an old boat half buried in it.' },
+    ],
   };
+  SW.K.ISLAND = Object.fromEntries(SW.K.ISLANDS.map((i) => [i.id, i]));
 
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -94,6 +105,6 @@ window.SW = window.SW || {};
     night: 0, glow: 0, dayness: 1,
     weather: { cloud: 0.25, rain: 0, fog: 0, snow: 0, wind: 0.4, aurora: 0, rainbow: 0 },
     breath: { b: 0, label: 'breathe in', kind: 'in', left: 0, outT: 99 },
-    started: false, quality: 'high', reduceMotion: false,
+    started: false, quality: 'high', reduceMotion: false, island: 'home',
   };
 })(window.SW);

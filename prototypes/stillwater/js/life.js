@@ -34,6 +34,8 @@
   const yaw = (dx, dz) => Math.atan2(dx, dz);
   const turnTo = (cur, want, rate, dt) => cur + clamp(U.angDiff(cur, want), -rate * dt, rate * dt);
   const season = () => U.seasonIndex(S.season);
+  // Most visitors gather around wherever you are looking.
+  const nearFocus = (p, r = 24) => Math.hypot(p.x - W.focus.x, p.z - W.focus.z) < r;
   const pickNear = (list, x, z, r) => { const near = list.filter((p) => Math.hypot(p[0] - x, p[1] - z) < r); return near.length ? U.pick(rand, near) : null; };
 
   // --------------------------------------------------------------------- koi
@@ -102,7 +104,7 @@
     part(c.L, col, 0.13, 0.008, 0.1, -0.065, 0, 0.02); part(c.L, col, 0.09, 0.008, 0.07, -0.05, 0, -0.06);
     part(c.R, col, 0.13, 0.008, 0.1, 0.065, 0, 0.02); part(c.R, col, 0.09, 0.008, 0.07, 0.05, 0, -0.06);
     c.update = (dt, t) => {
-      const nectar = GD.feat.nectar.filter((n) => t > n.ready);
+      const nectar = GD.feat.nectar.filter((n) => t > n.ready && nearFocus(n));
       const want = Math.min(10, 2 + nectar.length);
       const si = season();
       const active = S.dayness > 0.6 && (si === 0 || si === 1 || (si === 2 && S.season % 1 < 0.4)) && S.weather.rain < 0.3 && S.weather.snow < 0.2 && c.i < want;
@@ -110,11 +112,12 @@
       if (c.state === 'away') {
         if (!active) { fadeTo(c, false, dt); return; }
         const a = rand() * TAU;
-        pos.set(Math.cos(a) * 22, 4, Math.sin(a) * 22);
+        pos.set(W.focus.x + Math.cos(a) * 22, 4, W.focus.z + Math.sin(a) * 22);
         c.state = 'fly'; c.pickTarget(nectar);
       }
-      if (!active && c.state !== 'leave') { c.state = 'leave'; c.tgt.set(pos.x * 3, 8, pos.z * 3); }
-      fadeTo(c, c.state !== 'leave' || pos.length() < 30, dt);
+      const away = Math.hypot(pos.x - W.focus.x, pos.z - W.focus.z);
+      if (!active && c.state !== 'leave') { c.state = 'leave'; c.tgt.set(W.focus.x + (pos.x - W.focus.x) * 3, 8, W.focus.z + (pos.z - W.focus.z) * 3); }
+      fadeTo(c, c.state !== 'leave' || away < 30, dt);
       if (c.state === 'rest') {
         c.timer -= dt;
         const open = 0.3 + 0.5 * Math.max(0, Math.sin(t * 1.6 + c.p));
@@ -124,7 +127,7 @@
       }
       tmpV.copy(c.tgt).sub(pos);
       const d = tmpV.length();
-      if (c.state === 'leave' && (d < 1 || pos.length() > 30)) { c.state = 'away'; c.fade = 0; g.visible = false; return; }
+      if ((c.state === 'leave' && (d < 1 || away > 30)) || away > 60) { c.state = 'away'; c.fade = 0; g.visible = false; return; }
       if (c.state === 'fly' && d < 0.12) { c.state = 'rest'; c.timer = 3 + rand() * 6; g.rotation.x = 0; return; }
       tmpV.normalize().multiplyScalar(Math.min(d * 2 + 0.3, 1.2) * dt);
       pos.add(tmpV);
@@ -136,7 +139,7 @@
     c.pickTarget = (nectar) => {
       const n = nectar.length ? U.pick(rand, nectar) : null;
       if (n && rand() < 0.75) c.tgt.set(n.x + (rand() - 0.5) * 0.15, n.y + 0.05, n.z + (rand() - 0.5) * 0.15);
-      else { const p = U.pick(rand, W.cols.grass); c.tgt.set(p[0], p[2] + 0.8 + rand() * 1.2, p[1]); c.wander = true; }
+      else { const p = U.pick(rand, W.local.grass.length ? W.local.grass : W.cols.grass); c.tgt.set(p[0], p[2] + 0.8 + rand() * 1.2, p[1]); c.wander = true; }
       if (!n) c.tgt.y += 0.4;
     };
   }
@@ -156,7 +159,7 @@
       fadeTo(c, c.off < 110, dt, 0.5);
       if (!c.g.visible) return;
       c.a += c.w * dt;
-      const r = c.r0 + 4 * Math.sin(t * 0.05 + c.p) + c.off, cx = 5 * Math.sin(t * 0.01), cz = 5 * Math.cos(t * 0.013);
+      const r = c.r0 + 4 * Math.sin(t * 0.05 + c.p) + c.off, cx = gullC.x + 5 * Math.sin(t * 0.01), cz = gullC.z + 5 * Math.cos(t * 0.013);
       g.position.set(cx + Math.cos(c.a) * r, 14 + 3 * Math.sin(t * 0.07 + c.p) + c.off * 0.1, cz + Math.sin(c.a) * r);
       g.rotation.set(0, yaw(-Math.sin(c.a) * Math.sign(c.w), Math.cos(c.a) * Math.sign(c.w)), -Math.sign(c.w) * 0.25);
       const flapping = Math.sin(t * 0.3 + c.p) > 0.55, wing = flapping ? Math.sin(t * 7 + c.p) * 0.6 : 0.12;
@@ -177,23 +180,23 @@
     c.L = pivot(g, -0.06, 0.09, 0); c.R = pivot(g, 0.06, 0.09, 0);
     part(c.L, body, 0.16, 0.02, 0.1, -0.08, 0, 0); part(c.R, body, 0.16, 0.02, 0.1, 0.08, 0, 0);
     const perches = () => {
-      const F = GD.feat, list = F.perch.filter((p) => S.t > p.ready).map((p) => [p.x, p.y, p.z]);
-      for (const b of F.birdhouse) list.push([b.x, b.y, b.z], [b.x, b.y, b.z]);
-      for (const n of F.nectar) if (!n.water) list.push([n.x + 0.2, W.heightAt(n.x + 0.2, n.z), n.z]);
+      const F = GD.feat, list = F.perch.filter((p) => S.t > p.ready && nearFocus(p)).map((p) => [p.x, p.y, p.z]);
+      for (const b of F.birdhouse) if (nearFocus(b)) list.push([b.x, b.y, b.z], [b.x, b.y, b.z]);
+      for (const n of F.nectar) if (!n.water && nearFocus(n)) list.push([n.x + 0.2, W.heightAt(n.x + 0.2, n.z), n.z]);
       return list;
     };
     c.update = (dt, t) => {
-      const F = GD.feat, homes = F.tree.length + F.birdhouse.length * 2;
+      const F = GD.feat, homes = F.tree.filter((p) => nearFocus(p)).length + F.birdhouse.filter((p) => nearFocus(p)).length * 2;
       const active = S.dayness > 0.5 && S.weather.rain < 0.5 && c.i < Math.min(6, homes);
       const pos = g.position;
       if (c.state === 'away') {
         if (!active) { fadeTo(c, false, dt); return; }
         const list = perches(); if (!list.length) return;
         const a = rand() * TAU;
-        pos.set(Math.cos(a) * 25, 9, Math.sin(a) * 25);
+        pos.set(W.focus.x + Math.cos(a) * 25, 9, W.focus.z + Math.sin(a) * 25);
         c.flyTo(U.pick(rand, list));
       }
-      if (!active && c.state !== 'leave') { const a = Math.atan2(pos.z, pos.x); c.flyTo([Math.cos(a) * 30, 10, Math.sin(a) * 30]); c.state = 'leave'; }
+      if (!active && c.state !== 'leave') { const a = Math.atan2(pos.z - W.focus.z, pos.x - W.focus.x); c.flyTo([W.focus.x + Math.cos(a) * 30, 10, W.focus.z + Math.sin(a) * 30]); c.state = 'leave'; }
       fadeTo(c, true, dt);
       if (c.state === 'fly' || c.state === 'leave') {
         c.k += dt / c.dur;
@@ -361,7 +364,7 @@
   }
 
   // -------------------------------------------------------------------- crabs
-  function makeCrab(i) {
+  function makeCrab(i, sand) {
     const c = { see: 'crab', i, timer: rand() * 3, dir: 1, moving: 0, p: rand() * 10 };
     const g = root(c);
     part(g, 0xd0604a, 0.2, 0.08, 0.14, 0, 0.06, 0, true);
@@ -369,7 +372,7 @@
     part(g, 0x2a2420, 0.025, 0.04, 0.025, -0.04, 0.12, 0.05); part(g, 0x2a2420, 0.025, 0.04, 0.025, 0.04, 0.12, 0.05);
     c.legs = pivot(g, 0, 0.03, 0);
     for (const s of [-1, 1]) for (let j = 0; j < 3; j++) part(c.legs, 0xb85040, 0.08, 0.02, 0.02, s * 0.13, 0, -0.04 + j * 0.04);
-    const spot = W.cols.sand[(i * 53 + 11) % W.cols.sand.length];
+    const spot = sand[(i * 53 + 11) % sand.length];
     g.position.set(spot[0], spot[2], spot[1]);
     g.rotation.y = rand() * TAU;
     c.update = (dt, t) => {
@@ -403,13 +406,14 @@
     c.L.visible = c.R.visible = false;
     c.update = (dt, t) => {
       const tod = S.tod, hours = tod < 0.22 || (tod > 0.5 && tod < 0.72);
-      const active = hours && S.weather.rain < 0.5 && W.cols.shallow.length > 0;
+      const shallows = W.local.shallow.length ? W.local.shallow : W.cols.shallow;
+      const active = hours && S.weather.rain < 0.5 && shallows.length > 0;
       const pos = g.position;
       if (c.state === 'away') {
         fadeTo(c, false, dt);
         if (!active) return;
-        const s = U.pick(rand, W.cols.shallow), a = rand() * TAU;
-        c.spot = s; pos.set(Math.cos(a) * 40, 14, Math.sin(a) * 40);
+        const s = U.pick(rand, shallows), a = rand() * TAU;
+        c.spot = s; pos.set(s[0] + Math.cos(a) * 40, 14, s[1] + Math.sin(a) * 40);
         c.from.copy(pos); c.to.set(s[0], s[2], s[1]); c.k = 0; c.state = 'arrive';
       }
       fadeTo(c, true, dt, 0.6);
@@ -428,7 +432,7 @@
         }
         return;
       }
-      if (!active) { const a = rand() * TAU; c.from.copy(pos); c.to.set(Math.cos(a) * 45, 16, Math.sin(a) * 45); c.k = 0; c.state = 'leave'; return; }
+      if (!active || Math.hypot(pos.x - W.focus.x, pos.z - W.focus.z) > 45) { const a = rand() * TAU; c.from.copy(pos); c.to.set(pos.x + Math.cos(a) * 45, 16, pos.z + Math.sin(a) * 45); c.k = 0; c.state = 'leave'; return; }
       c.timer -= dt;
       c.strike = Math.max(0, c.strike - dt);
       const s = c.strike > 0 ? Math.sin(Math.PI * c.strike / 0.8) : 0;
@@ -439,7 +443,7 @@
       if (c.timer <= 0) {
         if (rand() < 0.5) { c.strike = 0.8; c.splashed = false; }
         else {
-          const n = pickNear(W.cols.shallow, pos.x, pos.z, 2.5);
+          const n = pickNear(shallows, pos.x, pos.z, 2.5);
           if (n) { g.rotation.y = yaw(n[0] - pos.x, n[1] - pos.z); pos.x += (n[0] - pos.x) * 0.3; pos.z += (n[1] - pos.z) * 0.3; }
         }
         c.timer = 12 + rand() * 20;
@@ -457,7 +461,7 @@
     c.w = [];
     for (const z of [0.03, -0.02]) for (const s of [-1, 1]) c.w.push(part(g, wing, 0.13, 0.004, 0.035, s * 0.07, 0.01, z));
     c.update = (dt, t) => {
-      const anchors = GD.feat.reed.concat(GD.feat.pad).filter((p) => t > p.ready);
+      const anchors = GD.feat.reed.concat(GD.feat.pad, GD.feat.reef).filter((p) => t > p.ready && nearFocus(p));
       const si = season();
       const active = S.dayness > 0.6 && (si === 1 || (si === 0 && S.season % 1 > 0.6)) && S.weather.rain < 0.3 && anchors.length > 0 && c.i < 3;
       if (!fadeTo(c, active, dt)) return;
@@ -487,7 +491,7 @@
     c.eyes = [part(c.head, eye, 0.05, 0.05, 0.02, -0.045, 0, 0.11), part(c.head, eye, 0.05, 0.05, 0.02, 0.045, 0, 0.11)];
     part(c.head, 0x5a4634, 0.04, 0.07, 0.04, -0.08, 0.1, 0); part(c.head, 0x5a4634, 0.04, 0.07, 0.04, 0.08, 0.1, 0);
     c.update = (dt, t) => {
-      const perches = GD.feat.perch.filter((p) => p.tree && t > p.ready);
+      const perches = GD.feat.perch.filter((p) => p.tree && t > p.ready && nearFocus(p, 20));
       const active = S.night > 0.6 && S.weather.rain < 0.5;
       if (active && (!c.perch || !perches.includes(c.perch))) {
         c.perch = perches.sort((a, b) => b.y - a.y)[0] || { x: W.dock.pole.x, y: W.dock.pole.y + 0.08, z: W.dock.pole.z };
@@ -550,13 +554,24 @@
       if (c.state === 'wait') {
         fadeTo(c, false, dt);
         c.timer -= dt;
-        if (c.timer <= 0) { c.state = 'swim'; c.k = 0; c.a = rand() * TAU; c.r = 42 + rand() * 18; c.dir = rand() < 0.5 ? 1 : -1; c.spouts = 0; audio('whale', W.panOf(tmpV.set(Math.cos(c.a) * c.r, 0, Math.sin(c.a) * c.r))); }
+        if (c.timer <= 0) {
+          c.timer = 40;
+          for (let tries = 0; tries < 40; tries++) {
+            const a = rand() * TAU, r = 30 + rand() * 16, dir = rand() < 0.5 ? 1 : -1, cx = W.focus.x, cz = W.focus.z;
+            let open = true;
+            for (let k = -0.2; k <= 0.75 && open; k += 0.08) { const aa = a + dir * k; if (W.heightAt(cx + Math.cos(aa) * r, cz + Math.sin(aa) * r) > -5) open = false; }
+            if (!open) continue;
+            Object.assign(c, { state: 'swim', k: 0, a, r, dir, cx, cz, spouts: 0 });
+            audio('whale', W.panOf(tmpV.set(cx + Math.cos(a) * r, 0, cz + Math.sin(a) * r)));
+            break;
+          }
+        }
         return;
       }
       fadeTo(c, true, dt, 3);
       c.k += dt;
       c.a += c.dir * dt * 0.9 / c.r;
-      const x = Math.cos(c.a) * c.r, z = Math.sin(c.a) * c.r;
+      const x = c.cx + Math.cos(c.a) * c.r, z = c.cz + Math.sin(c.a) * c.r;
       g.position.set(x, K.WL, z);
       g.rotation.y = yaw(-Math.sin(c.a) * c.dir, Math.cos(c.a) * c.dir);
       const cyc = c.k % 8, n = Math.floor(c.k / 8), last = n === 2;
@@ -593,7 +608,7 @@
         fadeTo(c, false, dt);
         c.timer -= dt;
         if (c.timer > 0) return;
-        const a = rand() * TAU, b = a + Math.PI + (rand() - 0.5) * 1.2, r = 80 + rand() * 25;
+        const a = rand() * TAU, b = a + Math.PI + (rand() - 0.5) * 1.2, r = 112 + rand() * 18;
         c.from.set(Math.cos(a) * r, 0, Math.sin(a) * r); c.to.set(Math.cos(b) * r, 0, Math.sin(b) * r);
         c.k = 0; c.state = 'sail'; c.dur = c.from.distanceTo(c.to) / 0.4;
       }
@@ -650,13 +665,287 @@
     };
   }
 
+  // ------------------------------------------------- grazers: sheep and deer
+  function makeGrazer(i, kind) {
+    const I = K.ISLAND[kind === 'sheep' ? 'meadow' : 'pine'], sheep = kind === 'sheep', stag = !sheep && i === 0;
+    const c = { see: kind, i, state: 'graze', timer: rand() * 4, speed: 0, goal: null, p: rand() * 10, look: 0 };
+    const g = root(c), coat = sheep ? 0xf2efe6 : 0x9a6a44, dark = sheep ? 0x2a2624 : 0x7a5434;
+    const legH = sheep ? 0.28 : 0.5, bodyY = legH + (sheep ? 0.2 : 0.16);
+    part(g, coat, sheep ? 0.5 : 0.36, sheep ? 0.4 : 0.32, sheep ? 0.66 : 0.72, 0, bodyY, 0, true);
+    c.legs = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([sx, sz]) => { const pv = pivot(g, sx * (sheep ? 0.15 : 0.12), legH, sz * 0.24); part(pv, dark, 0.07, legH, 0.07, 0, -legH / 2, 0); return pv; });
+    c.head = pivot(g, 0, bodyY + (sheep ? 0.08 : 0.22), sheep ? 0.36 : 0.36);
+    part(c.head, dark, sheep ? 0.18 : 0.14, sheep ? 0.2 : 0.16, sheep ? 0.22 : 0.26, 0, 0, 0.08);
+    if (sheep) part(c.head, coat, 0.2, 0.08, 0.14, 0, 0.11, 0.02);
+    else { part(g, coat, 0.1, 0.32, 0.12, 0, bodyY + 0.14, 0.3); part(g, 0xf2ece0, 0.08, 0.1, 0.04, 0, bodyY + 0.06, -0.37); }
+    if (stag) for (const sx of [-1, 1]) { part(c.head, 0xd8c8a8, 0.03, 0.22, 0.03, sx * 0.06, 0.18, 0); part(c.head, 0xd8c8a8, 0.1, 0.03, 0.03, sx * 0.1, 0.24, 0); part(c.head, 0xd8c8a8, 0.03, 0.12, 0.03, sx * 0.13, 0.3, 0); }
+    const spot = I.cols.grass[(i * 41 + 7) % I.cols.grass.length];
+    g.position.set(spot[0], spot[2], spot[1]);
+    g.rotation.y = rand() * TAU;
+    c.update = (dt, t) => {
+      if (!fadeTo(c, I.cols.grass.length > 0, dt, 0.5)) return;
+      const pos = g.position;
+      c.timer -= dt;
+      if (c.state === 'graze') {
+        c.head.rotation.x = c.look > 0 ? -0.2 : 0.7 + Math.sin(t * 3 + c.p) * 0.05;
+        c.legs.forEach((l) => { l.rotation.x = 0; });
+        if (c.timer <= 0) {
+          const goal = pickNear(I.cols.grass, pos.x, pos.z, 4);
+          if (goal) { c.goal = goal; c.state = 'walk'; c.speed = sheep ? 0.3 : 0.4; }
+          c.timer = 4 + rand() * 8;
+        }
+        if (sheep && rand() < dt * 0.012 && nearFocus(pos, 30)) audio('bleat', W.panOf(pos));
+      } else {
+        const dx = c.goal[0] - pos.x, dz = c.goal[1] - pos.z, d = Math.hypot(dx, dz);
+        if (d < 0.2) { c.state = 'graze'; c.timer = 5 + rand() * 10; return; }
+        g.rotation.y = turnTo(g.rotation.y, yaw(dx, dz), 2.5, dt);
+        const nx = pos.x + Math.sin(g.rotation.y) * c.speed * dt, nz = pos.z + Math.cos(g.rotation.y) * c.speed * dt;
+        if (!W.isGrass(nx, nz)) { c.state = 'graze'; c.timer = 2; return; }
+        const gh = W.heightAt(nx, nz);
+        pos.x = nx; pos.z = nz; pos.y += (gh - pos.y) * Math.min(1, dt * 6);
+        const sw = Math.sin(t * c.speed * 22) * 0.5;
+        c.legs.forEach((l, j) => { l.rotation.x = (j === 0 || j === 3 ? sw : -sw); });
+        c.head.rotation.x = 0.1;
+        if (c.speed > 1) pos.y += Math.abs(Math.sin(t * 10)) * 0.15;
+      }
+      c.look = Math.max(0, c.look - dt);
+    };
+    c.tap = () => {
+      c.look = 3;
+      if (sheep) { audio('bleat', W.panOf(g.position)); return; }
+      const a = g.rotation.y + Math.PI + (rand() - 0.5);
+      const goal = pickNear(I.cols.grass, g.position.x + Math.sin(a) * 4, g.position.z + Math.cos(a) * 4, 3);
+      if (goal) { c.goal = goal; c.state = 'walk'; c.speed = 2.4; c.timer = 3; }
+    };
+  }
+
+  // ----------------------------------------------------------- seals, puffins
+  function makeSeal(i) {
+    const I = K.ISLAND.rocks, c = { see: 'seal', i, state: 'bask', timer: 10 + rand() * 30, a: rand() * TAU, p: rand() * 10, from: new THREE.Vector3(), k: 1 };
+    const g = root(c), grey = [0x8a8f94, 0x6f747a, 0x9a9488][i % 3];
+    c.body = part(g, grey, 0.36, 0.26, 0.9, 0, 0.13, 0, true);
+    c.head = pivot(g, 0, 0.2, 0.42);
+    part(c.head, grey, 0.24, 0.22, 0.26, 0, 0.04, 0.08); part(c.head, 0x2a2a2a, 0.05, 0.04, 0.03, 0, 0.02, 0.22);
+    part(g, grey, 0.4, 0.04, 0.16, 0, 0.04, 0.15); part(g, grey, 0.3, 0.05, 0.14, 0, 0.06, -0.48);
+    const rocks = () => I.cols.rock.filter((r) => r[2] >= 1 && r[2] <= 3);
+    const home = rocks()[(i * 7 + 3) % Math.max(1, rocks().length)] || [I.x, I.z, 1];
+    c.rock = home; g.position.set(home[0], home[2], home[1]); g.rotation.y = rand() * TAU;
+    c.update = (dt, t) => {
+      if (!fadeTo(c, true, dt, 0.5)) return;
+      const pos = g.position;
+      c.timer -= dt;
+      if (c.state === 'bask') {
+        c.head.rotation.x = Math.sin(t * 0.3 + c.p) > 0.7 ? -0.6 : 0.15;
+        c.body.scale.y = 0.26 * (1 + 0.05 * S.breath.b);
+        if (rand() < dt * 0.01 && nearFocus(pos, 35)) audio('bark', W.panOf(pos));
+        if (c.timer <= 0) { c.state = 'slide'; c.k = 0; c.from.copy(pos); c.a = Math.atan2(pos.z - I.z, pos.x - I.x); }
+      } else if (c.state === 'slide' || c.state === 'haul') {
+        c.k = Math.min(1, c.k + dt / 2.5);
+        const tgt = c.state === 'slide' ? tmpV.set(I.x + Math.cos(c.a) * (I.r + 2), K.WL - 0.2, I.z + Math.sin(c.a) * (I.r + 2)) : tmpV.set(c.rock[0], c.rock[2], c.rock[1]);
+        pos.lerpVectors(c.from, tgt, smooth(0, 1, c.k));
+        g.rotation.y = yaw(tgt.x - c.from.x, tgt.z - c.from.z);
+        if (c.k >= 1) {
+          if (c.state === 'slide') { c.state = 'swim'; c.timer = 20 + rand() * 30; W.addRipple(pos.x, pos.z, 0.7); audio('splash', W.panOf(pos), 0.6); }
+          else { c.state = 'bask'; c.timer = 30 + rand() * 60; }
+        }
+      } else {
+        c.a += dt * 0.12;
+        const x = I.x + Math.cos(c.a) * (I.r + 2), z = I.z + Math.sin(c.a) * (I.r + 2);
+        pos.set(x, W.waveY(x, z) - 0.2, z);
+        g.rotation.y = yaw(-Math.sin(c.a), Math.cos(c.a));
+        c.head.rotation.x = -0.3;
+        if (c.timer <= 0) { const list = rocks(); c.rock = list.length ? U.pick(rand, list) : c.rock; c.state = 'haul'; c.k = 0; c.from.copy(pos); }
+      }
+    };
+    c.tap = () => { c.head.rotation.x = -0.6; audio('bark', W.panOf(g.position)); };
+  }
+  function makePuffin(i) {
+    const I = K.ISLAND.rocks, c = { see: 'puffin', i, state: 'stand', timer: 5 + rand() * 20, from: new THREE.Vector3(), to: new THREE.Vector3(), k: 0, p: rand() * 10 };
+    const g = root(c);
+    part(g, 0x222428, 0.13, 0.2, 0.13, 0, 0.12, 0); part(g, 0xf2f2ee, 0.1, 0.14, 0.04, 0, 0.11, 0.06);
+    c.head = pivot(g, 0, 0.25, 0.01);
+    part(c.head, 0x222428, 0.11, 0.1, 0.11, 0, 0, 0); part(c.head, 0xf2f2ee, 0.115, 0.06, 0.06, 0, -0.005, 0.03);
+    part(c.head, 0xf08a3a, 0.04, 0.06, 0.07, 0, -0.01, 0.08);
+    c.L = pivot(g, -0.07, 0.17, 0); c.R = pivot(g, 0.07, 0.17, 0);
+    part(c.L, 0x222428, 0.16, 0.02, 0.09, -0.08, 0, 0); part(c.R, 0x222428, 0.16, 0.02, 0.09, 0.08, 0, 0);
+    const rock = () => { const list = I.cols.rock.filter((r) => r[2] >= 1); return list.length ? U.pick(rand, list) : [I.x, I.z, 2]; };
+    const r0 = rock();
+    g.position.set(r0[0] + (rand() - 0.5) * 0.6, r0[2], r0[1] + (rand() - 0.5) * 0.6);
+    c.update = (dt, t) => {
+      if (!fadeTo(c, S.night < 0.7, dt, 0.5)) return;
+      c.timer -= dt;
+      if (c.state === 'stand') {
+        c.head.rotation.y = Math.sin(t * 0.8 + c.p) * 0.8;
+        c.L.rotation.z = c.R.rotation.z = 0;
+        if (c.timer <= 0) { const r = rock(); c.from.copy(g.position); c.to.set(r[0] + (rand() - 0.5) * 0.6, r[2], r[1] + (rand() - 0.5) * 0.6); c.k = 0; c.state = 'fly'; c.loop = rand() * TAU; }
+        return;
+      }
+      c.k = Math.min(1, c.k + dt / 6);
+      const a = c.loop + c.k * TAU, rr = 5 * Math.sin(Math.PI * c.k);
+      g.position.lerpVectors(c.from, c.to, c.k);
+      g.position.x += Math.cos(a) * rr; g.position.z += Math.sin(a) * rr; g.position.y += Math.sin(Math.PI * c.k) * 4;
+      g.rotation.y = yaw(-Math.sin(a), Math.cos(a));
+      const flap = Math.sin(t * 34) * 0.9;
+      c.L.rotation.z = flap; c.R.rotation.z = -flap;
+      if (c.k >= 1) { c.state = 'stand'; c.timer = 10 + rand() * 30; }
+    };
+    c.tap = () => { c.timer = 0; };
+  }
+
+  // -------------------------------------------------------------- reef fish
+  function makeSchool(i) {
+    const I = K.ISLAND.atoll, c = { see: 'reeffish', i, a: rand() * TAU, p: rand() * 10, fish: [] };
+    const g = root(c);
+    const cols = [[0xf2d35a, 0x3a6ac0], [0x4aa8e8, 0xf2d35a], [0xf08a3a, 0xf6f2ea]][i % 3];
+    for (let j = 0; j < 8; j++) {
+      const f = pivot(g, 0, 0, 0);
+      part(f, cols[0], 0.05, 0.1, 0.16, 0, 0, 0); part(f, cols[1], 0.055, 0.04, 0.04, 0, 0.01, 0.02); part(f, cols[0], 0.02, 0.07, 0.06, 0, 0, -0.1);
+      c.fish.push({ f, ox: (rand() - 0.5) * 1.4, oz: (rand() - 0.5) * 1.4, oy: (rand() - 0.5) * 0.25, p: rand() * 10 });
+    }
+    c.update = (dt, t) => {
+      if (!fadeTo(c, true, dt)) return;
+      c.a += dt * 0.12 * (i % 2 ? 1 : -1);
+      const r = I.r * 0.28 + Math.sin(t * 0.17 + c.p) * 0.8;
+      g.position.set(I.x + Math.cos(c.a) * r, K.WL - 0.55, I.z + Math.sin(c.a) * r);
+      const heading = yaw(-Math.sin(c.a) * (i % 2 ? 1 : -1), Math.cos(c.a) * (i % 2 ? 1 : -1));
+      for (const o of c.fish) {
+        o.f.position.set(o.ox + Math.sin(t * 0.9 + o.p) * 0.2, o.oy, o.oz + Math.cos(t * 0.7 + o.p) * 0.2);
+        o.f.rotation.y = heading + Math.sin(t * 3 + o.p) * 0.25;
+      }
+    };
+    c.tap = () => { for (const o of c.fish) { o.ox *= -1; o.oz *= -1; } };
+  }
+
+  // -------------------------------------------------------------- windmill sails
+  const sails = new Map();
+  let sailVersion = -1;
+  function syncSails() {
+    sailVersion = GD.version;
+    const live = new Set(GD.feat.windmill || []);
+    for (const [f, g] of sails) if (!live.has(f)) { scene.remove(g); sails.delete(f); }
+    for (const f of live) {
+      if (sails.has(f)) continue;
+      const g = new THREE.Group();
+      g.position.set(f.x, f.y, f.z);
+      g.rotation.y = Math.atan2(Math.cos(f.angle), Math.sin(f.angle));
+      const hub = new THREE.Group(); g.add(hub);
+      part(hub, 0x5a4030, 0.2, 0.2, 0.3, 0, 0, 0);
+      for (let b = 0; b < 4; b++) {
+        const arm = pivot(hub, 0, 0, 0.12); arm.rotation.z = b * Math.PI / 2;
+        part(arm, 0x6a4f3a, 0.08, 2.6, 0.06, 0, 1.35, 0, true);
+        part(arm, 0xf2ece0, 0.5, 1.9, 0.03, 0.29, 1.6, 0, true);
+      }
+      g.userData.hub = hub;
+      scene.add(g);
+      sails.set(f, g);
+    }
+  }
+  function updateSails(dt, t) {
+    if (sailVersion !== GD.version) syncSails();
+    const speed = 0.25 + S.weather.wind * 0.7;
+    for (const [f, g] of sails) { g.visible = t > f.ready - 6; g.userData.hub.rotation.z += dt * speed; }
+  }
+
+  // ------------------------------------------------------------------ rowboat
+  // A small rowboat waits at whichever island you are on, and rows you to the next.
+  let boat, trip = null;
+  function makeRowboat() {
+    boat = new THREE.Group();
+    const wood = 0x8a6a4c, dark = 0x6a4f3a;
+    part(boat, dark, 0.8, 0.1, 2.0, 0, 0.05, 0, true);
+    for (const sx of [-1, 1]) part(boat, wood, 0.08, 0.28, 2.0, sx * 0.42, 0.2, 0, true);
+    part(boat, wood, 0.84, 0.28, 0.08, 0, 0.2, -1.0, true); part(boat, wood, 0.5, 0.28, 0.08, 0, 0.2, 1.02, true);
+    part(boat, dark, 0.8, 0.06, 0.24, 0, 0.26, -0.1);
+    const rower = pivot(boat, 0, 0.3, -0.1);
+    part(rower, 0x5f7f9a, 0.32, 0.36, 0.22, 0, 0.18, 0, true);
+    part(rower, 0xe8c8a8, 0.2, 0.2, 0.2, 0, 0.47, 0);
+    part(rower, 0xd8b04a, 0.38, 0.04, 0.38, 0, 0.58, 0); part(rower, 0xd8b04a, 0.2, 0.1, 0.2, 0, 0.63, 0);
+    boat.userData.rower = rower;
+    boat.userData.oars = [-1, 1].map((sx) => {
+      const pv = pivot(boat, sx * 0.46, 0.34, -0.1);
+      part(pv, 0x9a7a5a, 1.5, 0.04, 0.04, sx * 0.62, 0, 0);
+      part(pv, 0x9a7a5a, 0.3, 0.02, 0.12, sx * 1.3, 0, 0);
+      return pv;
+    });
+    scene.add(boat);
+    mooring();
+  }
+  function mooring() {
+    const I = W.island, a = Math.atan2(I.out.y, I.out.x);
+    boat.position.set(I.landing.x, K.WL, I.landing.z);
+    boat.rotation.y = yaw(Math.cos(a + 1.2), Math.sin(a + 1.2));
+  }
+  function clearWater(ax, az, bx, bz) {
+    const d = Math.hypot(bx - ax, bz - az), n = Math.ceil(d);
+    for (let i = 0; i <= n; i++) { const k = i / n; if (W.heightAt(ax + (bx - ax) * k, az + (bz - az) * k) > -2) return false; }
+    return true;
+  }
+  L.travel = function (toId) {
+    const A = W.island, B = K.ISLAND[toId];
+    if (!B || A === B || trip) return null;
+    const p0 = A.landing, p1 = new THREE.Vector3(p0.x + A.out.x * 6, K.WL, p0.z + A.out.y * 6);
+    const p3 = B.landing, p2 = new THREE.Vector3(p3.x + B.out.x * 6, K.WL, p3.z + B.out.y * 6);
+    const pts = [p0.clone(), p1];
+    if (!clearWater(p1.x, p1.z, p2.x, p2.z)) {
+      const mx = (p1.x + p2.x) / 2, mz = (p1.z + p2.z) / 2, len = Math.hypot(p2.x - p1.x, p2.z - p1.z) || 1;
+      const nx = -(p2.z - p1.z) / len, nz = (p2.x - p1.x) / len;
+      for (const off of [18, -18, 30, -30, 45, -45, 60, -60]) {
+        const qx = mx + nx * off, qz = mz + nz * off;
+        if (clearWater(p1.x, p1.z, qx, qz) && clearWater(qx, qz, p2.x, p2.z)) { pts.push(new THREE.Vector3(qx, K.WL, qz)); break; }
+      }
+    }
+    pts.push(p2, p3.clone());
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+    trip = { curve, len: curve.getLength(), d: 0, from: A, to: B, last: 0, fwd: new THREE.Vector3(1, 0, 0) };
+    return trip;
+  };
+  L.trip = () => trip;
+  L.boat = () => boat;
+  L.arriveNow = () => { if (trip) trip.d = trip.len; };
+  function updateBoat(dt, t) {
+    const oars = boat.userData.oars;
+    if (!trip) {
+      boat.position.y = W.waveY(boat.position.x, boat.position.z) - 0.05;
+      boat.rotation.z = Math.sin(t * 0.7) * 0.04;
+      oars.forEach((o, j) => { o.rotation.set(0, (j ? -1 : 1) * 0.9, (j ? 1 : -1) * -0.25); });
+      return;
+    }
+    // one stroke every 2.5 seconds: the boat surges on the pull and glides on the recovery
+    const ph = (t / 2.5) % 1, pull = ph < 0.45;
+    const v = 2.6 * (pull ? 1 + 0.5 * Math.sin(Math.PI * ph / 0.45) : 0.75);
+    trip.d = Math.min(trip.len, trip.d + v * dt);
+    const u = trip.d / trip.len, p = trip.curve.getPointAt(u), tan = trip.curve.getTangentAt(u);
+    trip.fwd.set(tan.x, 0, tan.z).normalize();
+    boat.position.set(p.x, W.waveY(p.x, p.z) - 0.05, p.z);
+    boat.rotation.set(Math.sin(t * 0.9) * 0.03, yaw(tan.x, tan.z), Math.sin(t * 0.7) * 0.04);
+    const sweep = pull ? -0.7 + 1.4 * (ph / 0.45) : 0.7 - 1.4 * ((ph - 0.45) / 0.55);
+    oars.forEach((o, j) => { o.rotation.set(0, (j ? -1 : 1) * sweep, (j ? 1 : -1) * (pull ? 0.12 : -0.18)); });
+    boat.userData.rower.rotation.x = pull ? -0.25 * Math.sin(Math.PI * ph / 0.45) : 0;
+    if (ph < trip.last) {
+      for (const sx of [-1, 1]) {
+        const ox = boat.position.x + Math.cos(boat.rotation.y) * sx * 1.6, oz = boat.position.z - Math.sin(boat.rotation.y) * sx * 1.6;
+        W.addRipple(ox, oz, 0.35);
+      }
+      audio('oar');
+    }
+    trip.last = ph;
+    if (trip.d >= trip.len) {
+      const to = trip.to;
+      trip = null;
+      W.setIsland(to.id);
+      mooring();
+      SW.emit('arrive', to.id);
+    }
+  }
+  SW.on('island', () => { if (boat && !trip) mooring(); });
+
   // ---------------------------------------------------------------- particles
   let fireflies, ffData, fall, fallData, flames, puffs, sparkle;
-  const FF = 80, FALL = 220;
+  const FF = 150, FALL = 260;
   function initParticles() {
     fireflies = W.makePoints(FF, 'glow', true, 620);
     const rng = mulberry32(5);
-    ffData = Array.from({ length: FF }, () => { const [x, z, h] = U.pick(rng, W.cols.grass); return { x, z, y: h + 0.6 + rng() * 2.2, p: rng() * 100, f: 0.4 + rng() * 0.7 }; });
+    const meadows = K.ISLANDS.flatMap((I) => I.cols.grass);
+    ffData = Array.from({ length: FF }, () => { const [x, z, h] = U.pick(rng, meadows); return { x, z, y: h + 0.6 + rng() * 2.2, p: rng() * 100, f: 0.4 + rng() * 0.7 }; });
     for (let i = 0; i < FF; i++) { fireflies.col[i * 3] = 1; fireflies.col[i * 3 + 1] = 0.93; fireflies.col[i * 3 + 2] = 0.62; }
     fall = W.makePoints(FALL, 'square', false, 95);
     fallData = Array.from({ length: FALL }, () => ({ on: false, x: 0, y: 0, z: 0, landed: 0, life: 0, s: rand() * 100 }));
@@ -753,7 +1042,7 @@
     return new THREE.CanvasTexture(cv);
   }
   L.releaseLantern = function () {
-    const d = W.dock.end;
+    const I = W.island, d = I.id === 'home' ? W.dock.end : I.shore;
     const g = new THREE.Group();
     const paper = new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, opacity: 0.95 });
     const box = new THREE.Mesh(W.boxGeo, paper); box.scale.set(0.34, 0.44, 0.34); g.add(box);
@@ -788,9 +1077,10 @@
   let stoneMat;
   L.skipStone = function (tx, tz) {
     // throw from the nearest beach toward the tapped water
-    let sx = tx * 0.3, sz = tz * 0.3;
-    const dir = Math.atan2(tz, tx);
-    for (let r = Math.hypot(tx, tz); r > 2; r -= 0.5) { const x = Math.cos(dir) * r, z = Math.sin(dir) * r; if (W.heightAt(x, z) >= 0) { sx = x; sz = z; break; } }
+    const I = W.island;
+    let sx = I.x + (tx - I.x) * 0.3, sz = I.z + (tz - I.z) * 0.3;
+    const dir = Math.atan2(tz - I.z, tx - I.x);
+    for (let r = Math.hypot(tx - I.x, tz - I.z); r > 1; r -= 0.5) { const x = I.x + Math.cos(dir) * r, z = I.z + Math.sin(dir) * r; if (W.heightAt(x, z) >= 0) { sx = x; sz = z; break; } }
     const dx = tx - sx, dz = tz - sz, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d;
     const pts = [[sx, W.heightAt(sx, sz) + 0.9, sz]];
     let x = tx, z = tz, hop = 1.6;
@@ -847,13 +1137,25 @@
     for (let i = 0; i < 5; i++) makeDuck(i);
     for (let i = 0; i < 4; i++) makeFrog(i);
     for (let i = 0; i < 3; i++) makeRabbit(i);
-    for (let i = 0; i < 3; i++) makeCrab(i);
+    for (let i = 0; i < 3; i++) makeCrab(i, W.cols.sand);
+    for (let i = 0; i < 3; i++) makeCrab(i + 3, K.ISLAND.atoll.cols.sand);
+    for (let i = 0; i < 2; i++) makeCrab(i + 6, K.ISLAND.wreck.cols.sand);
     for (let i = 0; i < 3; i++) makeDragonfly(i);
     makeHeron(); makeOwl(); makeCat(); makeWhale(); makeBoat(); makeTurtle(); makeLeaper();
+    for (let i = 0; i < 5; i++) makeGrazer(i, 'sheep');
+    for (let i = 0; i < 3; i++) makeGrazer(i, 'deer');
+    for (let i = 0; i < 4; i++) makeSeal(i);
+    for (let i = 0; i < 6; i++) makePuffin(i);
+    for (let i = 0; i < 3; i++) makeSchool(i);
+    makeRowboat();
   };
   let seeTimer = 0;
+  const gullC = new THREE.Vector3();
   L.update = function (dt, t) {
+    gullC.lerp(W.focus, 1 - Math.exp(-dt / 25));
     for (const c of creatures) c.update(dt, t);
+    updateSails(dt, t);
+    updateBoat(dt, t);
     updateParticles(dt, t);
     spout.update(dt);
     updateLanterns(dt, t);
