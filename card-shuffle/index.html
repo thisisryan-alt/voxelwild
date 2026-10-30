@@ -193,6 +193,41 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
 :root.still *, :root.still *::before, :root.still *::after { animation-duration: .01s !important; animation-delay: 0s !important; transition-duration: .01s !important; }
 .progress { width: min(260px, 70%); height: 5px; margin: 0 auto; border-radius: 3px; background: #00000055; overflow: hidden; }
 .progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--gold-lo), var(--gold)); transition: width .12s linear; }
+.modeinfo { margin: -2px 0 0; text-align: center; font-size: .8rem; opacity: .8; text-wrap: balance; min-height: 1.2em; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 600; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--slate-line); background: var(--slate); cursor: pointer; }
+.toggle input { accent-color: var(--gold); width: 18px; height: 18px; margin: 0; }
+.toggle:has(input:disabled) { opacity: .5; cursor: default; }
+.sideline { margin: -4px 0 0; text-align: center; font-size: .85rem; font-weight: 600; min-height: 1.2em; }
+.sideline.win { color: var(--gold); } .sideline.lose { color: var(--bad); }
+.odds { grid-template-columns: repeat(var(--n, 2), 1fr) !important; max-width: 520px !important; }
+.alt kbd { margin-left: 4px; opacity: .7; font-size: .65rem; padding: 0 4px; }
+.alt.redtxt { color: #ff8a99; }
+.mcell.missed .pc { filter: brightness(.6) saturate(.6); }
+.score { font: 400 1.35rem var(--display); color: var(--chalk); font-variant-numeric: tabular-nums; }
+.progress.countdown i { background: linear-gradient(90deg, var(--red), var(--gold)); }
+.vp-hand { display: flex; gap: clamp(4px, 1.6vw, 10px); justify-content: center; --cw: clamp(52px, 15.5vw, 92px); }
+.vcell { border: 0; background: none; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px; color: inherit; }
+.vcell .heldtag { font: 800 .64rem var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink); background: var(--gold); padding: 2px 7px; border-radius: 4px; visibility: hidden; }
+.vcell.held .heldtag { visibility: visible; }
+.vcell .pc { transition: transform .15s; }
+.vcell.held .pc { transform: translateY(-6px); }
+.vcell.held .pc .face { box-shadow: 0 0 0 3px var(--gold), 0 8px 14px #0007; }
+.paytable { width: 100%; max-width: 400px; margin: 0 auto; border-collapse: collapse; font-size: .78rem; font-variant-numeric: tabular-nums; background: #00000030; border-radius: 10px; overflow: hidden; }
+.paytable td { padding: 3px 10px; border-bottom: 1px solid #ffffff12; }
+.paytable td:last-child { text-align: right; color: var(--gold); font-weight: 700; }
+.paytable tr.now td { background: #e2b5561c; }
+.paytable tr.hit td { background: var(--gold); color: var(--ink); }
+.cups { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: min(60vh, 460px); overflow-y: auto; }
+.cups li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 10px; background: #ffffff08; }
+.cups li i { font-style: normal; font-size: 1.2rem; text-align: center; filter: grayscale(1); opacity: .35; }
+.cups li b { display: block; font-size: .86rem; } .cups li small { margin: 0; }
+.cups li.got { background: #e2b55614; } .cups li.got i { filter: none; opacity: 1; color: var(--gold); } .cups li.got b { color: var(--gold); }
+.toast > span:first-child { color: var(--gold); font-size: 1.25rem; }
+#trophies { width: min(360px, 100%); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 10px;
+  background: var(--slate); border: 2px solid var(--gold); border-radius: 999px; padding: 10px 18px; box-shadow: 0 10px 30px #000a; font-weight: 600; max-width: calc(100% - 32px); animation: toastIn .35s ease-out; }
+.toast b { color: var(--gold); }
+@keyframes toastIn { from { transform: translate(-50%, 20px); opacity: 0; } }
 @media (max-width: 440px) { .board { grid-template-columns: repeat(2, 1fr); } .table { border-width: 9px; padding-inline: 8px; } }
 @media (prefers-reduced-motion: reduce) { .wchip, .mcell.wave .pc, .card, .inner, .dealt, .mcell .pc, .ledger li.new, .delta, .status.anim, .view.anim, .shake, .glow > .inner > .face { transition-duration: .01s !important; animation: none !important; } }
 </style>
@@ -202,13 +237,18 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
 <header class="top">
   <div class="brand">
     <h1>Find the Queen</h1>
-    <p class="sub">A card parlor with five tables</p>
+    <p class="sub">A card parlor with six tables</p>
   </div>
   <div class="bank">
     <div class="purse" id="purse" title="Your chips are shared by every table"><span class="coin" aria-hidden="true"></span><b id="chips">200</b></div>
     <button class="alt" id="rebuy" hidden>Buy back in</button>
     <button class="iconbtn" id="mute" aria-label="Sound on">🔊</button>
+    <button class="iconbtn" id="cup" aria-label="Trophies" aria-expanded="false" aria-controls="trophies">🏆</button>
     <button class="iconbtn" id="gear" aria-label="Settings" aria-expanded="false" aria-controls="settings">⚙︎</button>
+  </div>
+  <div class="panel" id="trophies" hidden>
+    <p class="label" style="text-align:left">Trophies · <span id="cup-count">0</span> of <span id="cup-total">0</span></p>
+    <ul class="cups" id="cup-list"></ul>
   </div>
   <div class="panel" id="settings" hidden>
     <p class="label" style="text-align:left">Settings</p>
@@ -226,10 +266,12 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
   <a href="#memory" data-v="memory">Memory</a>
   <a href="#blackjack" data-v="blackjack">Blackjack</a>
   <a href="#war" data-v="war">War</a>
+  <a href="#poker" data-v="poker">Video Poker</a>
 </nav>
 
 <div class="ledger"><p class="label">Recent</p><ol id="ledger" aria-label="Recent results"></ol></div>
 <canvas id="fx" aria-hidden="true"></canvas>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <!-- Find the Queen -->
 <section class="view" id="v-monte">
@@ -239,15 +281,22 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
     <div id="m-cards"></div>
     <div class="progress" id="m-prog" role="progressbar" aria-label="Shuffle progress" aria-valuemin="0" aria-valuemax="100" hidden><i></i></div>
     <div class="controls">
-      <select id="m-mode" aria-label="Difficulty">
+      <select id="m-mode" aria-label="Speed">
         <option value="5,500,15">Low · pays 15</option>
         <option value="10,320,25" selected>Medium · pays 25</option>
         <option value="16,210,40">High · pays 40</option>
         <option value="26,130,70">Insane · pays 70</option>
         <option value="45,70,150">God · pays 150</option>
       </select>
+      <select id="m-var" aria-label="Variant">
+        <option value="classic">Classic</option>
+        <option value="decoy">Decoy queen · ×1.5</option>
+        <option value="quick">Quick draw · ×1.5</option>
+        <option value="crowd">Crowded table · ×2</option>
+      </select>
       <button class="go" id="m-deal">Deal · 10</button>
     </div>
+    <p class="modeinfo" id="m-info"></p>
   </div>
   <div class="board">
     <div class="stat"><b id="m-round">1</b><span>Round</span></div>
@@ -255,13 +304,13 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
     <div class="stat"><b id="m-best">0</b><span>Best streak</span></div>
     <div class="stat"><b id="m-cardsn">3</b><span>Cards</span></div>
   </div>
-  <p class="rules">Each deal costs 10 chips. Harder modes shuffle longer and faster, and pay more. Every win adds swaps and speeds the dealer up, and a fourth and fifth card join at rounds 4 and 7. A miss sends you back to round 1.<br>Keys: <kbd>Space</kbd> or <kbd>D</kbd> deal, <kbd>1</kbd>–<kbd>5</kbd> pick a spot.</p>
+  <p class="rules">Each deal costs 10 chips. The speed sets how long and fast the shuffle runs; the variant changes the table, and harder variants multiply the payout. In Classic, every win adds swaps and a fourth and fifth card join at rounds 4 and 7. A miss sends you back to round 1.<br>Keys: <kbd>Space</kbd> or <kbd>D</kbd> deal, <kbd>1</kbd>–<kbd>5</kbd> pick a spot.</p>
 </section>
 
 <!-- Higher or Lower -->
 <section class="view" id="v-hilo" hidden>
   <div class="table">
-    <svg class="print" viewBox="0 0 400 120" aria-hidden="true"><path id="arc-h" d="M20,104 Q200,4 380,104" fill="none"/><text><textPath href="#arc-h" startOffset="50%" text-anchor="middle">ACES LOW · KINGS HIGH</textPath></text></svg>
+    <svg class="print" viewBox="0 0 400 120" aria-hidden="true"><path id="arc-h" d="M20,104 Q200,4 380,104" fill="none"/><text><textPath href="#arc-h" startOffset="50%" text-anchor="middle">CALL THE NEXT CARD</textPath></text></svg>
     <p class="status" aria-live="polite" id="h-status">Bet 10 chips to draw the first card.</p>
     <div class="duel">
       <div class="seat"><p class="label">Showing</p><div id="h-cur"><div class="slot"></div></div></div>
@@ -269,16 +318,19 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
       <div class="seat"><p class="label">Next</p><div id="h-next"><div class="slot"></div></div></div>
     </div>
     <div class="run" id="h-run" aria-label="Cards drawn this round"></div>
-    <div class="odds">
-      <div id="h-boxh">Higher <b id="h-oh">—</b><span id="h-ph"></span></div>
-      <div id="h-boxl">Lower <b id="h-ol">—</b><span id="h-pl"></span></div>
-    </div>
+    <div class="odds" id="h-odds"></div>
+    <div class="controls" id="h-calls" aria-label="Your call"></div>
     <div class="controls">
+      <select id="h-mode" aria-label="Game">
+        <option value="hilo">Higher or Lower</option>
+        <option value="color">Red or Black</option>
+        <option value="suit">Call the suit</option>
+        <option value="seven">Over or under 7</option>
+      </select>
       <button class="go" id="h-deal">Deal · 10</button>
-      <button class="alt" id="h-hi" disabled>Higher ▲</button>
-      <button class="alt" id="h-lo" disabled>Lower ▼</button>
       <button class="go" id="h-cash" disabled>Cash out</button>
     </div>
+    <p class="modeinfo" id="h-info"></p>
   </div>
   <div class="board">
     <div class="stat"><b id="h-pot">—</b><span>Pot</span></div>
@@ -286,13 +338,13 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
     <div class="stat"><b id="h-best">0</b><span>Best cash-out</span></div>
     <div class="stat"><b id="h-left">52</b><span>Cards left</span></div>
   </div>
-  <p class="rules">Aces are low and kings are high. Each correct call multiplies the pot by the odds against it, so a long-shot call pays far more than a safe one. A matching rank is a push. Cash out at any time after your first correct call; one wrong call loses the pot.<br>Keys: <kbd>Space</kbd> or <kbd>D</kbd> deal, <kbd>H</kbd> higher, <kbd>L</kbd> lower, <kbd>C</kbd> cash out.</p>
+  <p class="rules">Bet 10 chips, then keep calling the next card. Every correct call multiplies the pot by the odds against it, worked out from the cards still in the deck, so a long shot pays far more than a safe call. Cash out at any time after your first correct call; one wrong call loses the pot.<br>Keys: <kbd>Space</kbd> or <kbd>D</kbd> deal, <kbd>C</kbd> cash out; each call shows its key.</p>
 </section>
 
 <!-- Memory -->
 <section class="view" id="v-memory" hidden>
   <div class="table">
-    <svg class="print" viewBox="0 0 400 120" aria-hidden="true"><path id="arc-mm" d="M20,104 Q200,4 380,104" fill="none"/><text><textPath href="#arc-mm" startOffset="50%" text-anchor="middle">MATCH RANK AND SUIT</textPath></text></svg>
+    <svg class="print" viewBox="0 0 400 120" aria-hidden="true"><path id="arc-mm" d="M20,104 Q200,4 380,104" fill="none"/><text><textPath href="#arc-mm" startOffset="50%" text-anchor="middle">REMEMBER EVERY CARD</textPath></text></svg>
     <p class="status" aria-live="polite" id="mm-status">Find every pair. Fewer moves earn more chips.</p>
     <div class="mem-grid" id="mm-grid"></div>
     <div class="controls">
@@ -301,28 +353,36 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
         <option value="normal" selected>Normal · 8 pairs</option>
         <option value="hard">Hard · 10 pairs</option>
       </select>
+      <select id="mm-mode" aria-label="Variant">
+        <option value="classic">Classic</option>
+        <option value="clock">Against the clock</option>
+        <option value="strikes">Strikes · ×2</option>
+        <option value="ranks">Rank pairs</option>
+      </select>
       <button class="go" id="mm-new">New board</button>
     </div>
+    <p class="modeinfo" id="mm-info"></p>
   </div>
   <div class="board">
     <div class="stat"><b id="mm-moves">0</b><span>Moves</span></div>
     <div class="stat"><b id="mm-pairs">0/8</b><span>Pairs</span></div>
-    <div class="stat"><b id="mm-time">0:00</b><span>Time</span></div>
+    <div class="stat"><b id="mm-time">0:00</b><span id="mm-timel">Time</span></div>
     <div class="stat"><b id="mm-best">—</b><span>Best moves · time</span></div>
   </div>
-  <p class="rules">Free to play. Turn over two cards per move; a pair must match rank and suit. A perfect board pays 12 chips per pair, and each extra move costs 3, down to a minimum of 5.<br>Keys: <kbd>Space</kbd> or <kbd>N</kbd> new board.</p>
+  <p class="rules">Free to play. Turn over two cards per move. A perfect board pays 12 chips per pair, and each extra move costs 3, down to a minimum of 5. Each size and variant keeps its own best.<br>Keys: <kbd>Space</kbd> or <kbd>N</kbd> new board.</p>
 </section>
 
 <!-- Blackjack -->
 <section class="view" id="v-blackjack" hidden>
   <div class="table">
     <svg class="print" viewBox="0 0 400 150" aria-hidden="true"><path id="arc-b1" d="M10,90 Q200,-10 390,90" fill="none"/><path id="arc-b2" d="M40,130 Q200,40 360,130" fill="none"/>
-      <text><textPath href="#arc-b1" startOffset="50%" text-anchor="middle">BLACKJACK PAYS 3 TO 2</textPath></text>
-      <text style="font-size:14px;letter-spacing:2px"><textPath href="#arc-b2" startOffset="50%" text-anchor="middle">DEALER STANDS ON ALL 17s</textPath></text></svg>
+      <text><textPath id="b-print1" href="#arc-b1" startOffset="50%" text-anchor="middle">BLACKJACK PAYS 3 TO 2</textPath></text>
+      <text style="font-size:14px;letter-spacing:2px"><textPath id="b-print2" href="#arc-b2" startOffset="50%" text-anchor="middle">DEALER STANDS ON ALL 17s</textPath></text></svg>
     <div class="seat"><p class="label">Dealer</p><div class="hand" id="b-dealer"><div class="slot"></div><div class="slot"></div></div><div class="total" id="b-dt"></div></div>
-    <p class="status" aria-live="polite" id="b-status">Pick a bet and deal. Dealer stands on all 17s.</p>
+    <p class="status" aria-live="polite" id="b-status">Pick a bet and deal.</p>
     <p class="hint" id="b-hint" hidden></p>
     <div class="seat"><div class="bj-hands" id="b-player"><div class="seat bj-hand"><div class="total"></div><div class="hand"><div class="slot"></div><div class="slot"></div></div></div></div><p class="label">You</p></div>
+    <p class="sideline" id="b-side" aria-live="polite"></p>
     <div class="chips" id="b-chips" role="group" aria-label="Bet">
       <button class="chipbtn" style="--c:#2f6fb0" data-bet="10" aria-pressed="true">10</button>
       <button class="chipbtn" style="--c:#2d8a4e" data-bet="25" aria-pressed="false">25</button>
@@ -335,7 +395,18 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
       <button class="alt" id="b-stand" disabled>Stand</button>
       <button class="alt" id="b-double" disabled>Double</button>
       <button class="alt" id="b-split" disabled>Split</button>
+      <button class="alt" id="b-surr" disabled>Surrender</button>
     </div>
+    <div class="controls">
+      <select id="b-rules" aria-label="Rules">
+        <option value="classic">Classic · 4 decks</option>
+        <option value="vegas">Vegas · 6 decks, H17</option>
+        <option value="single">Single deck · 6:5</option>
+        <option value="charlie">Five-card Charlie</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="b-pp"> Perfect Pairs · 10</label>
+    </div>
+    <p class="modeinfo" id="b-info"></p>
   </div>
   <div class="board">
     <div class="stat"><b id="b-won">0</b><span>Hands won</span></div>
@@ -343,7 +414,7 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
     <div class="stat"><b id="b-bj">0</b><span>Blackjacks</span></div>
     <div class="stat"><b id="b-shoe">208</b><span>Cards in shoe</span></div>
   </div>
-  <p class="rules">Four-deck shoe, reshuffled below 52 cards. Blackjack pays 3 to 2, other wins pay even money, and ties push. Double down on two cards to double your bet and take exactly one more card. Split any pair of equal value into two hands for a second bet.<br>Keys: <kbd>Space</kbd> or <kbd>D</kbd> deal, <kbd>H</kbd> hit, <kbd>S</kbd> stand, <kbd>X</kbd> double, <kbd>P</kbd> split.</p>
+  <p class="rules">Wins pay even money and ties push. Double down on two cards to double your bet and take one more card. Split any pair of equal value into two hands. Surrender your first two cards to get half your bet back. The Perfect Pairs side bet pays 6 to 1 for a mixed pair, 12 to 1 for a pair of one color, and 25 to 1 for a pair of one suit.<br>Keys: <kbd>Space</kbd> or <kbd>D</kbd> deal, <kbd>H</kbd> hit, <kbd>S</kbd> stand, <kbd>X</kbd> double, <kbd>P</kbd> split, <kbd>R</kbd> surrender.</p>
 </section>
 
 <!-- War -->
@@ -353,7 +424,7 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
     <p class="status" aria-live="polite" id="w-status">Pick a bet and flip. High card wins.</p>
     <div class="war-field">
       <div class="seat"><p class="label">You</p><div class="hand" id="w-you"><div class="slot"></div></div></div>
-      <div class="burn"><div class="vs">vs</div><div class="potspot" id="w-pot" aria-live="polite"></div><div class="hand" id="w-burn"></div></div>
+      <div class="burn"><div class="vs">vs</div><div class="score" id="w-score" hidden></div><div class="potspot" id="w-pot" aria-live="polite"></div><div class="hand" id="w-burn"></div></div>
       <div class="seat"><p class="label">Dealer</p><div class="hand" id="w-them"><div class="slot"></div></div></div>
     </div>
     <div class="chips" id="w-chips" role="group" aria-label="Bet">
@@ -367,6 +438,14 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
       <button class="go" id="w-war" hidden>Go to war</button>
       <button class="alt" id="w-surrender" hidden>Surrender half</button>
     </div>
+    <div class="controls">
+      <select id="w-mode" aria-label="Mode">
+        <option value="classic">Classic</option>
+        <option value="match">Best of seven</option>
+      </select>
+      <label class="toggle" id="w-tiewrap"><input type="checkbox" id="w-tie"> Tie bet · 10</label>
+    </div>
+    <p class="modeinfo" id="w-info"></p>
   </div>
   <div class="board">
     <div class="stat"><b id="w-won">0</b><span>Battles won</span></div>
@@ -374,7 +453,39 @@ kbd { font: 700 .72rem var(--body); padding: 1px 6px; border-radius: 4px; border
     <div class="stat"><b id="w-wars">0</b><span>Wars fought</span></div>
     <div class="stat"><b id="w-left">52</b><span>Cards left</span></div>
   </div>
-  <p class="rules">Aces are high. A higher card wins even money. On a tie you can surrender and take back half your bet, or go to war: match your bet, three cards are burned face down, and the next cards decide it. Winning a war pays the raise; tying a war pays a bonus.<br>Keys: <kbd>Space</kbd> or <kbd>F</kbd> flip, <kbd>W</kbd> go to war, <kbd>R</kbd> surrender.</p>
+  <p class="rules">Aces are high. In Classic, a higher card wins even money. On a tie you can surrender half your bet or go to war: match your bet, three cards are burned, and the next cards decide it. The Tie side bet pays 10 to 1 when the first two cards tie. In Best of seven, one bet covers a whole match: the first to win four battles takes it, and ties are flipped again.<br>Keys: <kbd>Space</kbd> or <kbd>F</kbd> flip, <kbd>W</kbd> go to war, <kbd>R</kbd> surrender.</p>
+</section>
+
+<!-- Video Poker -->
+<section class="view" id="v-poker" hidden>
+  <div class="table">
+    <svg class="print top" viewBox="0 0 400 120" aria-hidden="true"><path id="arc-p" d="M20,104 Q200,4 380,104" fill="none"/><text><textPath id="p-print" href="#arc-p" startOffset="50%" text-anchor="middle">JACKS OR BETTER</textPath></text></svg>
+    <p class="status" aria-live="polite" id="p-status">Pick a bet and deal five cards.</p>
+    <div class="vp-hand" id="p-hand"></div>
+    <table class="paytable" id="p-pay" aria-label="Pay table"></table>
+    <div class="chips" id="p-chips" role="group" aria-label="Bet">
+      <button class="chipbtn" style="--c:#2f6fb0" data-bet="10" aria-pressed="true">10</button>
+      <button class="chipbtn" style="--c:#2d8a4e" data-bet="25" aria-pressed="false">25</button>
+      <button class="chipbtn" style="--c:#1b1b1b" data-bet="50" aria-pressed="false">50</button>
+      <button class="chipbtn" style="--c:#7a2fa0" data-bet="100" aria-pressed="false">100</button>
+    </div>
+    <div class="controls">
+      <select id="p-mode" aria-label="Game">
+        <option value="job">Jacks or Better</option>
+        <option value="bonus">Bonus Poker</option>
+        <option value="deuces">Deuces Wild</option>
+      </select>
+      <button class="go" id="p-deal">Deal · 10</button>
+    </div>
+    <p class="modeinfo" id="p-info"></p>
+  </div>
+  <div class="board">
+    <div class="stat"><b id="p-played">0</b><span>Hands played</span></div>
+    <div class="stat"><b id="p-won">0</b><span>Paying hands</span></div>
+    <div class="stat"><b id="p-bestwin">0</b><span>Biggest payout</span></div>
+    <div class="stat"><b id="p-royals">0</b><span>Royal flushes</span></div>
+  </div>
+  <p class="rules">Deal five cards, tap the ones you want to keep, then draw replacements for the rest. The pay table shows what each hand returns for your bet, including the bet itself. In Deuces Wild every 2 counts as any card, and the lowest paying hand is three of a kind.<br>Keys: <kbd>Space</kbd> or <kbd>D</kbd> deal and draw, <kbd>1</kbd>–<kbd>5</kbd> hold a card.</p>
 </section>
 
 <script>
@@ -437,6 +548,7 @@ const calm = { get matches() { return calmQuery.matches || prefs.still; } };
 document.documentElement.classList.toggle('still', !!prefs.still);
 
 // ---- Chip bank shared by every table ----
+var trophiesReady = false; // set once the trophy list below exists
 let chips = store.get('chips', 200);
 let shown = null, tween = 0;
 function setChips(v, quiet) {
@@ -449,7 +561,7 @@ function setChips(v, quiet) {
   }
   const peak = Math.max(chips, store.get('peak', 200)); store.set('peak', peak);
   $('purse').title = `${chips} chips, shared by every table. Peak bank: ${peak}.`;
-  $('rebuy').hidden = chips >= 10;
+  $('rebuy').hidden = chips >= 10; if (chips >= 1000 && trophiesReady) trophy('bank');
   const from = shown ?? chips, to = chips, t0 = performance.now(); cancelAnimationFrame(tween);
   const tick = t => { const k = Math.min(1, (t - t0) / 450); shown = Math.round(from + (to - from) * (1 - (1 - k) ** 3)); $('chips').textContent = shown; if (k < 1) tween = requestAnimationFrame(tick); };
   if (quiet || calm.matches) { shown = chips; $('chips').textContent = chips; } else tween = requestAnimationFrame(tick);
@@ -463,7 +575,7 @@ const broke = n => `You need ${n} chips for that. Buy back in at the top.`;
 
 // ---- Ledger of recent results across tables ----
 let ledgerItems = store.get('ledger', []);
-const LEDGER_VIEW = { Queen: 'monte', 'Hi-Lo': 'hilo', Memory: 'memory', Blackjack: 'blackjack', War: 'war' };
+const LEDGER_VIEW = { Queen: 'monte', 'Hi-Lo': 'hilo', Memory: 'memory', Blackjack: 'blackjack', War: 'war', Poker: 'poker' };
 function drawLedger(fresh) {
   $('ledger').innerHTML = ledgerItems.length
     ? ledgerItems.map((e, i) => `<li${fresh && i === 0 ? ' class="new"' : ''}><a href="#${LEDGER_VIEW[e.t] || 'monte'}">${e.t} <b class="${e.n > 0 ? 'gain' : e.n < 0 ? 'loss' : ''}">${e.n > 0 ? '+' : ''}${e.n}</b></a></li>`).join('')
@@ -471,6 +583,42 @@ function drawLedger(fresh) {
 }
 function ledger(table, net) { ledgerItems.unshift({ t: table, n: Math.round(net) }); ledgerItems = ledgerItems.slice(0, 10); store.set('ledger', ledgerItems); drawLedger(true); }
 drawLedger(false);
+
+// ---- Trophies ----
+const TROPHIES = [
+  ['sharp', '👁', 'Sharp eye', 'Find the Queen on Insane or God speed.'],
+  ['quick', '⚡', 'Quick hands', 'Win a Quick draw round of Find the Queen.'],
+  ['streak', '🔥', 'Hot streak', 'Find the Queen five times in a row.'],
+  ['longshot', '🎯', 'Long shot', 'Win a call with under 30% odds.'],
+  ['highroller', '💰', 'High roller', 'Cash out 100 or more in Higher or Lower.'],
+  ['recall', '🧠', 'Total recall', 'Clear a Memory board without a single miss.'],
+  ['clock', '⏱', 'Beat the clock', 'Clear a Memory board against the clock.'],
+  ['bj', '🂡', 'Twenty-one', 'Be dealt a blackjack.'],
+  ['charlie', '🖐', 'Charlie', 'Win with a five-card Charlie.'],
+  ['perfect', '💎', 'Perfect pair', 'Hit a perfect pair on the side bet.'],
+  ['war', '⚔', 'Battle won', 'Go to war and win.'],
+  ['match', '🏅', 'Match point', 'Win a best-of-seven War match.'],
+  ['boat', '🃏', 'Full house', 'Draw a full house or better in Video Poker.'],
+  ['royal', '👑', 'Royal treatment', 'Draw a royal flush.'],
+  ['bank', '🏦', 'Bank builder', 'Grow your bank to 1,000 chips.'],
+];
+const earned = new Set(store.get('trophies', []));
+function drawTrophies() {
+  $('cup-list').innerHTML = TROPHIES.map(([id, icon, name, desc]) => `<li class="${earned.has(id) ? 'got' : ''}"><i aria-hidden="true">${icon}</i><span><b>${name}</b><small>${desc}${earned.has(id) ? '' : ' Locked.'}</small></span></li>`).join('');
+  $('cup-count').textContent = earned.size; $('cup-total').textContent = TROPHIES.length;
+  $('cup').setAttribute('aria-label', `Trophies, ${earned.size} of ${TROPHIES.length}`);
+}
+let toastTimer = 0;
+function trophy(id) {
+  if (earned.has(id)) return;
+  const t = TROPHIES.find(x => x[0] === id); if (!t) return;
+  earned.add(id); store.set('trophies', [...earned]); drawTrophies();
+  const el = $('toast'); el.innerHTML = `<span aria-hidden="true">${t[1]}</span><span>Trophy unlocked: <b>${t[2]}</b></span>`;
+  el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+  setTimeout(() => [784, 1047, 1319].forEach((f, i) => tone(f, .18, 'sine', .12, i * .07)), 500);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 3600);
+}
+drawTrophies(); trophiesReady = true; if (chips >= 1000) trophy('bank');
 
 // ---- Confetti of suits for big wins ----
 const fx = $('fx');
@@ -545,28 +693,46 @@ function pickBet(groupId, onPick) {
   return dis => btns.forEach(b => b.disabled = dis);
 }
 // Remember each table's mode and board size.
-for (const id of ['m-mode', 'mm-size']) {
+for (const id of ['m-mode', 'm-var', 'mm-size', 'mm-mode', 'h-mode', 'b-rules', 'w-mode', 'p-mode']) {
   const el = $(id), v = store.get('sel-' + id, null);
   if (v && [...el.options].some(o => o.value === v)) el.value = v;
   el.addEventListener('change', () => store.set('sel-' + id, el.value));
+}
+for (const id of ['b-pp', 'w-tie']) {
+  const el = $(id); el.checked = !!store.get('opt-' + id, false);
+  el.addEventListener('change', () => store.set('opt-' + id, el.checked));
 }
 let refreshHint = () => {};
 const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).classList.toggle('live', !!on);
 
 // ---- Table 1: Find the Queen ----
 (() => {
-  const wrap = $('m-cards'), st = $('m-status'), btn = $('m-deal');
-  const ALL = [{ r: 'Q', s: '♥', red: true, queen: true }, { r: 'J', s: '♠' }, { r: 'K', s: '♣' }, { r: 'J', s: '♦', red: true }, { r: 'K', s: '♠' }];
-  let cards = [], slots = [], round = 1, streak = 0, best = store.get('best', 0), canPick = false, w = 0, cw = 0;
-  const count = () => round >= 7 ? 5 : round >= 4 ? 4 : 3;
-  const layout = () => cards.forEach((c, i) => { c.style.left = (slots[i] * w + w / 2 - cw / 2) + '%'; c.dataset.spot = slots[i] + 1; c.setAttribute('aria-label', c.classList.contains('down') ? `Face-down card in spot ${slots[i] + 1}` : `${nameOf({ ...ALL[i], v: RANKS.indexOf(ALL[i].r) + 1 })}, spot ${slots[i] + 1}`); });
+  const wrap = $('m-cards'), st = $('m-status'), btn = $('m-deal'), speedSel = $('m-mode'), varSel = $('m-var'), prog = $('m-prog'), bar = prog.firstElementChild;
+  const VARIANTS = {
+    classic: { x: 1, info: 'Follow the Queen of Hearts through the shuffle.' },
+    decoy: { x: 1.5, info: 'The Queen of Diamonds sits in as a decoy. Only the Queen of Hearts wins.' },
+    quick: { x: 1.5, info: 'After the shuffle you have 3 seconds to pick, or the hand is lost.' },
+    crowd: { x: 2, info: 'All five cards are on the table from the first round.' },
+  };
+  const BASE = [{ r: 'Q', s: '♥', red: true, queen: true }, { r: 'J', s: '♠' }, { r: 'K', s: '♣' }, { r: 'J', s: '♦', red: true }, { r: 'K', s: '♠' }];
+  let ALL = BASE, cards = [], slots = [], round = 1, streak = 0, best = store.get('best', 0), canPick = false, w = 0, cw = 0, built = '', timer = 0;
+  const variant = () => VARIANTS[varSel.value];
+  const prize = () => Math.round(+speedSel.value.split(',')[2] * variant().x);
+  const count = () => varSel.value === 'crowd' ? 5 : round >= 7 ? 5 : round >= 4 ? 4 : 3;
+  const info = () => { $('m-info').textContent = `${variant().info} A win pays ${prize()}.`; };
+  const cardName = i => nameOf({ ...ALL[i], v: RANKS.indexOf(ALL[i].r) + 1 });
+  const layout = () => cards.forEach((c, i) => {
+    c.style.left = (slots[i] * w + w / 2 - cw / 2) + '%'; c.dataset.spot = c.dataset.key = slots[i] + 1;
+    c.setAttribute('aria-label', c.classList.contains('down') ? `Face-down card in spot ${slots[i] + 1}` : `${cardName(i)}, spot ${slots[i] + 1}`);
+  });
   function build() {
-    wrap.innerHTML = ''; cards = []; const n = count();
+    ALL = varSel.value === 'decoy' ? [BASE[0], { r: 'Q', s: '♦', red: true }, ...BASE.slice(2)] : BASE;
+    wrap.innerHTML = ''; cards = []; const n = count(); built = varSel.value + n;
     slots = [...Array(n).keys()]; w = 100 / n;
     cw = Math.min(0.88 * 46 * 5 / 7, w * 0.86); // card width as a % of the table width
     ALL.slice(0, n).forEach((f, i) => {
       const b = document.createElement('button');
-      b.className = 'card'; b.setAttribute('aria-label', `Card ${i + 1}`);
+      b.className = 'card';
       b.innerHTML = `<div class="inner"><div class="face${f.red ? ' red' : ''}" data-c="${short(f)}">${faceHTML(f)}</div><div class="back"></div></div>`;
       b.style.width = cw + '%'; b.style.marginTop = '5%'; b.style.setProperty('--cwp', cw);
       b.onclick = () => pick(i);
@@ -576,21 +742,22 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
     layout(); paint();
   }
   function paint() {
-    $('m-round').textContent = round; $('m-streak').textContent = streak; $('m-best').textContent = best; $('m-cardsn').textContent = count();
+    $('m-round').textContent = round; $('m-streak').textContent = streak; $('m-best').textContent = best; $('m-cardsn').textContent = count(); info();
   }
+  const lockSelects = on => { speedSel.disabled = varSel.disabled = on; };
   async function shuffle() {
     if (!pay(10)) { say(st, broke(10), 'lose'); return; }
-    btn.disabled = true; $('m-mode').disabled = true; canPick = false; setLive('monte', true);
-    if (cards.length !== count()) { build(); await wait(500); }
+    btn.disabled = true; lockSelects(true); canPick = false; setLive('monte', true);
+    if (built !== varSel.value + count()) { build(); await wait(500); }
     cards.forEach(c => c.classList.remove('glow', 'dim', 'down'));
-    say(st, 'Keep your eye on her...');
+    say(st, varSel.value === 'decoy' ? 'Two red queens. Keep your eye on the heart...' : 'Keep your eye on her...');
     await wait(700);
     cards.forEach(c => c.classList.add('down')); sfx.flip(); layout();
     await wait(550);
-    const [baseSwaps, baseMs] = $('m-mode').value.split(',').map(Number);
-    const n = cards.length, swaps = baseSwaps + round * 2, ms = Math.max(Math.round(baseMs * 0.6), baseMs - round * 20);
+    const [baseSwaps, baseMs] = speedSel.value.split(',').map(Number);
+    const n = cards.length, swaps = baseSwaps + round * 2 + (n - 3) * 2, ms = Math.max(Math.round(baseMs * 0.6), baseMs - round * 20);
     cards.forEach(c => c.style.setProperty('--spd', ms / 1000 + 's'));
-    const prog = $('m-prog'), bar = prog.firstElementChild; prog.hidden = false;
+    prog.hidden = false;
     for (let k = 0; k < swaps; k++) {
       const pct = Math.round((k + 1) / swaps * 100); bar.style.width = pct + '%'; prog.setAttribute('aria-valuenow', pct);
       const a = Math.floor(Math.random() * n), b = (a + 1 + Math.floor(Math.random() * (n - 1))) % n;
@@ -601,51 +768,74 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
       cards[ia].classList.remove('lift'); cards[ib].classList.remove('dip');
     }
     await sleep(150); prog.hidden = true; bar.style.width = '0';
-    say(st, 'Where is the Queen? Pick a card.');
     canPick = true; wrap.classList.add('pickable');
+    if (varSel.value === 'quick') {
+      say(st, 'Quick! Pick a card in 3 seconds.');
+      prog.hidden = false; prog.classList.add('countdown'); bar.style.transition = 'none'; bar.style.width = '100%'; void bar.offsetWidth;
+      bar.style.transition = 'width 3s linear'; bar.style.width = '0';
+      timer = setTimeout(() => pick(-1), 3000);
+    } else say(st, 'Where is the Queen? Pick a card.');
   }
   async function pick(i) {
     if (!canPick) return; canPick = false; wrap.classList.remove('pickable');
-    cards[i].classList.remove('down'); sfx.flip();
-    await wait(500);
-    const q = ALL.findIndex(f => f.queen), prize = +$('m-mode').value.split(',')[2];
+    clearTimeout(timer); prog.hidden = true; prog.classList.remove('countdown'); bar.style.transition = ''; bar.style.width = '0';
+    if (i >= 0) { cards[i].classList.remove('down'); sfx.flip(); await wait(500); }
+    const q = ALL.findIndex(f => f.queen), p = prize();
     if (i === q) {
-      award(prize); streak++; round++; cards[i].classList.add('glow'); prize >= 70 ? bigWin() : sfx.win(); ledger('Queen', prize - 10);
+      award(p); streak++; round++; cards[i].classList.add('glow'); p >= 70 ? bigWin() : sfx.win(); ledger('Queen', p - 10);
+      if (speedSel.selectedIndex >= 3) trophy('sharp'); if (varSel.value === 'quick') trophy('quick'); if (streak >= 5) trophy('streak');
       if (streak > best) { best = streak; store.set('best', best); }
-      say(st, `Found her! +${prize} chips. ` + (round === 4 || round === 7 ? 'Another card joins the table.' : 'The dealer speeds up.'), 'win');
+      const grows = varSel.value !== 'crowd' && (round === 4 || round === 7);
+      say(st, `Found her! +${p} chips. ` + (grows ? 'Another card joins the table.' : 'The dealer speeds up.'), 'win');
     } else {
-      cards[q].classList.add('glow'); cards[i].classList.add('dim', 'shake'); setTimeout(() => cards[i].classList.remove('shake'), 500);
-      say(st, `Not this time. The Queen was in spot ${slots[q] + 1}. Back to round 1.`, 'lose');
+      cards[q].classList.add('glow');
+      if (i >= 0) { cards[i].classList.add('dim', 'shake'); setTimeout(() => cards[i].classList.remove('shake'), 500); }
+      const decoy = i >= 0 && ALL[i].r === 'Q' ? ' You found the decoy.' : '';
+      say(st, (i < 0 ? 'Too slow! ' : 'Not this time.' + decoy + ' ') + `The Queen was in spot ${slots[q] + 1}. Back to round 1.`, 'lose');
       streak = 0; round = 1; sfx.lose(); ledger('Queen', -10);
     }
     cards.forEach(c => c.classList.remove('down')); layout();
-    btn.textContent = 'Deal again · 10'; btn.disabled = false; $('m-mode').disabled = false; setLive('monte', false); paint();
+    btn.textContent = 'Deal again · 10'; btn.disabled = false; lockSelects(false); setLive('monte', false); paint();
   }
   btn.onclick = shuffle;
+  varSel.addEventListener('change', () => { round = 1; streak = 0; build(); say(st, `${varSel.options[varSel.selectedIndex].text.split(' ·')[0]}. Watch the Queen of Hearts, then deal.`); });
+  speedSel.addEventListener('change', info);
   build();
 })();
 
-// ---- Table 2: Higher or Lower ----
+// ---- Table 2: Higher or Lower (and other calls) ----
 (() => {
-  const st = $('h-status'), curS = $('h-cur'), nextS = $('h-next'), hi = $('h-hi'), lo = $('h-lo'), cash = $('h-cash'), deal = $('h-deal');
+  const st = $('h-status'), curS = $('h-cur'), nextS = $('h-next'), cash = $('h-cash'), deal = $('h-deal'), sel = $('h-mode'), callsEl = $('h-calls'), oddsEl = $('h-odds');
+  const MODES = {
+    hilo: { info: 'Aces are low and kings are high. A matching rank is a push.', push: (c, cur) => c.v === cur.v,
+      calls: cur => [{ key: 'h', label: 'Higher ▲', test: c => c.v > cur.v }, { key: 'l', label: 'Lower ▼', test: c => c.v < cur.v }] },
+    color: { info: 'Call the color of the next card.',
+      calls: () => [{ key: 'r', label: 'Red', test: c => c.red, red: true }, { key: 'b', label: 'Black', test: c => !c.red }] },
+    suit: { info: 'Call the suit of the next card. Long odds, long pay.',
+      calls: () => SUITS.map((s, i) => ({ key: String(i + 1), label: `${s.s}︎ ${SUIT_NAMES[s.s]}`, test: c => c.s === s.s, red: s.red })) },
+    seven: { info: 'Will the next card be under 7, exactly 7, or over 7? Aces are low.',
+      calls: () => [{ key: 'u', label: 'Under 7', test: c => c.v < 7 }, { key: 's', label: 'Seven', test: c => c.v === 7 }, { key: 'o', label: 'Over 7', test: c => c.v > 7 }] },
+  };
   let d = deck(), cur = null, pot = 0, steps = 0, live = false, busy = false, best = store.get('hilo-best', 0), run = [];
-  const drawRun = () => $('h-run').innerHTML = run.map((x, i) => (i ? `<i>${x.dir > 0 ? '▲' : x.dir < 0 ? '▼' : '='}</i>` : '') + `<span class="${x.c.red ? 'red' : ''}">${short(x.c)}</span>`).join('');
-  const odds = () => ({ h: d.filter(c => c.v > cur.v).length / d.length, l: d.filter(c => c.v < cur.v).length / d.length });
+  const mode = () => MODES[sel.value];
+  const drawRun = () => $('h-run').innerHTML = run.map((x, i) => (i ? `<i>${sel.value !== 'hilo' ? '·' : x.dir > 0 ? '▲' : x.dir < 0 ? '▼' : '='}</i>` : '') + `<span class="${x.c.red ? 'red' : ''}">${short(x.c)}</span>`).join('');
+  const chance = test => d.filter(test).length / d.length;
   const mult = p => p > 0 ? 0.95 / p : 0;
   function show() {
     $('h-pot').textContent = live ? pot : '—'; $('h-steps').textContent = steps; $('h-best').textContent = best; $('h-left').textContent = d.length;
-    if (live && cur) {
-      const o = odds();
-      $('h-oh').textContent = Math.round(o.h * 100) + '%'; $('h-ol').textContent = Math.round(o.l * 100) + '%';
-      $('h-ph').textContent = o.h ? `pays ×${mult(o.h).toFixed(2)}` : 'impossible';
-      $('h-pl').textContent = o.l ? `pays ×${mult(o.l).toFixed(2)}` : 'impossible';
-      hi.disabled = busy || !o.h; lo.disabled = busy || !o.l;
-      $('h-boxh').classList.toggle('fav', o.h > o.l); $('h-boxl').classList.toggle('fav', o.l > o.h);
-    } else {
-      ['h-oh', 'h-ol'].forEach(id => $(id).textContent = '—'); ['h-ph', 'h-pl'].forEach(id => $(id).textContent = '');
-      hi.disabled = lo.disabled = true; $('h-boxh').classList.remove('fav'); $('h-boxl').classList.remove('fav');
-    }
-    cash.disabled = !live || busy || steps === 0; deal.disabled = live || busy;
+    $('h-info').textContent = mode().info;
+    const on = live && cur, calls = mode().calls(cur || { v: 7 }), ps = calls.map(c => on ? chance(c.test) : null);
+    const top = Math.max(...ps.map(p => p ?? 0)), unique = ps.filter(p => p === top).length === 1;
+    callsEl.innerHTML = ''; oddsEl.innerHTML = ''; oddsEl.style.setProperty('--n', calls.length);
+    calls.forEach((c, i) => {
+      const b = document.createElement('button');
+      b.className = 'alt' + (c.red ? ' redtxt' : ''); b.dataset.key = c.key; b.disabled = !on || busy || !ps[i];
+      b.innerHTML = `${c.label} <kbd>${c.key.toUpperCase()}</kbd>`; b.onclick = () => guess(c, ps[i]); callsEl.appendChild(b);
+      const o = document.createElement('div'); if (on && unique && ps[i] === top) o.className = 'fav';
+      o.innerHTML = `${c.label}<b>${ps[i] == null ? '—' : Math.round(ps[i] * 100) + '%'}</b><span>${ps[i] == null ? '' : ps[i] ? `pays ×${mult(ps[i]).toFixed(2)}` : 'impossible'}</span>`;
+      oddsEl.appendChild(o);
+    });
+    cash.disabled = !live || busy || steps === 0; deal.disabled = live || busy; sel.disabled = live || busy;
     cash.textContent = live && steps ? `Cash out ${pot}` : 'Cash out'; setLive('hilo', live);
   }
   function put(slot, c, down) { slot.innerHTML = ''; const el = cardEl(c, down); slot.appendChild(el); return el; }
@@ -654,17 +844,17 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
     if (d.length < 20) d = deck();
     cur = d.pop(); pot = 10; steps = 0; live = true;
     put(curS, cur); nextS.innerHTML = '<div class="slot"></div>'; sfx.deal(); run = [{ c: cur }]; drawRun();
-    say(st, `${nameOf(cur)}. Will the next card be higher or lower?`); show();
+    say(st, `${nameOf(cur)}. Make your call.`); show();
   }
-  async function guess(up) {
+  async function guess(call, p) {
     busy = true; show();
-    const p = up ? odds().h : odds().l, nx = d.pop();
+    const nx = d.pop(), push = mode().push?.(nx, cur);
     const el = put(nextS, nx, true); sfx.deal();
     await wait(280); reveal(el, nx); run.push({ c: nx, dir: Math.sign(nx.v - cur.v) }); drawRun(); await wait(480);
-    if (nx.v === cur.v) { say(st, `${nameOf(nx)}, the same rank. That's a push, so call again.`); sfx.push(); }
-    else if ((nx.v > cur.v) === up) {
+    if (push) { say(st, `${nameOf(nx)}, the same rank. That's a push, so call again.`); sfx.push(); }
+    else if (call.test(nx)) {
       pot = Math.max(pot + 1, Math.floor(pot * mult(p))); steps++;
-      say(st, `${nameOf(nx)}. Correct! The pot is ${pot}.`, 'win'); el.classList.add('glow'); sfx.good();
+      say(st, `${nameOf(nx)}. Correct! The pot is ${pot}.`, 'win'); el.classList.add('glow'); p < .3 ? bigWin() : sfx.good(); if (p < .3) trophy('longshot');
     } else {
       say(st, `${nameOf(nx)}. Wrong call, and the pot of ${pot} is lost.`, 'lose'); el.classList.add('dim', 'shake'); sfx.lose(); ledger('Hi-Lo', -10);
       live = false; pot = 0; busy = false; deal.textContent = 'Deal again · 10'; show(); return;
@@ -678,29 +868,49 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
     busy = false; show();
   }
   function cashOut() {
-    award(pot); if (pot > best) { best = pot; store.set('hilo-best', best); }
+    award(pot); if (pot > best) { best = pot; store.set('hilo-best', best); } if (pot >= 100) trophy('highroller');
     say(st, `Cashed out ${pot} chips after ${steps} correct call${steps === 1 ? '' : 's'}.`, 'win'); pot >= 50 ? bigWin() : sfx.win(); ledger('Hi-Lo', pot - 10);
     live = false; deal.textContent = 'Deal again · 10'; show();
   }
-  deal.onclick = start; hi.onclick = () => guess(true); lo.onclick = () => guess(false); cash.onclick = cashOut;
+  deal.onclick = start; cash.onclick = cashOut; sel.addEventListener('change', show);
   show();
 })();
 
 // ---- Table 3: Memory ----
 (() => {
-  const grid = $('mm-grid'), st = $('mm-status'), sel = $('mm-size');
+  const grid = $('mm-grid'), st = $('mm-status'), sel = $('mm-size'), varSel = $('mm-mode');
   const SIZES = { easy: { pairs: 6, cols: 4 }, normal: { pairs: 8, cols: 4 }, hard: { pairs: 10, cols: 5 } };
-  let size, first = null, lock = false, moves = 0, found = 0, t0 = 0, timer = null, done = false;
-  const bests = store.get('mem-best', {});
-  const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  const clock = () => { $('mm-time').textContent = fmt(t0 ? Math.floor((Date.now() - t0) / 1000) : 0); };
+  const VARIANTS = {
+    classic: n => `Pairs match rank and suit. A perfect board pays ${n * 12}.`,
+    clock: n => `Clear the board in ${n * 8} seconds. Every second left is added to the prize.`,
+    strikes: n => `Pairs match rank and suit. ${strikesFor(n)} mismatches and the board is lost, but a clear pays double.`,
+    ranks: n => `Pairs match rank only: each pair is the same rank in two different suits.`,
+  };
+  const strikesFor = n => Math.ceil(n * 1.25);
+  let size, v, first = null, lock = false, moves = 0, misses = 0, found = 0, t0 = 0, timer = null, done = false;
+  const bests = store.get('mem-best', {}), times = store.get('mem-time', {});
+  const key = () => v === 'classic' ? sel.value : `${sel.value}-${v}`; // classic keeps the original keys
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
+  const elapsed = () => t0 ? Math.floor((Date.now() - t0) / 1000) : 0;
+  const limit = () => size.pairs * 8;
+  function clock() {
+    if (v === 'clock') {
+      const left = limit() - elapsed(); $('mm-time').textContent = fmt(Math.max(0, left));
+      if (t0 && !done && left <= 0) fail('Time is up.');
+    } else $('mm-time').textContent = fmt(elapsed());
+  }
   function paint() {
-    $('mm-moves').textContent = moves; $('mm-pairs').textContent = `${found}/${size.pairs}`; const bt = store.get('mem-time', {})[sel.value]; $('mm-best').textContent = sel.value in bests ? `${bests[sel.value]} · ${fmt(bt ?? 0)}` : '—'; clock();
+    $('mm-moves').textContent = v === 'strikes' ? `${moves} · ${misses}✗` : moves; $('mm-pairs').textContent = `${found}/${size.pairs}`;
+    $('mm-timel').textContent = v === 'clock' ? 'Time left' : 'Time';
+    $('mm-best').textContent = key() in bests ? `${bests[key()]} · ${fmt(times[key()] ?? 0)}` : '—'; clock();
   }
   function start() {
-    setLive('memory', false); size = SIZES[sel.value]; first = null; lock = false; moves = 0; found = 0; t0 = 0; done = false; clearInterval(timer);
-    const picks = deck().slice(0, size.pairs);
-    const cards = mix([...picks, ...picks].map(c => ({ ...c })));
+    setLive('memory', false); size = SIZES[sel.value]; v = varSel.value; first = null; lock = false; moves = 0; misses = 0; found = 0; t0 = 0; done = false; clearInterval(timer);
+    let cards;
+    if (v === 'ranks') {
+      cards = mix([...RANKS]).slice(0, size.pairs).flatMap(r => mix([...SUITS]).slice(0, 2).map(s => ({ r, v: RANKS.indexOf(r) + 1, s: s.s, red: s.red })));
+    } else { const picks = deck().slice(0, size.pairs); cards = [...picks, ...picks].map(c => ({ ...c })); }
+    mix(cards);
     grid.style.setProperty('--cols', size.cols); grid.innerHTML = '';
     cards.forEach((c, i) => {
       const b = document.createElement('button');
@@ -708,46 +918,71 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
       const el = cardEl(c, true, false); b.appendChild(el); b.card = c; b.pc = el;
       b.onclick = () => flip(b); grid.appendChild(b);
     });
-    say(st, `Find all ${size.pairs} pairs. Fewer moves earn more chips.`); paint();
+    $('mm-info').textContent = VARIANTS[v](size.pairs);
+    say(st, `Find all ${size.pairs} pairs.` + (v === 'clock' ? ' The clock starts on your first card.' : ' Fewer moves earn more chips.')); paint();
   }
+  const same = (a, b) => a.r === b.r && (v === 'ranks' || a.s === b.s);
   async function flip(b) {
     if (lock || done || b.classList.contains('found') || !b.pc.classList.contains('down')) return;
-    if (!t0) { t0 = Date.now(); timer = setInterval(clock, 1000); setLive('memory', true); }
+    if (!t0) { t0 = Date.now(); timer = setInterval(clock, 250); setLive('memory', true); }
     b.pc.classList.remove('down'); b.setAttribute('aria-label', nameOf(b.card)); sfx.flip();
     if (!first) { first = b; return; }
     moves++; const a = first; first = null;
-    if (a.card.r === b.card.r && a.card.s === b.card.s) {
+    if (same(a.card, b.card)) {
       found++; a.classList.add('found'); b.classList.add('found'); sfx.good(); paint();
       if (found === size.pairs) finish();
       return;
     }
-    lock = true; paint();
+    misses++; lock = true; paint();
+    if (v === 'strikes') {
+      const left = strikesFor(size.pairs) - misses;
+      if (left <= 0) { await sleep(400); return fail('Out of strikes.'); }
+      say(st, `Strike ${misses} of ${strikesFor(size.pairs)}. ${left} left.`, left <= 2 ? 'lose' : '');
+    }
     await sleep(350); [a, b].forEach(x => x.pc.classList.add('shake'));
     await wait(650); [a, b].forEach(x => x.pc.classList.remove('shake'));
+    if (done) return;
     [a, b].forEach(x => { x.pc.classList.add('down'); x.setAttribute('aria-label', `Card ${[...grid.children].indexOf(x) + 1}, face down`); }); sfx.flip();
     lock = false;
   }
-  function finish() {
-    done = true; clearInterval(timer); clock(); setLive('memory', false);
-    [...grid.children].forEach((b, i) => { b.pc.style.animationDelay = i * 45 + 'ms'; b.classList.add('wave'); });
-    const prize = Math.max(5, size.pairs * 12 - (moves - size.pairs) * 3);
-    const isBest = !(sel.value in bests) || moves < bests[sel.value];
-    const secs = Math.floor((Date.now() - t0) / 1000), times = store.get('mem-time', {});
-    if (isBest) { bests[sel.value] = moves; store.set('mem-best', bests); times[sel.value] = secs; store.set('mem-time', times); }
-    award(prize); moves === size.pairs ? bigWin() : sfx.win(); ledger('Memory', prize);
-    say(st, `Board cleared in ${moves} moves and ${$('mm-time').textContent}. +${prize} chips.${isBest ? ' New best!' : ''}`, 'win'); paint();
+  function fail(why) {
+    done = true; lock = true; clearInterval(timer); setLive('memory', false);
+    [...grid.children].forEach(b => { if (!b.classList.contains('found')) { b.pc.classList.remove('down', 'shake'); b.classList.add('missed'); } });
+    sfx.lose(); say(st, `${why} You found ${found} of ${size.pairs} pairs. Try a new board.`, 'lose'); paint();
   }
-  $('mm-new').onclick = start; sel.onchange = start;
+  function finish() {
+    done = true; clearInterval(timer); setLive('memory', false);
+    const secs = elapsed(); clock();
+    [...grid.children].forEach((b, i) => { b.pc.style.animationDelay = i * 45 + 'ms'; b.classList.add('wave'); });
+    let prize = Math.max(5, size.pairs * 12 - (moves - size.pairs) * 3), extra = '';
+    if (v === 'clock') { const left = Math.max(0, limit() - secs); prize += left; extra = ` Includes ${left} for time left.`; }
+    if (v === 'strikes') prize *= 2;
+    const isBest = !(key() in bests) || moves < bests[key()];
+    if (isBest) { bests[key()] = moves; times[key()] = secs; store.set('mem-best', bests); store.set('mem-time', times); }
+    award(prize); moves === size.pairs ? bigWin() : sfx.win(); ledger('Memory', prize);
+    if (moves === size.pairs) trophy('recall'); if (v === 'clock') trophy('clock');
+    say(st, `Board cleared in ${moves} moves and ${fmt(secs)}. +${prize} chips.${extra}${isBest ? ' New best!' : ''}`, 'win'); paint();
+  }
+  $('mm-new').onclick = start; sel.onchange = start; varSel.onchange = start;
   start();
 })();
 
 // ---- Table 4: Blackjack ----
 (() => {
-  const st = $('b-status'), pArea = $('b-player'), dH = $('b-dealer'), deal = $('b-deal'), hit = $('b-hit'), stand = $('b-stand'), dbl = $('b-double'), split = $('b-split');
-  let shoe = deck(4), H = [], cur = 0, D = [], hole = null, bet = 10, live = false, busy = false;
+  const st = $('b-status'), pArea = $('b-player'), dH = $('b-dealer'), deal = $('b-deal'), hit = $('b-hit'), stand = $('b-stand'), dbl = $('b-double'), split = $('b-split'), surr = $('b-surr');
+  const rulesSel = $('b-rules'), pp = $('b-pp'), side = $('b-side');
+  const RULES = {
+    classic: { decks: 4, h17: false, bj: 1.5, charlie: false, info: 'Four decks. Dealer stands on all 17s. Blackjack pays 3 to 2.', print: ['BLACKJACK PAYS 3 TO 2', 'DEALER STANDS ON ALL 17s'] },
+    vegas: { decks: 6, h17: true, bj: 1.5, charlie: false, info: 'Six decks. Dealer hits soft 17. Blackjack pays 3 to 2.', print: ['BLACKJACK PAYS 3 TO 2', 'DEALER HITS SOFT 17'] },
+    single: { decks: 1, h17: false, bj: 1.2, charlie: false, info: 'One deck, reshuffled often. Blackjack pays only 6 to 5.', print: ['BLACKJACK PAYS 6 TO 5', 'SINGLE DECK'] },
+    charlie: { decks: 4, h17: false, bj: 1.5, charlie: true, info: 'Five cards without busting win on the spot, whatever the dealer holds.', print: ['FIVE-CARD CHARLIE WINS', 'DEALER STANDS ON ALL 17s'] },
+  };
+  const R = () => RULES[rulesSel.value];
+  let shoe = [], shoeFor = '', H = [], cur = 0, D = [], hole = null, bet = 10, live = false, busy = false, sideNet = 0;
   const stats = store.get('bj-stats', { won: 0, played: 0, bj: 0 });
   const lockBets = pickBet('b-chips', v => { bet = v; deal.textContent = deal.textContent.replace(/\d+$/, v); });
-  const draw = () => { if (shoe.length < 52) { shoe = deck(4); } return shoe.pop(); };
+  const fresh = () => { shoe = deck(R().decks); shoeFor = rulesSel.value; };
+  const draw = () => { if (shoeFor !== rulesSel.value || shoe.length < Math.max(15, R().decks * 13)) fresh(); return shoe.pop(); };
   const ten = c => Math.min(c.v, 10);
   function val(h) {
     let s = 0, aces = 0;
@@ -755,6 +990,7 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
     const soft = aces > 0 && s + 10 <= 21; return { s: soft ? s + 10 : s, soft };
   }
   const natural = h => H.length === 1 && h.length === 2 && val(h).s === 21;
+  const charlie = h => R().charlie && h.cards.length >= 5 && val(h.cards).s <= 21;
   const label = (h, nat) => { const v = val(h); return v.s > 21 ? `${v.s} · bust` : nat ? 'Blackjack' : (v.soft ? `soft ${v.s}` : `${v.s}`); };
   function newHand(stake) {
     const seat = document.createElement('div'); seat.className = 'seat bj-hand';
@@ -764,22 +1000,27 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
   }
   function totals() {
     H.forEach((h, i) => {
-      h.tot.textContent = h.cards.length ? label(h.cards, natural(h.cards)) + (H.length > 1 ? ` · bet ${h.stake}` : '') : '';
+      h.tot.textContent = h.cards.length ? (charlie(h) ? `Charlie · ${val(h.cards).s}` : label(h.cards, natural(h.cards))) + (H.length > 1 ? ` · bet ${h.stake}` : '') : '';
       h.seat.classList.toggle('active', live && H.length > 1 && i === cur);
     });
     $('b-dt').textContent = !D.length ? '' : hole ? `${D[0].v === 1 ? 'A' : ten(D[0])} showing` : label(D, D.length === 2 && val(D).s === 21);
   }
+  function rules() {
+    $('b-info').textContent = R().info; $('b-print1').textContent = R().print[0]; $('b-print2').textContent = R().print[1];
+    $('b-shoe').textContent = shoeFor === rulesSel.value ? shoe.length : R().decks * 52;
+  }
   function buttons() {
-    const h = H[cur], act = live && !busy && !!h;
-    deal.disabled = live || busy; lockBets(live || busy); setLive('blackjack', live || busy);
+    const h = H[cur], act = live && !busy && !!h, two = act && h.cards.length === 2;
+    deal.disabled = live || busy; lockBets(live || busy); rulesSel.disabled = pp.disabled = live || busy; setLive('blackjack', live || busy);
     hit.disabled = stand.disabled = !act;
-    dbl.disabled = !act || h.cards.length !== 2 || chips < h.stake;
-    split.disabled = !act || H.length !== 1 || h.cards.length !== 2 || ten(h.cards[0]) !== ten(h.cards[1]) || chips < h.stake;
+    dbl.disabled = !two || chips < h.stake;
+    split.disabled = !two || H.length !== 1 || ten(h.cards[0]) !== ten(h.cards[1]) || chips < h.stake;
+    surr.disabled = !two || H.length !== 1;
     const hint = $('b-hint'); hint.hidden = !(prefs.hints && act);
     if (!hint.hidden) hint.innerHTML = `Basic strategy: <b>${advise(h, D[0])}</b>`;
-    $('b-shoe').textContent = shoe.length;
+    rules();
   }
-  // Basic strategy for a multi-deck game where the dealer stands on soft 17.
+  // Basic strategy for a multi-deck game.
   function advise(h, up) {
     const u = up.v === 1 ? 11 : ten(up), v = val(h.cards), two = h.cards.length === 2;
     const orDouble = a => two && chips >= h.stake ? 'Double' : a;
@@ -787,6 +1028,7 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
       const p = h.cards[0].v === 1 ? 11 : ten(h.cards[0]);
       if (p === 11 || p === 8 || ([2, 3, 7].includes(p) && u <= 7) || (p === 6 && u <= 6) || (p === 9 && u !== 7 && u <= 9) || (p === 4 && (u === 5 || u === 6))) return 'Split';
     }
+    if (two && H.length === 1 && !v.soft && ((v.s === 16 && u >= 9) || (v.s === 15 && u === 10))) return 'Surrender';
     if (v.soft) {
       if (v.s >= 19) return 'Stand';
       if (v.s === 18) return u >= 3 && u <= 6 ? orDouble('Stand') : u <= 8 ? 'Stand' : 'Hit';
@@ -809,12 +1051,22 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
     if (down) hole = { c, node };
     totals(); buttons(); await wait(320); return c;
   }
-  const prompt = () => say(st, H.length > 1 ? `Hand ${cur + 1} of ${H.length}: hit, stand, or double?` : 'Hit, stand, or double down?');
+  const prompt = () => say(st, H.length > 1 ? `Hand ${cur + 1} of ${H.length}: hit, stand, or double?` : 'Hit, stand, double, or surrender?');
+  function perfectPairs(stake) {
+    const [a, b] = H[0].cards;
+    if (a.r !== b.r) { side.textContent = `Perfect Pairs: no pair. −${stake}`; side.className = 'sideline lose'; return -stake; }
+    const [m, name] = a.s === b.s ? [25, 'perfect pair'] : a.red === b.red ? [12, 'colored pair'] : [6, 'mixed pair'];
+    award(stake * (m + 1)); m >= 12 ? bigWin() : sfx.good(); if (m === 25) trophy('perfect');
+    side.textContent = `Perfect Pairs: ${name} pays ${m} to 1. +${stake * m}`; side.className = 'sideline win'; return stake * m;
+  }
   async function start() {
     if (!pay(bet)) { say(st, broke(bet), 'lose'); return; }
+    let sideStake = 0; side.textContent = ''; side.className = 'sideline'; sideNet = 0;
+    if (pp.checked) { if (pay(10)) sideStake = 10; else { side.textContent = 'Not enough chips for the side bet.'; } }
     H = []; cur = 0; D = []; hole = null; pArea.innerHTML = ''; dH.innerHTML = ''; busy = true; say(st, 'Dealing...');
     const h = newHand(bet); buttons();
     await add(h.cards, h.el); await add(D, dH); await add(h.cards, h.el); await add(D, dH, true);
+    if (sideStake) sideNet = perfectPairs(sideStake);
     if (val(h.cards).s === 21 || val(D).s === 21) { await flipHole(); return settle(); }
     live = true; busy = false; prompt(); totals(); buttons();
   }
@@ -830,14 +1082,16 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
     }
     live = false; busy = true; totals(); buttons(); say(st, 'Dealer plays...');
     await flipHole();
-    if (H.some(h => val(h.cards).s <= 21)) while (val(D).s < 17) { await wait(250); await add(D, dH); }
+    const dealerHits = () => { const v = val(D); return v.s < 17 || (R().h17 && v.s === 17 && v.soft); };
+    if (H.some(h => val(h.cards).s <= 21 && !charlie(h))) while (dealerHits()) { await wait(250); await add(D, dH); }
     settle();
   }
   async function doHit() {
     const h = H[cur]; busy = true; buttons(); await add(h.cards, h.el); busy = false;
     const s = val(h.cards).s;
     if (s > 21) h.el.classList.add('shake');
-    if (s >= 21) return next();
+    if (charlie(h)) { h.el.classList.add('glow'); sfx.good(); }
+    if (s >= 21 || charlie(h)) return next();
     buttons();
   }
   async function doDouble() {
@@ -857,15 +1111,23 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
     if (val(h.cards).s === 21) { cur = -1; return next(); }
     cur = 0; prompt(); totals(); buttons();
   }
+  async function doSurrender() {
+    const h = H[0]; live = false; busy = true; buttons();
+    await flipHole();
+    const back = Math.floor(h.stake / 2); award(back); stats.played++; store.set('bj-stats', stats);
+    ledger('Blackjack', back - h.stake + sideNet); sfx.push();
+    say(st, `You surrender and get back ${back}.`); busy = false; deal.textContent = `Deal again · ${bet}`; totals(); buttons(); paint();
+  }
   function settle() {
     const ds = val(D).s, dBJ = D.length === 2 && ds === 21;
     let ret = 0, staked = 0; const parts = [];
     H.forEach((h, i) => {
       const ps = val(h.cards).s, pBJ = natural(h.cards); let r = 0, m;
       staked += h.stake;
-      if (pBJ && !dBJ) { const bonus = Math.floor(h.stake * 1.5); r = h.stake + bonus; m = `Blackjack! Paid 3 to 2: +${bonus}`; stats.bj++; }
+      if (pBJ && !dBJ) { const bonus = Math.floor(h.stake * R().bj); r = h.stake + bonus; m = `Blackjack! Paid ${R().bj === 1.5 ? '3 to 2' : '6 to 5'}: +${bonus}`; stats.bj++; trophy('bj'); }
       else if (ps > 21) m = `Bust with ${ps}`;
       else if (dBJ && !pBJ) m = 'Dealer has blackjack';
+      else if (charlie(h)) { r = h.stake * 2; m = `Five-card Charlie! +${h.stake}`; trophy('charlie'); }
       else if (ds > 21) { r = h.stake * 2; m = `Dealer busts. +${h.stake}`; }
       else if (ps > ds) { r = h.stake * 2; m = `${ps} beats ${ds}. +${h.stake}`; }
       else if (ps === ds) { r = h.stake; m = `Push at ${ps}`; }
@@ -875,28 +1137,40 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
     });
     const net = ret - staked, cls = net > 0 ? 'win' : net < 0 ? 'lose' : '';
     H.some(h => natural(h.cards)) && !dBJ ? bigWin() : net > 0 ? sfx.win() : net < 0 ? sfx.lose() : sfx.push();
-    store.set('bj-stats', stats); award(ret); ledger('Blackjack', net);
+    store.set('bj-stats', stats); award(ret); ledger('Blackjack', net + sideNet);
     say(st, parts.join('. ') + '.', cls); live = false; busy = false; deal.textContent = `Deal again · ${bet}`; totals(); buttons(); paint();
   }
-  deal.onclick = start; hit.onclick = doHit; stand.onclick = next; dbl.onclick = doDouble; split.onclick = doSplit;
-  buttons(); paint();
+  deal.onclick = start; hit.onclick = doHit; stand.onclick = next; dbl.onclick = doDouble; split.onclick = doSplit; surr.onclick = doSurrender;
+  rulesSel.addEventListener('change', () => { fresh(); buttons(); say(st, `${rulesSel.options[rulesSel.selectedIndex].text}. Fresh shoe.`); });
+  fresh(); buttons(); paint();
 })();
 
 // ---- Table 5: War ----
 (() => {
   const st = $('w-status'), you = $('w-you'), them = $('w-them'), burn = $('w-burn'), flipB = $('w-flip'), warB = $('w-war'), surB = $('w-surrender');
-  let d = deck(), bet = 10, staked = 0, busy = false, tie = false;
+  const modeSel = $('w-mode'), tieBox = $('w-tie'), score = $('w-score');
+  const INFO = {
+    classic: 'One battle per bet. Ties can go to war.',
+    match: 'One bet covers a match. First to win four battles takes it and doubles the bet.',
+  };
+  let d = deck(), bet = 10, staked = 0, busy = false, tie = false, tieStake = 0, match = null;
   const stats = store.get('war-stats', { won: 0, lost: 0, wars: 0 });
-  const lockBets = pickBet('w-chips', v => { bet = v; flipB.textContent = `Flip · ${v}`; });
+  const lockBets = pickBet('w-chips', v => { bet = v; label(); });
   const power = c => c.v === 1 ? 14 : c.v;
+  const draw = () => { if (!d.length) d = deck(); return d.pop(); };
   const CHIP = { 10: '#2f6fb0', 25: '#2d8a4e', 50: '#1b1b1b', 100: '#7a2fa0' };
   function potChip(n) { $('w-pot').innerHTML = `<div class="wchip" style="--c:${CHIP[bet] || '#b8862b'}" aria-label="${n} chips at stake">${n}</div>`; }
   function potEnd(cls) { const c = $('w-pot').firstElementChild; if (c) c.classList.add(cls); }
-  const draw = () => { if (!d.length) d = deck(); return d.pop(); };
+  function label() { flipB.textContent = modeSel.value === 'match' && !match ? `Start match · ${bet}` : match ? 'Flip' : `Flip · ${bet}`; }
   function paint() {
     $('w-won').textContent = stats.won; $('w-lost').textContent = stats.lost; $('w-wars').textContent = stats.wars; $('w-left').textContent = d.length;
     flipB.hidden = tie; warB.hidden = surB.hidden = !tie;
-    flipB.disabled = warB.disabled = surB.disabled = busy; lockBets(busy || tie); setLive('war', busy || tie);
+    flipB.disabled = warB.disabled = surB.disabled = busy;
+    lockBets(busy || tie || !!match); modeSel.disabled = busy || tie || !!match; tieBox.disabled = busy || tie;
+    $('w-tiewrap').hidden = modeSel.value === 'match';
+    score.hidden = !match; if (match) score.textContent = `${match.you} – ${match.them}`;
+    $('w-info').textContent = INFO[modeSel.value];
+    setLive('war', busy || tie || !!match); label();
   }
   async function battle() {
     const a = draw(), b = draw();
@@ -906,37 +1180,183 @@ const setLive = (v, on) => document.querySelector(`.tabs a[data-v="${v}"]`).clas
     return { a, b, ea, eb };
   }
   async function flip() {
+    if (modeSel.value === 'match') return matchFlip();
     if (d.length < 2) d = deck();
     if (!pay(bet)) { say(st, broke(bet), 'lose'); return; }
+    tieStake = 0;
+    if (tieBox.checked) { if (pay(10)) tieStake = 10; }
     staked = bet; busy = true; burn.innerHTML = ''; potChip(staked); say(st, 'Flipping...'); paint();
     const { a, b, ea, eb } = await battle();
-    if (power(a) > power(b)) { award(staked * 2); stats.won++; ea.classList.add('glow'); eb.classList.add('dim'); say(st, `Your ${short(a)} beats the dealer's ${short(b)}. You win ${staked}.`, 'win'); sfx.win(); ledger('War', staked); potEnd('won'); }
-    else if (power(a) < power(b)) { stats.lost++; eb.classList.add('glow'); ea.classList.add('dim', 'shake'); say(st, `The dealer's ${short(b)} beats your ${short(a)}. You lose ${staked}.`, 'lose'); sfx.lose(); ledger('War', -staked); potEnd('lost'); }
-    else { tie = true; say(st, `Two ${RANK_NAMES[a.v - 1]}s! Go to war for ${staked} more, or surrender half.`); sfx.drum(); }
+    let tieNet = 0;
+    if (tieStake) {
+      if (power(a) === power(b)) { award(tieStake * 11); tieNet = tieStake * 10; } else tieNet = -tieStake;
+    }
+    const tieMsg = tieStake ? (tieNet > 0 ? ` Tie bet pays ${tieNet}!` : '') : '';
+    if (power(a) > power(b)) { award(staked * 2); stats.won++; ea.classList.add('glow'); eb.classList.add('dim'); say(st, `Your ${short(a)} beats the dealer's ${short(b)}. You win ${staked}.`, 'win'); sfx.win(); ledger('War', staked + tieNet); potEnd('won'); }
+    else if (power(a) < power(b)) { stats.lost++; eb.classList.add('glow'); ea.classList.add('dim', 'shake'); say(st, `The dealer's ${short(b)} beats your ${short(a)}. You lose ${staked}.`, 'lose'); sfx.lose(); ledger('War', -staked + tieNet); potEnd('lost'); }
+    else { tie = true; pendingTieNet = tieNet; say(st, `Two ${RANK_NAMES[a.v - 1]}s!${tieMsg} Go to war for ${staked} more, or surrender half.`); tieNet > 0 ? bigWin() : sfx.drum(); }
     busy = false; store.set('war-stats', stats); paint();
   }
+  let pendingTieNet = 0;
   async function goWar() {
     if (d.length < 8) { d = deck(); }
     if (!pay(staked)) { say(st, broke(staked), 'lose'); return; }
     busy = true; stats.wars++; potChip(staked * 2); say(st, 'Burning three cards each...'); paint();
     for (let i = 0; i < 3; i++) { draw(); draw(); burn.appendChild(cardEl({ r: '', s: '', v: 0 }, true)); sfx.deal(); await wait(220); }
     const { a, b, ea, eb } = await battle();
-    tie = false;
-    if (power(a) > power(b)) { award(staked * 3); stats.won++; ea.classList.add('glow'); eb.classList.add('dim'); say(st, `War won! Your ${short(a)} beats the dealer's ${short(b)}. Your raise pays ${staked}.`, 'win'); bigWin(); ledger('War', staked); potEnd('won'); }
-    else if (power(a) === power(b)) { award(staked * 4); stats.won++; ea.classList.add('glow'); eb.classList.add('glow'); say(st, `Tied again at war! The bonus pays ${staked * 2}.`, 'win'); bigWin(); ledger('War', staked * 2); potEnd('won'); }
-    else { stats.lost++; eb.classList.add('glow'); ea.classList.add('dim'); say(st, `War lost. The dealer's ${short(b)} beats your ${short(a)}. You lose ${staked * 2}.`, 'lose'); sfx.lose(); ledger('War', -staked * 2); potEnd('lost'); }
+    tie = false; const tn = pendingTieNet; pendingTieNet = 0;
+    if (power(a) > power(b)) { award(staked * 3); stats.won++; ea.classList.add('glow'); eb.classList.add('dim'); say(st, `War won! Your ${short(a)} beats the dealer's ${short(b)}. Your raise pays ${staked}.`, 'win'); bigWin(); trophy('war'); ledger('War', staked + tn); potEnd('won'); }
+    else if (power(a) === power(b)) { award(staked * 4); stats.won++; ea.classList.add('glow'); eb.classList.add('glow'); say(st, `Tied again at war! The bonus pays ${staked * 2}.`, 'win'); bigWin(); ledger('War', staked * 2 + tn); potEnd('won'); }
+    else { stats.lost++; eb.classList.add('glow'); ea.classList.add('dim'); say(st, `War lost. The dealer's ${short(b)} beats your ${short(a)}. You lose ${staked * 2}.`, 'lose'); sfx.lose(); ledger('War', -staked * 2 + tn); potEnd('lost'); }
     busy = false; store.set('war-stats', stats); paint();
   }
   function surrender() {
     tie = false; const back = Math.floor(staked / 2); award(back); stats.lost++; store.set('war-stats', stats);
-    say(st, `You surrender and take back ${back}.`); sfx.push(); ledger('War', back - staked); potEnd('lost'); paint();
+    const tn = pendingTieNet; pendingTieNet = 0;
+    say(st, `You surrender and take back ${back}.`); sfx.push(); ledger('War', back - staked + tn); potEnd('lost'); paint();
+  }
+  async function matchFlip() {
+    if (!match) {
+      if (!pay(bet)) { say(st, broke(bet), 'lose'); return; }
+      match = { you: 0, them: 0, stake: bet }; burn.innerHTML = ''; potChip(bet);
+    }
+    if (d.length < 2) d = deck();
+    busy = true; say(st, 'Flipping...'); paint();
+    const { a, b, ea, eb } = await battle();
+    if (power(a) > power(b)) { match.you++; ea.classList.add('glow'); eb.classList.add('dim'); sfx.good(); }
+    else if (power(a) < power(b)) { match.them++; eb.classList.add('glow'); ea.classList.add('dim', 'shake'); sfx.lose(); }
+    else { sfx.push(); }
+    const s = `${match.you} – ${match.them}`;
+    if (match.you === 4) {
+      award(match.stake * 2); stats.won++; ledger('War', match.stake); potEnd('won'); bigWin(); trophy('match');
+      say(st, `You take the match ${match.you} to ${match.them} and win ${match.stake}.`, 'win'); match = null;
+    } else if (match.them === 4) {
+      stats.lost++; ledger('War', -match.stake); potEnd('lost');
+      say(st, `The dealer takes the match ${match.them} to ${match.you}. You lose ${match.stake}.`, 'lose'); match = null;
+    } else say(st, power(a) === power(b) ? `Tie, no point. Score ${s}. Flip again.` : `Score ${s}. First to four wins.`, power(a) > power(b) ? 'win' : power(a) < power(b) ? 'lose' : '');
+    busy = false; store.set('war-stats', stats); paint();
+    if (!match) { score.hidden = false; score.textContent = s; }
   }
   flipB.onclick = flip; warB.onclick = goWar; surB.onclick = surrender;
+  modeSel.addEventListener('change', () => { $('w-pot').innerHTML = ''; score.hidden = true; paint(); });
   paint();
 })();
 
+// ---- Table 6: Video Poker ----
+(() => {
+  const st = $('p-status'), handEl = $('p-hand'), btn = $('p-deal'), sel = $('p-mode'), payEl = $('p-pay');
+  const PAY = {
+    job: { info: '9/6 Jacks or Better. A pair of jacks or better is the lowest paying hand.', rows: [['royal', 'Royal Flush', 800], ['sf', 'Straight Flush', 50], ['k4', 'Four of a Kind', 25], ['fh', 'Full House', 9], ['fl', 'Flush', 6], ['st', 'Straight', 4], ['k3', 'Three of a Kind', 3], ['tp', 'Two Pair', 2], ['jb', 'Jacks or Better', 1]] },
+    bonus: { info: 'Jacks or Better with bonus pays for four of a kind, highest for four aces.', rows: [['royal', 'Royal Flush', 800], ['sf', 'Straight Flush', 50], ['k4a', 'Four Aces', 80], ['k4l', 'Four 2s, 3s or 4s', 40], ['k4', 'Four 5s through Ks', 25], ['fh', 'Full House', 8], ['fl', 'Flush', 5], ['st', 'Straight', 4], ['k3', 'Three of a Kind', 3], ['tp', 'Two Pair', 2], ['jb', 'Jacks or Better', 1]] },
+    deuces: { info: 'Every 2 is wild. Three of a kind is the lowest paying hand.', rows: [['royal', 'Natural Royal Flush', 800], ['d4', 'Four Deuces', 200], ['wroyal', 'Wild Royal Flush', 25], ['k5', 'Five of a Kind', 15], ['sf', 'Straight Flush', 9], ['k4', 'Four of a Kind', 5], ['fh', 'Full House', 3], ['fl', 'Flush', 2], ['st', 'Straight', 2], ['k3', 'Three of a Kind', 1]] },
+  };
+  const PRINT = { job: 'JACKS OR BETTER', bonus: 'BONUS POKER', deuces: 'DEUCES WILD' };
+  let d = [], hand = [], held = [], cells = [], phase = 'idle', bet = 10, staked = 0;
+  const stats = store.get('vp-stats', { played: 0, won: 0, bestwin: 0, royals: 0 });
+  let lockBets = () => {};
+  const rows = () => PAY[sel.value].rows;
+  function evaluate(cards, mode) {
+    const wildMode = mode === 'deuces';
+    const w = wildMode ? cards.filter(c => c.v === 2).length : 0;
+    const rest = wildMode ? cards.filter(c => c.v !== 2) : cards;
+    const hi = c => c.v === 1 ? 14 : c.v, vals = rest.map(hi);
+    const counts = {}; vals.forEach(v => counts[v] = (counts[v] || 0) + 1);
+    const groups = Object.entries(counts).map(([r, n]) => [+r, n]).sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+    const top = groups[0]?.[1] || 0, second = groups[1]?.[1] || 0;
+    const flush = rest.every(c => c.s === rest[0].s);
+    const span = vs => Math.max(...vs) - Math.min(...vs);
+    const straight = groups.length === rest.length && (span(vals) <= 4 || span(vals.map(v => v === 14 ? 1 : v)) <= 4);
+    const royalRanks = vals.every(v => v >= 10);
+    if (!wildMode) {
+      if (straight && flush) return royalRanks ? 'royal' : 'sf';
+      if (top === 4) { if (mode !== 'bonus') return 'k4'; const r = groups[0][0]; return r === 14 ? 'k4a' : r <= 4 ? 'k4l' : 'k4'; }
+      if (top === 3 && second === 2) return 'fh';
+      if (flush) return 'fl';
+      if (straight) return 'st';
+      if (top === 3) return 'k3';
+      if (top === 2 && second === 2) return 'tp';
+      if (top === 2 && groups[0][0] >= 11) return 'jb';
+      return null;
+    }
+    if (w === 4) return 'd4';
+    if (straight && flush && royalRanks) return w === 0 ? 'royal' : 'wroyal';
+    if (top + w >= 5) return 'k5';
+    if (straight && flush) return 'sf';
+    if (top + w >= 4) return 'k4';
+    if ((w === 0 && top === 3 && second === 2) || (w === 1 && top === 2 && second === 2)) return 'fh';
+    if (flush) return 'fl';
+    if (straight) return 'st';
+    if (top + w >= 3) return 'k3';
+    return null;
+  }
+  window.vpEvaluate = evaluate; // used by the test page
+  function drawPay(now, hit) {
+    payEl.innerHTML = `<tbody>${rows().map(([k, name, p]) => `<tr class="${k === hit ? 'hit' : k === now ? 'now' : ''}"><td>${name}</td><td>${(p * bet).toLocaleString()}</td></tr>`).join('')}</tbody>`;
+    $('p-print').textContent = PRINT[sel.value]; $('p-info').textContent = PAY[sel.value].info;
+  }
+  function setCard(i, c, down) {
+    cells[i].querySelector('.pc, .slot')?.remove();
+    const el = cardEl(c, down); cells[i].appendChild(el); return el;
+  }
+  function makeCells() {
+    handEl.innerHTML = ''; cells = []; held = [false, false, false, false, false];
+    for (let i = 0; i < 5; i++) {
+      const b = document.createElement('button');
+      b.className = 'vcell'; b.dataset.key = i + 1; b.innerHTML = '<span class="heldtag">Held</span><div class="slot"></div>';
+      b.onclick = () => toggle(i); handEl.appendChild(b); cells.push(b);
+    }
+  }
+  function toggle(i) {
+    if (phase !== 'dealt') return;
+    held[i] = !held[i]; cells[i].classList.toggle('held', held[i]); cells[i].setAttribute('aria-pressed', held[i]); tone(held[i] ? 880 : 660, .06, 'triangle', .1);
+    const kept = held.filter(Boolean).length;
+    say(st, kept === 5 ? 'Holding all five. Draw to stand pat.' : kept ? `Holding ${kept}. Draw replaces the other ${5 - kept}.` : 'Tap the cards you want to keep, then draw.');
+  }
+  function paint() {
+    $('p-played').textContent = stats.played; $('p-won').textContent = stats.won; $('p-bestwin').textContent = stats.bestwin; $('p-royals').textContent = stats.royals;
+    lockBets(phase !== 'idle'); sel.disabled = phase !== 'idle'; btn.disabled = phase === 'busy'; setLive('poker', phase !== 'idle');
+  }
+  async function dealHand() {
+    if (!pay(bet)) { say(st, broke(bet), 'lose'); return; }
+    staked = bet; phase = 'busy'; paint(); makeCells(); d = deck(); hand = [];
+    say(st, 'Dealing...');
+    for (let i = 0; i < 5; i++) { hand.push(d.pop()); const el = setCard(i, hand[i], true); sfx.deal(); await wait(110); reveal(el, hand[i]); }
+    await wait(250);
+    const now = evaluate(hand, sel.value);
+    drawPay(now); phase = 'dealt'; btn.textContent = 'Draw'; paint();
+    say(st, now ? `You hold ${rows().find(r => r[0] === now)[1].toLowerCase()} already. Choose what to keep, then draw.` : 'Tap the cards you want to keep, then draw.');
+  }
+  async function drawCards() {
+    phase = 'busy'; paint(); say(st, 'Drawing...');
+    const swap = [0, 1, 2, 3, 4].filter(i => !held[i]);
+    swap.forEach(i => cells[i].querySelector('.pc').classList.add('down'));
+    if (swap.length) { sfx.flip(); await wait(350); }
+    for (const i of swap) { hand[i] = d.pop(); const el = setCard(i, hand[i], true); sfx.deal(); await wait(120); reveal(el, hand[i]); }
+    await wait(350);
+    const hit = evaluate(hand, sel.value), row = rows().find(r => r[0] === hit), mult = row ? row[2] : 0, ret = staked * mult;
+    stats.played++;
+    if (ret) {
+      stats.won++; stats.bestwin = Math.max(stats.bestwin, ret); if (hit === 'royal') stats.royals++;
+      if (['royal', 'wroyal'].includes(hit)) trophy('royal'); if (['royal', 'wroyal', 'sf', 'k5', 'd4', 'k4', 'k4a', 'k4l', 'fh'].includes(hit)) trophy('boat');
+      award(ret); mult >= 25 ? bigWin() : mult >= 2 ? sfx.win() : sfx.good();
+      cells.forEach(c => c.querySelector('.pc').classList.add('glow'));
+      say(st, `${row[1]}! Pays ${ret}.`, 'win');
+    } else {
+      sfx.lose(); cells.forEach(c => c.querySelector('.pc').classList.add('dim'));
+      say(st, 'No paying hand this time.', 'lose');
+    }
+    ledger('Poker', ret - staked); store.set('vp-stats', stats);
+    drawPay(null, hit); cells.forEach(c => c.classList.remove('held'));
+    phase = 'idle'; btn.textContent = `Deal again · ${bet}`; paint();
+  }
+  btn.onclick = () => phase === 'dealt' ? drawCards() : phase === 'idle' ? dealHand() : null;
+  sel.addEventListener('change', () => drawPay());
+  lockBets = pickBet('p-chips', v => { bet = v; if (phase === 'idle') btn.textContent = btn.textContent.replace(/\d+$/, v); drawPay(); });
+  makeCells(); drawPay(); paint();
+})();
+
 // ---- Tabs (hash routing) ----
-const VIEWS = ['monte', 'hilo', 'memory', 'blackjack', 'war'];
+const VIEWS = ['monte', 'hilo', 'memory', 'blackjack', 'war', 'poker'];
 let view = 'monte';
 function route() {
   const h = location.hash.slice(1) || store.get('view', 'monte'), v = view = VIEWS.includes(h) ? h : 'monte';
@@ -948,26 +1368,35 @@ addEventListener('hashchange', route); route();
 
 // ---- Keyboard shortcuts for the open table ----
 const KEYS = {
-  monte: { d: 'm-deal' }, hilo: { d: 'h-deal', h: 'h-hi', l: 'h-lo', c: 'h-cash' }, memory: { n: 'mm-new' },
-  blackjack: { d: 'b-deal', h: 'b-hit', s: 'b-stand', x: 'b-double', p: 'b-split' }, war: { f: 'w-flip', w: 'w-war', r: 'w-surrender' },
+  monte: { d: 'm-deal' }, hilo: { d: 'h-deal', c: 'h-cash' }, memory: { n: 'mm-new' },
+  blackjack: { d: 'b-deal', h: 'b-hit', s: 'b-stand', x: 'b-double', p: 'b-split', r: 'b-surr' }, war: { f: 'w-flip', w: 'w-war', r: 'w-surrender' },
+  poker: { d: 'p-deal' },
 };
-const PRIMARY = { monte: 'm-deal', hilo: 'h-deal', memory: 'mm-new', blackjack: 'b-deal', war: 'w-flip' };
+const PRIMARY = { monte: 'm-deal', hilo: 'h-deal', memory: 'mm-new', blackjack: 'b-deal', war: 'w-flip', poker: 'p-deal' };
 addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('settings').hidden) { toggleSettings(false); $('gear').focus(); return; }
-  if ((e.key === ' ' || e.key === 'Enter') && e.target === document.body) {
+  if (e.key === 'Escape' && !$('trophies').hidden) { toggleCups(false); $('cup').focus(); return; }
+  // Space deals even right after clicking a tab; Enter only from the page itself so links still work.
+  if ((e.key === ' ' && (e.target === document.body || e.target.closest('.tabs, .ledger'))) || (e.key === 'Enter' && e.target === document.body)) {
     const el = $(PRIMARY[view]); if (el && !el.disabled && !el.hidden) { e.preventDefault(); audioOn(); el.click(); } return;
   }
   if (e.ctrlKey || e.metaKey || e.altKey || e.target.matches('select, input, textarea')) return;
   const id = KEYS[view][e.key.toLowerCase()];
-  const el = id ? $(id) : view === 'monte' && /^[1-5]$/.test(e.key) ? document.querySelector(`#m-cards .card[data-spot="${e.key}"]`) : null;
+  // Otherwise a control on the open table can claim the key with data-key (card spots, calls, holds).
+  const el = id ? $(id) : document.querySelector(`#v-${view} [data-key="${CSS.escape(e.key.toLowerCase())}"]`);
   if (el && !el.disabled && !el.hidden) { e.preventDefault(); audioOn(); el.click(); }
 });
 
 // ---- Settings ----
-const panel = $('settings'), gear = $('gear');
-function toggleSettings(open = panel.hidden) { panel.hidden = !open; gear.setAttribute('aria-expanded', open); }
+const panel = $('settings'), gear = $('gear'), cupPanel = $('trophies'), cup = $('cup');
+function toggleSettings(open = panel.hidden) { panel.hidden = !open; gear.setAttribute('aria-expanded', open); if (open) toggleCups(false); }
+function toggleCups(open = cupPanel.hidden) { cupPanel.hidden = !open; cup.setAttribute('aria-expanded', open); if (open) toggleSettings(false); }
 gear.onclick = e => { e.stopPropagation(); toggleSettings(); };
-document.addEventListener('click', e => { if (!panel.hidden && !panel.contains(e.target)) toggleSettings(false); });
+cup.onclick = e => { e.stopPropagation(); toggleCups(); };
+document.addEventListener('click', e => {
+  if (!panel.hidden && !panel.contains(e.target)) toggleSettings(false);
+  if (!cupPanel.hidden && !cupPanel.contains(e.target)) toggleCups(false);
+});
 const vol = $('set-vol'), fast = $('set-fast'), hints = $('set-hints'), still = $('set-still'), reset = $('set-reset');
 vol.value = prefs.vol; fast.checked = prefs.fast; hints.checked = prefs.hints; still.checked = prefs.still;
 still.onchange = () => { prefs.still = still.checked; store.set('prefs', prefs); document.documentElement.classList.toggle('still', prefs.still); };
