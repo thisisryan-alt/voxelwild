@@ -225,7 +225,8 @@
       cam.target.lerp(cam.tTarget, 1 - Math.exp(-dt * (cam.mode === 'drift' ? 0.3 : cam.mode === 'walk' ? 8 : 1.5)));
     }
     computeWant();
-    if (cam.mode === 'walk') wantPos.y = Math.max(wantPos.y, W.heightAt(wantPos.x, wantPos.z) + 0.8, K.WL + 0.6);
+    // keep every orbiting view out of hillsides and cliffs, not only the walk camera
+    wantPos.y = Math.max(wantPos.y, W.heightAt(wantPos.x, wantPos.z) + (cam.mode === 'walk' ? 0.8 : 1.2), K.WL + 0.6);
     cam.blend = Math.max(0, cam.blend - dt);
     const kb = cam.blend > 0 ? 1 - Math.exp(-dt * 1.6) : 1;
     curPos.lerp(wantPos, kb); curLook.lerp(wantLook, kb);
@@ -678,7 +679,11 @@
     clearTimeout(wakeHud.t);
     wakeHud.t = setTimeout(() => { $('sitOverlay').classList.remove('awake'); $('zenShow').classList.remove('awake'); }, 3000);
   }
-  function anyOpen() { return $$('.pop, .panel').some((p) => !p.hidden) || !$('composer').hidden || !!openCat; }
+  let overlays = null;
+  function anyOpen() {
+    overlays = overlays || $$('.pop, .panel').concat($('composer'));
+    return !!openCat || overlays.some((p) => !p.hidden);
+  }
 
   function begin(withSound) {
     if (S.started) return;
@@ -774,7 +779,8 @@
   }
 
   // -------------------------------------------------------------------- loop
-  let last = performance.now(), clockSync = 0, seasonShown = -1, lastHudH = 0, lastW = 0, lastH = 0;
+  let last = performance.now(), clockSync = 0, seasonShown = -1, lastHudH = 0, lastW = 0, lastH = 0, lastRing = '';
+  const el = {};   // elements touched every frame, looked up once
   function frame() {
     const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
     last = now;
@@ -793,13 +799,13 @@
     W.update(dt);
     GD.update(t, dt);
     L.update(dt, t);
+    SW.walk.update(dt, t, cam.theta);   // before the camera, so the walk camera never trails a frame behind
     updateCamera(dt, t);
     let fire = 0;
     for (const f of GD.feat.fire) fire = Math.max(fire, U.clamp(1 - (W.camera.position.distanceTo(tmpFire.set(f.x, f.y, f.z)) - 8) / 45, 0, 1));
     const ear = SW.walk.active ? SW.walk.pos : W.camera.position;
     const falls = U.clamp(1 - (ear.distanceTo(W.waterfall) - 6) / 55, 0, 1), springs = U.clamp(1 - (ear.distanceTo(W.springs) - 5) / 28, 0, 1);
     A.update({ fire, chimes: GD.feat.chime.length, trees: GD.feat.tree.length, falls, springs });
-    SW.walk.update(dt, t, cam.theta);
     for (let i = growing.length - 1; i >= 0; i--) {
       const g = growing[i];
       if (t < g.at) continue;
@@ -810,15 +816,17 @@
     // breath guide
     if (prefs.guide && S.started) {
       const B = S.breath;
-      $('ring').style.transform = 'scale(' + (0.55 + 0.45 * B.b).toFixed(4) + ')';
-      if ($('word').textContent !== B.label) $('word').textContent = B.label;
+      const sc = 'scale(' + (0.55 + 0.45 * B.b).toFixed(3) + ')';
+      if (sc !== lastRing) { lastRing = sc; el.ring.style.transform = sc; }
+      if (el.word.textContent !== B.label) el.word.textContent = B.label;
       const c = String(Math.max(1, Math.ceil(B.left)));
-      if ($('count').textContent !== c) $('count').textContent = c;
+      if (el.count.textContent !== c) el.count.textContent = c;
     }
-    if (S.started && !anyOpen() && !sit) { hudTimer -= dt; if (hudTimer <= 0) $('hud').classList.add('quiet'); }
+    if (S.started && hudTimer > 0 && !sit && !anyOpen()) { hudTimer -= dt; if (hudTimer <= 0) el.hud.classList.add('quiet'); }
     if (sit) {
       const left = Math.max(0, sit.end - t), m = Math.floor(left / 60), s = Math.floor(left % 60);
-      $('sitLeft').textContent = m + ':' + String(s).padStart(2, '0') + ' left';
+      const txt = m + ':' + String(s).padStart(2, '0') + ' left';
+      if (el.sitLeft.textContent !== txt) el.sitLeft.textContent = txt;
       if (left <= 0) endSit(true);
     }
     updateToast();
@@ -838,17 +846,28 @@
     W.render();
   }
   const tmpFire = new THREE.Vector3();
-  // If the first seconds run slowly, step the graphics down a level (unless the player picked one).
-  let perfT = 0, perfFrames = 0, perfSlow = 0;
+  // When frames run long, first lower the drawing resolution a step at a time; if that is not enough, step
+  // the graphics down a level. Resolution comes back when there is room again. A quality the player picked
+  // in Settings is left alone.
+  let perfT = 0, perfFrames = 0, perfSlow = 0, perfFast = 0, perfSkip = 0, upBlockedUntil = 0, lastUpAt = -1e9;
   function watchFrameRate(now, dt) {
-    if (!S.started || prefs.qualityChosen || prefs.quality === 'low' || document.hidden) return;
+    if (!S.started || prefs.qualityChosen || prefs.quality === 'low' || document.hidden) { perfT = 0; perfFrames = 0; return; }
     perfT += dt; perfFrames++;
-    if (perfT < 3) return;
+    if (perfT < 2) return;
     const ms = perfT / perfFrames * 1000;
     perfT = 0; perfFrames = 0;
+    if (perfSkip > 0) { perfSkip--; return; }   // the window after a change includes its own hitch
+    const minScale = U.clamp(0.95 / (W.basePixelRatio || 1), 0.6, 0.85);
+    if (ms > 22) {
+      perfFast = 0;
+      if (now - lastUpAt < 15000) upBlockedUntil = now + 90000;   // it just went up and could not hold it
+      if (W.renderScale > minScale + 0.01) { W.setRenderScale(Math.max(minScale, W.renderScale * 0.85)); perfSkip = 1; }
+    } else if (ms < 17.5 && W.renderScale < 1 && now > upBlockedUntil) {
+      if (++perfFast >= 4) { perfFast = 0; lastUpAt = now; W.setRenderScale(Math.min(1, W.renderScale * 1.12)); perfSkip = 1; }
+    } else perfFast = 0;
     perfSlow = ms > 42 ? perfSlow + 1 : 0;
-    if (perfSlow >= 2) {
-      perfSlow = 0;
+    if (perfSlow >= 3 && (W.renderScale <= minScale + 0.01 || perfSlow >= 5)) {
+      perfSlow = 0; perfSkip = 1;
       prefs.quality = prefs.quality === 'high' ? 'balanced' : 'low';
       W.setQuality(prefs.quality);
       toast('Switched to ' + (prefs.quality === 'balanced' ? 'Balanced' : 'Light') + ' graphics to keep things smooth. You can change this in Settings.', 6);
@@ -885,6 +904,9 @@
     $('btnBreath').setAttribute('aria-pressed', String(prefs.guide));
     W.resize();
     setView('island', true);
+    Object.assign(el, { ring: $('ring'), word: $('word'), count: $('count'), hud: $('hud'), sitLeft: $('sitLeft') });
+    try { W.warmUp(); } catch (e) { console.warn(e); }
+    W.ready = true;
     W.renderer.setAnimationLoop(frame);
     if (data && data.started) begin(false);
   }

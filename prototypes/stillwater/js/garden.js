@@ -67,16 +67,36 @@
     W.scene.add(mesh);
     const f = () => new Float32Array(cap);
     return {
-      mesh, cap, n: 0, base: 0, pending: [], shrinking: [], cursor: 0, colorDirty: false, matDirty: false,
+      mesh, cap, n: 0, base: 0, pending: [], shrinking: [], cursor: 0, mLo: Infinity, mHi: -1, cLo: Infinity, cHi: -1,
       px: f(), py: f(), pz: f(), sz: f(), sy: f(), birth: f(), dur: f(), grow: f(), rr: f(),
       vis: new Float32Array(cap).fill(1), pal: new Int16Array(cap).fill(-1), dead: new Uint8Array(cap), col: new Float32Array(cap * 3),
     };
   }
+  // Only the range of voxels that changed is sent to the GPU, not the whole buffer.
   function setVoxel(g, i) {
     const s = g.dead[i] ? 0 : g.sz[i] * g.grow[i] * g.vis[i];
     M4.makeScale(s, s * g.sy[i], s);
     M4.setPosition(g.px[i], g.py[i], g.pz[i]);
     g.mesh.setMatrixAt(i, M4);
+    if (i < g.mLo) g.mLo = i;
+    if (i > g.mHi) g.mHi = i;
+  }
+  function setColor(g, i, c) {
+    g.mesh.setColorAt(i, c);
+    if (i < g.cLo) g.cLo = i;
+    if (i > g.cHi) g.cHi = i;
+  }
+  function flush(g) {
+    if (g.mHi >= g.mLo) {
+      const a = g.mesh.instanceMatrix;
+      a.updateRange.offset = g.mLo * 16; a.updateRange.count = (g.mHi - g.mLo + 1) * 16; a.needsUpdate = true;
+      g.mLo = Infinity; g.mHi = -1;
+    }
+    if (g.cHi >= g.cLo) {
+      const a = g.mesh.instanceColor;
+      a.updateRange.offset = g.cLo * 3; a.updateRange.count = (g.cHi - g.cLo + 1) * 3; a.needsUpdate = true;
+      g.cLo = Infinity; g.cHi = -1;
+    }
   }
   function addVoxel(g, x, y, z, s, sy, c, birth, dur, r) {
     const i = g.n++;
@@ -85,21 +105,21 @@
     if (typeof c === 'number') { g.pal[i] = c; g.vis[i] = U.seasonColor(PAL_LIST[c], r, S.season, tmpC); }
     else { g.pal[i] = -1; g.vis[i] = 1; tmpC.copy(c); }
     g.col[i * 3] = tmpC.r; g.col[i * 3 + 1] = tmpC.g; g.col[i * 3 + 2] = tmpC.b;
-    g.mesh.setColorAt(i, tmpC);
+    setColor(g, i, tmpC);
     setVoxel(g, i);
     g.pending.push(i);
-    g.mesh.count = g.n; g.colorDirty = g.matDirty = true;
+    g.mesh.count = g.n;
   }
   function updateGrower(g, t) {
     const p = g.pending;
     let w = 0;
     for (let j = 0; j < p.length; j++) {
       const i = p[j];
-      if (g.dead[i]) { setVoxel(g, i); g.matDirty = true; continue; }
+      if (g.dead[i]) { setVoxel(g, i); continue; }
       const k = (t - g.birth[i]) / g.dur[i];
       if (k <= 0) { p[w++] = i; continue; }
       g.grow[i] = k >= 1 ? 1 : 1 - Math.pow(1 - k, 3);
-      setVoxel(g, i); g.matDirty = true;
+      setVoxel(g, i);
       if (k < 1) p[w++] = i;
     }
     p.length = w;
@@ -111,11 +131,9 @@
         if (k >= 1) g.dead[i] = 1;
         setVoxel(g, i);
       }
-      g.matDirty = true;
       if (k >= 1) g.shrinking.splice(j, 1);
     }
-    if (g.matDirty) { g.mesh.instanceMatrix.needsUpdate = true; g.matDirty = false; }
-    if (g.colorDirty) { g.mesh.instanceColor.needsUpdate = true; g.colorDirty = false; }
+    flush(g);
   }
   // Walk through the canopy a slice at a time, nudging colours and leaf cover toward the season.
   function sweep(g, Sv, budget) {
@@ -128,9 +146,9 @@
       const vis = U.seasonColor(PAL_LIST[g.pal[i]], g.rr[i], Sv, tmpC), o = i * 3;
       if (Math.abs(tmpC.r - g.col[o]) + Math.abs(tmpC.g - g.col[o + 1]) + Math.abs(tmpC.b - g.col[o + 2]) > 0.006) {
         g.col[o] = tmpC.r; g.col[o + 1] = tmpC.g; g.col[o + 2] = tmpC.b;
-        g.mesh.setColorAt(i, tmpC); g.colorDirty = true;
+        setColor(g, i, tmpC);
       }
-      if (Math.abs(vis - g.vis[i]) > 0.004) { g.vis[i] = vis; setVoxel(g, i); g.matDirty = true; }
+      if (Math.abs(vis - g.vis[i]) > 0.004) { g.vis[i] = vis; setVoxel(g, i); }
     }
   }
   function clearGrower(g) { g.n = g.base; g.pending.length = 0; g.shrinking.length = 0; g.cursor = 0; g.mesh.count = g.n; }
@@ -962,13 +980,14 @@
     if (!grass) return;
     grass.count = Math.floor(grass.instanceMatrix.count * grassDensity / 4);
     grass.visible = grassDensity > 0;
-    grassS = -99;
+    grassS = -99; grassVer = -1; grassCursor = -1;
   };
   const gq = new THREE.Quaternion(), gUp = new THREE.Vector3(0, 1, 0), gPos = new THREE.Vector3(), gScale = new THREE.Vector3();
+  // Re-tints and re-scales the blades a slice at a time, so a season change never stalls a frame.
+  let grassCursor = -1, grassPassS = 0;
   function updateGrass() {
     if (!grass || !grass.visible) return;
-    const verChanged = grassVer !== GD.version, seasonChanged = Math.abs(S.season - grassS) > 0.01;
-    if (!verChanged && !seasonChanged) return;
+    const verChanged = grassVer !== GD.version;
     if (verChanged) {
       grassVer = GD.version;
       const cells = new Map();
@@ -976,27 +995,37 @@
         const r = CLEAR[it.k];
         if (!r) continue;
         for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
-          const key = (Math.round(it.x) + dx) + ',' + (Math.round(it.z) + dz);
-          (cells.get(key) || cells.set(key, []).get(key)).push([it.x, it.z, r]);
+          const key = (Math.round(it.x) + dx) * 4096 + (Math.round(it.z) + dz);
+          (cells.get(key) || cells.set(key, []).get(key)).push(it.x, it.z, r);
         }
       }
-      for (let i = 0; i < grass.count; i++) {
-        const list = cells.get(Math.round(gData.x[i]) + ',' + Math.round(gData.z[i]));
-        gData.hide[i] = list && list.some(([x, z, r]) => Math.hypot(gData.x[i] - x, gData.z[i] - z) < r) ? 1 : 0;
+      const total = grass.instanceMatrix.count;
+      for (let i = 0; i < total; i++) {
+        const list = cells.get(Math.round(gData.x[i]) * 4096 + Math.round(gData.z[i]));
+        let hide = 0;
+        if (list) for (let j = 0; j < list.length && !hide; j += 3) if (Math.hypot(gData.x[i] - list[j], gData.z[i] - list[j + 1]) < list[j + 2]) hide = 1;
+        gData.hide[i] = hide;
       }
     }
-    grassS = S.season;
-    for (let i = 0; i < grass.count; i++) {
-      const vis = gData.hide[i] ? 0 : U.seasonColor(GRASS_PAL, gData.r[i], S.season, tmpC);
+    if (grassCursor < 0) {
+      if (!verChanged && Math.abs(S.season - grassS) <= 0.01) return;
+      grassCursor = 0; grassPassS = S.season; grassS = S.season;
+    } else if (verChanged) grassCursor = 0;
+    const end = Math.min(grass.count, grassCursor + 2500), start = grassCursor;
+    for (let i = start; i < end; i++) {
+      const vis = gData.hide[i] ? 0 : U.seasonColor(GRASS_PAL, gData.r[i], grassPassS, tmpC);
       grass.setColorAt(i, tmpC.multiplyScalar(0.88 + ((gData.r[i] * 13.7) % 1) * 0.24));
-      const s = gData.sc[i] * vis;
+      const k = Math.max(gData.sc[i] * vis, 0.0001);
       gq.setFromAxisAngle(gUp, gData.rot[i]);
-      const k = Math.max(s, 0.0001);
       M4.compose(gPos.set(gData.x[i], gData.y[i], gData.z[i]), gq, gScale.set(k * 2.2, k * (0.75 + gData.r[i] * 0.6) * 1.15, k * 2.2));
       grass.setMatrixAt(i, M4);
     }
-    grass.instanceMatrix.needsUpdate = true;
-    if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
+    if (end > start) {
+      const m = grass.instanceMatrix, c = grass.instanceColor;
+      m.updateRange.offset = start * 16; m.updateRange.count = (end - start) * 16; m.needsUpdate = true;
+      c.updateRange.offset = start * 3; c.updateRange.count = (end - start) * 3; c.needsUpdate = true;
+    }
+    grassCursor = end >= grass.count ? -1 : end;
   }
 
   GD.init = function () {
@@ -1019,6 +1048,7 @@
     W.uniforms.uSwayAmp.value = 0.6 + wind * 0.9;
     updateGrower(woodG, t); updateGrower(leafG, t); updateGrower(glowG, t);
     sweep(leafG, S.season, 2600);
+    flush(leafG);
     glowMat.color.setScalar(0.75 + 1.5 * S.glow);
     if (featVersion !== GD.version) rebuildFeatures();
     updateGrass();

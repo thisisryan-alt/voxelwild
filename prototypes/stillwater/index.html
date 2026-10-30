@@ -42,7 +42,9 @@
 
   /* Title card */
   .intro {
-    position: fixed; inset: 0; z-index: 40; display: grid; align-items: end; justify-items: start;
+    /* the auto top margin on the card keeps it at the bottom, and lets it scroll instead of clipping on short screens */
+    position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: flex-start;
+    overflow-y: auto; overscroll-behavior: contain;
     padding-block: 8vh;
     padding-left: max(16px, env(safe-area-inset-left, 0px), 7vw);
     padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -50,7 +52,7 @@
     transition: opacity 2.2s ease;
   }
   .intro.gone { opacity: 0; pointer-events: none; }
-  .intro-inner { max-width: 35rem; min-width: 0; }
+  .intro-inner { max-width: 35rem; min-width: 0; margin-top: auto; }
   .intro h1 {
     font-family: var(--display); font-style: italic; font-weight: 400; margin: 0 0 0.25em;
     font-size: clamp(3.4rem, 12vw, 7.5rem); line-height: 0.9; letter-spacing: -0.01em;
@@ -60,6 +62,12 @@
   .actions { display: flex; flex-wrap: wrap; gap: 12px; }
   .fine { font-size: 0.95rem; color: var(--ink-soft); margin: 1.2rem 0 0; line-height: 1.5; text-shadow: 0 1px 14px rgba(10, 26, 33, 0.7); }
   .nogl { color: var(--lantern); }
+  @media (max-height: 520px) {
+    .intro { padding-block: 16px; }
+    .intro h1 { font-size: clamp(2.4rem, 17vh, 4.5rem); }
+    .lede { font-size: 1rem; margin-bottom: 0.9rem; }
+    .fine { margin-top: 0.7rem; font-size: 0.86rem; }
+  }
 
   /* Controls */
   .hud {

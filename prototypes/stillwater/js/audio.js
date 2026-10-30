@@ -340,21 +340,27 @@
     update(e) {
       if (!this.ready()) return;
       const ctx = this.ctx, now = ctx.currentTime, tc = 0.12, wx = S.weather, b = S.breath.b;
-      this.surf.gain.setTargetAtTime(0.16 + 0.3 * b, now, tc);
-      this.surfLP.frequency.setTargetAtTime(260 + 520 * b, now, tc);
-      const x = S.breath.outT, w = x < 0.9 ? x / 0.9 : Math.exp(-(x - 0.9) * 0.75);
-      this.wash.gain.setTargetAtTime(0.012 + 0.11 * w, now, tc);
-      this.washBP.frequency.setTargetAtTime(900 + 1500 * w, now, tc);
-      this.wind.gain.setTargetAtTime((0.03 + 0.05 * wx.wind) * (1 - wx.snow * 0.4), now, 0.5);
-      this.windBP.frequency.setTargetAtTime(330 + 260 * wx.wind + 80 * Math.sin(S.t * 0.031), now, 0.5);
-      this.rain.gain.setTargetAtTime(wx.rain * 0.16, now, 0.5);
-      this.rainLow.gain.setTargetAtTime(wx.rain * 0.12, now, 0.5);
+      // Smoothly gliding levels are retargeted 20 times a second rather than every frame, which keeps the
+      // audio thread's automation queue short on fast displays.
+      const glide = !(now < this.nextGlide);
+      if (glide) {
+        this.nextGlide = now + 0.05;
+        this.surf.gain.setTargetAtTime(0.16 + 0.3 * b, now, tc);
+        this.surfLP.frequency.setTargetAtTime(260 + 520 * b, now, tc);
+        const x = S.breath.outT, w = x < 0.9 ? x / 0.9 : Math.exp(-(x - 0.9) * 0.75);
+        this.wash.gain.setTargetAtTime(0.012 + 0.11 * w, now, tc);
+        this.washBP.frequency.setTargetAtTime(900 + 1500 * w, now, tc);
+        this.wind.gain.setTargetAtTime((0.03 + 0.05 * wx.wind) * (1 - wx.snow * 0.4), now, 0.5);
+        this.windBP.frequency.setTargetAtTime(330 + 260 * wx.wind + 80 * Math.sin(S.t * 0.031), now, 0.5);
+        this.rain.gain.setTargetAtTime(wx.rain * 0.16, now, 0.5);
+        this.rainLow.gain.setTargetAtTime(wx.rain * 0.12, now, 0.5);
+        this.fire.gain.setTargetAtTime(e.fire * 0.09, now, 0.4);
+        this.falls.gain.setTargetAtTime((e.falls || 0) * 0.22, now, 0.4);
+      }
       if (wx.rain > 0.05 && now > this.nextDrip) {
         this.noiseBurst(now + 0.01, 0.03, 2500 + rand() * 3000, 2, 0.02 * wx.rain, this.ch.rain, rand() * 1.6 - 0.8);
         this.nextDrip = now + 0.02 + rand() * 0.12 / wx.rain;
       }
-      this.fire.gain.setTargetAtTime(e.fire * 0.09, now, 0.4);
-      this.falls.gain.setTargetAtTime((e.falls || 0) * 0.22, now, 0.4);
       if ((e.springs || 0) > 0.05 && now > this.nextBubble) {
         const o = ctx.createOscillator(), g = ctx.createGain(), f0 = 300 + rand() * 500, out = this.pan(rand() * 0.8 - 0.4, this.ch.falls);
         o.frequency.setValueAtTime(f0, now); o.frequency.exponentialRampToValueAtTime(f0 * 1.8, now + 0.05);

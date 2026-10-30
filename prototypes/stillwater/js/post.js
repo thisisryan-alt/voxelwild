@@ -255,9 +255,13 @@
     for (let i = 0; i < LEVELS; i++) { bw = Math.max(1, bw >> 1); bh = Math.max(1, bh >> 1); down.push(makeRT(bw, bh, hdrType, false)); if (i < LEVELS - 1) up.push(makeRT(bw, bh, hdrType, false)); }
     PP.targets = { rtA, rtB, rtAO1, rtRefl };
   }
+  let builtFor = '';
   PP.resize = function () {
     if (!ok) return;
     renderer.getDrawingBufferSize(size);
+    const key = size.x + 'x' + size.y + S.quality;   // the AO target's scale depends on quality
+    if (key === builtFor) return;
+    builtFor = key;
     build();
   };
 
@@ -266,15 +270,16 @@
   const virt = new THREE.PerspectiveCamera(), texMat = new THREE.Matrix4();
   const plane = new THREE.Plane(), clipPlane = new THREE.Vector4(), q = new THREE.Vector4();
   const camPos = new THREE.Vector3(), look = new THREE.Vector3(), rot = new THREE.Matrix4(), N = new THREE.Vector3(0, 1, 0), P0 = new THREE.Vector3();
+  const view = new THREE.Vector3(), target = new THREE.Vector3();
   PP.texMat = texMat;
   function renderReflection() {
     P0.set(0, SW.K.WL, 0);
     camPos.setFromMatrixPosition(camera.matrixWorld);
     if (camPos.y < P0.y) return false;
-    const view = new THREE.Vector3().subVectors(P0, camPos).reflect(N).negate().add(P0);
+    view.subVectors(P0, camPos).reflect(N).negate().add(P0);
     rot.extractRotation(camera.matrixWorld);
     look.set(0, 0, -1).applyMatrix4(rot).add(camPos);
-    const target = new THREE.Vector3().subVectors(P0, look).reflect(N).negate().add(P0);
+    target.subVectors(P0, look).reflect(N).negate().add(P0);
     virt.position.copy(view);
     virt.up.set(0, 1, 0).applyMatrix4(rot).reflect(N);
     virt.lookAt(target);
@@ -300,12 +305,15 @@
   }
 
   // ------------------------------------------------------------------- render
-  const sunScreen = new THREE.Vector3(), camFwd = new THREE.Vector3();
+  const sunScreen = new THREE.Vector3(), camFwd = new THREE.Vector3(), WHITE = new THREE.Color(1, 1, 1);
+  let frameNo = 0;
   const pass = (m, target) => { quad.material = m; renderer.setRenderTarget(target); renderer.render(quadScene, quadCam); };
   PP.render = function () {
     const near = camera.near, far = camera.far;
     for (const m of [aoMat, aoBlurMat, copyMat, compMat, dofMat]) { m.uniforms.uNear.value = near; m.uniforms.uFar.value = far; }
-    renderer.shadowMap.needsUpdate = true;
+    // Balanced redraws the shadow map every other frame; the sun and most shadows move slowly.
+    frameNo++;
+    if (S.quality !== 'balanced' || frameNo % 2) renderer.shadowMap.needsUpdate = true;
     const reflOn = PP.reflections && renderReflection();
     SW.world.setWaterInputs({ refl: reflOn ? rtRefl.texture : null, scene: rtA.texture, depth: rtA.depthTexture, ao: rtAO1.texture, res: size, texMat, near, far });
 
@@ -383,7 +391,7 @@
     C.uCamPos.value.copy(camera.position); C.uCamFwd.value.copy(camFwd);
     const tod = S.tod, morning = (1 - smooth(0.06, 0.2, tod)) * smooth(0.0, 0.02, tod) + smooth(0.97, 1.0, tod);
     C.uMist.value = (morning * 0.6 + S.weather.fog * 0.3) * (1 - S.weather.rain * 0.5);
-    C.uMistCol.value.copy(E.hor).lerp(new THREE.Color(1, 1, 1), 0.25);
+    C.uMistCol.value.copy(E.hor).lerp(WHITE, 0.25);
     const dofOn = PP.dof && S.quality === 'high';
     pass(compMat, dofOn ? rtD : rtC);
     let src = dofOn ? rtD : rtC;
@@ -404,11 +412,17 @@
     W = SW.world; renderer = W.renderer; scene = W.scene; camera = W.camera;
     const ext = renderer.extensions, isGL2 = renderer.capabilities.isWebGL2;
     const has = (n) => (ext.has ? ext.has(n) : !!ext.get(n));
-    if (!isGL2 && !has('WEBGL_depth_texture')) return;
+    if (!isGL2 && !(has('WEBGL_depth_texture') && has('EXT_frag_depth'))) return;   // the depth copy needs both
     hdrType = (isGL2 ? has('EXT_color_buffer_float') : has('OES_texture_half_float') && has('EXT_color_buffer_half_float')) ? THREE.HalfFloatType : THREE.UnsignedByteType;
     ok = true;
     renderer.getDrawingBufferSize(size);
+    builtFor = size.x + 'x' + size.y + S.quality;
     build();
+  };
+  // Compile the passes that only run some of the time (sun shafts, depth of field) before they are needed.
+  PP.warm = function () {
+    if (!ok) return;
+    for (const m of [aoMat, aoBlurMat, copyMat, preMat, downMat, upMat, rayMaskMat, rayBlurMat, compMat, dofMat, fxaaMat]) { quad.material = m; renderer.compile(quadScene, quadCam); }
   };
   PP.available = () => ok;
   PP.debugAO = (on) => { copyMat.uniforms.uDebug.value = on ? 1 : 0; };

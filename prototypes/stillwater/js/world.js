@@ -39,10 +39,33 @@
   }
   W.resize = resize;
 
+  // renderScale (0.6–1) lowers the drawing resolution a little when frames run long; see watchFrameRate in main.js.
+  W.renderScale = 1;
+  function applyPixelRatio() {
+    const q = S.quality, base = Math.min(window.devicePixelRatio || 1, q === 'high' ? 1.75 : q === 'balanced' ? 1.25 : 1);
+    const pr = base * W.renderScale;
+    renderer.setPixelRatio(pr); prU.value = pr; W.pixelRatio = pr; W.basePixelRatio = base;
+  }
+  W.setRenderScale = function (s) {
+    if (Math.abs(s - W.renderScale) < 0.01) return;
+    W.renderScale = s;
+    applyPixelRatio();
+    resize();
+  };
+  // Compile every material up front, including things not yet on screen (rain, snow, lanterns, other islands),
+  // so they do not stall a frame the first time they appear.
+  W.warmUp = function () {
+    const target = SW.post.enabled && SW.post.targets ? SW.post.targets.rtA : null;
+    renderer.setRenderTarget(target);
+    renderer.compile(scene, camera);
+    renderer.setRenderTarget(null);
+    SW.post.warm();
+  };
+
   W.setQuality = function (q) {
     S.quality = q;
-    const pr = Math.min(window.devicePixelRatio || 1, q === 'high' ? 1.75 : q === 'balanced' ? 1.25 : 1);
-    renderer.setPixelRatio(pr); prU.value = pr; W.pixelRatio = pr;
+    W.renderScale = 1;
+    applyPixelRatio();
     const shadows = q !== 'low', size = q === 'high' ? 4096 : 2048;
     sun.shadow.radius = q === 'high' ? 2 : 1;
     if (sun.shadow.mapSize.x !== size) {
@@ -56,6 +79,7 @@
     SW.post.setQuality(q);
     if (SW.garden && SW.garden.setGrassDensity) SW.garden.setGrassDensity(q);
     resize();
+    if (W.ready) W.warmUp();
   };
 
   W.isOnScreen = function (p, maxDist = 80) {
@@ -568,12 +592,14 @@
     blocks.forEach((b, i) => {
       m.makeTranslation(b[0], b[1], b[2]); terrain.setMatrixAt(i, m);
       tKind[i] = b[3]; tRand[i] = rng(); tJit[i] = (rng() - 0.5) * 0.07;
-      terrain.setColorAt(i, TSTATIC[b[3]] || TSTATIC[0]);
+      if (TPAL[b[3]]) U.seasonColor(TPAL[b[3]], tRand[i], S.season, tmpC);
+      else tmpC.copy(TSTATIC[b[3]] || TSTATIC[0]);
+      terrain.setColorAt(i, tmpC.multiplyScalar(1 + tJit[i]));
     });
     terrain.castShadow = true; terrain.receiveShadow = true;
     scene.add(terrain);
     W.terrain = terrain;
-    recolorTerrain(S.season);
+    lastTerrainS = S.season;
 
     // seabed height texture for the water shader
     const data = new Uint8Array(G * G * 4);
@@ -585,16 +611,21 @@
     W.heightTex.magFilter = THREE.LinearFilter; W.heightTex.minFilter = THREE.LinearFilter;
     W.heightTex.needsUpdate = true;
   }
-  function recolorTerrain(Sv) {
-    lastTerrainS = Sv;
-    for (let i = 0; i < tKind.length; i++) {
+  // Seasonal recolouring is spread over several frames, and each frame uploads only the slice it touched,
+  // so the turn of the seasons never stalls a frame. Rock, soil and ice keep the colours set at build time.
+  let tCursor = -1, tPassS = 0;
+  function recolorTerrain(Sv, count) {
+    if (tCursor < 0) { tCursor = 0; tPassS = Sv; }
+    const n = tKind.length, from = tCursor, end = Math.min(n, from + count), attr = terrain.instanceColor;
+    for (let i = from; i < end; i++) {
       const k = tKind[i];
-      if (TPAL[k]) U.seasonColor(TPAL[k], tRand[i], Sv, tmpC);
-      else tmpC.copy(TSTATIC[k]);
-      tmpC.multiplyScalar(1 + tJit[i]);
-      terrain.setColorAt(i, tmpC);
+      if (k === 6 || !TPAL[k]) continue;
+      U.seasonColor(TPAL[k], tRand[i], tPassS, tmpC);
+      terrain.setColorAt(i, tmpC.multiplyScalar(1 + tJit[i]));
     }
-    terrain.instanceColor.needsUpdate = true;
+    attr.updateRange.offset = from * 3; attr.updateRange.count = (end - from) * 3; attr.needsUpdate = true;
+    tCursor = end >= n ? -1 : end;
+    if (tCursor < 0) lastTerrainS = tPassS;
   }
 
   // ------------------------------------------------------------------- water
@@ -1087,7 +1118,12 @@
     scene.add(pts);
     return {
       pts, pos, col, al, sz, max,
-      dirty() { for (const k of ['position', 'aC', 'aA', 'aS']) geo.attributes[k].needsUpdate = true; },
+      // positions and alpha always; colours and sizes only when they may have changed
+      dirty(all = true) {
+        const A = geo.attributes;
+        A.position.needsUpdate = true; A.aA.needsUpdate = true;
+        if (all) { A.aC.needsUpdate = true; A.aS.needsUpdate = true; }
+      },
     };
   };
   // Short-lived particles: smoke, spray, sparks.
@@ -1230,7 +1266,7 @@
     { clear: 0.3, fair: 0.25, snow: 0.35, fog: 0.1 },
   ];
   let wxKind = 'fair', wxTimer = 150, wxMode = 'auto', rainPeak = 0, rainbowT = 0, auroraNight = -1, auroraOn = false;
-  W.setWeatherMode = function (m) { wxMode = m; if (m === 'auto') wxTimer = 40; };
+  W.setWeatherMode = function (m) { wxMode = WX_TYPES[m] ? m : 'auto'; if (wxMode === 'auto') wxTimer = 40; };   // an unknown saved value falls back to changing weather
   W.weatherKind = () => wxKind;
   function pickWeighted(w) {
     let r = Math.random() * Object.values(w).reduce((a, b) => a + b, 0);
@@ -1353,7 +1389,7 @@
     updateShootingStar(dt);
     updateLights(t);
     updateFeatures(dt, t);
-    if (Math.abs(S.season - lastTerrainS) > 0.004) recolorTerrain(S.season);
+    if (tCursor >= 0 || Math.abs(S.season - lastTerrainS) > 0.004) recolorTerrain(S.season, 4000);
     sightings(dt);
   };
 })(window.SW);

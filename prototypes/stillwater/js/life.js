@@ -36,6 +36,16 @@
   const season = () => U.seasonIndex(S.season);
   // Most visitors gather around wherever you are looking.
   const nearFocus = (p, r = 24) => Math.hypot(p.x - W.focus.x, p.z - W.focus.z) < r;
+  // Lists of nearby plants and perches change slowly: build each at most twice a second and share it between
+  // the creatures that ask, rather than filtering every list for every creature on every frame.
+  const listCache = new Map();
+  function shared(key, build) {
+    const e = listCache.get(key);
+    if (e && S.t - e.t < 0.5 && S.t >= e.t) return e.v;
+    const v = build();
+    listCache.set(key, { t: S.t, v });
+    return v;
+  }
   const pickNear = (list, x, z, r) => { const near = list.filter((p) => Math.hypot(p[0] - x, p[1] - z) < r); return near.length ? U.pick(rand, near) : null; };
 
   // --------------------------------------------------------------------- koi
@@ -104,7 +114,7 @@
     part(c.L, col, 0.13, 0.008, 0.1, -0.065, 0, 0.02); part(c.L, col, 0.09, 0.008, 0.07, -0.05, 0, -0.06);
     part(c.R, col, 0.13, 0.008, 0.1, 0.065, 0, 0.02); part(c.R, col, 0.09, 0.008, 0.07, 0.05, 0, -0.06);
     c.update = (dt, t) => {
-      const nectar = GD.feat.nectar.filter((n) => t > n.ready && nearFocus(n));
+      const nectar = shared('nectar', () => GD.feat.nectar.filter((n) => S.t > n.ready && nearFocus(n)));
       const want = Math.min(10, 2 + nectar.length);
       const si = season();
       const active = S.dayness > 0.6 && (si === 0 || si === 1 || (si === 2 && S.season % 1 < 0.4)) && S.weather.rain < 0.3 && S.weather.snow < 0.2 && c.i < want;
@@ -186,7 +196,7 @@
       return list;
     };
     c.update = (dt, t) => {
-      const F = GD.feat, homes = F.tree.filter((p) => nearFocus(p)).length + F.birdhouse.filter((p) => nearFocus(p)).length * 2;
+      const F = GD.feat, homes = shared('homes', () => F.tree.filter((p) => nearFocus(p)).length + F.birdhouse.filter((p) => nearFocus(p)).length * 2);
       const active = S.dayness > 0.5 && S.weather.rain < 0.5 && c.i < Math.min(6, homes);
       const pos = g.position;
       if (c.state === 'away') {
@@ -289,8 +299,8 @@
       g.rotation.y = yaw(next.x - g.position.x, next.z - g.position.z);
     };
     c.update = (dt, t) => {
-      const pads = GD.feat.pad.filter((p) => t > p.ready && nearFocus(p, 30));
-      const lilies = new Set(pads.map((p) => p.rec)).size;
+      const pads = shared('pads', () => GD.feat.pad.filter((p) => S.t > p.ready && nearFocus(p, 30)));
+      const lilies = shared('lilies', () => new Set(pads.map((p) => p.rec)).size);
       const active = season() !== 3 && c.i < Math.min(4, lilies);
       fadeTo(c, active && !!c.pad, dt);
       if (!active) { c.pad = null; return; }
@@ -467,7 +477,7 @@
     c.w = [];
     for (const z of [0.03, -0.02]) for (const s of [-1, 1]) c.w.push(part(g, wing, 0.13, 0.004, 0.035, s * 0.07, 0.01, z));
     c.update = (dt, t) => {
-      const anchors = GD.feat.reed.concat(GD.feat.pad, GD.feat.reef).filter((p) => t > p.ready && nearFocus(p));
+      const anchors = shared('dragonfly', () => GD.feat.reed.concat(GD.feat.pad, GD.feat.reef).filter((p) => S.t > p.ready && nearFocus(p)));
       const si = season();
       const active = S.dayness > 0.6 && (si === 1 || (si === 0 && S.season % 1 > 0.6)) && S.weather.rain < 0.3 && anchors.length > 0 && c.i < 3;
       if (!fadeTo(c, active, dt)) return;
@@ -497,7 +507,7 @@
     c.eyes = [part(c.head, eye, 0.05, 0.05, 0.02, -0.045, 0, 0.11), part(c.head, eye, 0.05, 0.05, 0.02, 0.045, 0, 0.11)];
     part(c.head, 0x5a4634, 0.04, 0.07, 0.04, -0.08, 0.1, 0); part(c.head, 0x5a4634, 0.04, 0.07, 0.04, 0.08, 0.1, 0);
     c.update = (dt, t) => {
-      const perches = GD.feat.perch.filter((p) => p.tree && t > p.ready && nearFocus(p, 20));
+      const perches = shared('owl', () => GD.feat.perch.filter((p) => p.tree && S.t > p.ready && nearFocus(p, 20)));
       const active = S.night > 0.6 && S.weather.rain < 0.5;
       if (active && (!c.perch || !perches.includes(c.perch))) {
         c.perch = perches.sort((a, b) => b.y - a.y)[0] || { x: W.dock.pole.x, y: W.dock.pole.y + 0.08, z: W.dock.pole.z };
@@ -989,7 +999,7 @@
   SW.on('island', () => { if (boat && !trip) mooring(); });
 
   // ---------------------------------------------------------------- particles
-  let fireflies, ffData, fall, fallData, flames, puffs, sparkle;
+  let fireflies, ffData, fall, fallData, flames, puffs, sparkle, ffIdle = false, fallBusy = true;
   const FF = 150, FALL = 260;
   function initParticles() {
     fireflies = W.makePoints(FF, 'glow', true, 620);
@@ -1009,8 +1019,12 @@
   L.splash = splash;
   function updateParticles(dt, t) {
     const si = season(), glow = smooth(0.15, 0.75, S.night), density = [0.5, 1, 0.35, 0][si] * (1 - S.weather.rain);
-    {
-      const n = Math.floor(FF * density);
+    const n = Math.floor(FF * density);
+    if (n === 0 || glow < 0.002) {
+      // by day, and in winter, there is nothing to move or upload
+      if (!ffIdle) { ffIdle = true; fireflies.al.fill(0); fireflies.dirty(false); }
+    } else {
+      ffIdle = false;
       for (let i = 0; i < FF; i++) {
         const f = ffData[i], s = t * 0.25 * f.f + f.p;
         fireflies.pos[i * 3] = f.x + Math.sin(s) * 1.3 + Math.sin(s * 2.3) * 0.4;
@@ -1018,12 +1032,13 @@
         fireflies.pos[i * 3 + 2] = f.z + Math.cos(s * 0.9) * 1.3;
         fireflies.al[i] = i < n ? glow * (0.15 + 0.85 * Math.pow(0.5 + 0.5 * Math.sin(t * f.f * 1.6 + f.p * 7), 2)) : 0;
       }
-      fireflies.dirty();
+      fireflies.dirty(false);
       if (glow > 0.5 && n > 10) SW.emit('seeIf', { id: 'fireflies', pos: tmpV.set(ffData[0].x, ffData[0].y, ffData[0].z) });
     }
     // Falling petals in spring and leaves in autumn
     {
       const sf = S.season % 1, rate = si === 0 && sf < 0.7 ? 0.25 : si === 2 ? 0.2 + sf * 0.6 : 0;
+      let spawned = false;
       if (rate > 0) {
         for (const src of GD.feat.leafSrc) {
           if (t < src.ready || rand() > dt * rate * 0.3) continue;
@@ -1035,12 +1050,15 @@
           SW.garden.colorOf(src.pal, tmpC);
           const i = fallData.indexOf(slot);
           fall.col[i * 3] = tmpC.r; fall.col[i * 3 + 1] = tmpC.g; fall.col[i * 3 + 2] = tmpC.b;
+          spawned = true;
         }
       }
       const wind = S.weather.wind, b = S.breath.b;
+      let active = 0;
       for (let i = 0; i < FALL; i++) {
         const p = fallData[i];
         if (!p.on) { fall.al[i] = 0; continue; }
+        active++;
         if (!p.landed) {
           p.x += (0.2 + wind * 0.5 + 0.22 * Math.sin(t * 0.6 + p.s)) * dt + Math.sin(t * 3 + p.s) * 0.006;
           p.z += 0.12 * Math.cos(t * 0.5 + p.s) * dt;
@@ -1055,7 +1073,8 @@
         fall.pos[i * 3] = p.x; fall.pos[i * 3 + 1] = p.y; fall.pos[i * 3 + 2] = p.z;
         fall.al[i] = clamp(p.life, 0, 1) * 0.95;
       }
-      fall.dirty();
+      if (active || fallBusy) fall.dirty(spawned);
+      fallBusy = active > 0;
     }
     // campfires and chimneys
     for (const f of GD.feat.fire) {

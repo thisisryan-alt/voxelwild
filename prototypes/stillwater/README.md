@@ -88,8 +88,10 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
 - **Meadow grass:** about ten thousand swaying blade tufts that change with the seasons and part
   around paths and buildings.
 - **Quality:** Sharp (everything), Balanced (no reflections or depth of field, half the grass) and
-  Light (no post-processing or grass). If the first seconds run slowly, the game steps down a level
-  on its own unless you chose one.
+  Light (no post-processing or grass). Unless you chose a level in Settings, slow frames first lower
+  the drawing resolution a little and then step down a level; resolution comes back when there is
+  room. Shaders are compiled at start, and seasonal recolouring is spread over several frames, so
+  weather and seasons change without stutter.
 
 ## Design choices and their sources
 

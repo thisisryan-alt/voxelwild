@@ -10,6 +10,7 @@
   let W, GD, L, A, fig;
   const P = {};
   let path = [], seatGoal = null, seat = null, stepDist = 0, kneel = 0, heldKeys = new Set();
+  let goal = null, replans = 0, stuckT = 0, wayBest = Infinity;   // for finding a new way round when blocked
   const SPEED = 1.5;
 
   // ------------------------------------------------------------------ figure
@@ -54,11 +55,14 @@
   const canStep = (y0, y1) => y1 - y0 <= 1.05 && y0 - y1 <= 3.05;
   // Solid things you walk around rather than through.
   const BLOCK = { cabin: 1.25, windmill: 0.85, lantern: 0.3, campfire: 0.45, cairn: 0.3, birdhouse: 0.15, chime: 0.15, bush: 0.55, wreck: 0, pavilion: 0, bench: 0 };
+  function solidR(it) {
+    const def = GD.CAT[it.k];
+    if (!def || !def.solid) return 0;
+    return BLOCK[it.k] != null ? BLOCK[it.k] : def.tree ? 0.32 : 0;
+  }
   function collide(pos) {
     for (const it of GD.items) {
-      const def = GD.CAT[it.k];
-      if (!def.solid) continue;
-      const r = BLOCK[it.k] != null ? BLOCK[it.k] : def.tree ? 0.32 : 0;
+      const r = solidR(it);
       if (!r) continue;
       const dx = pos.x - it.x, dz = pos.z - it.z, d = Math.hypot(dx, dz);
       if (d < r + 0.2 && d > 0.001) { pos.x = it.x + dx / d * (r + 0.2); pos.z = it.z + dz / d * (r + 0.2); }
@@ -88,6 +92,18 @@
     const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
     const s = idx(ox, oz);
     if (yAt(ox, oz) < -50) return null;
+    // cells taken by trees, bushes and buildings, which the walker would otherwise press against forever
+    const blocked = new Uint8Array(N * N);
+    for (const it of GD.items) {
+      const r = solidR(it);
+      if (!r || Math.abs(it.x - ox) > R + 3 || Math.abs(it.z - oz) > R + 3) continue;
+      const reach = r + 0.4;
+      for (let x = Math.ceil(it.x - reach); x <= Math.floor(it.x + reach); x++) for (let z = Math.ceil(it.z - reach); z <= Math.floor(it.z + reach); z++) {
+        if (Math.abs(x - ox) <= R && Math.abs(z - oz) <= R && Math.hypot(x - it.x, z - it.z) < reach) blocked[idx(x, z)] = 1;
+      }
+    }
+    blocked[s] = 0;
+    const open = (x, z) => !blocked[idx(x, z)] && yAt(x, z) > -50;
     g[s] = 0; push(Math.hypot(gx - ox, gz - oz), s);
     let best = s, bestH = Math.hypot(gx - ox, gz - oz), steps = 0;
     while (heap.length && steps++ < 9000) {
@@ -102,9 +118,15 @@
         if (!dx && !dz) continue;
         const nx = x + dx, nz = z + dz;
         if (Math.abs(nx - ox) > R || Math.abs(nz - oz) > R) continue;
+        if (!open(nx, nz)) continue;
         const ny = yAt(nx, nz);
-        if (ny < -50 || !canStep(y, ny)) continue;
-        if (dx && dz && (yAt(x + dx, z) < -50 || yAt(x, z + dz) < -50)) continue;
+        if (!canStep(y, ny)) continue;
+        // a diagonal step must not clip the corner of a cliff, a tree or the sea
+        if (dx && dz) {
+          if (!open(x + dx, z) || !open(x, z + dz)) continue;
+          const a = yAt(x + dx, z), b = yAt(x, z + dz);
+          if (!canStep(y, a) || !canStep(y, b) || !canStep(a, ny) || !canStep(b, ny)) continue;
+        }
         const j = idx(nx, nz), cost = g[i] + (dx && dz ? 1.414 : 1) * (wet[j] ? 2.5 : 1);
         if (cost < g[j]) { g[j] = cost; from[j] = i; push(cost + Math.hypot(gx - nx, gz - nz), j); }
       }
@@ -136,6 +158,7 @@
     seatGoal = null;
     if (!res || !res.cells.length) return false;
     path = res.cells; seat = null;
+    goal = { x, z }; replans = 0; stuckT = 0; wayBest = Infinity;
     return res.reached;
   };
   WK.goSit = function (st) {
@@ -144,6 +167,16 @@
     if (ok) { seatGoal = st; path.push([st.x, st.z]); }
     return ok;
   };
+  // If the walker stops getting closer to the next step, look for another way from here (twice at most).
+  function replan() {
+    if (!goal || replans >= 2) return false;
+    replans++;
+    const res = findPath(WK.pos.x, WK.pos.z, goal.x, goal.z);
+    if (!res || !res.cells.length) return false;
+    path = res.cells;
+    if (seatGoal) path.push([seatGoal.x, seatGoal.z]);
+    return true;
+  }
   WK.front = (d) => ({ x: WK.pos.x + Math.sin(WK.facing) * d, z: WK.pos.z + Math.cos(WK.facing) * d });
   WK.kneel = () => { kneel = 0.9; };
   WK.seatNear = function (x, z, r = 1.3) {
@@ -179,11 +212,21 @@
       const fx = -Math.cos(camTheta), fz = -Math.sin(camTheta);
       dx = fx * fwd - fz * side; dz = fz * fwd + fx * side;
     } else if (path.length) {
-      const p = path[0], ex = p[0] - pos.x, ez = p[1] - pos.z, d = Math.hypot(ex, ez);
-      if (d < (path.length > 1 ? 0.45 : 0.12)) {
-        path.shift();
-        if (!path.length && seatGoal) sitOn(seatGoal);
-      } else { dx = ex; dz = ez; }
+      // move on to the next step in the same frame, so the stride never stops for a frame at each one
+      let p = path[0], ex = p[0] - pos.x, ez = p[1] - pos.z, d = Math.hypot(ex, ez);
+      while (d < (path.length > 1 ? 0.45 : 0.12)) {
+        path.shift(); wayBest = Infinity; stuckT = 0;
+        if (!path.length) { if (seatGoal) sitOn(seatGoal); break; }
+        p = path[0]; ex = p[0] - pos.x; ez = p[1] - pos.z; d = Math.hypot(ex, ez);
+      }
+      if (path.length) {
+        dx = ex; dz = ez;
+        if (d < wayBest - 0.03) { wayBest = d; stuckT = 0; }
+        else if ((stuckT += dt) > 0.9) {
+          stuckT = 0; wayBest = Infinity;
+          if (!replan()) { path = []; seatGoal = null; dx = dz = 0; }
+        }
+      }
     }
     const len = Math.hypot(dx, dz);
     const here = groundAt(pos.x, pos.z) || { y: pos.y, kind: 'sand' };
@@ -198,7 +241,11 @@
         pos.x = nx; pos.z = nz;
         return true;
       };
-      if (!tryMove(dx, dz) && !tryMove(dx, 0) && !tryMove(0, dz)) { path = []; WK.moving = false; }
+      if (!tryMove(dx, dz) && !tryMove(dx, 0) && !tryMove(0, dz)) {
+        // on a path, ease back toward the middle of this block and let the stuck check find another way
+        const cx = Math.round(pos.x) - pos.x, cz = Math.round(pos.z) - pos.z, cl = Math.hypot(cx, cz);
+        if (!path.length || cl < 0.02 || !tryMove(cx / cl, cz / cl)) WK.moving = false;
+      }
       collide(pos);
       WK.facing += U.angDiff(WK.facing, Math.atan2(dx, dz)) * Math.min(1, dt * 9);
       stepDist += v;
