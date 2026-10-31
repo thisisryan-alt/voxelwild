@@ -254,6 +254,7 @@
   .isle.here { border-color: rgba(143, 211, 199, 0.5); background: rgba(143, 211, 199, 0.08); }
   .isle-here { font-size: 0.82rem; color: var(--tide); letter-spacing: 0.04em; }
   .isle-far { font-weight: 400; font-size: 0.82rem; color: var(--ink-soft); }
+  .isle-out { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0.6rem 0 0.8rem; }
   .pop-sub { font-family: var(--display); font-weight: 400; font-size: 1.15rem; margin: 1.1rem 0 0.5rem; }
   .isle.world { border-style: dashed; }
   /* the crossing between worlds */
@@ -344,6 +345,7 @@
 
 <div id="popIslands" class="pop wide" hidden role="dialog" aria-labelledby="popIslandsTitle">
   <h2 id="popIslandsTitle">Islands</h2>
+  <p class="isle-out"><button id="btnBoatOut" class="btn small">Take the boat out</button> <span class="opt-sub">Row anywhere you like, and step ashore where there is land.</span></p>
   <ul id="islandList" class="isles"></ul>
   <p class="pop-note">Rowing takes a slow half minute or so; Arrive now skips ahead. Tap the moored boat while walking to come here.</p>
   <h3 class="pop-sub">Other worlds</h3>
@@ -511,6 +513,7 @@
       <button class="seg" data-season="2">Autumn</button>
       <button class="seg" data-season="3">Winter</button>
     </div>
+    <p id="seasonNote" class="set-note" hidden></p>
   </section>
   <section class="set">
     <h3>Weather</h3>
@@ -540,7 +543,7 @@
   </section>
   <section class="set">
     <h3>Keys</h3>
-    <p class="set-note">W A S D or arrows walk · B breath guide · M sound · I islands · H hide controls · J journal · V next view · 1–9 handpan (when open) · Esc close</p>
+    <p class="set-note">W A S D or arrows walk, or row when out in the boat · R take the boat out or step ashore · F go fishing, and strike when the float dips · B breath guide · M sound · I islands · H hide controls · J journal · V next view · 1–9 handpan (when open) · Esc close</p>
   </section>
   <section class="set">
     <div id="resetRow" class="reset"></div>

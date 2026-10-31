@@ -9,8 +9,8 @@ fonts from Google Fonts; everything else is in `js/`.
 - **Four worlds**, each its own sea with its own islands, weather, music and garden. Sail between them
   from the Islands menu; your journal comes with you.
   - **Stillwater**, the original archipelago of seventeen islands (below).
-  - **Lantern Bay**, an evening lagoon where the days pass slowly: paper lanterns drift on the water,
-    houses stand on stilts over the shallows of Stilt Village, a lit pagoda crowns Pagoda Hill, cranes
+  - **Lantern Bay**, an evening lagoon where the days pass slowly: paper lanterns drift on the water
+    and the nearest light it after dusk, houses stand on stilts over the shallows of Stilt Village, a lit pagoda crowns Pagoda Hill, cranes
     wade Lotus Lagoon, fireflies fill Firefly Glade, and bats come out at dusk.
   - **Frost Fjord**, always deep winter: snow on everything, ice cliffs with arctic foxes, drifting
     icebergs, hot springs steaming in the snow, reindeer on Pine Ridge, seals and puffins, white hares
@@ -39,8 +39,11 @@ fonts from Google Fonts; everything else is in `js/`.
 - **Handpan:** press **Play** for a nine-note handpan in D major pentatonic (keys 1–9). Every note
   ripples the water nearby.
 - **Rowing:** a rowboat waits at whichever island you are on. Open **Islands** and choose *Row there*
-  for a slow trip with a follow camera, or *Look now* to glide the camera over. Visitors, weather, shadows
-  and lights follow you.
+  for a slow trip with a follow camera, or *Look now* to glide the camera over. Or choose *Take the boat
+  out* (or press R) and row wherever you like: the arrow keys or WASD row and steer, and a tap on the
+  water or a shore sets a course, which finds its way round any land in between. The boat glides to a
+  stop before it would run aground; *Step ashore* (or R) lands you wherever there is beach alongside.
+  You can fish from the boat. Visitors, weather, shadows and lights follow you.
 - **Garden:** 8 trees (oak, maple, birch, cherry, apple, willow, pine, palm), 9 plants (wildflowers,
   tulips, lavender, sunflowers, ferns, mushrooms, berry bush, bamboo, dune grass) and 2 water plants (lily
   pads with lotus, reeds). Trees grow by recursive branching over about 30 seconds; apple trees blossom
@@ -68,14 +71,16 @@ fonts from Google Fonts; everything else is in `js/`.
 - **Views:** island orbit, the shore of the current island, Home's sunset beach and pond, the whole
   archipelago from above, and a slow drifting camera.
 - **Sound:** all synthesised live, with a mixer for waves, wind, rain, wildlife, frogs and crickets, fire,
-  chimes, music, the waterfall and springs, and footsteps.
+  chimes, music, the waterfall and springs, and footsteps. Each world sounds like itself: a temple bell
+  across Lantern Bay and insects from early evening, a colder wind and creaking ice in Frost Fjord,
+  tropical birdsong and cicadas in Coral Cays.
 - **Journal:** field notes for 84 visitors, sights, worlds and places, the good things you have written, and the research
   behind each design choice.
 
 Each world's garden, tidied wild plants, current island and time of day, plus the journal, settings and
 the last world visited, are saved in the browser's local storage.
 
-**Keys:** WASD or arrows walk · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
+**Keys:** WASD or arrows walk, or row when out in the boat · R take the boat out or step ashore · F go fishing, and strike when the float dips · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
 
 ## Files
 

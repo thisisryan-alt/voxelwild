@@ -46,7 +46,7 @@
     for (const p of W.pools || []) if (Math.hypot(x - p.x, z - p.z) < p.r && c.h >= 0) return { y: c.h, kind: 'water', pool: p };
     if (c.h >= 0) {
       const winter = U.seasonIndex(S.season) === 3 && S.season % 1 > 0.15;
-      const kind = c.rock ? (W.island.id === 'glacier' ? 'snow' : 'stone') : c.grassy ? (winter ? 'snow' : 'grass') : 'sand';
+      const kind = c.rock ? (W.island.shape === 'glacier' ? 'snow' : 'stone') : c.grassy ? (winter ? 'snow' : 'grass') : 'sand';
       return { y: c.h, kind };
     }
     if (c.h === -1) return { y: -1, kind: 'water' };

@@ -1165,7 +1165,7 @@
       I.out = new THREE.Vector2(ox, oz);
       I.landing = new THREE.Vector3(sx + ox * 3.6, K.WL, sz + oz * 3.6);
       I.shore = new THREE.Vector3(sx, sh, sz);
-      if (I.id === 'rocks') continue;
+      if (I.shape === 'rocks') continue;   // no jetty on bare rocks
       const g = new THREE.Group();
       g.position.set(sx, 0, sz);
       g.rotation.y = -a;
@@ -1351,6 +1351,7 @@
       for (const f of floaters) {
         f.a += f.speed * dt;
         const x = f.ax + Math.cos(f.a) * f.r, z = f.az + Math.sin(f.a) * f.r, y = W.waveY(x, z), s = f.s;
+        f.x = x; f.y = y; f.z = z;
         Q.setFromAxisAngle(UP, f.a * 2);
         M4.compose(VP.set(x, y + 0.24 * s, z), Q, VS.set(0.26 * s, 0.32 * s, 0.26 * s)); lanternMesh.setMatrixAt(f.i, M4);
         M4.compose(VP.set(x, y + 0.03, z), Q, VS.set(0.42 * s, 0.07, 0.42 * s)); lanternBase.setMatrixAt(f.i, M4);

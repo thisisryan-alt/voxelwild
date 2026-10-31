@@ -922,8 +922,11 @@
   }
   L.travel = function (toId) {
     const A = W.island, B = K.ISLAND[toId];
-    if (!B || A === B || trip) return null;
-    const p0 = A.landing, p1 = new THREE.Vector3(p0.x + A.out.x * 6, K.WL, p0.z + A.out.y * 6);
+    if (!B || trip || (A === B && !free)) return null;
+    // out in the boat already? then the trip starts from wherever it is
+    const fromBoat = !!free, p0 = fromBoat ? new THREE.Vector3(boat.position.x, K.WL, boat.position.z) : A.landing;
+    const p1 = fromBoat ? new THREE.Vector3(p0.x + free.fwd.x * 4, K.WL, p0.z + free.fwd.z * 4) : new THREE.Vector3(p0.x + A.out.x * 6, K.WL, p0.z + A.out.y * 6);
+    free = null;
     const p3 = B.landing, p2 = new THREE.Vector3(p3.x + B.out.x * 6, K.WL, p3.z + B.out.y * 6);
     const pts = [p0.clone(), p1];
     if (!clearWater(p1.x, p1.z, p2.x, p2.z)) {
@@ -1066,8 +1069,181 @@
 
   L.boat = () => boat;
   L.arriveNow = () => { if (trip) trip.d = trip.len; };
+  // ------------------------------------------------------------ rowing freely
+  // Take the boat out and go anywhere: the keys row and steer, a tap on the water sets a course, and the
+  // boat glides to a stop before it would run aground. Step ashore wherever there is land alongside.
+  let free = null;
+  L.rowFree = function () {
+    if (trip || free) return false;
+    free = { heading: boat.rotation.y, v: 0, goal: null, ph: 0, last: 0, inFwd: 0, inTurn: 0, fwd: new THREE.Vector3(), bump: 0 };
+    free.fwd.set(Math.sin(free.heading), 0, Math.cos(free.heading));
+    return true;
+  };
+  L.rowing = () => free;
+  // A course to a point on land ends in the water just off that shore, on the side facing the boat.
+  L.rowGoal = function (x, z) {
+    if (!free) return;
+    if (W.heightAt(x, z) > -1) {
+      const bx = boat.position.x, bz = boat.position.z, d = Math.hypot(bx - x, bz - z) || 1, ux = (bx - x) / d, uz = (bz - z) / d;
+      let r = 0;
+      while (r < d && W.heightAt(x + ux * r, z + uz * r) > -1) r += 0.5;
+      x += ux * (r + 1.2); z += uz * (r + 1.2);
+    }
+    free.path = waterPath(boat.position.x, boat.position.z, x, z);
+    free.goal = free.path.length ? free.path[0] : [x, z];
+    free.stuck = 0; free.best = Infinity; free.since = 0;
+  };
+  // A route over open water: A* on a coarse grid of the sea, then straightened into a few waypoints.
+  let navGrid = null;
+  const NAV = 2;
+  function waterPath(sx, sz, gx, gz) {
+    const o = K.MINX, n = Math.ceil(-2 * o / NAV), ci = (v) => clamp(Math.floor((v - o) / NAV), 0, n - 1), cx = (i) => o + (i + 0.5) * NAV;
+    if (!navGrid) {
+      navGrid = new Uint8Array(n * n);
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        const x = cx(i), z = cx(j);
+        navGrid[i * n + j] = W.heightAt(x, z) <= -1 && W.heightAt(x + 0.8, z) <= -1 && W.heightAt(x - 0.8, z) <= -1 && W.heightAt(x, z + 0.8) <= -1 && W.heightAt(x, z - 0.8) <= -1 ? 1 : 0;
+      }
+    }
+    const s = ci(sx) * n + ci(sz);
+    // the goal cell, or the nearest open water to it
+    let g = ci(gx) * n + ci(gz);
+    if (!navGrid[g]) {
+      let best = -1, bd = Infinity;
+      const gi = ci(gx), gj = ci(gz);
+      for (let di = -6; di <= 6; di++) for (let dj = -6; dj <= 6; dj++) {
+        const i = gi + di, j = gj + dj;
+        if (i < 0 || j < 0 || i >= n || j >= n || !navGrid[i * n + j]) continue;
+        const d = Math.hypot(cx(i) - gx, cx(j) - gz) + 0.3 * Math.hypot(cx(i) - sx, cx(j) - sz) / 10;
+        if (d < bd) { bd = d; best = i * n + j; }
+      }
+      if (best < 0) return [];
+      g = best;
+    }
+    const cost = new Float32Array(n * n).fill(Infinity), from = new Int32Array(n * n).fill(-1), heap = [];
+    const push = (f, i) => { heap.push([f, i]); let k = heap.length - 1; while (k > 0) { const pk = (k - 1) >> 1; if (heap[pk][0] <= heap[k][0]) break; [heap[pk], heap[k]] = [heap[k], heap[pk]]; k = pk; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+    const hx = (i) => Math.hypot(Math.floor(i / n) - Math.floor(g / n), (i % n) - (g % n));
+    cost[s] = 0; push(hx(s), s);
+    let found = false;
+    for (let it = 0; heap.length && it < 60000; it++) {
+      const [, i] = pop();
+      if (i === g) { found = true; break; }
+      const a = Math.floor(i / n), b = i % n;
+      for (let da = -1; da <= 1; da++) for (let db = -1; db <= 1; db++) {
+        if (!da && !db) continue;
+        const na = a + da, nb = b + db;
+        if (na < 0 || nb < 0 || na >= n || nb >= n) continue;
+        const j = na * n + nb;
+        if (!navGrid[j] && j !== g) continue;
+        if (da && db && (!navGrid[a * n + nb] || !navGrid[na * n + b])) continue;
+        const c = cost[i] + (da && db ? 1.414 : 1);
+        if (c < cost[j]) { cost[j] = c; from[j] = i; push(c + hx(j), j); }
+      }
+    }
+    if (!found) return [];
+    const cells = [];
+    for (let i = g; i !== -1 && i !== s; i = from[i]) cells.push([cx(Math.floor(i / n)), cx(i % n)]);
+    cells.reverse();
+    if (navGrid[ci(gx) * n + ci(gz)]) cells.push([gx, gz]);
+    // keep only the turns: skip ahead to the furthest waypoint in clear sight
+    const out = [];
+    let px = sx, pz = sz, k = 0;
+    while (k < cells.length) {
+      let far = k;
+      for (let m = cells.length - 1; m > k; m--) if (clearSeg(px, pz, cells[m][0], cells[m][1])) { far = m; break; }
+      out.push(cells[far]); px = cells[far][0]; pz = cells[far][1]; k = far + 1;
+    }
+    return out;
+  }
+  function clearSeg(ax, az, bx, bz) {
+    const d = Math.hypot(bx - ax, bz - az), steps = Math.ceil(d / 0.7);
+    for (let i = 1; i <= steps; i++) { const t = i / steps; if (W.heightAt(ax + (bx - ax) * t, az + (bz - az) * t) > -1) return false; }
+    return true;
+  }
+  L.rowInput = (fwd, turn) => { if (free) { free.inFwd = fwd; free.inTurn = turn; } };
+  // the nearest dry, walkable ground beside the boat, if any
+  L.shoreNear = function (r = 3.2) {
+    const p = boat.position;
+    let best = null, bd = r;
+    for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) {
+      const x = Math.round(p.x) + dx, z = Math.round(p.z) + dz, h = W.heightAt(x, z), d = Math.hypot(x - p.x, z - p.z);
+      if (h < 0 || h > 2 || d >= bd) continue;
+      bd = d; best = { x, z, y: h };
+    }
+    return best;
+  };
+  L.stopRowing = function () { if (!free) return; free = null; boat.userData.oars.forEach((o, j) => { o.rotation.set(0, (j ? -1 : 1) * 0.9, (j ? 1 : -1) * -0.25); }); };
+  L.boatFwd = () => (trip ? trip.fwd : free ? free.fwd : null);
+  const EDGE = () => -K.MINX - 12;
+  function updateFree(dt, t) {
+    const f = free, bp = boat.position, oars = boat.userData.oars;
+    let want = 0, turn = 0;
+    if (f.inFwd || f.inTurn) { want = f.inFwd; turn = f.inTurn; f.goal = null; }
+    else if (f.goal) {
+      let dx = f.goal[0] - bp.x, dz = f.goal[1] - bp.z, d = Math.hypot(dx, dz);
+      // move on to the next waypoint once this one is close
+      if (f.path && f.path.length > 1 && d < 3) { f.path.shift(); f.goal = f.path[0]; dx = f.goal[0] - bp.x; dz = f.goal[1] - bp.z; d = Math.hypot(dx, dz); f.best = Infinity; }
+      const direct = Math.atan2(dx, dz);
+      // give up on a waypoint that has not come any closer for a while
+      if (d < f.best - 0.5) { f.best = d; f.since = 0; } else f.since += dt;
+      if (d < 1.4 || f.since > 15) { f.goal = null; f.path = null; }
+      else {
+        // steer round land in the way: try headings either side of the course until one is clear
+        let aim = direct;
+        if (!clearAlong(bp, direct, Math.min(4, d))) for (const off of [0.45, -0.45, 0.9, -0.9, 1.4, -1.4, 2, -2]) if (clearAlong(bp, direct + off, 4)) { aim = direct + off; break; }
+        const a = U.angDiff(f.heading, aim);
+        turn = clamp(a * 1.8, -1, 1); want = Math.abs(a) < 1.1 ? 1 : 0.25;
+        f.aligned = Math.abs(a) < 0.6;
+      }
+    }
+    f.heading += turn * dt * 0.85;
+    if (want) f.ph = (f.ph + dt / 2.2) % 1;
+    const pull = want && f.ph < 0.45;
+    const target = want > 0 ? want * (pull ? 3.4 : 2.2) : want * 1.2;
+    f.v += (target - f.v) * (1 - Math.exp(-dt * (want ? 1.4 : 0.6)));
+    f.fwd.set(Math.sin(f.heading), 0, Math.cos(f.heading));
+    // look ahead along the way you are moving; shallows and land, or the edge of the world, stop the boat
+    const dir = f.v >= 0 ? 1 : -1, px = bp.x + f.fwd.x * dir * 1.7, pz = bp.z + f.fwd.z * dir * 1.7, e = EDGE();
+    if (W.heightAt(px, pz) > -1 || Math.abs(px) > e || Math.abs(pz) > e) {
+      if (Math.abs(f.v) > 0.6 && f.bump <= 0) { W.addRipple(px, pz, 0.4); f.bump = 1.5; }
+      f.v *= Math.exp(-dt * 8);
+      // a course that keeps running into land while pointed along it is given up
+      if (f.goal && f.aligned) f.stuck = (f.stuck || 0) + dt;
+      if (f.goal && (Math.hypot(f.goal[0] - bp.x, f.goal[1] - bp.z) < 3 || f.stuck > 5)) f.goal = null;
+    } else f.stuck = 0;
+    f.bump -= dt;
+    bp.x += f.fwd.x * f.v * dt; bp.z += f.fwd.z * f.v * dt;
+    bp.y = W.waveY(bp.x, bp.z) - 0.05;
+    boat.rotation.set(Math.sin(t * 0.9) * 0.03 - f.v * 0.01, f.heading, Math.sin(t * 0.7) * 0.04 + turn * 0.05);
+    const sweep = !want ? 0.9 : pull ? -0.7 + 1.4 * (f.ph / 0.45) : 0.7 - 1.4 * ((f.ph - 0.45) / 0.55);
+    oars.forEach((o, j) => { o.rotation.set(0, (j ? -1 : 1) * sweep, (j ? 1 : -1) * (pull ? 0.12 : -0.18)); });
+    boat.userData.rower.rotation.x = pull ? -0.25 * Math.sin(Math.PI * f.ph / 0.45) : 0;
+    if (want && f.ph < f.last) {
+      for (const sx of [-1, 1]) W.addRipple(bp.x + Math.cos(f.heading) * sx * 1.6, bp.z - Math.sin(f.heading) * sx * 1.6, 0.35);
+      audio('oar');
+    }
+    f.last = f.ph;
+    if (Math.abs(f.v) > 0.5) { wakeT -= dt; if (wakeT <= 0) { wakeT = 0.08; wakeAt(bp.x - f.fwd.x * 1.2, bp.z - f.fwd.z * 1.2); } }
+    // whichever island you are rowing past becomes the current one
+    const I = W.islandAt(bp.x, bp.z);
+    if (I !== W.island && Math.hypot(bp.x - I.x, bp.z - I.z) < I.r + 14) W.setIsland(I.id);
+  }
+  function clearAlong(p, h, dist) {
+    const sx = Math.sin(h), sz = Math.cos(h), e = EDGE();
+    for (let r = 1; r <= dist; r += 1) { const x = p.x + sx * r, z = p.z + sz * r; if (W.heightAt(x, z) > -1 || Math.abs(x) > e || Math.abs(z) > e) return false; }
+    return true;
+  }
+  function wakeAt(x, z) {
+    const yw = boat.rotation.y, rx = Math.cos(yw), rz = -Math.sin(yw), fx = Math.sin(yw), fz = Math.cos(yw), dim = 1 - 0.65 * S.night;
+    for (const side of [-1, 1]) {
+      const wx = x + rx * side * 0.3, wz = z + rz * side * 0.3;
+      wake.emit({ x: wx, y: W.waveY(wx, wz) + 0.14, z: wz, vx: rx * side * 0.45 - fx * 0.2, vz: rz * side * 0.45 - fz * 0.2, drag: 0.35, life: 3.4, size: 0.6, size2: 2.6, alpha: 0.42, r: 0.93 * dim, g: 0.97 * dim, b: dim });
+    }
+  }
   function updateBoat(dt, t) {
     const oars = boat.userData.oars;
+    if (free) { updateFree(dt, t); return; }
     if (!trip) {
       boat.position.y = W.waveY(boat.position.x, boat.position.z) - 0.05;
       boat.rotation.z = Math.sin(t * 0.7) * 0.04;

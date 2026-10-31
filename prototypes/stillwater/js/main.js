@@ -225,9 +225,9 @@
         cam.tTheta += U.angDiff(cam.tTheta, behind) * Math.min(1, dt * 1.2);
       }
     }
-    const trip = L.trip();
-    if (cam.mode === 'follow' && trip) {
-      const b = L.boat().position, f = trip.fwd, c = Math.cos(cam.fYaw), sn = Math.sin(cam.fYaw);
+    const bf = L.boatFwd();
+    if (cam.mode === 'follow' && bf) {
+      const b = L.boat().position, f = bf, c = Math.cos(cam.fYaw), sn = Math.sin(cam.fYaw);
       const dx = f.x * c - f.z * sn, dz = f.x * sn + f.z * c;
       wantPos.set(b.x - dx * 7.5, b.y + 3.3, b.z - dz * 7.5);
       wantLook.set(b.x + dx * 5, b.y + 0.7, b.z + dz * 5);
@@ -314,13 +314,28 @@
     ndc.set((cx / window.innerWidth) * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
     raycaster.setFromCamera(ndc, W.camera);
     if (W.tryWish(cx, cy)) return;
+    if (L.rowing()) { rowTap(); return; }
     if (SW.walk.active && !L.trip()) { walkTap(); return; }
     if (tool !== 'tidy' && L.tapAt(raycaster)) return;
     const hit = raycaster.intersectObject(W.terrain, false)[0];
     const wHit = raycaster.ray.intersectPlane(waterPlane, wp);
     const wDist = wHit ? raycaster.ray.origin.distanceTo(wp) : Infinity;
     if (hit && hit.point.y > K.WL && hit.distance <= wDist) onLand(hit);
-    else if (wHit && Math.hypot(wp.x, wp.z) < 200) onWater(wp.x, wp.z);
+    else if (wHit && Math.abs(wp.x) < -K.MINX && Math.abs(wp.z) < -K.MINX) onWater(wp.x, wp.z);
+  }
+  // Out in the boat, a tap on the water (or on a shore) is where to row; with a float out, a tap near it strikes.
+  function rowTap() {
+    if (L.tapAt(raycaster)) return;
+    const hit = raycaster.intersectObject(W.terrain, false)[0];
+    const wHit = raycaster.ray.intersectPlane(waterPlane, wp);
+    const pt = hit && hit.point.y > K.WL && (!wHit || hit.distance <= raycaster.ray.origin.distanceTo(wp)) ? hit.point : wHit ? wp : null;
+    if (!pt) return;
+    const at = L.fishAt();
+    if (tool === 'fish' && at && Math.hypot(at.x - pt.x, at.z - pt.z) < 3) { strike(); return; }
+    if (tool === 'fish' && W.heightAt(pt.x, pt.z) <= -1 && L.boat().position.distanceTo(pt) < 14) { L.cast(L.boat().position, pt.x, pt.z); return; }
+    L.rowGoal(pt.x, pt.z);
+    W.addRipple(pt.x, pt.z, 0.25);
+    if (cam.mode !== 'follow') followBoat();
   }
   // While walking, a tap is somewhere to go: a spot on land or in the shallows, a seat, the boat,
   // or open water to throw a pebble into.
@@ -346,8 +361,38 @@
       pebbles++;
     } else toast('That is too far to throw a pebble.', 3, true);
   }
+  function takeBoat() {
+    if (L.trip() || L.rowing()) return;
+    closePops();
+    if (cam.mode === 'look' || cam.view === 'sky' || cam.mode === 'drift') setView('island', true);
+    if (SW.walk.active) { SW.walk.hide(true); L.setRower(true); }
+    L.rowFree();
+    cam.mode = 'follow'; cam.view = 'follow'; cam.fYaw = 0; setViewButtons();
+    $('tripText').textContent = 'Out in the boat';
+    $('tripSkip').textContent = 'Step ashore';
+    $('tripBar').hidden = false;
+    if (!prefs.rowTips) { prefs.rowTips = true; toast('Row with the arrow keys or WASD, or tap the water to set a course. Row up to a shore and Step ashore.', 9, true); }
+  }
+  function stepAshore() {
+    const sh = L.shoreNear(3.2);
+    if (!sh) { toast('Row up alongside a shore first.', 3, true); return false; }
+    L.stopRowing();
+    $('tripBar').hidden = true;
+    const I = W.islandAt(sh.x, sh.z);
+    W.setIsland(I.id);
+    if (!SW.walk.active) SW.walk.enter();
+    SW.walk.hide(false); L.setRower(false);
+    const b = L.boat().position;
+    SW.walk.place(sh.x, sh.z, Math.atan2(sh.x - b.x, sh.z - b.z));
+    cam.mode = 'walk'; cam.view = 'walk'; cam.tR = 9; cam.tPhi = 1.18; cam.blend = 3;
+    cam.tTheta = Math.atan2(-Math.cos(SW.walk.facing), -Math.sin(SW.walk.facing));
+    $('btnWalk').setAttribute('aria-pressed', 'true');
+    setViewButtons(); saveSoon();
+    return true;
+  }
   function startWalking() {
     if (L.trip()) { toast('Wait until you land.', 3, true); return; }
+    if (L.rowing()) { stepAshore(); return; }
     if (cam.view === 'sky' || cam.mode === 'look' || cam.mode === 'drift') setView('island', true);
     SW.walk.enter();
     cam.mode = 'walk'; cam.view = 'walk'; cam.tR = 9; cam.tPhi = 1.18; cam.blend = 3;
@@ -357,6 +402,7 @@
     if (!prefs.walkTips) { prefs.walkTips = true; toast('Tap where to go, or use the arrow keys. Tap a bench, a jetty’s end or a hot spring to sit.', 8, true); }
   }
   function stopWalking() {
+    if (L.rowing()) return;
     SW.walk.exit();
     $('btnWalk').setAttribute('aria-pressed', 'false');
     cam.mode = 'orbit'; cam.view = 'island';
@@ -604,6 +650,7 @@
     if (SW.walk.active) { SW.walk.hide(true); L.setRower(true); }
     cam.mode = 'follow'; cam.view = 'follow'; cam.fYaw = 0; setViewButtons();
     $('tripText').textContent = 'Rowing to ' + tr.to.name;
+    $('tripSkip').textContent = 'Arrive now';
     $('tripBar').hidden = false;
     toast('A slow row across. Drag to look around.', 4, true);
   }
@@ -804,7 +851,8 @@
     }));
     $('btnJournal').addEventListener('click', () => openPanel('panelJournal'));
     $('btnIslands').addEventListener('click', () => { renderIslands(); togglePop('popIslands'); });
-    $('tripSkip').addEventListener('click', () => L.arriveNow());
+    $('tripSkip').addEventListener('click', () => { if (L.rowing()) stepAshore(); else L.arriveNow(); });
+    $('btnBoatOut').addEventListener('click', () => takeBoat());
     $('btnWalk').addEventListener('click', () => { closePops(); if (SW.walk.active) stopWalking(); else startWalking(); });
     $('btnPlay').addEventListener('click', () => { closePops(); toggleHandpan(); });
     $('panClose').addEventListener('click', () => toggleHandpan(false));
@@ -828,6 +876,11 @@
     $('noteClose').addEventListener('click', () => { $('noteCard').hidden = true; });
     $$('[data-flow]').forEach((b) => b.addEventListener('click', () => { prefs.flow = b.dataset.flow; seg('flow', prefs.flow); saveSoon(); }));
     $$('[data-season]').forEach((b) => b.addEventListener('click', () => { prefs.season = b.dataset.season; seg('season', prefs.season); saveSoon(); }));
+    if (LOOK.season != null) {
+      const n = $('seasonNote');
+      n.hidden = false;
+      n.textContent = 'In ' + K.WORLD.name + ' it is always ' + U.seasonName(LOOK.season).toLowerCase() + '. This choice applies in the other worlds.';
+    }
     $$('[data-weather]').forEach((b) => b.addEventListener('click', () => { prefs.weather = b.dataset.weather; W.setWeatherMode(prefs.weather); seg('weather', prefs.weather); saveSoon(); }));
     $$('[data-quality]').forEach((b) => b.addEventListener('click', () => { prefs.quality = b.dataset.quality; prefs.qualityChosen = true; W.setQuality(prefs.quality); seg('quality', prefs.quality); saveSoon(); }));
     $('todSlider').addEventListener('input', (e) => { S.tod = U.todOf(e.target.value / 4); syncClock(); });
@@ -864,9 +917,31 @@
       if (key === 'j') openPanel('panelJournal');
       if (key === 'i') { renderIslands(); togglePop('popIslands'); }
       if (!$('handpan').hidden && /^[1-9]$/.test(key)) { playPad(+key - 1); return; }
+      if (key === 'r') { if (L.rowing()) stepAshore(); else takeBoat(); }
+      if (key === 'f') { if (L.fishing() === 'bite') strike(); else chooseTool('fish'); }
       if (key === 'v') { const vs = Object.keys(VIEWS); setView(vs[(vs.indexOf(cam.view) + 1) % vs.length]); toast(VIEWS[cam.view], 2, true); }
     });
   }
+
+  // Keys held down while out in the boat: forward and back, and turning.
+  const rowKeys = new Set();
+  const ROW_KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+  window.addEventListener('keydown', (e) => {
+    if (!L || !L.rowing() || /INPUT|TEXTAREA/.test(e.target.tagName) || e.metaKey || e.ctrlKey) return;
+    const k = e.key.toLowerCase();
+    if (ROW_KEYS.includes(k)) { rowKeys.add(k); e.preventDefault(); }
+  });
+  window.addEventListener('keyup', (e) => rowKeys.delete(e.key.toLowerCase()));
+  window.addEventListener('blur', () => rowKeys.clear());
+  function rowFromKeys() {
+    if (!L.rowing()) { rowKeys.clear(); return; }
+    const has = (a, b) => rowKeys.has(a) || rowKeys.has(b);
+    const fwd = (has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0), turn = (has('a', 'arrowleft') ? 1 : 0) - (has('d', 'arrowright') ? 1 : 0);
+    L.rowInput(fwd, turn);
+    if ((fwd || turn) && cam.mode !== 'follow') followBoat();
+  }
+  // rowing again after looking around from another view brings the camera back behind the boat
+  function followBoat() { cam.mode = 'follow'; cam.view = 'follow'; cam.fYaw = 0; setViewButtons(); }
 
   // -------------------------------------------------------------------- loop
   let last = performance.now(), clockSync = 0, seasonShown = -1, lastHudH = 0, lastW = 0, lastH = 0, lastRing = '';
@@ -889,6 +964,7 @@
     updateBreath(t);
     W.update(dt);
     GD.update(t, dt);
+    rowFromKeys();
     L.update(dt, t);
     SW.walk.update(dt, t, cam.theta);   // before the camera, so the walk camera never trails a frame behind
     updateCamera(dt, t);

@@ -1239,7 +1239,13 @@
     if (lightTimer <= 0) {
       lightTimer = 0.5;
       const F = W.focus;
-      W.setDynamicLights(GD.feat.light.filter((l) => t > l.ready - 2).sort((a, b) => Math.hypot(a.x - F.x, a.z - F.z) - Math.hypot(b.x - F.x, b.z - F.z)));
+      const lights = GD.feat.light.filter((l) => t > l.ready - 2);
+      // in Lantern Bay the nearest floating lanterns light the water around them after dusk
+      if (W.waterLanterns && S.glow > 0.25) {
+        const near = W.waterLanterns.filter((f) => f.x != null).sort((a, b) => Math.hypot(a.x - F.x, a.z - F.z) - Math.hypot(b.x - F.x, b.z - F.z)).slice(0, 3);
+        for (const f of near) lights.push({ x: f.x, y: f.y + 0.45, z: f.z, color: 0xffb468, base: 0.9 * S.glow, distance: 7 });
+      }
+      W.setDynamicLights(lights.sort((a, b) => Math.hypot(a.x - F.x, a.z - F.z) - Math.hypot(b.x - F.x, b.z - F.z)));
     }
   };
   let lightTimer = 0;

@@ -253,6 +253,53 @@
         t += 0.2;
       }
     },
+    // a deep temple bell far across the water, its long hum beating slowly
+    templeBell(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, out = this.pan(pan, this.ch.music), t = ctx.currentTime + 0.05, f0 = 98;
+      for (const [m, v, d] of [[1, 0.05, 9], [2.01, 0.03, 6], [2.98, 0.02, 4.5], [4.1, 0.012, 3], [1.005, 0.035, 9]]) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = f0 * m;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0005, t + d);
+        o.connect(g); g.connect(out); g.connect(this.verbIn); o.start(t); o.stop(t + d + 0.1);
+      }
+    },
+    // ice settling: a low groan that slides down, and now and then a crack
+    iceCreak(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, out = this.pan(pan, this.ch.wind), t = ctx.currentTime + 0.05;
+      const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain(), am = ctx.createOscillator(), amg = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(95 + rand() * 30, t); o.frequency.exponentialRampToValueAtTime(55 + rand() * 10, t + 1.6);
+      f.type = 'lowpass'; f.frequency.value = 380; am.frequency.value = 11 + rand() * 6; amg.gain.value = 0.02;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.035, t + 0.3); g.gain.linearRampToValueAtTime(0, t + 1.7);
+      am.connect(amg); amg.connect(g.gain);
+      o.connect(f); f.connect(g); g.connect(out); g.connect(this.verbIn); o.start(t); am.start(t); o.stop(t + 1.8); am.stop(t + 1.8);
+      if (rand() < 0.4) this.noiseBurst(t + 1.2 + rand() * 0.5, 0.05, 2400, 1.2, 0.05, this.ch.wind, pan);
+    },
+    // a bright two-note whistle, rising then falling
+    tropicBird(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, out = this.pan(pan, this.ch.wildlife);
+      let t = ctx.currentTime + 0.05;
+      for (let i = 0; i < 2 + ((rand() * 2) | 0); i++) {
+        const o = ctx.createOscillator(), g = ctx.createGain(), a = 1600 + rand() * 300;
+        o.frequency.setValueAtTime(a, t); o.frequency.exponentialRampToValueAtTime(a * 1.5, t + 0.14); o.frequency.exponentialRampToValueAtTime(a * 1.1, t + 0.32);
+        this.env(g, t, 0.022, 0.02, 0.32);
+        o.connect(g); g.connect(out); g.connect(this.verbIn); o.start(t); o.stop(t + 0.36);
+        t += 0.42 + rand() * 0.2;
+      }
+    },
+    // a wash of cicadas from the trees in the heat of the day, swelling and fading
+    cicada(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, out = this.pan(pan, this.ch.insects), t = ctx.currentTime + 0.05, len = 4 + rand() * 4;
+      const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), am = ctx.createOscillator(), amg = ctx.createGain();
+      s.buffer = this.pink; s.loop = true; f.type = 'bandpass'; f.frequency.value = 5200; f.Q.value = 6;
+      am.frequency.value = 38; amg.gain.value = 0.006;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.012, t + len * 0.4); g.gain.linearRampToValueAtTime(0, t + len);
+      am.connect(amg); amg.connect(g.gain);
+      s.connect(f); f.connect(g); g.connect(out); s.start(t); am.start(t); s.stop(t + len + 0.1); am.stop(t + len + 0.1);
+    },
     owl(pan) {
       if (!this.ready()) return;
       const ctx = this.ctx, out = this.pan(pan, this.ch.wildlife), t = ctx.currentTime + 0.05;
@@ -393,7 +440,7 @@
         const x = S.breath.outT, w = x < 0.9 ? x / 0.9 : Math.exp(-(x - 0.9) * 0.75);
         this.wash.gain.setTargetAtTime(0.012 + 0.11 * w, now, tc);
         this.washBP.frequency.setTargetAtTime(900 + 1500 * w, now, tc);
-        this.wind.gain.setTargetAtTime((0.03 + 0.05 * wx.wind) * (1 - wx.snow * 0.4), now, 0.5);
+        this.wind.gain.setTargetAtTime((0.03 + 0.05 * wx.wind) * (1 - wx.snow * 0.4) * (SW.K.WORLD.id === 'frost' ? 1.7 : 1), now, 0.5);
         this.windBP.frequency.setTargetAtTime(330 + 260 * wx.wind + 80 * Math.sin(S.t * 0.031), now, 0.5);
         this.rain.gain.setTargetAtTime(wx.rain * 0.16, now, 0.5);
         this.rainLow.gain.setTargetAtTime(wx.rain * 0.12, now, 0.5);
@@ -445,12 +492,27 @@
         for (let i = 0; i < 1 + ((rand() * 3) | 0); i++) this.chime(rand() * 1.2 - 0.6);
         this.nextWindChime = now + (2 + rand() * 5) / (0.4 + wx.wind) / Math.min(3, e.chimes);
       }
-      if (S.dayness > 0.6 && wx.rain < 0.4 && e.trees > 0 && now > this.nextBirdAmbient) {
-        this.bird(rand() * 1.6 - 0.8);
+      // each world sounds like itself: a temple bell over Lantern Bay, ice creaking in Frost Fjord,
+      // tropical birds and cicadas in Coral Cays
+      const wid = SW.K.WORLD.id;
+      if (S.dayness > 0.6 && wx.rain < 0.4 && e.trees > 0 && wid !== 'frost' && now > this.nextBirdAmbient) {
+        if (wid === 'coral') this.tropicBird(rand() * 1.6 - 0.8); else this.bird(rand() * 1.6 - 0.8);
         this.nextBirdAmbient = now + 5 + rand() * 12;
       }
-      const si = U.seasonIndex(S.season);
-      if (S.night > 0.55 && (si === 1 || si === 2) && wx.rain < 0.5 && now > this.nextCricket) {
+      if (wid === 'lantern' && !(now < this.nextTemple)) {
+        if (this.nextTemple) this.templeBell(rand() * 1.2 - 0.6);
+        this.nextTemple = now + 70 + rand() * 80;
+      }
+      if (wid === 'frost' && !(now < this.nextCreak)) {
+        if (this.nextCreak) this.iceCreak(rand() * 1.6 - 0.8);
+        this.nextCreak = now + 18 + rand() * 30;
+      }
+      if (wid === 'coral' && S.dayness > 0.7 && wx.rain < 0.3 && !(now < this.nextCicada)) {
+        if (this.nextCicada) this.cicada(rand() * 1.4 - 0.7);
+        this.nextCicada = now + 14 + rand() * 20;
+      }
+      const si = U.seasonIndex(S.season), dusk = wid === 'lantern' ? 0.3 : 0.55;
+      if (S.night > dusk && (si === 1 || si === 2) && wx.rain < 0.5 && now > this.nextCricket) {
         const out = this.pan(rand() * 1.4 - 0.7, this.ch.insects), f = 4200 + rand() * 500;
         let t = now + 0.02;
         for (let i = 0; i < 3; i++) { this.tone(f, t, 0.025, 0.008, out, 'sine', 0.006); t += 0.05; }
