@@ -78,9 +78,11 @@ The garden, tidied wild plants, current island, journal, settings and time of da
 
 Everything is drawn with three.js r128 and hand-written shaders; there are no image textures.
 
-- **Pipeline** (`js/post.js`): the opaque world renders into an HDR target with a depth texture.
-  Ambient occlusion is computed from depth and blurred with depth-aware weights, then the transparent
-  layer (sea, particles, glows) is drawn on top. Bloom uses a six-level mip chain; sun shafts are a
+- **Pipeline** (`js/post.js`): the opaque world renders into an HDR target, and every surface writes
+  its distance from the camera into the alpha channel, so the effects never need a depth texture
+  (which some GPUs and browsers handle badly). Ambient occlusion is computed from those distances and
+  blurred with distance-aware weights, then the transparent layer (sea, particles, glows) is drawn on
+  top, depth-tested against the opaque pass's own depth buffer. Bloom uses a six-level mip chain; sun shafts are a
   radial blur of the visible sky; haze toward the sun, low dawn mist, a soft highlight roll-off,
   time-of-day and seasonal colour grading, vignette and fine grain follow; then depth of field and
   FXAA.
@@ -103,7 +105,9 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
   Light (no post-processing or grass). Unless you chose a level in Settings, slow frames first lower
   the drawing resolution a little and then step down a level; resolution comes back when there is
   room. Shaders are compiled at start, and seasonal recolouring is spread over several frames, so
-  weather and seasons change without stutter.
+  weather and seasons change without stutter. A few times after starting, the game checks a grid of
+  points for pixels nothing was drawn into; if a device keeps leaving parts of the scene undrawn, it
+  switches to Light and says so.
 
 ## Design choices and their sources
 

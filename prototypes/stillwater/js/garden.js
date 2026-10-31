@@ -1043,7 +1043,7 @@
     m.onBeforeCompile = (sh) => {
       const PU = W.uniforms;
       Object.assign(sh.uniforms, { uSway: PU.uSway, uSwayAmp: PU.uSwayAmp, uWalker: grassWalker, uGust: PU.uGust, uCloudTex: PU.uCloudTex, uCloudSh: PU.uCloudSh });
-      sh.vertexShader = 'attribute float aH; varying float vH, vGu; varying vec3 vGW; uniform float uSway, uSwayAmp; uniform vec3 uWalker;\n' + W.GUST_GLSL + '\n' + sh.vertexShader.replace('#include <project_vertex>', `
+      sh.vertexShader = 'attribute float aH; varying float vH, vGu, vVD; varying vec3 vGW; uniform float uSway, uSwayAmp; uniform vec3 uWalker;\n' + W.GUST_GLSL + '\n' + sh.vertexShader.replace('#include <project_vertex>', `
         vec4 mvPosition = instanceMatrix * vec4(transformed, 1.0);
         float ph = uSway * 1.3 + mvPosition.x * 0.5 + mvPosition.z * 0.35;
         // a passing gust flattens the blades downwind and sets them tossing; the bent blades catch the light
@@ -1056,11 +1056,14 @@
         mvPosition.xz += normalize(away + 1e-4) * near * aH * 0.22 * step(abs(mvPosition.y - uWalker.y), 0.6);
         vH = aH;
         mvPosition = modelViewMatrix * mvPosition;
+        vVD = -mvPosition.z;
         gl_Position = projectionMatrix * mvPosition;`);
-      sh.fragmentShader = 'varying float vH, vGu; varying vec3 vGW;\n' + W.CLOUD_GLSL + '\n' + sh.fragmentShader
+      sh.fragmentShader = 'varying float vH, vGu, vVD; varying vec3 vGW;\n' + W.CLOUD_GLSL + '\n' + sh.fragmentShader
+        .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.a = vVD;')   // distance, for the post effects
         .replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb *= mix(0.72, 1.12, vH) * (1.0 + 0.16 * vGu * vH);')
         .replace('reflectedLight.directDiffuse *= BRDF_Diffuse_Lambert( diffuseColor.rgb ) * getShadowMask();', 'reflectedLight.directDiffuse *= BRDF_Diffuse_Lambert( diffuseColor.rgb ) * getShadowMask() * swCloudShade(vGW);');
     };
+    m.__swDepth = true;
     grass = new THREE.InstancedMesh(bladeGeometry(), m, n);
     grass.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     grass.castShadow = false; grass.receiveShadow = true; grass.frustumCulled = false;

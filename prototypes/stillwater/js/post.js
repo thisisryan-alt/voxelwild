@@ -21,9 +21,11 @@
   const size = new THREE.Vector2(), tmpV = new THREE.Vector3(), tmpV4 = new THREE.Vector4();
 
   const VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+  // Every opaque surface writes its distance from the camera into the alpha channel of the HDR image
+  // (the sky writes SKY_DIST). The effects read distance from there rather than from a depth texture.
   const COMMON = `
+    const float SKY = 4000.0;
     uniform float uNear, uFar;
-    float linZ(float d){ return uNear * uFar / (uFar - d * (uFar - uNear)); }
     float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
     float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x), mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x), f.y); }`;
   const mat = (fs, uniforms, extra) => new THREE.ShaderMaterial(Object.assign({
@@ -34,12 +36,12 @@
 
   // ---------------------------------------------------------- ambient occlusion
   const aoMat = mat(`
-    uniform sampler2D tDepth; uniform vec2 uRes; uniform mat4 uInvProj; uniform float uProjY, uRadius, uIntensity;
+    uniform sampler2D tDepth; uniform vec2 uRes, uProj; uniform float uProjY, uRadius, uIntensity;
     varying vec2 vUv;
-    vec3 vpos(vec2 uv){ float d = texture2D(tDepth, uv).r; vec4 p = uInvProj * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0); return p.xyz / p.w; }
+    vec3 vpos(vec2 uv){ float z = texture2D(tDepth, uv).a; return vec3((uv * 2.0 - 1.0) * z / uProj, -z); }
     void main(){
-      float d = texture2D(tDepth, vUv).r;
-      if (d >= 0.99999) { gl_FragColor = vec4(1.0); return; }
+      float d = texture2D(tDepth, vUv).a;
+      if (d >= SKY) { gl_FragColor = vec4(1.0); return; }
       vec3 P = vpos(vUv);
       vec2 px = 1.0 / uRes;
       vec3 pr = vpos(vUv + vec2(px.x, 0.0)), pl = vpos(vUv - vec2(px.x, 0.0)), pu = vpos(vUv + vec2(0.0, px.y)), pd = vpos(vUv - vec2(0.0, px.y));
@@ -58,29 +60,31 @@
       }
       ao = clamp(1.0 - uIntensity * ao / 12.0, 0.0, 1.0);
       gl_FragColor = vec4(ao, ao, ao, 1.0);
-    }`, { tDepth: { value: null }, uRes: { value: new THREE.Vector2() }, uInvProj: { value: new THREE.Matrix4() }, uProjY: { value: 1 }, uRadius: { value: 1.4 }, uIntensity: { value: 1.8 } });
+    }`, { tDepth: { value: null }, uRes: { value: new THREE.Vector2() }, uProj: { value: new THREE.Vector2(1, 1) }, uProjY: { value: 1 }, uRadius: { value: 1.4 }, uIntensity: { value: 1.8 } });
   const aoBlurMat = mat(`
     uniform sampler2D tAO, tDepth; uniform vec2 uDir; varying vec2 vUv;
     void main(){
-      float z0 = linZ(texture2D(tDepth, vUv).r), sum = 0.0, wsum = 0.0;
+      float z0 = texture2D(tDepth, vUv).a, sum = 0.0, wsum = 0.0;
       for (int i = -4; i <= 4; i++) {
         vec2 uv = vUv + uDir * float(i);
-        float z = linZ(texture2D(tDepth, uv).r), w = exp(-abs(z - z0) / (0.02 * z0 + 0.05)) * (1.0 - abs(float(i)) / 5.0);
+        float z = texture2D(tDepth, uv).a, w = exp(-abs(z - z0) / (0.02 * z0 + 0.05)) * (1.0 - abs(float(i)) / 5.0);
         sum += texture2D(tAO, uv).r * w; wsum += w;
       }
       float a = sum / max(wsum, 1e-4);
       gl_FragColor = vec4(a, a, a, 1.0);
     }`, { tAO: { value: null }, tDepth: { value: null }, uDir: { value: new THREE.Vector2() } });
 
-  // Writes the occluded opaque image and its depth, so the transparent pass can depth-test against it.
+  // Darkens the opaque image by the occlusion in place: colour is multiplied, the distance in alpha is kept.
+  const aoApplyMat = mat(`
+    uniform sampler2D tAO; uniform float uAOAmount; varying vec2 vUv;
+    void main(){ float ao = mix(1.0, texture2D(tAO, vUv).r, uAOAmount); gl_FragColor = vec4(ao, ao, ao, 1.0); }`,
+  { tAO: { value: null }, uAOAmount: { value: 1 } },
+  { transparent: true, blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.ZeroFactor, blendDst: THREE.SrcColorFactor,
+    blendEquationAlpha: THREE.AddEquation, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });
+  // A copy of the occluded opaque image and its distances, for the sea to look through.
   const copyMat = mat(`
-    uniform sampler2D tColor, tAO, tDepth; uniform float uAOAmount, uDebug; varying vec2 vUv;
-    void main(){
-      float ao = mix(1.0, texture2D(tAO, vUv).r, uAOAmount);
-      gl_FragColor = vec4(uDebug > 0.5 ? vec3(ao) : texture2D(tColor, vUv).rgb * ao, 1.0);
-      gl_FragDepthEXT = texture2D(tDepth, vUv).r;
-    }`, { tColor: { value: null }, tAO: { value: null }, tDepth: { value: null }, uAOAmount: { value: 1 }, uDebug: { value: 0 } },
-  { depthTest: true, depthWrite: true, depthFunc: THREE.AlwaysDepth, extensions: { fragDepth: true } });
+    uniform sampler2D tColor; varying vec2 vUv;
+    void main(){ gl_FragColor = texture2D(tColor, vUv); }`, { tColor: { value: null } });
 
   // -------------------------------------------------------------------- bloom
   const preMat = mat(`
@@ -117,7 +121,7 @@
   const rayMaskMat = mat(`
     uniform sampler2D tDepth; uniform vec2 uSun; uniform float uAspect; varying vec2 vUv;
     void main(){
-      float sky = step(0.99999, texture2D(tDepth, vUv).r);
+      float sky = step(SKY, texture2D(tDepth, vUv).a);
       vec2 dv = (vUv - uSun) * vec2(uAspect, 1.0);
       float m = sky * max(0.0, 1.0 - length(dv) * 1.4);
       gl_FragColor = vec4(m * m, 0.0, 0.0, 1.0);
@@ -143,10 +147,10 @@
     void main(){
       vec3 c = texture2D(tColor, vUv).rgb;
       c += texture2D(tBloom, vUv).rgb * uBloom;
-      float d = texture2D(tDepth, vUv).r;
+      float d = texture2D(tDepth, vUv).a;
       vec4 vp = uInvProj * vec4(vUv * 2.0 - 1.0, 1.0, 1.0); vp /= vp.w;
       vec3 rd = normalize((uCamWorld * vec4(vp.xyz, 0.0)).xyz);
-      float dist = d >= 0.99999 ? 1500.0 : linZ(d);
+      float dist = d >= SKY ? 1500.0 : d;
       float mie = pow(max(dot(rd, uSunDir), 0.0), 7.0);
       c += uSunCol * mie * (1.0 - exp(-dist * 0.004)) * uInscatter;
       if (uMist > 0.01) {
@@ -161,7 +165,7 @@
       c += uSunCol * texture2D(tRays, vUv).r * uRays;
       if (uFlare > 0.01) {
         // a few faint ghosts on the line through the sun and the centre of the frame, hidden when the sun is
-        float vis = step(0.99999, texture2D(tDepth, uSunUV).r) * step(0.0, uSunUV.x) * step(uSunUV.x, 1.0) * step(0.0, uSunUV.y) * step(uSunUV.y, 1.0);
+        float vis = step(SKY, texture2D(tDepth, uSunUV).a) * step(0.0, uSunUV.x) * step(uSunUV.x, 1.0) * step(0.0, uSunUV.y) * step(uSunUV.y, 1.0);
         vec2 axis = vec2(0.5) - uSunUV, asp = vec2(uRes.x / uRes.y, 1.0);
         for (int i = 0; i < 4; i++) {
           float k = 0.55 + float(i) * 0.42, r = 0.025 + 0.03 * float(i);
@@ -196,13 +200,13 @@
     float coc(float z){ return clamp((abs(z - uFocus) - uRange) / (uRange * 2.5 + z * 0.12), 0.0, 1.0); }
     void main(){
       vec4 base = texture2D(tColor, vUv);
-      float c0 = coc(linZ(texture2D(tDepth, vUv).r));
+      float c0 = coc(min(texture2D(tDepth, vUv).a, uFar));
       if (c0 < 0.03) { gl_FragColor = base; return; }
       vec3 sum = base.rgb; float wsum = 1.0, rot = hash12(gl_FragCoord.xy) * 6.2832;
       for (int i = 0; i < 20; i++) {
         float fi = float(i) + 0.5, r = sqrt(fi / 20.0) * uMaxR * c0, a = fi * 2.39996 + rot;
         vec2 uv = vUv + vec2(cos(a), sin(a)) * r / uRes;
-        float cs = coc(linZ(texture2D(tDepth, uv).r));
+        float cs = coc(min(texture2D(tDepth, uv).a, uFar));
         float w = smoothstep(r - 2.0, r, cs * uMaxR + 1.0);
         sum += texture2D(tColor, uv).rgb * w; wsum += w;
       }
@@ -229,8 +233,8 @@
     }`, { tColor: { value: null }, uRes: { value: new THREE.Vector2() } });
 
   // ------------------------------------------------------------------ targets
-  const makeRT = (w, h, type, depth) => {
-    const rt = new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), { type, format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: !!depth, stencilBuffer: false });
+  const makeRT = (w, h, type, depth, stencil) => {
+    const rt = new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), { type, format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: !!depth, stencilBuffer: !!stencil });
     rt.texture.generateMipmaps = false;
     return rt;
   };
@@ -238,11 +242,9 @@
     const w = size.x, h = size.y;
     [rtA, rtB, rtAO1, rtAO2, rtRefl, rtRay1, rtRay2, rtC, rtD, ...down, ...up].forEach((rt) => rt && rt.dispose());
     down.length = 0; up.length = 0;
-    rtA = makeRT(w, h, hdrType, true);
-    rtA.depthTexture = new THREE.DepthTexture(w, h);
-    rtA.depthTexture.type = THREE.UnsignedIntType;
-    rtA.depthTexture.minFilter = rtA.depthTexture.magFilter = THREE.NearestFilter;
-    rtB = makeRT(w, h, hdrType, true);
+    // an ordinary depth buffer (24-bit, with stencil) for depth testing; distances for the effects live in alpha
+    rtA = makeRT(w, h, hdrType, true, true);
+    rtB = makeRT(w, h, hdrType, false);
     const aoScale = S.quality === 'high' ? 2 : 3;
     rtAO1 = makeRT(w / aoScale | 0, h / aoScale | 0, THREE.UnsignedByteType, false);
     rtAO2 = makeRT(w / aoScale | 0, h / aoScale | 0, THREE.UnsignedByteType, false);
@@ -263,6 +265,7 @@
     if (key === builtFor) return;
     builtFor = key;
     build();
+    PP.recheck();
   };
 
   // ---------------------------------------------------------------- reflection
@@ -304,45 +307,83 @@
     return true;
   }
 
+  // ----------------------------------------------------------------- self-check
+  // Some GPUs and browsers have been seen to drop parts of the main pass: the sky and whole islands, with
+  // the sea showing through. Every surface writes colour and a distance, so a pixel still holding the clear
+  // colour (black, alpha 1) means nothing was drawn there. A few times after starting, and after any change
+  // to the graphics, a grid of 64 points is checked; if empty pixels keep turning up, PP.onBroken is told.
+  const checkRT = new THREE.WebGLRenderTarget(8, 8, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false, stencilBuffer: false });
+  checkRT.texture.generateMipmaps = false;
+  const checkMat = mat(`
+    uniform sampler2D tColor; uniform vec2 uSize; varying vec2 vUv;
+    void main(){
+      vec2 p = (floor(vUv * 8.0) + 0.5) / 8.0 * 0.92 + 0.04;
+      vec4 c = texture2D(tColor, (floor(p * uSize) + 0.5) / uSize);
+      float empty = (c.a == 1.0 && c.r == 0.0 && c.g == 0.0 && c.b == 0.0) ? 1.0 : 0.0;
+      gl_FragColor = vec4(empty, 0.0, 0.0, 1.0);
+    }`, { tColor: { value: null }, uSize: { value: new THREE.Vector2() } });
+  const checkBuf = new Uint8Array(8 * 8 * 4);
+  let frameNo = 0, checkAt = 40, badChecks = 0;
+  PP.recheck = () => { checkAt = frameNo + 40; badChecks = 0; };
+  PP.lastCheck = -1;
+  function selfCheck() {
+    checkMat.uniforms.tColor.value = rtB.texture; checkMat.uniforms.uSize.value.set(rtB.width, rtB.height);
+    pass(checkMat, checkRT);
+    renderer.readRenderTargetPixels(checkRT, 0, 0, 8, 8, checkBuf);
+    let empty = 0;
+    for (let i = 0; i < 64; i++) if (checkBuf[i * 4] > 127) empty++;
+    PP.lastCheck = empty;
+    badChecks = empty >= 3 ? badChecks + 1 : 0;
+    if (badChecks >= 2 && PP.onBroken) { badChecks = 0; PP.onBroken(empty); return; }
+    // early on check often, then rarely; each check costs one tiny read back from the GPU
+    checkAt = frameNo + (frameNo < 600 ? 45 : 900);
+  }
+
   // ------------------------------------------------------------------- render
   const sunScreen = new THREE.Vector3(), camFwd = new THREE.Vector3(), WHITE = new THREE.Color(1, 1, 1);
-  let frameNo = 0;
   const pass = (m, target) => { quad.material = m; renderer.setRenderTarget(target); renderer.render(quadScene, quadCam); };
   PP.render = function () {
     const near = camera.near, far = camera.far;
-    for (const m of [aoMat, aoBlurMat, copyMat, compMat, dofMat]) { m.uniforms.uNear.value = near; m.uniforms.uFar.value = far; }
+    for (const m of [aoMat, aoBlurMat, compMat, dofMat]) { m.uniforms.uNear.value = near; m.uniforms.uFar.value = far; }
     // Balanced redraws the shadow map every other frame; the sun and most shadows move slowly.
     frameNo++;
     if (S.quality !== 'balanced' || frameNo % 2) renderer.shadowMap.needsUpdate = true;
     const reflOn = PP.reflections && renderReflection();
-    SW.world.setWaterInputs({ refl: reflOn ? rtRefl.texture : null, scene: rtA.texture, depth: rtA.depthTexture, ao: rtAO1.texture, res: size, texMat, near, far });
+    SW.world.setWaterInputs({ refl: reflOn ? rtRefl.texture : null, scene: rtB.texture, res: size, texMat, near, far });
 
     camera.layers.set(0); camera.layers.enable(2);
     renderer.setRenderTarget(rtA);
     renderer.render(scene, camera);
 
     // ambient occlusion
-    aoMat.uniforms.tDepth.value = rtA.depthTexture;
+    const P = camera.projectionMatrix.elements;
+    aoMat.uniforms.tDepth.value = rtA.texture;
     aoMat.uniforms.uRes.value.set(rtAO1.width, rtAO1.height);
-    aoMat.uniforms.uInvProj.value.copy(camera.projectionMatrixInverse);
-    aoMat.uniforms.uProjY.value = camera.projectionMatrix.elements[5];
+    aoMat.uniforms.uProj.value.set(P[0], P[5]);
+    aoMat.uniforms.uProjY.value = P[5];
     pass(aoMat, rtAO1);
-    aoBlurMat.uniforms.tDepth.value = rtA.depthTexture;
+    aoBlurMat.uniforms.tDepth.value = rtA.texture;
     aoBlurMat.uniforms.tAO.value = rtAO1.texture; aoBlurMat.uniforms.uDir.value.set(1.5 / rtAO1.width, 0); pass(aoBlurMat, rtAO2);
     aoBlurMat.uniforms.tAO.value = rtAO2.texture; aoBlurMat.uniforms.uDir.value.set(0, 1.5 / rtAO1.height); pass(aoBlurMat, rtAO1);
 
-    // occluded opaque scene and its depth, then the transparent layer on top
-    copyMat.uniforms.tColor.value = rtA.texture; copyMat.uniforms.tAO.value = rtAO1.texture; copyMat.uniforms.tDepth.value = rtA.depthTexture;
+    // darken the opaque image by the occlusion, keep a copy for the sea to look through, then draw the
+    // transparent layer straight on top, depth-tested against the opaque pass's own depth buffer
+    renderer.autoClear = false;
+    aoApplyMat.uniforms.tAO.value = rtAO1.texture;
+    pass(aoApplyMat, rtA);
+    renderer.autoClear = true;
+    copyMat.uniforms.tColor.value = rtA.texture;
     pass(copyMat, rtB);
+    if (frameNo >= checkAt) selfCheck();
     camera.layers.set(1);
     renderer.autoClear = false;
-    renderer.setRenderTarget(rtB);
+    renderer.setRenderTarget(rtA);
     renderer.render(scene, camera);
     renderer.autoClear = true;
     camera.layers.enableAll();
 
     // bloom
-    preMat.uniforms.tColor.value = rtB.texture; preMat.uniforms.uTexel.value.set(1 / size.x, 1 / size.y);
+    preMat.uniforms.tColor.value = rtA.texture; preMat.uniforms.uTexel.value.set(1 / size.x, 1 / size.y);
     preMat.uniforms.uThreshold.value = hdrType === THREE.UnsignedByteType ? 0.82 : 1.0;
     pass(preMat, down[0]);
     for (let i = 1; i < LEVELS; i++) { downMat.uniforms.tColor.value = down[i - 1].texture; downMat.uniforms.uTexel.value.set(1 / down[i - 1].width, 1 / down[i - 1].height); pass(downMat, down[i]); }
@@ -360,7 +401,7 @@
     const facing = smooth(0.15, 0.6, camFwd.dot(L)), wx = S.weather;
     const rayStrength = facing * clamp(1 - S.night * 1.6, 0, 1) * (1 - SW.world.env.over) * smooth(-0.02, 0.1, L.y) * (0.35 + 0.65 * (1 - smooth(0.25, 0.8, L.y)));
     if (rayStrength > 0.01) {
-      rayMaskMat.uniforms.tDepth.value = rtA.depthTexture;
+      rayMaskMat.uniforms.tDepth.value = rtB.texture;
       rayMaskMat.uniforms.uSun.value.set(sunScreen.x * 0.5 + 0.5, sunScreen.y * 0.5 + 0.5);
       rayMaskMat.uniforms.uAspect.value = size.x / size.y;
       pass(rayMaskMat, rtRay1);
@@ -370,7 +411,7 @@
 
     // composite and grade
     const C = compMat.uniforms, E = SW.world.env, night = S.night, gold = SW.world.golden();
-    C.tColor.value = rtB.texture; C.tBloom.value = up[0].texture; C.tRays.value = rtRay2.texture; C.tDepth.value = rtA.depthTexture;
+    C.tColor.value = rtA.texture; C.tBloom.value = up[0].texture; C.tRays.value = rtRay2.texture; C.tDepth.value = rtB.texture;
     C.uRes.value.copy(size);
     C.uInvProj.value.copy(camera.projectionMatrixInverse); C.uCamWorld.value.copy(camera.matrixWorld);
     C.uSunDir.value.copy(L); C.uSunCol.value.copy(E.sun);
@@ -397,7 +438,7 @@
     let src = dofOn ? rtD : rtC;
     if (dofOn) {
       const D = dofMat.uniforms, focus = Math.max(4, camera.position.distanceTo(SW.world.focus));
-      D.tColor.value = rtD.texture; D.tDepth.value = rtA.depthTexture; D.uRes.value.copy(size);
+      D.tColor.value = rtD.texture; D.tDepth.value = rtB.texture; D.uRes.value.copy(size);
       // views that look out to the horizon keep a long range in focus; orbit and walk views focus on the subject
       const lookOut = SW.ui && SW.ui.camera.mode === 'look';
       D.uFocus.value = lookOut ? 40 : focus; D.uRange.value = lookOut ? 32 : focus * 0.22; D.uMaxR.value = (lookOut ? 4 : 7) * size.y / 1080;
@@ -412,8 +453,9 @@
     W = SW.world; renderer = W.renderer; scene = W.scene; camera = W.camera;
     const ext = renderer.extensions, isGL2 = renderer.capabilities.isWebGL2;
     const has = (n) => (ext.has ? ext.has(n) : !!ext.get(n));
-    if (!isGL2 && !(has('WEBGL_depth_texture') && has('EXT_frag_depth'))) return;   // the depth copy needs both
-    hdrType = (isGL2 ? has('EXT_color_buffer_float') : has('OES_texture_half_float') && has('EXT_color_buffer_half_float')) ? THREE.HalfFloatType : THREE.UnsignedByteType;
+    // the pipeline needs floating-point colour targets, since distances are stored in their alpha channel
+    if (!(isGL2 ? has('EXT_color_buffer_float') : has('OES_texture_half_float') && has('EXT_color_buffer_half_float'))) return;
+    hdrType = THREE.HalfFloatType;
     ok = true;
     renderer.getDrawingBufferSize(size);
     builtFor = size.x + 'x' + size.y + S.quality;
@@ -422,10 +464,10 @@
   // Compile the passes that only run some of the time (sun shafts, depth of field) before they are needed.
   PP.warm = function () {
     if (!ok) return;
-    for (const m of [aoMat, aoBlurMat, copyMat, preMat, downMat, upMat, rayMaskMat, rayBlurMat, compMat, dofMat, fxaaMat]) { quad.material = m; renderer.compile(quadScene, quadCam); }
+    for (const m of [aoMat, aoBlurMat, aoApplyMat, copyMat, preMat, downMat, upMat, rayMaskMat, rayBlurMat, compMat, dofMat, fxaaMat]) { quad.material = m; renderer.compile(quadScene, quadCam); }
   };
   PP.available = () => ok;
-  PP.debugAO = (on) => { copyMat.uniforms.uDebug.value = on ? 1 : 0; };
+  PP.debugAO = (on) => { aoApplyMat.blending = on ? THREE.NoBlending : THREE.CustomBlending; };   // on: show the occlusion alone
   PP.setQuality = function (q) {
     PP.enabled = ok && q !== 'low';
     PP.reflections = PP.enabled && q === 'high';

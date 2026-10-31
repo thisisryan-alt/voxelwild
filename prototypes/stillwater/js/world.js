@@ -55,6 +55,7 @@
   // Compile every material up front, including things not yet on screen (rain, snow, lanterns, other islands),
   // so they do not stall a frame the first time they appear.
   W.warmUp = function () {
+    scene.traverse((o) => { if ((o.isMesh || o.isInstancedMesh) && !o.layers.test(LATE)) [].concat(o.material).forEach(W.depthAlpha); });
     const target = SW.post.enabled && SW.post.targets ? SW.post.targets.rtA : null;
     renderer.setRenderTarget(target);
     renderer.compile(scene, camera);
@@ -143,7 +144,7 @@
         uTrans: { value: o.trans || 0 }, uFaceShade: { value: o.faceShade == null ? 1 : o.faceShade },
       });
       sh.vertexShader = defs + `uniform float uSway, uSwayAmp;
-        varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN;
+        varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN; varying float vVD;
         #ifdef SWAY
           ` + GUST_GLSL + `
         #endif
@@ -168,10 +169,11 @@
           vKind = aKind;
         #endif
         mvPosition = modelViewMatrix * mvPosition;
+        vVD = -mvPosition.z;
         gl_Position = projectionMatrix * mvPosition;`);
       sh.fragmentShader = defs + CLOUD_GLSL + `
         uniform float uTime, uWL, uWet, uEdge, uTexel, uTexAmt, uTrans, uFaceShade; uniform vec3 uCaus, uDirt;
-        varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN;
+        varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN; varying float vVD;
         #ifdef GRASS_SIDE
           varying float vKind;
         #endif
@@ -223,14 +225,29 @@
             gl_FragColor.rgb += uCaus * c * (1.0 - clamp((uWL - vWPos.y) / 4.0, 0.0, 1.0));
           }
         #endif
-        #include <fog_fragment>`);
+        #include <fog_fragment>`).replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.a = vVD;');
     };
+    material.__swDepth = true;
     return material;
+  };
+  // The same distance-in-alpha for the few built-in materials that are not patched (lamps, the far hills).
+  W.depthAlpha = function (m) {
+    if (!m || m.__swDepth || m.transparent || m.isShaderMaterial || !(m.isMeshBasicMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) return;
+    m.__swDepth = true;
+    const prev = m.onBeforeCompile, prevKey = prev && prev.toString();
+    m.onBeforeCompile = function (sh, r) {
+      if (prev) prev.call(this, sh, r);
+      sh.vertexShader = 'varying float vVD;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vVD = -mvPosition.z;');
+      sh.fragmentShader = 'varying float vVD;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.a = vVD;');
+    };
+    m.customProgramCacheKey = () => (prevKey || '') + '|sw-depth';
+    m.needsUpdate = true;
   };
   // Phong for per-pixel light (lantern pools, sun glints in the rain), patched as above.
   W.voxelMat = (color, o = {}) => W.patch(new THREE.MeshPhongMaterial({ color, shininess: o.shininess || 14, specular: o.specular || 0x0b0b0b }), o);
   // Things drawn after the ambient occlusion: water, particles, glows.
   W.late = (obj) => { obj.traverse((o) => o.layers.set(1)); return obj; };
+  const LATE = new THREE.Layers(); LATE.set(1);
 
   const dummyTex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
   dummyTex.needsUpdate = true;
@@ -246,7 +263,7 @@
   W.setWaterInputs = function (o) {
     waterU.uPost.value = 1;
     waterU.uReflOn.value = o.refl ? 1 : 0;
-    waterU.tRefl.value = o.refl || dummyTex; waterU.tScene.value = o.scene; waterU.tDepth.value = o.depth; waterU.tAO.value = o.ao;
+    waterU.tRefl.value = o.refl || dummyTex; waterU.tScene.value = o.scene;
     waterU.uRes.value.copy(o.res); waterU.uTexMat.value.copy(o.texMat); waterU.uNear.value = o.near; waterU.uFar.value = o.far;
   };
   W.sunDirection = () => skySun;
@@ -405,7 +422,7 @@
           }
           float full = 1.0 - abs(uMoonPhase - 0.5) * 2.0;
           col += vec3(0.55, 0.65, 0.85) * pow(max(mc, 0.0), 300.0) * 0.35 * uNight * full * (1.0 - uOvercast) * smoothstep(-0.04, 0.04, md.y);
-          gl_FragColor = vec4(col, 1.0);
+          gl_FragColor = vec4(col, 5000.0);   // alpha: distance, beyond everything (see post.js)
         }`,
     }));
     sky.renderOrder = -10;
@@ -745,7 +762,7 @@
     uRain: { value: 0 }, uBio: { value: 0 },
     uHeight: { value: null }, uHX: { value: new THREE.Vector2(MINX, G) }, uRip: { value: ripples },
     // inputs from the post-processing pipeline
-    uClear: { value: 1 }, uWind: { value: 0.4 }, uPost: { value: 0 }, uReflOn: { value: 0 }, tRefl: { value: null }, tScene: { value: null }, tDepth: { value: null }, tAO: { value: null },
+    uClear: { value: 1 }, uWind: { value: 0.4 }, uPost: { value: 0 }, uReflOn: { value: 0 }, tRefl: { value: null }, tScene: { value: null },
     uRes: { value: new THREE.Vector2(1, 1) }, uTexMat: { value: new THREE.Matrix4() }, uNear: { value: 0.3 }, uFar: { value: 2400 },
     uCloudTex: PU.uCloudTex, uCloudSh: PU.uCloudSh,
   };
@@ -760,7 +777,7 @@
     }`;
   function initWater() {
     waterU.uHeight.value = W.heightTex;
-    for (const k of ['tRefl', 'tScene', 'tDepth', 'tAO']) waterU[k].value = dummyTex;
+    for (const k of ['tRefl', 'tScene']) waterU[k].value = dummyTex;
     const geo = new THREE.PlaneGeometry(900, 900, 300, 300);
     geo.rotateX(-Math.PI / 2);
     const vtex = renderer.capabilities.vertexTextures ? '#define VTEX\n' : '';
@@ -768,7 +785,7 @@
       uniforms: waterU, transparent: true, depthWrite: true,
       vertexShader: vtex + WAVE + `
         uniform sampler2D uHeight; uniform vec2 uHX; uniform float uWL; uniform mat4 uTexMat;
-        varying vec3 vW; varying vec4 vRefl;
+        varying vec3 vW; varying vec4 vRefl; varying float vVZ;
         void main(){
           vec4 w = modelMatrix * vec4(position, 1.0);
           float damp = 1.0;
@@ -779,17 +796,17 @@
           w.y += waveH(w.xz) * damp + (uBreath - 0.5) * 0.07;
           vW = w.xyz;
           vRefl = uTexMat * vec4(w.xyz, 1.0);
-          gl_Position = projectionMatrix * viewMatrix * w;
+          vec4 mv = viewMatrix * w; vVZ = -mv.z;
+          gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: WAVE + CLOUD_GLSL + `
         uniform vec3 uSunDir, uSunCol, uTop, uHor, uFog, uCam, uShallow, uDeep, uBioCol;
         uniform float uFogNear, uFogFar, uNight, uWL, uRain, uBio, uPost, uReflOn, uNear, uFar, uClear, uWind;
-        uniform sampler2D uHeight, tRefl, tScene, tDepth, tAO; uniform vec2 uHX, uRes; uniform vec4 uRip[10];
-        varying vec3 vW; varying vec4 vRefl;
+        uniform sampler2D uHeight, tRefl, tScene; uniform vec2 uHX, uRes; uniform vec4 uRip[10];
+        varying vec3 vW; varying vec4 vRefl; varying float vVZ;
         float h12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
         float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(h12(i), h12(i + vec2(1, 0)), f.x), mix(h12(i + vec2(0, 1)), h12(i + vec2(1, 1)), f.x), f.y); }
-        float linZ(float d){ return uNear * uFar / (uFar - d * (uFar - uNear)); }
         void main(){
           vec2 p = vW.xz;
           float e = 0.15, hc = waveH(p);
@@ -837,11 +854,12 @@
           vec3 col; float alpha = 1.0;
           if (uPost > 0.5) {
             // refraction of the opaque scene, coloured by how much water the light passes through
+            // the scene behind the water (already darkened by occlusion) holds each surface's distance in alpha
             vec2 suv = gl_FragCoord.xy / uRes;
-            float surfZ = linZ(gl_FragCoord.z), thick = max(linZ(texture2D(tDepth, suv).r) - surfZ, 0.0);
+            float surfZ = vVZ, thick = max(texture2D(tScene, suv).a - surfZ, 0.0);
             vec2 ruv = clamp(suv + n.xz * 0.05 * clamp(thick * 0.5, 0.0, 1.0), vec2(0.001), vec2(0.999));
-            if (linZ(texture2D(tDepth, ruv).r) < surfZ) ruv = suv;
-            vec3 refr = texture2D(tScene, ruv).rgb * texture2D(tAO, ruv).r;
+            if (texture2D(tScene, ruv).a < surfZ) ruv = suv;
+            vec3 refr = texture2D(tScene, ruv).rgb;
             vec3 tint = mix(vec3(1.0), uShallow * 1.35, 0.6);
             vec3 body = mix(refr * tint, uDeep, 1.0 - exp(-thick * 0.3));
             vec3 refl = skyc;
@@ -970,14 +988,15 @@
     const rng = mulberry32(99);
     const mat = new THREE.ShaderMaterial({
       uniforms: cloudU,
-      vertexShader: `varying vec3 vN, vW, vL;
+      vertexShader: `varying vec3 vN, vW, vL; varying float vVD;
         void main(){
           vec4 w = modelMatrix * instanceMatrix * vec4(position, 1.0);
           vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal); vW = w.xyz; vL = position;
-          gl_Position = projectionMatrix * viewMatrix * w;
+          vec4 mv = viewMatrix * w; vVD = -mv.z;
+          gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `uniform vec3 uSunDir, uSunCol, uLit, uShade, uCam, uFog; uniform float uFogNear, uFogFar, uNight;
-        varying vec3 vN, vW, vL;
+        varying vec3 vN, vW, vL; varying float vVD;
         void main(){
           vec3 n = normalize(vN), L = normalize(uSunDir), V = normalize(uCam - vW);
           float up = n.y * 0.5 + 0.5, lit = max(dot(n, L), 0.0);
@@ -985,7 +1004,7 @@
           // light through the thin edges when the sun is behind: strongest on faces seen edge-on
           float back = pow(max(dot(-V, L), 0.0), 5.0), rim = 1.0 - abs(dot(n, V));
           col += uSunCol * back * (0.3 + 0.7 * rim * rim) * 0.9 * (1.0 - uNight);
-          gl_FragColor = vec4(mix(col, uFog, smoothstep(uFogNear, uFogFar, length(uCam - vW))), 1.0);
+          gl_FragColor = vec4(mix(col, uFog, smoothstep(uFogNear, uFogFar, length(uCam - vW))), vVD);
         }`,
     });
     for (let c = 0; c < NCLOUD; c++) {

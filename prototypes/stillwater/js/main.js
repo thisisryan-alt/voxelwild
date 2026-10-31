@@ -916,6 +916,15 @@
     Object.assign(el, { ring: $('ring'), word: $('word'), count: $('count'), hud: $('hud'), sitLeft: $('sitLeft') });
     try { W.warmUp(); } catch (e) { console.warn(e); }
     W.ready = true;
+    // If the full renderer leaves parts of the scene undrawn on this device (see the self-check in post.js),
+    // fall back to the simple one and say so, rather than show a broken picture.
+    SW.post.onBroken = (empty) => {
+      if (S.quality === 'low') return;
+      console.warn('Stillwater: ' + empty + ' of 64 sample points were left undrawn; switching to Light graphics.');
+      prefs.quality = 'low';
+      W.setQuality('low'); seg('quality', 'low'); saveSoon();
+      toast('Parts of the scene were not drawing properly on this device, so the game has switched to Light graphics. You can try the others again in Settings.', 9);
+    };
     W.renderer.setAnimationLoop(frame);
     if (data && data.started) begin(false);
   }
