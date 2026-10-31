@@ -87,6 +87,12 @@
     ['seal', 'Seals', 'They bask on Seal Rocks and slip into the sea to swim.', 'Row to Seal Rocks.'],
     ['puffin', 'Puffins', 'Small seabirds with bright beaks, looping over the rocks.', 'Row to Seal Rocks by day.'],
     ['reeffish', 'Reef fish', 'Bright schools circling the lagoon.', 'Look into the lagoon at Palm Atoll.'],
+    ['crane', 'Cranes', 'Tall and very still in the shallows. Now and then they call, open their wings and dance.', 'Row to Bamboo Isle. Tap one to see it dance.'],
+    ['bee', 'Bees', 'They leave the hive on warm days and visit the flowers nearby.', 'Visit Orchard Isle in spring or summer, or build a beehive near flowers.'],
+    ['cormorant', 'Cormorants', 'Dark seabirds that stand on the columns with their wings held out to dry, then fly down to fish.', 'Row to Basalt Isle.'],
+    ['squirrel', 'Red squirrels', 'They scamper among the roots and run up the trunk of the old tree.', 'Row to Old Tree Isle by day.'],
+    ['hare', 'Hares', 'Bigger and quicker than rabbits, with black-tipped ears. They race between the stones.', 'Row to the Standing Stones.'],
+    ['plover', 'Plovers', 'Tiny shorebirds that run along the tideline, stop, and run again.', 'Row to Dune Isle and watch the water’s edge.'],
   ].map(([id, name, line, hint]) => ({ id, name, line, hint }));
   for (const I of K.ISLANDS) if (I.id !== 'home') JOURNAL.push({ id: 'isle-' + I.id, name: I.name, line: I.line, hint: 'Row there from the Islands menu.' });
   const JBY = Object.fromEntries(JOURNAL.map((j) => [j.id, j]));
@@ -143,7 +149,7 @@
     if (v === 'island' || v === 'sky' || v === 'drift') {
       cam.mode = v === 'drift' ? 'drift' : 'orbit';
       if (v === 'sky') cam.tTarget.set(0, 0, 0); else cam.tTarget.copy(I.center);
-      cam.tR = v === 'sky' ? 290 : (I.id === 'home' ? 46 : Math.max(26, I.r * 3.1)) * (W.portrait ? 1.6 : 1);
+      cam.tR = v === 'sky' ? 400 : (I.id === 'home' ? 46 : Math.max(26, I.r * 3.1) * (I.view || 1)) * (W.portrait ? 1.6 : 1);
       cam.tPhi = v === 'sky' ? 0.5 : 1.1;
     } else {
       cam.mode = 'look';
@@ -341,7 +347,7 @@
     SW.walk.exit();
     $('btnWalk').setAttribute('aria-pressed', 'false');
     cam.mode = 'orbit'; cam.view = 'island';
-    cam.tTarget.copy(W.island.center); cam.tR = W.island.id === 'home' ? 46 : Math.max(26, W.island.r * 3.1); cam.tPhi = 1.1; cam.blend = 3;
+    cam.tTarget.copy(W.island.center); cam.tR = W.island.id === 'home' ? 46 : Math.max(26, W.island.r * 3.1) * (W.island.view || 1); cam.tPhi = 1.1; cam.blend = 3;
   }
   // In walk mode the tray acts right where you stand.
   function actHere(k) {
@@ -404,10 +410,10 @@
 
   // -------------------------------------------------------------------- tools
   const TOOLS = {
-    trees: ['oak', 'maple', 'birch', 'cherry', 'willow', 'pine', 'palm'],
-    plants: ['flowers', 'tulips', 'lavender', 'sunflower', 'fern', 'mushroom', 'bush'],
+    trees: ['oak', 'maple', 'birch', 'cherry', 'apple', 'willow', 'pine', 'palm'],
+    plants: ['flowers', 'tulips', 'lavender', 'sunflower', 'fern', 'mushroom', 'bush', 'bamboo'],
     water: ['lily', 'reeds', 'coral', 'pebble', 'skip'],
-    decor: ['lantern', 'chime', 'bench', 'campfire', 'cairn', 'birdhouse', 'stones', 'cabin', 'pavilion', 'windmill'],
+    decor: ['lantern', 'chime', 'bench', 'campfire', 'cairn', 'birdhouse', 'hive', 'stones', 'cabin', 'pavilion', 'windmill'],
     rituals: ['letgo', 'grateful', 'tidy'],
   };
   const SPECIAL = {
@@ -499,9 +505,12 @@
 
   // -------------------------------------------------------------------- islands
   function renderIslands() {
-    $('islandList').innerHTML = K.ISLANDS.map((I) => {
+    // nearest first, with a rough idea of how long the row is
+    const from = W.island, dist = (I) => Math.hypot(I.x - from.x, I.z - from.z);
+    const rowLabel = (d) => (d < 75 ? 'A short row' : d < 150 ? 'A gentle row' : 'A long row');
+    $('islandList').innerHTML = K.ISLANDS.slice().sort((a, b) => dist(a) - dist(b)).map((I) => {
       const here = I === W.island;
-      return `<li class="isle${here ? ' here' : ''}"><span class="opt-name">${I.name}</span><span class="opt-sub">${I.line}</span>` +
+      return `<li class="isle${here ? ' here' : ''}"><span class="opt-name">${I.name}${here ? '' : ` <span class="isle-far">· ${rowLabel(dist(I))}</span>`}</span><span class="opt-sub">${I.line}</span>` +
         (here ? '<span class="isle-here">You are here</span>' : `<span class="isle-go"><button class="btn small" data-row="${I.id}">Row there</button><button class="btn small ghost" data-look="${I.id}">Look now</button></span>`) + '</li>';
     }).join('');
     $$('[data-row]').forEach((b) => b.addEventListener('click', () => rowTo(b.dataset.row)));

@@ -6,13 +6,18 @@ fonts from Google Fonts; everything else is in `js/`.
 
 ## What is out there
 
-- **Eleven islands:** Home Island (your garden, the pond and the dock), Pine Isle (steep, rocky, deer),
+- **Seventeen islands:** Home Island (your garden, the pond and the dock), Pine Isle (steep, rocky, deer),
   Blossom Isle (cherry trees around a pavilion), Meadow Isle (sheep, wildflowers and a turning windmill),
   Palm Atoll (a sand ring around a coral lagoon with reef fish), Seal Rocks (seals and puffins), Wreck
   Bar (a sandbar with an old boat), Waterfall Isle (a mesa whose stream falls off a sheer cliff), Hot
   Spring Isle (steaming pools you can soak in), Glacier Isle (ice, snowy pines and arctic foxes) and Marsh
-  Isle (lily pools, reeds, willows and otters). A rock sea arch stands north of home. Each island has
-  its own wild plants, which you can tidy away like your own.
+  Isle (lily pools, reeds, willows and otters). Further out lie Bamboo Isle (a bamboo grove, a koi pond
+  and a round stone moon gate, with cranes), Orchard Isle (apple trees that blossom and fruit, beehives
+  and bees), Basalt Isle (dark stone columns topped with turf over a black sand beach, with cormorants),
+  Old Tree Isle (one vast, ancient tree with red squirrels), the Standing Stones (a ring of tall stones
+  on grassy downs, with hares) and Dune Isle (dunes, driftwood to sit on, and plovers on the tideline).
+  A rock sea arch stands north of home, and bare skerries are scattered over the open sea. Each island
+  has its own wild plants, which you can tidy away like your own.
 - **Walking:** press **Walk** to step off the boat as a small figure in a straw hat. Tap where to go
   (pathfinding climbs one block at a time) or use WASD or the arrow keys. Wade the shallows, sit on
   benches, pavilions and the ends of jetties, and walk into a hot spring to soak. Footsteps change with
@@ -24,11 +29,13 @@ fonts from Google Fonts; everything else is in `js/`.
 - **Rowing:** a rowboat waits at whichever island you are on. Open **Islands** and choose *Row there*
   for a slow trip with a follow camera, or *Look now* to glide the camera over. Visitors, weather, shadows
   and lights follow you.
-- **Garden:** 7 trees (oak, maple, birch, cherry, willow, pine, palm), 8 plants (wildflowers, tulips,
-  lavender, sunflowers, ferns, mushrooms, berry bush, dune grass) and 2 water plants (lily pads with lotus,
-  reeds). Trees grow by recursive branching over about 30 seconds.
-- **Build:** stone lantern, wind chime, bench, campfire, stone stack, birdhouse, stepping stones, cabin
-  with a smoking chimney and lit windows, pavilion and windmill. Coral can be planted on the sea floor.
+- **Garden:** 8 trees (oak, maple, birch, cherry, apple, willow, pine, palm), 9 plants (wildflowers,
+  tulips, lavender, sunflowers, ferns, mushrooms, berry bush, bamboo, dune grass) and 2 water plants (lily
+  pads with lotus, reeds). Trees grow by recursive branching over about 30 seconds; apple trees blossom
+  in spring and carry green, then red, apples.
+- **Build:** stone lantern, wind chime, bench, campfire, stone stack, birdhouse, beehive (bees come out
+  to visit the flowers nearby), stepping stones, cabin with a smoking chimney and lit windows, pavilion
+  and windmill. Coral can be planted on the sea floor.
 - **Seasons:** one season per in-game day. Leaves turn and fall, cherry petals drift in spring, flowers rest
   in winter, snow settles on the ground and the pines.
 - **Weather:** clear, cloudy, rain (with rings on the water), fog and snow, changing on its own or set by
@@ -36,7 +43,8 @@ fonts from Google Fonts; everything else is in `js/`.
   shooting stars you can tap to make a wish, and glowing water at night.
 - **Visitors:** koi, pond goldfish, butterflies, gulls, songbirds, ducks with ducklings, frogs, rabbits,
   crabs, a heron, dragonflies, an owl, a cat asleep on the dock, a sea turtle, leaping fish, sheep, deer,
-  seals, puffins, reef fish, a whale and a passing sailboat. Many can be tapped. A lighthouse turns its beam at dusk.
+  seals, puffins, reef fish, cranes that dance, bees, cormorants drying their wings, red squirrels,
+  hares, plovers, a whale and a passing sailboat. Many can be tapped. A lighthouse turns its beam at dusk.
 - **Rituals:** drop a pebble, skip a stone, let a thought go on a sky lantern (the words are never saved),
   plant a glowing flower for something good (kept in the journal), or sit for 3–20 minutes with a singing
   bowl at each end.
@@ -46,7 +54,7 @@ fonts from Google Fonts; everything else is in `js/`.
   archipelago from above, and a slow drifting camera.
 - **Sound:** all synthesised live, with a mixer for waves, wind, rain, wildlife, frogs and crickets, fire,
   chimes, music, the waterfall and springs, and footsteps.
-- **Journal:** field notes for 47 visitors, sights and places, the good things you have written, and the research
+- **Journal:** field notes for 59 visitors, sights and places, the good things you have written, and the research
   behind each design choice.
 
 The garden, tidied wild plants, current island, journal, settings and time of day are saved in the browser's local storage.
@@ -85,8 +93,12 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
 - **Sky:** a horizon haze band, a warm glow on the sun's side at golden hour, an HDR sun disk,
   drifting high cirrus, varied stars, a phased moon, aurora and rainbows. Voxel clouds have their own
   shader with sunlit tops, cool undersides and silver linings.
-- **Meadow grass:** about ten thousand swaying blade tufts that change with the seasons and part
-  around paths and buildings.
+- **Meadow grass:** thousands of swaying blade tufts that change with the seasons and part around
+  paths and buildings.
+- **Wind and cloud:** gusts roll across the islands as travelling patches of stronger wind that flatten
+  the grass (which catches the light as it bends) and toss the trees. Each cloud casts a soft shadow,
+  projected along the sun's rays, that drifts over land, grass and sea; under it the water loses its
+  glitter. The rowboat leaves a spreading foam wake.
 - **Quality:** Sharp (everything), Balanced (no reflections or depth of field, half the grass) and
   Light (no post-processing or grass). Unless you chose a level in Settings, slow frames first lower
   the drawing resolution a little and then step down a level; resolution comes back when there is
@@ -100,8 +112,8 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
 | Paced breathing near 6/min, long exhale | The world follows the breathing pattern; optional on-screen guide | Lehrer & Gevirtz 2014, *Front. Psychol.*; Zaccaro et al. 2018, *Front. Hum. Neurosci.* |
 | Cyclic sighing | One of the breathing patterns | Balban et al. 2023, *Cell Rep. Med.* |
 | Water and nature scenes | Island in a calm sea, plants, slow day–night cycle; night is deep blue | White et al. 2010, *J. Environ. Psychol.*; Ulrich et al. 1991, *J. Environ. Psychol.* |
-| Soft fascination, being away, extent | Clouds, koi, fireflies, falling leaves; eleven islands, a slow row between them and paths to walk give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
-| Watching animals | Koi, reef fish, seals, otters, turtle, ducks, whale | Cracknell et al. 2016, *Environ. Behav.* |
+| Soft fascination, being away, extent | Clouds and their drifting shadows, koi, fireflies, falling leaves; seventeen islands, a slow row between them and paths to walk give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
+| Watching animals | Koi, reef fish, seals, otters, cranes, squirrels, turtle, ducks, whale | Cracknell et al. 2016, *Environ. Behav.* |
 | Mid-complexity fractals | Recursive tree branching; layered-noise clouds | Taylor et al. 2011, *Front. Hum. Neurosci.*; Hagerhall et al. 2008, *Perception* |
 | Natural sound | Surf, rain, wind, birds, frogs, crickets | Alvarsson, Wiens & Nilsson 2010, *IJERPH*; Gould van Praag et al. 2017, *Sci. Rep.* |
 | A short walk outdoors | Walk mode: wander, wade and sit | Barton & Pretty 2010, *Environ. Sci. Technol.* |

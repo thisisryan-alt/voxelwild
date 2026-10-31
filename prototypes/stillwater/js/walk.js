@@ -54,7 +54,7 @@
   }
   const canStep = (y0, y1) => y1 - y0 <= 1.05 && y0 - y1 <= 3.05;
   // Solid things you walk around rather than through.
-  const BLOCK = { cabin: 1.25, windmill: 0.85, lantern: 0.3, campfire: 0.45, cairn: 0.3, birdhouse: 0.15, chime: 0.15, bush: 0.55, wreck: 0, pavilion: 0, bench: 0 };
+  const BLOCK = { cabin: 1.25, windmill: 0.85, lantern: 0.3, campfire: 0.45, cairn: 0.3, birdhouse: 0.15, chime: 0.15, bush: 0.55, wreck: 0, pavilion: 0, bench: 0, bamboo: 0.45, hive: 0.4, oldtree: 1.5, moongate: 0, driftwood: 0 };
   function solidR(it) {
     const def = GD.CAT[it.k];
     if (!def || !def.solid) return 0;

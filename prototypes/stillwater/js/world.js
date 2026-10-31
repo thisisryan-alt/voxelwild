@@ -82,6 +82,15 @@
     if (W.ready) W.warmUp();
   };
 
+  // Ask for items lo..hi of an instanced buffer to go to the GPU with the next frame. A slice still waiting
+  // from earlier in the frame is merged in, never replaced, so one update can't drop another.
+  W.queueUpload = function (attr, lo, hi) {
+    const n = attr.itemSize, r = attr.updateRange;
+    if (r.count > 0) { lo = Math.min(lo, r.offset / n); hi = Math.max(hi, (r.offset + r.count) / n - 1); }
+    r.offset = lo * n; r.count = (hi - lo + 1) * n;
+    attr.needsUpdate = true;
+  };
+
   W.isOnScreen = function (p, maxDist = 80) {
     if (camera.position.distanceTo(p) > maxDist) return false;
     tmpV.copy(p).project(camera);
@@ -99,7 +108,29 @@
   const PU = W.uniforms = {
     uTime: { value: 0 }, uWL: { value: K.WL }, uCaus: { value: new THREE.Color() }, uWet: { value: 0 },
     uSway: { value: 0 }, uSwayAmp: { value: 1 }, uDirt: { value: hex(0x8d6f50) },
+    uCloudTex: { value: null }, uCloudSh: { value: new THREE.Vector3() },   // cloud shadows (see below)
+    uGust: { value: new THREE.Vector3(0, 0, 0) },                           // wind gusts: travelled offset xy, strength z
   };
+  // Shade from the clouds overhead: 1 in sunlight, lower beneath a cloud. uCloudSh.xy turns height into the
+  // sideways shift along the sun's rays; z is how dark the shadows are.
+  const CS_SPAN = 512, CS_RES = 256;   // the shadow texture covers 512 x 512 world units
+  const CLOUD_GLSL = `uniform sampler2D uCloudTex; uniform vec3 uCloudSh;
+    float swCloudShade(vec3 p){ vec2 uv = (p.xz - uCloudSh.xy * p.y) / ${CS_SPAN.toFixed(1)} + 0.5; return 1.0 - uCloudSh.z * texture2D(uCloudTex, uv).r; }`;
+  W.CLOUD_GLSL = CLOUD_GLSL;
+  // the sun's direct light, dimmed under the clouds (three.js's own light loop, with one line added)
+  const LIGHTS_CLOUDED = THREE.ShaderChunk.lights_fragment_begin.replace('getDirectionalDirectLightIrradiance( directionalLight, geometry, directLight );',
+    'getDirectionalDirectLightIrradiance( directionalLight, geometry, directLight );\n\t\tdirectLight.color *= swCloudShade(vWPos);');
+  // Wind gusts: patches of stronger wind that travel downwind over the islands. uGust.xy is how far the
+  // pattern has travelled, uGust.z how strong the gusts are.
+  const GUST_GLSL = `uniform vec3 uGust;
+    const vec2 GUST_DIR = vec2(0.94, 0.34);
+    float gh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float gustAt(vec2 p){
+      vec2 q = p * 0.045 - uGust.xy, i = floor(q), f = fract(q); f = f * f * (3.0 - 2.0 * f);
+      float n = mix(mix(gh(i), gh(i + vec2(1.0, 0.0)), f.x), mix(gh(i + vec2(0.0, 1.0)), gh(i + vec2(1.0, 1.0)), f.x), f.y);
+      return smoothstep(0.5, 0.88, n) * uGust.z;
+    }`;
+  W.GUST_GLSL = GUST_GLSL;
   const wetMats = [];
   W.patch = function (material, o = {}) {
     const defs = (o.sway ? '#define SWAY\n' : '') + (o.grassSide ? '#define GRASS_SIDE\n' : '') + (o.caustics ? '#define CAUSTICS\n' : '') + (o.trans ? '#define TRANS\n' : '') + (o.wet ? '#define WET\n' : '');
@@ -113,6 +144,9 @@
       });
       sh.vertexShader = defs + `uniform float uSway, uSwayAmp;
         varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN;
+        #ifdef SWAY
+          ` + GUST_GLSL + `
+        #endif
         #ifdef GRASS_SIDE
           attribute float aKind; varying float vKind;
         #endif
@@ -123,7 +157,10 @@
         #endif
         #ifdef SWAY
           float sw = sin(uSway * 0.9 + mvPosition.x * 0.45 + mvPosition.z * 0.3) + 0.5 * sin(uSway * 1.7 + mvPosition.z * 0.8);
-          mvPosition.x += sw * 0.03 * uSwayAmp; mvPosition.z += sw * 0.018 * uSwayAmp;
+          // gusts roll across the islands: canopies lean downwind and toss harder as one passes
+          float gu = gustAt((modelMatrix * mvPosition).xz);
+          mvPosition.x += sw * 0.03 * uSwayAmp * (1.0 + 1.6 * gu) + gu * 0.05 * GUST_DIR.x;
+          mvPosition.z += sw * 0.018 * uSwayAmp * (1.0 + 1.6 * gu) + gu * 0.05 * GUST_DIR.y;
         #endif
         vWPos = (modelMatrix * mvPosition).xyz;
         vLocal = position; vObjN = normal;
@@ -132,7 +169,8 @@
         #endif
         mvPosition = modelViewMatrix * mvPosition;
         gl_Position = projectionMatrix * mvPosition;`);
-      sh.fragmentShader = defs + `uniform float uTime, uWL, uWet, uEdge, uTexel, uTexAmt, uTrans, uFaceShade; uniform vec3 uCaus, uDirt;
+      sh.fragmentShader = defs + CLOUD_GLSL + `
+        uniform float uTime, uWL, uWet, uEdge, uTexel, uTexAmt, uTrans, uFaceShade; uniform vec3 uCaus, uDirt;
         varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN;
         #ifdef GRASS_SIDE
           varying float vKind;
@@ -176,7 +214,7 @@
             outgoingLight += diffuseColor.rgb * directionalLights[0].color * tr * uTrans;
           }
         #endif
-        #include <envmap_fragment>`).replace('#include <fog_fragment>', `
+        #include <envmap_fragment>`).replace('#include <lights_fragment_begin>', LIGHTS_CLOUDED).replace('#include <fog_fragment>', `
         #ifdef CAUSTICS
           if (vWPos.y < uWL - 0.02) {
             vec2 ca = vWPos.xz * 0.9 + vec2(sin(uTime * 0.4 + vWPos.z * 0.6), cos(uTime * 0.33 + vWPos.x * 0.5)) * 0.6;
@@ -198,6 +236,7 @@
   dummyTex.needsUpdate = true;
   W.render = function () {
     const PP = SW.post;
+    renderCloudShadows();
     if (PP && PP.enabled) { PP.render(); return; }
     waterU.uPost.value = 0; waterU.uReflOn.value = 0;
     camera.layers.enableAll();
@@ -417,6 +456,7 @@
   // ----------------------------------------------------------------- terrain
   const G = K.G, MINX = K.MINX;
   const heights = new Int8Array(G * G), grassy = new Uint8Array(G * G), rocky = new Uint8Array(G * G), owner = new Int8Array(G * G);
+  const tint = new Uint8Array(G * G);   // 1 sand all the way down (dunes), 2 black sand (Basalt Isle)
   // Stacks of rock that make up Seal Rocks, relative to its centre: [dx, dz, radius, height]
   const SEAL_STACKS = [[0, 0, 3.2, 3], [4, 2.5, 2, 2], [-3.5, 3, 2.2, 1.6], [2, -4, 2.4, 2.2], [-4, -3, 1.6, 1]];
   function islandHeight(I, x, z) {
@@ -462,6 +502,22 @@
       }
       case 'glacier': return base > 0 ? Math.pow(base, 0.7) * I.h + n * 2 * base + 0.5 : base * 4 + 0.4;
       case 'marsh': return base > 0 ? base * 1.8 + n * 2.4 + 0.1 : base * 4 + 0.2;
+      case 'bamboo': return base > 0 ? Math.pow(base, 0.8) * I.h + n * 1.8 * base + 0.5 : base * 4 + 0.4;
+      case 'basalt': {
+        if (base <= 0) return base * 5 + 0.6;
+        if (base < 0.14) return 0.9 + n * 0.6;   // a black sand beach
+        // staggered columns two blocks across, each standing at its own height
+        const cx = Math.floor((x + 0.5) / 2), cz = Math.floor((z + 0.5) / 2 + (cx & 1) * 0.5);
+        return Math.min(I.h + 1.5, Math.pow(base, 0.6) * I.h * 1.15 + (U.hash2(cx, cz, 61) - 0.5) * 3.2) + 0.9;
+      }
+      case 'oldtree': return base > 0 ? Math.min(I.h, base * I.h * 1.5) + n * 1.1 * base + 0.6 : base * 4 + 0.4;
+      case 'stones': return base > 0 ? Math.pow(base, 1.25) * I.h + n * 1.3 * base + 0.8 : base * 4 + 0.4;
+      case 'dunes': {
+        if (base <= 0) return base * 4 + 0.5;
+        // long ridges lying across the wind
+        const ridge = Math.sin((dx * 0.8 + dz * 0.6) * 0.55 + n * 3);
+        return base * I.h * 0.55 + (ridge * 1.7 + 0.6) * Math.min(1, base * 2.2) + 0.55;
+      }
       default: return base > 0 ? base * I.h + n * 1.6 * base + 0.6 : base * 4 + 0.4;
     }
   }
@@ -477,6 +533,8 @@
     while (d < F.r * 1.3 && Math.round(islandHeight(F, F.x + ox * d, F.z + oz * d)) >= level - 1) d += 0.25;
     const ex = F.x + ox * d, ez = F.z + oz * d;
     POOLS.push({ x: px, z: pz, r: 1.6, level, warm: false });
+    const B = K.ISLAND.bamboo, BP = K.BAMBOO_POND;
+    POOLS.push({ x: B.x + BP.dx, z: B.z + BP.dz, r: BP.r, level: Math.max(2, Math.round(islandHeight(B, B.x + BP.dx, B.z + BP.dz)) - 1), warm: false, koi: true });
     FALLS = { ax: px, az: pz, bx: ex - ox * 0.6, bz: ez - oz * 0.6, level, edge: { x: ex - ox * 0.45, z: ez - oz * 0.45 }, out: { x: ox, z: oz } };
   }
   const segDist = (x, z, ax, az, bx, bz) => {
@@ -498,12 +556,27 @@
     }
     if (isl && (isl.id === 'rocks' || (isl.id === 'pine' && h >= 6) || (isl.id === 'springs' && h >= 3))) rock = 1;
     if (isl && isl.id === 'glacier' && h >= 0) rock = 2;   // ice
+    let tn = 0;
+    if (isl && isl.id === 'dunes' && h >= 0) tn = 1;
+    if (isl && isl.id === 'basalt' && h >= 0) {
+      // moss and turf on some of the highest columns, black sand below the cliffs
+      if (h >= 2) rock = h >= 5 && fbm(x * 0.3, z * 0.3, 63, 2) > 0.52 ? 0 : 3;
+      else tn = 2;
+    }
+    if (isl && isl.id === 'stones') {
+      for (const st of STONE_RING) if (Math.round(x) === st.x && Math.round(z) === st.z) { h += st.h; rock = 1; }
+    }
+    for (const sk of SKERRIES) {
+      const d = Math.hypot(x - sk.x, z - sk.z);
+      if (d < sk.r) { const hs = Math.round(sk.h * (1 - (d / sk.r) ** 2) + fbm(x * 0.5, z * 0.5, 71, 2) * 0.8); if (hs > h) { h = hs; rock = 1; } }
+    }
+    let bed = false;   // the floor of a pool or stream: no grass grows there
     for (const p of POOLS) {
       const pd = Math.hypot(x - p.x, z - p.z);
-      if (pd < p.r) { h = p.level - 1; if (p.warm) rock = 1; }
+      if (pd < p.r) { h = p.level - 1; if (p.warm) rock = 1; else bed = true; }
       else if (p.warm && pd < p.r + 1.1 && h >= p.level - 1) { h = p.level; rock = 1; }
     }
-    if (FALLS && isl && isl.id === 'falls' && segDist(x, z, FALLS.ax, FALLS.az, FALLS.bx, FALLS.bz) < 0.75 && h >= FALLS.level - 1) h = FALLS.level - 1;
+    if (FALLS && isl && isl.id === 'falls' && segDist(x, z, FALLS.ax, FALLS.az, FALLS.bx, FALLS.bz) < 0.75 && h >= FALLS.level - 1) { h = FALLS.level - 1; bed = true; }
     const AR = K.ARCH;
     for (const sgn of [-1, 1]) {
       const ax = AR.x + Math.cos(AR.dir) * AR.span * sgn, az = AR.z + Math.sin(AR.dir) * AR.span * sgn;
@@ -513,7 +586,31 @@
     const I = K.ISLET, id = Math.hypot(x - I.x, z - I.z) / I.r;
     if (id < 1.3) { const hi = Math.round((1 - id * id) * 3.4 + 0.2); if (hi > h) { h = hi; rock = 1; } }
     for (const s of K.STACKS) if (Math.hypot(x - s[0], z - s[1]) < s[2] && s[3] > h) { h = s[3]; rock = 1; }
-    return [clamp(h, -7, 9), rock, owner];
+    return [clamp(h, -7, 9), rock, owner, bed && !rock ? 3 : tn];
+  }
+  // Standing Stones: ten pillars in a ring, one of them fallen. Relative heights above the turf.
+  const STONE_RING = [];
+  // Skerries: bare rocks scattered over the open sea, kept clear of the islands and the routes between them.
+  const SKERRIES = [];
+  function planScenery() {
+    const ST = K.ISLAND.stones;
+    for (let k = 0; k < 10; k++) {
+      const a = k / 10 * Math.PI * 2 + 0.2;
+      STONE_RING.push({ x: Math.round(ST.x + Math.cos(a) * 5.6), z: Math.round(ST.z + Math.sin(a) * 5.6), h: k === 6 ? 1 : k % 3 === 0 ? 2 : 3 });
+    }
+    STONE_RING.push({ x: ST.x, z: ST.z, h: 1 });   // a low stone at the centre
+    const rng = mulberry32(515), isl = K.ISLANDS;
+    for (let tries = 0; tries < 400 && SKERRIES.length < 26; tries++) {
+      const a = rng() * Math.PI * 2, r = 34 + rng() * 170, x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (Math.abs(x) > 205 || Math.abs(z) > 205) continue;
+      if (isl.some((I) => Math.hypot(x - I.x, z - I.z) < I.r * 2.2 + 9)) continue;
+      if (Math.hypot(x - K.ARCH.x, z - K.ARCH.z) < 16 || Math.hypot(x - K.ISLET.x, z - K.ISLET.z) < 10) continue;
+      let onRoute = false;
+      for (let i = 0; i < isl.length && !onRoute; i++) for (let j = i + 1; j < isl.length; j++) if (segDist(x, z, isl[i].x, isl[i].z, isl[j].x, isl[j].z) < 9) { onRoute = true; break; }
+      if (onRoute || SKERRIES.some((k) => Math.hypot(x - k.x, z - k.z) < 14)) continue;
+      SKERRIES.push({ x, z, r: 1.4 + rng() * 1.6, h: 1 + rng() * 2.6 });
+    }
+    K.SKERRIES = SKERRIES;
   }
   const colH = (ix, iz) => (ix < 0 || iz < 0 || ix >= G || iz >= G) ? -7 : heights[ix * G + iz];
   W.heightAt = (x, z) => colH(Math.round(x - MINX), Math.round(z - MINX));
@@ -532,7 +629,10 @@
     5: U.pal4([0x8f948f, 0x9a9f9b, 0x86907f], [0x8f948f, 0x9a9f9b, 0x86907f], [0x8f948f, 0x9a9f9b, 0x8a8c80], [0xe8eef0, 0x9a9f9b, 0xdfe6ea]),
   };
   TPAL[6] = U.pal4(...Array(4).fill([0xd6edf7, 0xc6e3f0, 0xe2f3fa, 0xcfe8f3]));   // glacier ice, the same in every season
-  const TSTATIC = { 0: hex(0xbca87f), 3: hex(0x8d6f50), 4: hex(0x9a9f9b), 7: hex(0xb8dbe6) };
+  // 8 basalt column tops, 9 black sand, 10 basalt sides
+  TPAL[8] = U.pal4([0x4f545b, 0x575c62, 0x484d54], [0x4f545b, 0x575c62, 0x484d54], [0x4f545b, 0x575c62, 0x4b4f53], [0xe6ecef, 0x575c62, 0xdde5e9]);
+  TPAL[9] = U.pal4([0x484a4c, 0x404244, 0x515355], [0x484a4c, 0x404244, 0x515355], [0x46484a, 0x3f4143], [0x8e9296, 0x6c7074, 0x55585b]);
+  const TSTATIC = { 0: hex(0xbca87f), 3: hex(0x8d6f50), 4: hex(0x9a9f9b), 7: hex(0xb8dbe6), 10: hex(0x44484f) };
   let terrain, tKind, tRand, tJit, lastTerrainS = -99;
   W.blocks = [];
   W.cols = { grass: [], sand: [], shallow: [], ring: [] };   // the home island's
@@ -540,16 +640,17 @@
 
   function initTerrain() {
     K.ISLANDS.forEach((I, idx) => { I.idx = idx; I.cols = { grass: [], sand: [], shallow: [], ring: [], rock: [] }; });
-    planPools();
+    planPools(); planScenery();
     for (let ix = 0; ix < G; ix++) for (let iz = 0; iz < G; iz++) {
-      const x = ix + MINX, z = iz + MINX, [h, rock, own] = rawHeight(x, z), i = ix * G + iz;
-      heights[i] = h; rocky[i] = rock; owner[i] = own;
+      const x = ix + MINX, z = iz + MINX, [h, rock, own, tn] = rawHeight(x, z), i = ix * G + iz;
+      heights[i] = h; rocky[i] = rock; owner[i] = own; tint[i] = tn;
       const kind = own >= 0 ? K.ISLANDS[own].id : '';
       const nearPond = Math.hypot(x - K.POND.x, z - K.POND.z) < K.POND.r + 3;
       const meadowy = kind === 'home' || kind === 'pine' ? h >= 2 || (h === 1 && (nearPond || fbm(x * 0.3, z * 0.3, 41, 2) > 0.42))
-        : kind === 'blossom' || kind === 'meadow' || kind === 'springs' || kind === 'falls' ? h >= 1
+        : kind === 'blossom' || kind === 'meadow' || kind === 'springs' || kind === 'falls' || kind === 'bamboo' || kind === 'orchard' || kind === 'oldtree' || kind === 'stones' ? h >= 1
+        : kind === 'basalt' ? h >= 5
         : kind === 'marsh' ? h >= 1 || (h === 0 && fbm(x * 0.4, z * 0.4, 52, 2) > 0.45) : false;
-      grassy[i] = !rock && meadowy ? 1 : 0;
+      grassy[i] = !rock && meadowy && tn !== 3 ? 1 : 0;
     }
     const blocks = W.blocks, rng = mulberry32(7);
     for (let ix = 0; ix < G; ix++) for (let iz = 0; iz < G; iz++) {
@@ -558,10 +659,13 @@
       const minN = Math.min(colH(ix - 1, iz), colH(ix + 1, iz), colH(ix, iz - 1), colH(ix, iz + 1));
       for (let lv = Math.max(-7, Math.min(h, minN + 1)); lv <= h; lv++) {
         let kind;
-        if (lv === h) kind = h <= -1 ? 0 : rocky[i] === 2 ? 6 : rocky[i] ? 5 : grassy[i] ? 2 : 1;
+        const tn = tint[i], basalt = owner[i] === K.ISLAND.basalt.idx;
+        if (lv === h) kind = h <= -1 || tn === 3 ? 0 : rocky[i] === 2 ? 6 : rocky[i] === 3 ? 8 : rocky[i] ? 5 : grassy[i] ? 2 : tn === 2 ? 9 : 1;
         else if (rocky[i] === 2) kind = 7;
+        else if (rocky[i] === 3 || (basalt && h >= 2)) kind = 10;
         else if (rocky[i]) kind = 4;
-        else if (h <= 1) kind = h <= -1 ? 0 : 1;
+        else if (tn === 1) kind = h - lv <= 3 ? 1 : 3;
+        else if (h <= 1) kind = h <= -1 ? 0 : tn === 2 ? 9 : 1;
         else kind = h - lv <= 1 ? 3 : 4;
         blocks.push([x, lv - 0.5, z, kind, ix, iz, lv]);
       }
@@ -576,7 +680,7 @@
         const C = isl.cols;
         if (grassy[i]) C.grass.push(col);
         else if (rocky[i] && h >= 0) C.rock.push(col);
-        else if (h >= 0 && h <= 2) C.sand.push(col);
+        else if (h >= 0 && h <= 5 && tint[i] !== 3) C.sand.push(col);
         else if (h === -1) C.shallow.push(col);
         else if (h <= -2 && h >= -3) C.ring.push(col);
       }
@@ -623,7 +727,7 @@
       U.seasonColor(TPAL[k], tRand[i], tPassS, tmpC);
       terrain.setColorAt(i, tmpC.multiplyScalar(1 + tJit[i]));
     }
-    attr.updateRange.offset = from * 3; attr.updateRange.count = (end - from) * 3; attr.needsUpdate = true;
+    if (end > from) W.queueUpload(attr, from, end - 1);
     tCursor = end >= n ? -1 : end;
     if (tCursor < 0) lastTerrainS = tPassS;
   }
@@ -643,6 +747,7 @@
     // inputs from the post-processing pipeline
     uClear: { value: 1 }, uWind: { value: 0.4 }, uPost: { value: 0 }, uReflOn: { value: 0 }, tRefl: { value: null }, tScene: { value: null }, tDepth: { value: null }, tAO: { value: null },
     uRes: { value: new THREE.Vector2(1, 1) }, uTexMat: { value: new THREE.Matrix4() }, uNear: { value: 0.3 }, uFar: { value: 2400 },
+    uCloudTex: PU.uCloudTex, uCloudSh: PU.uCloudSh,
   };
   const WAVE = `
     uniform float uTime, uBreath, uAmp;
@@ -676,7 +781,7 @@
           vRefl = uTexMat * vec4(w.xyz, 1.0);
           gl_Position = projectionMatrix * viewMatrix * w;
         }`,
-      fragmentShader: WAVE + `
+      fragmentShader: WAVE + CLOUD_GLSL + `
         uniform vec3 uSunDir, uSunCol, uTop, uHor, uFog, uCam, uShallow, uDeep, uBioCol;
         uniform float uFogNear, uFogFar, uNight, uWL, uRain, uBio, uPost, uReflOn, uNear, uFar, uClear, uWind;
         uniform sampler2D uHeight, tRefl, tScene, tDepth, tAO; uniform vec2 uHX, uRes; uniform vec4 uRip[10];
@@ -725,8 +830,10 @@
           float ndv = max(dot(n, V), 0.0);
           vec3 Rf = reflect(-V, n);
           vec3 skyc = mix(uHor, uTop, clamp(Rf.y * 1.6, 0.0, 1.0));
-          float spec = pow(max(dot(reflect(-L, n), V), 0.0), 220.0);
-          float glint = pow(h12(floor(p * 16.0) + floor(uTime * 5.0)), 30.0) * pow(max(dot(reflect(-L, n), V), 0.0), 10.0);
+          // under a cloud's shadow the sea loses its glitter and turns a deeper, duller blue
+          float cs = swCloudShade(vW);
+          float spec = pow(max(dot(reflect(-L, n), V), 0.0), 220.0) * cs * cs;
+          float glint = pow(h12(floor(p * 16.0) + floor(uTime * 5.0)), 30.0) * pow(max(dot(reflect(-L, n), V), 0.0), 10.0) * cs * cs;
           vec3 col; float alpha = 1.0;
           if (uPost > 0.5) {
             // refraction of the opaque scene, coloured by how much water the light passes through
@@ -740,10 +847,10 @@
             vec3 refl = skyc;
             if (uReflOn > 0.5) refl = texture2D(tRefl, clamp(vRefl.xy / vRefl.w + n.xz * 0.04, vec2(0.001), vec2(0.999))).rgb;
             float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
-            col = mix(body, refl, clamp(fres * 1.1 + 0.06, 0.0, 1.0));
+            col = mix(body * mix(1.0, cs, 0.6), refl, clamp(fres * 1.1 + 0.06, 0.0, 1.0));
             col += uSunCol * (spec * 3.5 + glint * 2.5 * uClear) * (1.0 - uNight * 0.6) * (0.3 + 0.7 * uClear);
           } else {
-            col = mix(uShallow, uDeep, smoothstep(0.0, 3.6, depth));
+            col = mix(uShallow, uDeep, smoothstep(0.0, 3.6, depth)) * mix(1.0, cs, 0.6);
             col = mix(col, skyc, 0.12 + 0.68 * pow(1.0 - ndv, 4.0));
             col += uSunCol * spec * 1.2;
           }
@@ -762,6 +869,7 @@
         }`,
     }));
     water.renderOrder = 1;
+    water.position.y = K.WL;   // the swell is added in the shader; the surface rests at the water level
     W.late(water);
     scene.add(water);
     W.water = water;
@@ -851,7 +959,7 @@
   }
 
   // ------------------------------------------------------------------- clouds
-  const clouds = [];
+  const clouds = [], NCLOUD = 24;
   // Clouds: puffy voxel heaps with their own shading. Sunlit tops, cool undersides, and a bright
   // silver lining around the edges when the sun is behind them.
   const cloudU = {
@@ -880,7 +988,7 @@
           gl_FragColor = vec4(mix(col, uFog, smoothstep(uFogNear, uFogFar, length(uCam - vW))), 1.0);
         }`,
     });
-    for (let c = 0; c < 16; c++) {
+    for (let c = 0; c < NCLOUD; c++) {
       const vox = [], v = 1.4, sx = 5 + ((rng() * 3) | 0), sz = 3 + ((rng() * 2) | 0);
       for (let x = -sx; x <= sx; x++) for (let z = -sz; z <= sz; z++) for (let y = 0; y <= 3; y++) {
         const e = (x / (sx + 0.5)) ** 2 + (z / (sz + 0.5)) ** 2 + ((y - 0.3) / 2.2) ** 2;
@@ -890,9 +998,9 @@
       const im = new THREE.InstancedMesh(W.boxGeo, mat, vox.length);
       const m = new THREE.Matrix4();
       vox.forEach((p, i) => { m.makeScale(v, v * 0.75, v); m.setPosition(p[0], p[1], p[2]); im.setMatrixAt(i, m); });
-      const a = rng() * Math.PI * 2, r = 12 + rng() * 140;
+      const a = rng() * Math.PI * 2, r = 12 + rng() * 210;
       im.position.set(Math.cos(a) * r, 26 + rng() * 10, Math.sin(a) * r);
-      clouds.push({ mesh: im, speed: 0.5 + rng() * 0.4, th: (c / 16) * 0.92 });
+      clouds.push({ mesh: im, speed: 0.5 + rng() * 0.4, th: (c / NCLOUD) * 0.92, rx: (sx + 0.5) * v, rz: (sz + 0.5) * v });
       scene.add(im);
     }
   }
@@ -909,12 +1017,66 @@
       // clouds gather and dissolve by growing and shrinking
       c.mesh.visible = vis > 0.02;
       c.mesh.scale.setScalar(Math.max(0.02, U.smooth(0, 1, vis)));
-      c.mesh.castShadow = vis > 0.5;
       const p = c.mesh.position;
       p.x += 0.6 * c.speed * speed * dt; p.z += 0.22 * c.speed * speed * dt;
-      if (p.x > 170) { p.x -= 340; p.z = (Math.random() - 0.5) * 260; }
-      if (p.z > 170) p.z -= 340;
+      if (p.x > 250) { p.x -= 500; p.z = (Math.random() - 0.5) * 440; }
+      if (p.z > 250) p.z -= 500;
     }
+  }
+
+  // ---------------------------------------------------------- cloud shadows
+  // Each frame the clouds' shadows are drawn into a small texture covering the whole archipelago:
+  // every cloud becomes a soft, lumpy patch, shifted along the sun's rays from its height. Land, grass
+  // and sea then darken where it falls, so patches of shade drift over the islands beneath the clouds.
+  const csRT = new THREE.WebGLRenderTarget(CS_RES, CS_RES, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false, stencilBuffer: false });
+  csRT.texture.generateMipmaps = false;
+  PU.uCloudTex.value = csRT.texture;
+  W.cloudShadowTarget = csRT;
+  const csC = Array.from({ length: NCLOUD }, () => new THREE.Vector4()), csR = Array.from({ length: NCLOUD }, () => new THREE.Vector2(1, 1));
+  const csU = { uC: { value: csC }, uR: { value: csR }, uOff: { value: new THREE.Vector2() } };
+  const csScene = new THREE.Scene(), csCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const csQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+    uniforms: csU, depthTest: false, depthWrite: false,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: `#define NC ${NCLOUD}
+      uniform vec4 uC[NC]; uniform vec2 uR[NC]; uniform vec2 uOff;
+      varying vec2 vUv;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+      float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y); }
+      void main(){
+        vec2 p = (vUv - 0.5) * ${CS_SPAN.toFixed(1)};
+        float s = 0.0;
+        for (int i = 0; i < NC; i++) {
+          vec4 c = uC[i];
+          if (c.w <= 0.0) continue;
+          vec2 rel = p + uOff * c.y - c.xz;
+          float d = length(rel / uR[i]) + (n2(rel * 0.3 + float(i) * 13.1) - 0.5) * 0.5;
+          s = max(s, c.w * (1.0 - smoothstep(0.3, 1.1, d)));
+        }
+        gl_FragColor = vec4(vec3(s), 1.0);
+      }`,
+  }));
+  csQuad.frustumCulled = false;
+  csScene.add(csQuad);
+  let csOn = false;
+  function updateCloudShadows() {
+    const L = lightDir, up = Math.max(L.y, 0.2);
+    const amt = S.quality === 'low' ? 0 : 0.64 * (1 - W.env.over * 0.55) * S.dayness * smooth(0.02, 0.15, skySun.y);
+    csU.uOff.value.set(L.x / up, L.z / up);
+    PU.uCloudSh.value.set(L.x / up, L.z / up, amt);
+    csOn = amt > 0.01;
+    clouds.forEach((c, i) => {
+      const p = c.mesh.position, k = c.mesh.visible ? c.mesh.scale.x : 0;
+      csC[i].set(p.x, p.y + 1.2, p.z, k > 0.05 ? smooth(0.05, 0.6, k) : 0);
+      csR[i].set(c.rx * 1.25 * Math.max(k, 0.05), c.rz * 1.3 * Math.max(k, 0.05));
+    });
+  }
+  function renderCloudShadows() {
+    if (!csOn) return;
+    renderer.setRenderTarget(csRT);
+    renderer.render(csScene, csCam);
+    renderer.setRenderTarget(null);
   }
 
   // --------------------------------------------------------------------- dock
@@ -956,7 +1118,7 @@
     for (const I of K.ISLANDS) {
       let peak = 0;
       for (const c of [].concat(I.cols.grass, I.cols.sand, I.cols.rock)) peak = Math.max(peak, c[2]);
-      I.center = new THREE.Vector3(I.x, clamp(peak * 0.35, 0.5, 3), I.z);
+      I.center = new THREE.Vector3(I.x, clamp(peak * 0.35, 0.5, 3) + (I.lift || 0), I.z);
       if (I.id === 'home') {
         I.center.y = 1.4;
         const a = W.dock.angle;
@@ -1323,8 +1485,8 @@
     scene.fog.color.copy(E.hor);
     const wet = clamp(wx.rain + wx.snow * 0.5, 0, 1);
     const extra = Math.max(0, camera.position.distanceTo(W.focus) - 50);   // see the whole archipelago from high up
-    scene.fog.near = lerp(70, 14, wx.fog) * lerp(1, 0.6, wet) + extra * 0.9;
-    scene.fog.far = lerp(240, 60, wx.fog) * lerp(1, 0.55, wet) + extra * 1.3;
+    scene.fog.near = lerp(80, 14, wx.fog) * lerp(1, 0.6, wet) + extra * 0.9;
+    scene.fog.far = lerp(270, 60, wx.fog) * lerp(1, 0.55, wet) + extra * 1.3;
 
     Object.assign(skyU.uNight, { value: P.night }); skyU.uTime.value = t;
     skyU.uTop.value.copy(E.top); skyU.uHor.value.copy(E.hor); skyU.uSunCol.value.copy(P.sun);
@@ -1364,6 +1526,14 @@
     W.dock.lanternMat.emissiveIntensity = 0.3 + 1.6 * S.breath.b * (0.3 + 0.7 * S.glow);
   }
 
+  // Gusts travel downwind at about the speed the clouds drift, a little faster when it is blowing hard.
+  function updateWind(dt) {
+    const w = S.weather.wind, G = PU.uGust.value, v = (1.6 + w * 4) * dt * 0.045;
+    G.x += 0.94 * v; G.y += 0.34 * v;
+    if (G.x > 1000) { G.x -= 1000; G.y -= 362; }
+    G.z = S.reduceMotion ? 0 : clamp(0.25 + w * 1.1 + S.weather.rain * 0.3, 0, 1.2);
+  }
+
   // ---------------------------------------------------------------- sightings
   let seeTimer = 0;
   function sightings(dt) {
@@ -1385,6 +1555,8 @@
     updateWeather(dt);
     updateEnv(t);
     updateClouds(dt);
+    updateCloudShadows();
+    updateWind(dt);
     updateWeatherFx(dt, t);
     updateShootingStar(dt);
     updateLights(t);

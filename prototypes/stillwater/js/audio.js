@@ -210,6 +210,49 @@
         t += 0.45;
       }
     },
+    // a crane's rolling, bugling call, two birds answering each other
+    crane(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, out = this.pan(pan, this.ch.wildlife);
+      let t = ctx.currentTime + 0.05;
+      for (let i = 0; i < 4; i++) {
+        const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain(), am = ctx.createOscillator(), amg = ctx.createGain(), base = i % 2 ? 560 : 640;
+        o.type = 'sawtooth'; f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 2.2;
+        o.frequency.setValueAtTime(base, t); o.frequency.linearRampToValueAtTime(base * 1.12, t + 0.12); o.frequency.linearRampToValueAtTime(base * 0.94, t + 0.42);
+        am.frequency.value = 32; amg.gain.value = 0.012;
+        this.env(g, t, 0.026, 0.04, 0.42);
+        am.connect(amg); amg.connect(g.gain);
+        o.connect(f); f.connect(g); g.connect(out); g.connect(this.verbIn); o.start(t); am.start(t); o.stop(t + 0.5); am.stop(t + 0.5);
+        t += 0.55 + (i % 2) * 0.15;
+      }
+    },
+    buzz(pan, len = 1.2) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, out = this.pan(pan, this.ch.insects), t = ctx.currentTime + 0.02;
+      const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain(), wob = ctx.createOscillator(), wg = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.value = 210 + rand() * 40; f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 1.2;
+      wob.frequency.value = 3 + rand() * 3; wg.gain.value = 18; wob.connect(wg); wg.connect(o.frequency);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.012, t + 0.25); g.gain.linearRampToValueAtTime(0, t + len);
+      o.connect(f); f.connect(g); g.connect(out); o.start(t); wob.start(t); o.stop(t + len + 0.05); wob.stop(t + len + 0.05);
+    },
+    chatter(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, out = this.pan(pan, this.ch.wildlife);
+      let t = ctx.currentTime + 0.02;
+      for (let i = 0; i < 7; i++) { this.tone(2600 + rand() * 900, t, 0.03, 0.012, out, 'square', 0.004); t += 0.06 + rand() * 0.03; }
+    },
+    pipe(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, out = this.pan(pan, this.ch.wildlife);
+      let t = ctx.currentTime + 0.02;
+      for (let i = 0; i < 2; i++) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.setValueAtTime(2900, t); o.frequency.exponentialRampToValueAtTime(2300, t + 0.12);
+        this.env(g, t, 0.022, 0.01, 0.13);
+        o.connect(g); g.connect(out); g.connect(this.verbIn); o.start(t); o.stop(t + 0.16);
+        t += 0.2;
+      }
+    },
     owl(pan) {
       if (!this.ready()) return;
       const ctx = this.ctx, out = this.pan(pan, this.ch.wildlife), t = ctx.currentTime + 0.05;

@@ -5,7 +5,7 @@ window.SW = window.SW || {};
 
   SW.K = {
     WL: -0.35,                 // water level; block tops sit on whole numbers
-    G: 300, MINX: -150,        // terrain grid
+    G: 440, MINX: -220,        // terrain grid
     R: 15,                     // home island radius
     DAY_LEN: 960,              // seconds per day at the normal pace; one season lasts one day
     POND: { x: 4.5, z: 5, r: 2.4 },
@@ -24,7 +24,15 @@ window.SW = window.SW || {};
       { id: 'springs', name: 'Hot Spring Isle', x: 96, z: -62, r: 11, h: 4, line: 'Warm, steaming pools among the rocks. Walk in to soak.' },
       { id: 'glacier', name: 'Glacier Isle', x: -30, z: -105, r: 13, h: 6, line: 'Ice and snowy pines all year round. Arctic foxes.' },
       { id: 'marsh', name: 'Marsh Isle', x: 10, z: 100, r: 14, line: 'Reeds, lily pools, willows, frogs and otters.' },
+      // the outer ring, further out; new islands go at the end so the older ones keep their layouts
+      { id: 'bamboo', name: 'Bamboo Isle', x: 124, z: 26, r: 11, h: 5, line: 'Whispering bamboo, a koi pond and a round moon gate. Cranes wade the shallows.' },
+      { id: 'orchard', name: 'Orchard Isle', x: -82, z: 112, r: 12, h: 3, line: 'Apple trees that blossom in spring and fruit in autumn. Bees and their hives.' },
+      { id: 'basalt', name: 'Basalt Isle', x: 40, z: -142, r: 12, h: 7, line: 'Dark stone columns over a black sand beach. Cormorants dry their wings.' },
+      { id: 'oldtree', name: 'Old Tree Isle', x: -152, z: -58, r: 11, h: 4, view: 1.35, lift: 5, line: 'One vast, ancient tree on a mossy hill. Red squirrels and mushrooms.' },
+      { id: 'stones', name: 'Standing Stones', x: 92, z: 136, r: 12, h: 4, line: 'A ring of tall stones on grassy downs. Hares race between them.' },
+      { id: 'dunes', name: 'Dune Isle', x: -144, z: 64, r: 13, h: 4, line: 'Rolling dunes, driftwood and dune grass. Little plovers run the tideline.' },
     ],
+    BAMBOO_POND: { dx: 3, dz: -2.5, r: 2.3 },   // a koi pond on Bamboo Isle, relative to its centre
     SPRING_POOLS: [[-2.5, 1, 1.7], [3, -1.5, 1.4], [0.5, -4.5, 1.2]],   // [dx, dz, radius] from Hot Spring Isle
     ARCH: { x: -14, z: 66, span: 6, dir: 0.3 },                         // a rock arch you can row under
   };

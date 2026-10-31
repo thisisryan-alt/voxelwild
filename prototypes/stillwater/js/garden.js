@@ -37,6 +37,10 @@
     shroomB: pal4([0x9a6a44], [0x8a5e3c], [0x9a6a44, 0x7a5434], null),
     shroomStem: pal4([0xf2ece0], [0xf2ece0], [0xe8e0d0], null),
     centre: pal4([0xf3c35c], [0xf3c35c], [0xb8945a], null),
+    apple: pal4([0xfaeef2, 0xf4d8e2, 0xfdf6f8, 0x9fcf6a, 0xeccad6], [0x6a9e52, 0x5f9449, 0x77aa5c, 0x84b465], [0xc9b04a, 0xb89a3a, 0x9aa548, 0xd8a03e], null),
+    fruit: pal4(null, [0x9cc45a, 0xa8cc62], [0xd8402e, 0xc8302a, 0xe25a34, 0xb82a26], null),
+    bambooLeaf: pal4([0x9cc860, 0x8abd55, 0xa8d06c], [0x7fb04e, 0x6fa244, 0x8aba58], [0x9fb04e, 0x8aa048, 0xb0b45a], [0x7c9e52, 0x6c8e48, 0xe8eef0]),
+    ancient: pal4([0x9ccb62, 0x8cc058, 0xaad470, 0x7fb352], [0x5e8e4a, 0x6a9a52, 0x527f42, 0x76a45c], [0xd99a3a, 0xc97a2e, 0xb8642a, 0xe0b44a, 0xa0782c], null),
   };
   const PETALS = [[0xb9a6e0, 0xd6caf0], [0xf6f2ea, 0xfdfbf6], [0xf2d98d, 0xf7e6ad], [0x9cc8e8, 0xc2def2], [0xeeb0bf, 0xf6ccd6], [0xf4a6a0, 0xf9c8c0]];
   PETALS.forEach((c, i) => { PALS['petal' + i] = pal4(c, c, [0xc8a87a, 0xb89a74], null); });
@@ -87,16 +91,8 @@
     if (i > g.cHi) g.cHi = i;
   }
   function flush(g) {
-    if (g.mHi >= g.mLo) {
-      const a = g.mesh.instanceMatrix;
-      a.updateRange.offset = g.mLo * 16; a.updateRange.count = (g.mHi - g.mLo + 1) * 16; a.needsUpdate = true;
-      g.mLo = Infinity; g.mHi = -1;
-    }
-    if (g.cHi >= g.cLo) {
-      const a = g.mesh.instanceColor;
-      a.updateRange.offset = g.cLo * 3; a.updateRange.count = (g.cHi - g.cLo + 1) * 3; a.needsUpdate = true;
-      g.cLo = Infinity; g.cHi = -1;
-    }
+    if (g.mHi >= g.mLo) { W.queueUpload(g.mesh.instanceMatrix, g.mLo, g.mHi); g.mLo = Infinity; g.mHi = -1; }
+    if (g.cHi >= g.cLo) { W.queueUpload(g.mesh.instanceColor, g.cLo, g.cHi); g.cLo = Infinity; g.cHi = -1; }
   }
   function addVoxel(g, x, y, z, s, sy, c, birth, dur, r) {
     const i = g.n++;
@@ -165,7 +161,7 @@
       const ix = Math.round(x / TS), iy = Math.round(y / TS), iz = Math.round(z / TS);
       if (iy < 0) return;
       const key = ix + ',' + iy + ',' + iz, cur = map.get(key);
-      if (cur) { if (cur.type === 'l' && type === 'w') { cur.type = 'w'; cur.order = Math.min(cur.order, order); } return; }
+      if (cur) { if (cur.type === 'l' && (type === 'w' || type === 'f')) { cur.type = type; cur.order = Math.min(cur.order, order); } return; }
       map.set(key, { ix, iy, iz, type, order });
     };
     const leaves = (cx, cy, cz, order) => {
@@ -179,7 +175,12 @@
     };
     const branch = (pos, dir, len, depth, order) => {
       const steps = Math.max(1, Math.ceil(len / (TS * 0.5))), p = new V();
-      for (let i = 0; i <= steps; i++) { p.copy(pos).addScaledVector(dir, len * i / steps); put(p.x, p.y, p.z, 'w', order + i * 0.5); }
+      // old trees carry a thick trunk and limbs, tapering toward the twigs
+      const rad = c.thick ? Math.round(c.thick * Math.pow(depth / c.depth, 2)) : 0;
+      for (let i = 0; i <= steps; i++) {
+        p.copy(pos).addScaledVector(dir, len * i / steps); put(p.x, p.y, p.z, 'w', order + i * 0.5);
+        if (rad) for (let a = -rad; a <= rad; a++) for (let b = -rad; b <= rad; b++) if (a * a + b * b <= rad * rad + 0.5) put(p.x + a * TS, p.y, p.z + b * TS, 'w', order + i * 0.5);
+      }
       const end = pos.clone().addScaledVector(dir, len), eo = order + steps * 0.5;
       if (depth === 0) { leaves(end.x, end.y, end.z, eo); return; }
       const n = rng() < c.split3 ? 3 : 2, phase = rng() * Math.PI * 2;
@@ -198,14 +199,36 @@
     for (const v of map.values()) {
       const x = v.ix * TS, y = v.iy * TS + TS * 0.5, z = v.iz * TS;
       if (v.type === 'w') o.vox('w', x, y, z, TS, c.wood(rng), v.order);
+      else if (v.type === 'f') o.vox('l', x, y, z, TS * 0.8, c.fruit, v.order);
       else { o.vox('l', x, y, z, TS * 0.97, c.pal, v.order); top = Math.max(top, y); }
     }
     tips.sort((a, b) => b[1] - a[1]);
     if (tips[0]) o.feature('perch', { x: tips[0][0], y: top + TS * 0.6, z: tips[0][2], tree: true });
-    tips.slice(0, 10).forEach((tp) => o.feature('leafSrc', { x: tp[0], y: tp[1], z: tp[2], pal: c.pal }));
+    tips.slice(0, c.leafSrc || 10).forEach((tp) => o.feature('leafSrc', { x: tp[0], y: tp[1], z: tp[2], pal: c.pal }));
     o.feature('tree', { x: 0, y: top, z: 0 });
+    if (c.perches) tips.slice(1, c.perches).forEach((tp) => o.feature('perch', { x: tp[0], y: tp[1] + TS * 2, z: tp[2], tree: true }));
   }
+  const mossWood = (rng) => (rng() < 0.16 ? hex(0x5f7a3e).offsetHSL(0, 0, (rng() - 0.5) * 0.06) : hex(0x5e4632).offsetHSL(0, 0, (rng() - 0.5) * 0.06));
   const TREES = {
+    apple: {
+      pal: 'apple', fruit: 'fruit', trunk: 1.5, depth: 3, spread: 0.66, ratio: 0.68, split3: 0.5, leafR: 2.2, squash: 1.35, wood: woodC(0x6a5040),
+      extra(put, tips, rng, TS) {
+        for (const [cx, cy, cz] of tips) for (let f = 0; f < 4; f++) {
+          const a = rng() * Math.PI * 2, r = (1.2 + rng() * 0.8) * TS * 2;
+          put(cx + Math.cos(a) * r, cy - TS * (1 + ((rng() * 2) | 0)), cz + Math.sin(a) * r, 'f', 30 + f);
+        }
+      },
+    },
+    // the one on Old Tree Isle: hundreds of years old, with a trunk you could not reach around
+    ancient: {
+      pal: 'ancient', trunk: 3.4, depth: 4, spread: 0.62, ratio: 0.74, split3: 0.55, leafR: 2.6, squash: 1.9, ts: 0.42, thick: 3, up: 0.03, wood: mossWood, leafSrc: 24, perches: 8,
+      extra(put, tips, rng, TS) {
+        for (let k = 0; k < 9; k++) {
+          const a = k / 9 * Math.PI * 2 + rng() * 0.4;
+          for (let j = 2; j < 9 + ((rng() * 4) | 0); j++) put(Math.cos(a) * j * TS, TS * (j < 5 ? 1 : 0.5), Math.sin(a) * j * TS, 'w', j);
+        }
+      },
+    },
     oak: { pal: 'oak', trunk: 2.2, depth: 3, spread: 0.48, ratio: 0.67, split3: 0.35, leafR: 2.7, wood: woodC(0x6e533d) },
     maple: { pal: 'maple', trunk: 2.0, depth: 3, spread: 0.55, ratio: 0.7, split3: 0.45, leafR: 2.5, squash: 1.2, wood: woodC(0x6a4a3a) },
     birch: { pal: 'birch', trunk: 2.9, depth: 3, spread: 0.36, ratio: 0.64, split3: 0.2, leafR: 2.0, ts: 0.32, wood: birchWood },
@@ -637,6 +660,65 @@
     o.feature('perch', { x: ((6 - L / 2) * ca) * s, y: s * 4.6, z: ((6 - L / 2) * sa) * s });
   }
 
+  function bamboo(o, rng) {
+    const s = 0.15, n = 5 + ((rng() * 5) | 0), green = [0x7fa04a, 0x86a850, 0x749646], node = hex(0x5f7e38);
+    for (let i = 0; i < n; i++) {
+      const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * 0.55, fx = Math.round(Math.cos(a) * r / s) * s, fz = Math.round(Math.sin(a) * r / s) * s;
+      const hgt = 16 + ((rng() * 12) | 0), shade = hex(U.pick(rng, green));
+      for (let j = 0; j < hgt; j++) o.vox('w', fx, s * (j + 0.5), fz, s * 0.8, j % 5 === 4 ? node : shade, j * 0.6);
+      // narrow leaves on the upper culm, held out sideways in little fans
+      for (let j = Math.floor(hgt * 0.5); j < hgt + 2; j += 2) {
+        const la = rng() * Math.PI * 2, len = 2 + ((rng() * 3) | 0);
+        for (let k = 1; k <= len; k++) o.vox('l', fx + Math.cos(la) * k * s, s * (j + 0.5) - k * s * 0.25, fz + Math.sin(la) * k * s, s * 0.9, 'bambooLeaf', j * 0.6 + k, 0.35);
+      }
+    }
+    o.feature('rustle', { x: 0, y: 2, z: 0 });
+  }
+  function hive(o, rng, rec) {
+    const s = 0.14, k = faceK(rec.x, rec.z), paint = hex(U.pick(rng, [0xf2e6c8, 0xe8eef0, 0xd8e6d0, 0xf0dcc0]));
+    const P = (x, y, z, c, ord) => { const [wx, wz] = rot(x, z, k); o.vox('w', wx * s, s * (y + 0.5), wz * s, s, c, ord); };
+    for (const x of [-2, 2]) for (const z of [-2, 2]) P(x, 0, z, hex(DARK), 0);
+    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) P(x, 1, z, hex(WOOD2), 1);
+    const boxes = 2 + ((rng() * 2) | 0);
+    for (let b = 0; b < boxes; b++) for (let y = 0; y < 3; y++) for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
+      if (Math.abs(x) < 2 && Math.abs(z) < 2 && y === 1) continue;
+      P(x, 2 + b * 3 + y, z, y === 2 ? paint.clone().offsetHSL(0, 0, -0.06) : paint, 2 + b * 3 + y);
+    }
+    const top = 2 + boxes * 3;
+    for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) P(x, top, z, hex(0x8a8f94), top);
+    P(2.6, 2.3, 0, hex(0x2a2420), 3);
+    const [hx, hz] = rot(2.6 * s, 0, k);
+    o.feature('hive', { x: hx, y: s * 2.8, z: hz });
+    o.feature('perch', { x: 0, y: s * (top + 1.2), z: 0 });
+  }
+  function moongate(o, rng, rec) {
+    const s = 0.3, k = faceK(rec.x, rec.z), R = 6;
+    const P = (x, y, z, c, ord) => { const [wx, wz] = rot(x, z, k); o.vox('w', wx * s, s * (y + 0.5), wz * s, s, c, ord); };
+    // a round opening in a short stone wall, with a tiled cap
+    for (let z = -R - 4; z <= R + 4; z++) for (let y = 0; y <= R * 2 + 1; y++) {
+      const dz = z, dy = y - R - 0.5, d = Math.hypot(dz, dy);
+      const inWall = Math.abs(z) <= R + 1 ? d >= R - 0.3 && y <= R * 2 + 1 : y <= 5 - Math.max(0, Math.abs(z) - R - 2);
+      if (!inWall || (Math.abs(z) > R + 1 && y > 5)) continue;
+      if (d < R - 0.3 && Math.abs(z) <= R) continue;
+      for (const x of [0, 1]) P(x, y, z, stoneC(rng).offsetHSL(0, 0, 0.08), y + Math.abs(z) * 0.2);
+    }
+    for (let z = -R - 2; z <= R + 2; z++) {
+      const y = R * 2 + 2 - Math.max(0, Math.abs(z) - R + 1);
+      for (const x of [-1, 0, 1, 2]) P(x, y, z, hex(0x4a5560), 20 + Math.abs(z) * 0.2);
+    }
+    o.feature('perch', { x: 0, y: s * (R * 2 + 3.2), z: 0 });
+  }
+  function driftwood(o, rng, rec) {
+    const s = 0.16, a = rng() * Math.PI, ca = Math.cos(a), sa = Math.sin(a), L = 12 + ((rng() * 8) | 0), bleach = [0xd8d0c0, 0xcfc6b4, 0xe2dccd, 0xbfb6a4];
+    for (let u = 0; u < L; u++) {
+      const t = u - L / 2, w = u < 2 ? 1 : 0;
+      for (let v = -w; v <= w; v++) for (let y = 0; y < (u < 2 ? 2 : 1) + (u % 7 === 3 ? 1 : 0); y++) o.vox('w', (t * ca - v * sa) * s, s * (y + 0.5), (t * sa + v * ca) * s, s, hex(U.pick(rng, bleach)), u);
+      if (u % 5 === 2) for (let j = 1; j <= 3; j++) o.vox('w', (t * ca + j * sa) * s, s * (0.5 + j * 0.6), (t * sa - j * ca) * s, s * 0.8, hex(U.pick(rng, bleach)), u + j);
+    }
+    o.feature('seat', { x: 0, y: s * 1.2, z: 0, angle: a + Math.PI / 2, kind: 'bench' });
+    o.feature('perch', { x: (L / 2 - 1) * ca * s, y: s * 2.2, z: (L / 2 - 1) * sa * s });
+  }
+
   // ---------------------------------------------------------------- catalog
   const tree = (pal, label, swatch, extra) => Object.assign({ cat: 'trees', label, swatch, on: 'grass', rad: 1.2, solid: true, tree: true, span: 32, build: (o, rng) => branchTree(o, rng, TREES[pal]) }, extra);
   const CAT = GD.CAT = {
@@ -646,6 +728,7 @@
     cherry: tree('cherry', 'Cherry', '#f4c1cf'),
     willow: tree('willow', 'Willow', '#a6d276', { rad: 1.5 }),
     pine: { cat: 'trees', label: 'Pine', swatch: '#3f6b4a', on: 'grass', rad: 1.1, solid: true, tree: true, span: 30, build: pine },
+    apple: tree('apple', 'Apple', '#d8402e'),
     palm: { cat: 'trees', label: 'Palm', swatch: '#6aa857', on: 'sand', rad: 1.0, solid: true, tree: true, span: 28, build: palm },
     flowers: { cat: 'plants', label: 'Wildflowers', swatch: '#f2d98d', on: 'grass', rad: 0.5, span: 6, build: flowers },
     tulips: { cat: 'plants', label: 'Tulips', swatch: '#e85a6a', on: 'grass', rad: 0.45, span: 6, build: tulips },
@@ -654,6 +737,7 @@
     fern: { cat: 'plants', label: 'Ferns', swatch: '#5f9a4e', on: 'grass', rad: 0.5, span: 6, build: fern },
     mushroom: { cat: 'plants', label: 'Mushrooms', swatch: '#c8453a', on: 'grass', rad: 0.4, span: 5, build: mushrooms },
     bush: { cat: 'plants', label: 'Berry bush', swatch: '#5f9450', on: 'grass', rad: 0.7, solid: true, span: 12, build: bush },
+    bamboo: { cat: 'plants', label: 'Bamboo', swatch: '#7fa04a', on: 'grass', rad: 0.75, solid: true, span: 14, build: bamboo },
     dune: { cat: 'plants', label: 'Dune grass', swatch: '#c9c98f', on: 'sand', rad: 0.4, span: 5, build: dune },
     lily: { cat: 'water', label: 'Lily pads', swatch: '#5c9a55', on: 'water', rad: 0.9, span: 8, build: lily },
     reeds: { cat: 'water', label: 'Reeds', swatch: '#7f9e5a', on: 'shore', rad: 0.5, span: 8, build: reeds },
@@ -666,10 +750,14 @@
     stones: { cat: 'decor', label: 'Stepping stones', swatch: '#a7aba6', on: 'land', rad: 0.9, span: 3, build: stones },
     cabin: { cat: 'decor', label: 'Cabin', swatch: '#8a4a3a', on: 'land', rad: 1.6, solid: true, span: 10, footprint: 1.15, build: cabin },
     pavilion: { cat: 'decor', label: 'Pavilion', swatch: '#8a3a30', on: 'land', rad: 1.6, solid: true, span: 12, footprint: 1.1, build: pavilion },
+    hive: { cat: 'decor', label: 'Beehive', swatch: '#f2e6c8', on: 'land', rad: 0.55, solid: true, span: 5, build: hive },
     windmill: { cat: 'decor', label: 'Windmill', swatch: '#ece6d8', on: 'land', rad: 1.2, solid: true, span: 12, footprint: 0.65, build: windmill },
     coral: { cat: 'water', label: 'Coral', swatch: '#f28aa0', on: 'reef', rad: 0.7, span: 8, build: coral },
     wreck: { cat: 'scenery', label: 'Shipwreck', swatch: '#7a6650', on: 'land', rad: 2.6, solid: true, span: 1, build: wreck },
     snowpine: { cat: 'scenery', label: 'Snowy pine', swatch: '#e9eff2', on: 'land', rad: 1.1, solid: true, tree: true, span: 30, build: (o, rng, rec) => pine(o, rng, rec, 'pineSnow') },
+    oldtree: { cat: 'scenery', label: 'Old tree', swatch: '#5e8e4a', on: 'land', rad: 2.4, solid: true, tree: true, span: 70, build: (o, rng) => branchTree(o, rng, TREES.ancient) },
+    moongate: { cat: 'scenery', label: 'Moon gate', swatch: '#c9cdc8', on: 'land', rad: 1.2, solid: true, span: 10, footprint: 0.9, build: moongate },
+    driftwood: { cat: 'scenery', label: 'Driftwood', swatch: '#d8d0c0', on: 'sand', rad: 1.1, solid: true, span: 3, build: driftwood },
     grat: { cat: 'rituals', label: 'Gratitude flower', swatch: '#faf3e0', on: 'grass', rad: 0.4, span: 6, build: grat },
   };
 
@@ -706,7 +794,7 @@
     return true;
   }
   function rebuildFeatures() {
-    const F = { perch: [], nectar: [], light: [], fire: [], smoke: [], pad: [], chime: [], leafSrc: [], tree: [], birdhouse: [], grat: [], reed: [], porch: [], seat: [], windmill: [], reef: [] };
+    const F = { perch: [], nectar: [], light: [], fire: [], smoke: [], pad: [], chime: [], leafSrc: [], tree: [], birdhouse: [], grat: [], reed: [], porch: [], seat: [], windmill: [], reef: [], hive: [], rustle: [] };
     for (const rec of GD.items) for (const f of rec._f || []) (F[f.type] = F[f.type] || []).push(f);
     GD.feat = F;
     featVersion = GD.version;
@@ -722,7 +810,7 @@
         if (!c.grassy || c.h < 1) return { ok: false, msg: def.label + (c.h < 0 ? ' grows on land.' : ' needs grass.') + (k === 'oak' || def.tree ? ' The palm likes sand.' : '') };
         y = c.h; break;
       case 'sand':
-        if (c.grassy || c.rock || c.h < 0 || c.h > 2) return { ok: false, msg: def.label + ' likes the sandy beach.' };
+        if (c.grassy || c.rock || c.h < 0 || c.h > 5) return { ok: false, msg: def.label + ' likes the sandy beach.' };
         y = c.h; break;
       case 'land':
         if (c.h < 0) return { ok: false, msg: def.label + ' goes on land.' };
@@ -741,6 +829,7 @@
         if (c.h > 1 || c.h < -1) return { ok: false, msg: 'Reeds grow right at the water’s edge.' };
         y = c.h; break;
     }
+    if (def.on !== 'water' && k !== 'stones' && (W.pools || []).some((p) => Math.hypot(p.x - x, p.z - z) < p.r)) return { ok: false, msg: 'That spot is under water.' };
     if (def.footprint) {
       let lo = 99, hi = -99;
       for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const h = W.heightAt(x + dx * def.footprint, z + dz * def.footprint); lo = Math.min(lo, h); hi = Math.max(hi, h); }
@@ -807,8 +896,14 @@
     springs: [['cabin', 1], ['lantern', 3], ['pine', 3], ['bush', 2], ['stones', 2], ['fern', 2]],
     glacier: [['snowpine', 8], ['cairn', 2]],
     marsh: [['willow', 3], ['lily', 9], ['reeds', 10], ['flowers', 3], ['fern', 3], ['mushroom', 2], ['birdhouse', 1]],
+    bamboo: [['moongate', 1], ['bamboo', 14], ['lantern', 3], ['maple', 2], ['fern', 4], ['stones', 2], ['bench', 1], ['reeds', 3]],
+    orchard: [['apple', 9], ['hive', 3], ['flowers', 6], ['lavender', 4], ['tulips', 2], ['bench', 1], ['birdhouse', 1]],
+    basalt: [['cairn', 3], ['fern', 3], ['dune', 4]],
+    oldtree: [['oldtree', 1], ['mushroom', 8], ['fern', 8], ['bush', 2], ['flowers', 3]],
+    stones: [['flowers', 9], ['bush', 3], ['oak', 1], ['tulips', 2]],
+    dunes: [['driftwood', 4], ['dune', 18], ['palm', 2]],
   };
-  const CENTRAL = new Set(['pavilion', 'windmill', 'wreck']);
+  const CENTRAL = new Set(['pavilion', 'windmill', 'wreck', 'oldtree', 'moongate']);
   let wildLayout = null;
   const wildGone = new Set();
   function layoutWild() {
@@ -924,7 +1019,7 @@
   // Thin blades over every grass block. They sway with the wind, turn gold in autumn, vanish under
   // snow, and part around paths and buildings.
   const GRASS_PAL = pal4([0x9ccc6a, 0xa8d476, 0x8fc460], [0x7fb062, 0x8ab86a, 0x74a65a, 0x6fa452], [0xbfae64, 0xb09a54, 0xc8b870, 0xa89a50], null);
-  const CLEAR = { stones: 0.95, cabin: 1.45, pavilion: 1.3, windmill: 0.9, campfire: 0.55, bench: 0.6, lantern: 0.4, cairn: 0.35, wreck: 2.4, birdhouse: 0.2, chime: 0.2 };
+  const CLEAR = { stones: 0.95, cabin: 1.45, pavilion: 1.3, windmill: 0.9, campfire: 0.55, bench: 0.6, lantern: 0.4, cairn: 0.35, wreck: 2.4, birdhouse: 0.2, chime: 0.2, hive: 0.45, moongate: 0.9, oldtree: 1.6, bamboo: 0.5 };
   let grass = null, gData = null, grassS = -99, grassVer = -1, grassDensity = 4;
   const grassWalker = { value: new THREE.Vector3(0, -99, 0) };
   function bladeGeometry() {
@@ -946,19 +1041,25 @@
     const cols = K.ISLANDS.flatMap((I) => I.cols.grass), rng = mulberry32(4242), MAX = 4, n = cols.length * MAX;
     const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uSway: W.uniforms.uSway, uSwayAmp: W.uniforms.uSwayAmp, uWalker: grassWalker });
-      sh.vertexShader = 'attribute float aH; varying float vH; uniform float uSway, uSwayAmp; uniform vec3 uWalker;\n' + sh.vertexShader.replace('#include <project_vertex>', `
+      const PU = W.uniforms;
+      Object.assign(sh.uniforms, { uSway: PU.uSway, uSwayAmp: PU.uSwayAmp, uWalker: grassWalker, uGust: PU.uGust, uCloudTex: PU.uCloudTex, uCloudSh: PU.uCloudSh });
+      sh.vertexShader = 'attribute float aH; varying float vH, vGu; varying vec3 vGW; uniform float uSway, uSwayAmp; uniform vec3 uWalker;\n' + W.GUST_GLSL + '\n' + sh.vertexShader.replace('#include <project_vertex>', `
         vec4 mvPosition = instanceMatrix * vec4(transformed, 1.0);
         float ph = uSway * 1.3 + mvPosition.x * 0.5 + mvPosition.z * 0.35;
-        mvPosition.x += sin(ph) * aH * aH * 0.12 * uSwayAmp;
-        mvPosition.z += cos(ph * 0.8) * aH * aH * 0.07 * uSwayAmp;
+        // a passing gust flattens the blades downwind and sets them tossing; the bent blades catch the light
+        float gu = gustAt(mvPosition.xz);
+        mvPosition.x += sin(ph) * aH * aH * 0.12 * uSwayAmp * (1.0 + 1.8 * gu) + aH * aH * 0.2 * gu * GUST_DIR.x;
+        mvPosition.z += cos(ph * 0.8) * aH * aH * 0.07 * uSwayAmp * (1.0 + 1.8 * gu) + aH * aH * 0.2 * gu * GUST_DIR.y;
+        vGu = gu; vGW = mvPosition.xyz;
         // blades lean away from the walker's feet
         vec2 away = mvPosition.xz - uWalker.xz; float near = 1.0 - smoothstep(0.15, 0.75, length(away));
         mvPosition.xz += normalize(away + 1e-4) * near * aH * 0.22 * step(abs(mvPosition.y - uWalker.y), 0.6);
         vH = aH;
         mvPosition = modelViewMatrix * mvPosition;
         gl_Position = projectionMatrix * mvPosition;`);
-      sh.fragmentShader = 'varying float vH;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb *= mix(0.72, 1.12, vH);');
+      sh.fragmentShader = 'varying float vH, vGu; varying vec3 vGW;\n' + W.CLOUD_GLSL + '\n' + sh.fragmentShader
+        .replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb *= mix(0.72, 1.12, vH) * (1.0 + 0.16 * vGu * vH);')
+        .replace('reflectedLight.directDiffuse *= BRDF_Diffuse_Lambert( diffuseColor.rgb ) * getShadowMask();', 'reflectedLight.directDiffuse *= BRDF_Diffuse_Lambert( diffuseColor.rgb ) * getShadowMask() * swCloudShade(vGW);');
     };
     grass = new THREE.InstancedMesh(bladeGeometry(), m, n);
     grass.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1020,11 +1121,7 @@
       M4.compose(gPos.set(gData.x[i], gData.y[i], gData.z[i]), gq, gScale.set(k * 2.2, k * (0.75 + gData.r[i] * 0.6) * 1.15, k * 2.2));
       grass.setMatrixAt(i, M4);
     }
-    if (end > start) {
-      const m = grass.instanceMatrix, c = grass.instanceColor;
-      m.updateRange.offset = start * 16; m.updateRange.count = (end - start) * 16; m.needsUpdate = true;
-      c.updateRange.offset = start * 3; c.updateRange.count = (end - start) * 3; c.needsUpdate = true;
-    }
+    if (end > start) { W.queueUpload(grass.instanceMatrix, start, end - 1); W.queueUpload(grass.instanceColor, start, end - 1); }
     grassCursor = end >= grass.count ? -1 : end;
   }
 

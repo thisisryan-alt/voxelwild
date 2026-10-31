@@ -46,6 +46,9 @@
     listCache.set(key, { t: S.t, v });
     return v;
   }
+  const nearNectar = () => shared('nectar', () => GD.feat.nectar.filter((n) => S.t > n.ready && nearFocus(n)));
+  // Visitors that live on one island only show themselves when you are near it.
+  const nearIsland = (I, extra = 45) => Math.hypot(W.focus.x - I.x, W.focus.z - I.z) < I.r + extra;
   const pickNear = (list, x, z, r) => { const near = list.filter((p) => Math.hypot(p[0] - x, p[1] - z) < r); return near.length ? U.pick(rand, near) : null; };
 
   // --------------------------------------------------------------------- koi
@@ -90,15 +93,19 @@
       c.target = [x, z]; c.retarget = 12; c.hurry = 0.8;
     }
   };
-  function makeGoldfish(i) {
-    const P = K.POND, c = { see: 'goldfish', a: i * Math.PI, p: i * 3.1, dir: i ? 1 : -1 };
-    const g = root(c);
-    part(g, 0xf3a03a, 0.16, 0.1, 0.32, 0, 0, 0); c.tail = pivot(g, 0, 0, -0.16); part(c.tail, 0xf6c06a, 0.03, 0.12, 0.16, 0, 0, -0.08);
+  // Goldfish in the home pond; given a pond, the koi of Bamboo Isle.
+  function makeGoldfish(i, o) {
+    const P = o ? o.pond : K.POND, c = { see: o ? 'koi' : 'goldfish', a: i * 2.1, p: i * 3.1, dir: i % 2 ? 1 : -1 };
+    const g = root(c), y = o ? P.y : K.WL - 0.5, r0 = o ? P.r * 0.5 : 0.9;
+    part(g, o ? [0xf2efe8, 0xe8642e, 0xf6f2ea][i % 3] : 0xf3a03a, 0.16, 0.1, 0.32, 0, 0, 0);
+    if (o) part(g, i % 3 === 1 ? 0xf2efe8 : 0xe8642e, 0.12, 0.02, 0.14, 0, 0.055, 0.04);
+    c.tail = pivot(g, 0, 0, -0.16); part(c.tail, o ? 0xf6e2c8 : 0xf6c06a, 0.03, 0.12, 0.16, 0, 0, -0.08);
     c.update = (dt, t) => {
-      fadeTo(c, season() !== 3, dt);
+      fadeTo(c, season() !== 3 && (!o || nearIsland(o.island)), dt);
+      if (!g.visible) return;
       c.a += dt * 0.32 * c.dir;
-      const r = 0.9 + Math.sin(t * 0.3 + c.p) * 0.3;
-      g.position.set(P.x + Math.cos(c.a) * r, K.WL - 0.5, P.z + Math.sin(c.a) * r);
+      const r = r0 + Math.sin(t * 0.3 + c.p) * 0.3;
+      g.position.set(P.x + Math.cos(c.a) * r, y, P.z + Math.sin(c.a) * r);
       g.rotation.y = yaw(-Math.sin(c.a) * c.dir, Math.cos(c.a) * c.dir);
       c.tail.rotation.y = Math.sin(t * 5 + c.p) * 0.5;
     };
@@ -114,7 +121,7 @@
     part(c.L, col, 0.13, 0.008, 0.1, -0.065, 0, 0.02); part(c.L, col, 0.09, 0.008, 0.07, -0.05, 0, -0.06);
     part(c.R, col, 0.13, 0.008, 0.1, 0.065, 0, 0.02); part(c.R, col, 0.09, 0.008, 0.07, 0.05, 0, -0.06);
     c.update = (dt, t) => {
-      const nectar = shared('nectar', () => GD.feat.nectar.filter((n) => S.t > n.ready && nearFocus(n)));
+      const nectar = nearNectar();
       const want = Math.min(10, 2 + nectar.length);
       const si = season();
       const active = S.dayness > 0.6 && (si === 0 || si === 1 || (si === 2 && S.season % 1 < 0.4)) && S.weather.rain < 0.3 && S.weather.snow < 0.2 && c.i < want;
@@ -320,31 +327,34 @@
   }
 
   // ------------------------------------------------------------------ rabbits
-  function makeRabbit(i) {
-    const fur = [0xa89a88, 0x8a7a6a, 0xe8e4dc][i % 3];
-    const c = { see: 'rabbit', i, state: 'idle', timer: 1 + rand() * 3, k: 1, hops: 0, from: new THREE.Vector3(), to: new THREE.Vector3(), p: rand() * 10, binky: 0 };
+  // Rabbits on Home Island; with options, the larger, longer-eared hares of the Standing Stones.
+  function makeRabbit(i, o = {}) {
+    const fur = o.fur || [0xa89a88, 0x8a7a6a, 0xe8e4dc][i % 3], grass = o.cols || W.cols.grass, ear = o.ear || 0.17;
+    const c = { see: o.see || 'rabbit', i, state: 'idle', timer: 1 + rand() * 3, k: 1, hops: 0, from: new THREE.Vector3(), to: new THREE.Vector3(), p: rand() * 10, binky: 0 };
     const g = root(c);
     c.body = pivot(g, 0, 0, 0);
     part(c.body, fur, 0.24, 0.2, 0.32, 0, 0.12, 0, true);
     c.head = pivot(c.body, 0, 0.24, 0.15);
     part(c.head, fur, 0.17, 0.15, 0.16, 0, 0, 0.02);
     part(c.head, 0x2a2420, 0.03, 0.03, 0.03, -0.07, 0.02, 0.06); part(c.head, 0x2a2420, 0.03, 0.03, 0.03, 0.07, 0.02, 0.06);
-    c.earL = pivot(c.head, -0.04, 0.07, -0.02); part(c.earL, fur, 0.04, 0.17, 0.06, 0, 0.08, 0);
-    c.earR = pivot(c.head, 0.04, 0.07, -0.02); part(c.earR, fur, 0.04, 0.17, 0.06, 0, 0.08, 0);
+    c.earL = pivot(c.head, -0.04, 0.07, -0.02); part(c.earL, fur, 0.04, ear, 0.06, 0, ear * 0.47, 0);
+    c.earR = pivot(c.head, 0.04, 0.07, -0.02); part(c.earR, fur, 0.04, ear, 0.06, 0, ear * 0.47, 0);
+    if (o.tips) for (const e of [c.earL, c.earR]) part(e, 0x2a2420, 0.042, 0.04, 0.062, 0, ear * 0.94, 0);
     part(c.body, 0xf6f4ee, 0.08, 0.08, 0.06, 0, 0.16, -0.18);
-    const spot = W.cols.grass[(i * 97) % W.cols.grass.length];
+    c.body.scale.setScalar(o.scale || 1);
+    const spot = grass[(i * 97) % grass.length];
     g.position.set(spot[0], spot[2], spot[1]);
     c.update = (dt, t) => {
-      const active = S.night < 0.6 && S.weather.rain < 0.6 && c.i < 3;
+      const active = S.night < 0.6 && S.weather.rain < 0.6 && c.i < 3 && (!o.island || nearIsland(o.island));
       if (!fadeTo(c, active, dt, 0.5)) return;
       const pos = g.position;
       c.cool = (c.cool || 0) - dt;
-      if (L.walker && c.state !== 'hop' && c.cool <= 0 && pos.distanceTo(L.walker) < 2.2) {
+      if (L.walker && c.state !== 'hop' && c.cool <= 0 && pos.distanceTo(L.walker) < (o.flee || 2.2)) {
         const a = Math.atan2(pos.x - L.walker.x, pos.z - L.walker.z);
         c.goal = [pos.x + Math.sin(a) * 3, pos.z + Math.cos(a) * 3]; c.hops = 5; c.cool = 3; c.nextHop();
       }
       if (c.state === 'hop') {
-        c.k += dt / 0.38;
+        c.k += dt / (o.hopT || 0.38);
         const k = Math.min(1, c.k);
         pos.lerpVectors(c.from, c.to, k);
         pos.y += Math.sin(Math.PI * k) * (0.22 + c.binky * 0.4);
@@ -362,7 +372,7 @@
       c.earL.rotation.z = Math.max(0, Math.sin(t * 0.9 + c.p)) * 0.3;
       c.earR.rotation.z = -Math.max(0, Math.sin(t * 1.1 + c.p * 2)) * 0.3;
       if (c.timer <= 0) {
-        const goal = pickNear(W.cols.grass, pos.x, pos.z, 5);
+        const goal = pickNear(grass, pos.x, pos.z, 5);
         if (goal && Math.hypot(goal[0] - K.POND.x, goal[1] - K.POND.z) > K.POND.r + 0.5) { c.goal = goal; c.hops = 3 + ((rand() * 5) | 0); c.nextHop(); }
         else c.timer = 1;
       }
@@ -370,7 +380,7 @@
     c.nextHop = () => {
       const pos = g.position, gx = c.goal[0] - pos.x, gz = c.goal[1] - pos.z, d = Math.hypot(gx, gz);
       if (d < 0.3) { c.hops = 0; c.state = 'sit'; c.timer = 2; return; }
-      const step = Math.min(0.45, d), nx = pos.x + gx / d * step, nz = pos.z + gz / d * step;
+      const step = Math.min(o.step || 0.45, d), nx = pos.x + gx / d * step, nz = pos.z + gz / d * step;
       if (!W.isGrass(nx, nz)) { c.hops = 0; c.state = 'sit'; c.timer = 1; return; }
       c.from.copy(pos); c.to.set(nx, W.heightAt(nx, nz), nz); c.k = 0; c.state = 'hop';
       g.rotation.y = yaw(gx, gz);
@@ -980,6 +990,17 @@
     const sweep = pull ? -0.7 + 1.4 * (ph / 0.45) : 0.7 - 1.4 * ((ph - 0.45) / 0.55);
     oars.forEach((o, j) => { o.rotation.set(0, (j ? -1 : 1) * sweep, (j ? 1 : -1) * (pull ? 0.12 : -0.18)); });
     boat.userData.rower.rotation.x = pull ? -0.25 * Math.sin(Math.PI * ph / 0.45) : 0;
+    // a spreading V of foam behind the stern, and a little at the bow on each pull
+    wakeT -= dt;
+    if (wakeT <= 0) {
+      wakeT = 0.06;
+      const yw = boat.rotation.y, fx = Math.sin(yw), fz = Math.cos(yw), rx = Math.cos(yw), rz = -Math.sin(yw), dim = 1 - 0.65 * S.night;
+      for (const side of [-1, 1]) {
+        const wx = boat.position.x - fx * 1.2 + rx * side * 0.3, wz = boat.position.z - fz * 1.2 + rz * side * 0.3;
+        wake.emit({ x: wx, y: W.waveY(wx, wz) + 0.14, z: wz, vx: rx * side * 0.45 - fx * 0.2, vz: rz * side * 0.45 - fz * 0.2, drag: 0.35, life: 3.4, size: 0.6, size2: 2.6, alpha: 0.42, r: 0.93 * dim, g: 0.97 * dim, b: dim });
+        if (pull && rand() < 0.5) wake.emit({ x: boat.position.x + fx * 1.25 + rx * side * 0.2, y: boat.position.y + 0.18, z: boat.position.z + fz * 1.25 + rz * side * 0.2, vx: rx * side * 0.7, vz: rz * side * 0.7, drag: 0.8, life: 1.4, size: 0.4, size2: 1.3, alpha: 0.5, r: dim, g: dim, b: dim });
+      }
+    }
     if (ph < trip.last) {
       for (const sx of [-1, 1]) {
         const ox = boat.position.x + Math.cos(boat.rotation.y) * sx * 1.6, oz = boat.position.z - Math.sin(boat.rotation.y) * sx * 1.6;
@@ -999,7 +1020,7 @@
   SW.on('island', () => { if (boat && !trip) mooring(); });
 
   // ---------------------------------------------------------------- particles
-  let fireflies, ffData, fall, fallData, flames, puffs, sparkle, ffIdle = false, fallBusy = true;
+  let fireflies, ffData, fall, fallData, flames, puffs, sparkle, wake, ffIdle = false, fallBusy = true, wakeT = 0;
   const FF = 150, FALL = 260;
   function initParticles() {
     fireflies = W.makePoints(FF, 'glow', true, 620);
@@ -1012,6 +1033,7 @@
     flames = W.makeEmitter(500, 'glow', true, 260);
     puffs = W.makeEmitter(500, 'soft', false, 300);
     sparkle = W.makeEmitter(300, 'glow', true, 240);
+    wake = W.makeEmitter(320, 'soft', false, 280);
   }
   function splash(x, z, n) {
     for (let i = 0; i < n; i++) puffs.emit({ x, y: K.WL + 0.05, z, vx: (rand() - 0.5) * 1.2, vy: 1.2 + rand() * 1.5, vz: (rand() - 0.5) * 1.2, grav: 6, life: 0.6 + rand() * 0.3, size: 0.6, size2: 0.3, alpha: 0.8, r: 0.9, g: 0.95, b: 1 });
@@ -1096,7 +1118,7 @@
       if (rand() > dt * 0.4) continue;
       sparkle.emit({ x: f.x + (rand() - 0.5) * 0.2, y: f.y + 0.15, z: f.z + (rand() - 0.5) * 0.2, vy: 0.25, vx: (rand() - 0.5) * 0.1, life: 4, size: 1.4, size2: 0.4, r: 1, g: 0.92, b: 0.7, alpha: 0.8 });
     }
-    flames.update(dt); puffs.update(dt); sparkle.update(dt);
+    flames.update(dt); puffs.update(dt); sparkle.update(dt); wake.update(dt);
   }
 
   // ------------------------------------------------------------- sky lanterns
@@ -1193,6 +1215,270 @@
   };
 
   // ------------------------------------------------------------------- public
+  // ------------------------------------------------- the outer islands' visitors
+  // Cranes on Bamboo Isle: they wade, stand very still, call, and now and then dance.
+  function makeCrane(i) {
+    const I = K.ISLAND.bamboo, c = { see: 'crane', i, state: 'stand', timer: 2 + rand() * 4, goal: null, p: rand() * 10, dance: 0, cool: 0, baseY: 0 };
+    const g = root(c), white = 0xf2f2ee, black = 0x2a2a2c, legH = 0.62;
+    let spotList = null;
+    const spots = () => spotList || (spotList = I.cols.shallow.concat(I.cols.sand));
+    c.legs = [-1, 1].map((sx) => { const pv = pivot(g, sx * 0.06, legH, 0); part(pv, 0x4a4a4c, 0.035, legH, 0.035, 0, -legH / 2, 0); return pv; });
+    part(g, white, 0.26, 0.24, 0.5, 0, legH + 0.1, 0, true);
+    part(g, black, 0.22, 0.12, 0.2, 0, legH + 0.12, -0.3);
+    c.neck = pivot(g, 0, legH + 0.18, 0.2);
+    part(c.neck, black, 0.06, 0.42, 0.06, 0, 0.2, 0);
+    c.head = pivot(c.neck, 0, 0.42, 0);
+    part(c.head, white, 0.09, 0.08, 0.13, 0, 0, 0.02); part(c.head, 0xd0342a, 0.06, 0.03, 0.06, 0, 0.05, 0.01); part(c.head, 0x8a8a70, 0.025, 0.025, 0.16, 0, -0.01, 0.15);
+    c.wings = [-1, 1].map((sx) => { const pv = pivot(g, sx * 0.13, legH + 0.18, 0); part(pv, white, 0.42, 0.03, 0.34, sx * 0.21, 0, 0); part(pv, black, 0.14, 0.03, 0.3, sx * 0.48, 0, -0.02); return pv; });
+    const start = spots()[(i * 37 + 5) % spots().length];
+    g.position.set(start[0], Math.max(start[2], -1), start[1]); g.rotation.y = rand() * TAU;
+    const dance = () => { c.state = 'dance'; c.dance = 4.5; c.baseY = g.position.y; audio('crane', W.panOf(g.position)); };
+    c.update = (dt, t) => {
+      if (!fadeTo(c, S.dayness > 0.3 && S.weather.rain < 0.7 && nearIsland(I), dt, 0.5)) return;
+      const pos = g.position;
+      c.timer -= dt; c.cool -= dt;
+      if (L.walker && c.cool <= 0 && c.state !== 'dance' && pos.distanceTo(L.walker) < 3) {
+        c.cool = 5;
+        const a = Math.atan2(pos.x - L.walker.x, pos.z - L.walker.z);
+        c.goal = pickNear(spots(), pos.x + Math.sin(a) * 4, pos.z + Math.cos(a) * 4, 3);
+        if (c.goal) c.state = 'walk';
+      }
+      if (c.state === 'dance') {
+        c.dance -= dt;
+        const k = Math.sin(t * 6 + c.p);
+        c.wings.forEach((w, j) => { w.rotation.z = (j ? -1 : 1) * (0.9 + 0.5 * k); });
+        pos.y = c.baseY + Math.max(0, Math.sin(t * 3)) * 0.35;
+        c.neck.rotation.x = -0.3 + 0.2 * k;
+        g.rotation.y += dt * 0.8;
+        if (c.dance <= 0) { c.state = 'stand'; pos.y = c.baseY; c.timer = 3; }
+        return;
+      }
+      c.wings.forEach((w) => { w.rotation.z *= 1 - Math.min(1, dt * 4); });
+      if (c.state === 'stand') {
+        // very still, a slow look about, now and then a stab at a fish
+        c.neck.rotation.x = Math.sin(t * 0.4 + c.p) > 0.8 ? 1.1 : 0.1 + 0.08 * Math.sin(t * 0.7 + c.p);
+        c.head.rotation.y = Math.sin(t * 0.3 + c.p * 2) * 0.6;
+        c.legs.forEach((l) => { l.rotation.x = 0; });
+        if (c.timer <= 0) {
+          if (rand() < 0.12) dance();
+          else { c.goal = pickNear(spots(), pos.x, pos.z, 5); if (c.goal) c.state = 'walk'; }
+          c.timer = 5 + rand() * 9;
+          if (rand() < 0.15 && nearFocus(pos, 40)) audio('crane', W.panOf(pos));
+        }
+      } else {
+        const dx = c.goal[0] - pos.x, dz = c.goal[1] - pos.z, d = Math.hypot(dx, dz);
+        if (d < 0.15) { c.state = 'stand'; c.timer = 4 + rand() * 8; return; }
+        g.rotation.y = turnTo(g.rotation.y, yaw(dx, dz), 1.5, dt);
+        pos.x += Math.sin(g.rotation.y) * 0.35 * dt; pos.z += Math.cos(g.rotation.y) * 0.35 * dt;
+        pos.y += (Math.max(W.heightAt(pos.x, pos.z), -1) - pos.y) * Math.min(1, dt * 4);
+        const sw = Math.sin(t * 4 + c.p) * 0.45;
+        c.legs[0].rotation.x = sw; c.legs[1].rotation.x = -sw;
+        c.neck.rotation.x = 0.25 + Math.sin(t * 8) * 0.05;
+      }
+    };
+    c.tap = () => { if (c.state !== 'dance') dance(); };
+  }
+
+  // Bees: they come out of any beehive near you in spring and summer and work the flowers around it.
+  function makeBee(i) {
+    const c = { see: 'bee', i, state: 'away', tgt: new THREE.Vector3(), timer: 0, p: rand() * 10, home: null };
+    const g = root(c);
+    part(g, 0xf2c230, 0.06, 0.05, 0.09, 0, 0, 0); part(g, 0x2a2420, 0.062, 0.052, 0.022, 0, 0, -0.012);
+    c.wl = part(g, 0xe8f0f4, 0.06, 0.004, 0.035, -0.04, 0.035, 0); c.wr = part(g, 0xe8f0f4, 0.06, 0.004, 0.035, 0.04, 0.035, 0);
+    const goHome = () => c.tgt.set(c.home.x, c.home.y, c.home.z);
+    c.pick = () => {
+      const near = nearNectar().filter((n) => Math.hypot(n.x - c.home.x, n.z - c.home.z) < 18);
+      if (near.length) { const n = U.pick(rand, near); c.tgt.set(n.x + (rand() - 0.5) * 0.2, n.y + 0.05, n.z + (rand() - 0.5) * 0.2); }
+      else c.tgt.set(c.home.x + (rand() - 0.5) * 6, c.home.y + 0.5 + rand(), c.home.z + (rand() - 0.5) * 6);
+    };
+    c.update = (dt, t) => {
+      const hives = shared('hives', () => GD.feat.hive.filter((h) => S.t > h.ready && nearFocus(h, 35)));
+      const si = season();
+      const active = hives.length > 0 && S.dayness > 0.6 && (si === 0 || si === 1) && S.weather.rain < 0.3 && c.i < 3 * hives.length;
+      const pos = g.position;
+      if (c.state === 'away') {
+        if (!active) { fadeTo(c, false, dt, 3); return; }
+        c.home = hives[c.i % hives.length];
+        pos.set(c.home.x, c.home.y, c.home.z); c.state = 'out'; c.pick();
+      }
+      if (!active && c.state !== 'in') { c.state = 'in'; goHome(); }
+      fadeTo(c, true, dt, 3);
+      if (c.state === 'sip') {
+        c.timer -= dt; pos.y = c.tgt.y + Math.sin(t * 9 + c.p) * 0.01;
+        if (c.timer <= 0) { c.state = 'back'; goHome(); }
+        return;
+      }
+      tmpV.copy(c.tgt).sub(pos);
+      const d = tmpV.length();
+      if (d < 0.08 || d > 60) {
+        if (c.state === 'out') { c.state = 'sip'; c.timer = 2 + rand() * 3; }
+        else if (c.state === 'in' || d > 60) { c.state = 'away'; c.fade = 0; g.visible = false; }
+        else { c.state = 'out'; c.pick(); if (rand() < 0.3 && nearFocus(pos, 12)) audio('buzz', W.panOf(pos)); }
+        return;
+      }
+      pos.addScaledVector(tmpV, Math.min(1, 2.2 * dt / d));
+      pos.x += Math.sin(t * 13 + c.p) * 0.6 * dt; pos.y += Math.sin(t * 17 + c.p * 3) * 0.5 * dt; pos.z += Math.cos(t * 11 + c.p) * 0.6 * dt;
+      g.rotation.y = yaw(c.tgt.x - pos.x, c.tgt.z - pos.z);
+      const f = Math.sin(t * 60 + c.p) * 0.5;
+      c.wl.rotation.z = f; c.wr.rotation.z = -f;
+    };
+  }
+
+  // Cormorants on Basalt Isle: they stand on the columns with their wings held out to dry, and fly
+  // down to fish.
+  let basaltPerches = null;
+  function makeCormorant(i) {
+    const I = K.ISLAND.basalt, c = { see: 'cormorant', i, state: 'perch', timer: 4 + rand() * 10, k: 0, dur: 1, from: new THREE.Vector3(), to: new THREE.Vector3(), p: rand() * 10, spread: 0, next: null };
+    const g = root(c), black = 0x22272a;
+    const perches = () => basaltPerches || (basaltPerches = I.cols.rock.filter((r) => r[2] >= 3));
+    part(g, black, 0.16, 0.16, 0.34, 0, 0.3, 0, true);
+    part(g, 0x2f3a36, 0.12, 0.08, 0.16, 0, 0.24, -0.22);
+    c.neck = pivot(g, 0, 0.36, 0.12); part(c.neck, black, 0.06, 0.24, 0.06, 0, 0.12, 0);
+    c.head = pivot(c.neck, 0, 0.25, 0);
+    part(c.head, black, 0.07, 0.07, 0.1, 0, 0, 0.02); part(c.head, 0xd8b84a, 0.03, 0.03, 0.1, 0, -0.01, 0.1); part(c.head, 0x3fa0a0, 0.02, 0.02, 0.012, 0.036, 0.015, 0.03);
+    for (const sx of [-1, 1]) part(g, 0x2a2a2a, 0.04, 0.2, 0.04, sx * 0.05, 0.1, 0);
+    c.wings = [-1, 1].map((sx) => { const pv = pivot(g, sx * 0.08, 0.36, 0); part(pv, black, 0.32, 0.03, 0.24, sx * 0.16, 0, 0); return pv; });
+    const home = perches()[(i * 53 + 11) % Math.max(1, perches().length)] || [I.x, I.z, 4];
+    g.position.set(home[0], home[2], home[1]); g.rotation.y = rand() * TAU;
+    const flyTo = (x, y, z, then) => { c.from.copy(g.position); c.to.set(x, y, z); c.k = 0; c.dur = Math.max(1.5, c.from.distanceTo(c.to) / 3.2); c.state = 'fly'; c.next = then; };
+    const toPerch = () => { const p = U.pick(rand, perches()); if (p) flyTo(p[0], p[2], p[1], 'perch'); };
+    c.update = (dt, t) => {
+      if (!fadeTo(c, S.night < 0.65 && nearIsland(I), dt, 0.5)) return;
+      const pos = g.position;
+      c.timer -= dt;
+      if (c.state === 'perch') {
+        // wings out to dry for a while, then folded, the head turning now and then
+        const want = Math.sin(t * 0.09 + c.p * 3) > 0.1 ? 1 : 0;
+        c.spread += (want - c.spread) * Math.min(1, dt * 1.5);
+        c.wings.forEach((w, j) => { w.rotation.z = (j ? -1 : 1) * (-0.1 + 1.25 * c.spread + Math.sin(t * 7 + c.p) * 0.04 * c.spread); });
+        c.neck.rotation.x = -0.15; c.head.rotation.y = Math.sin(t * 0.5 + c.p) * 0.7;
+        if (c.timer <= 0) {
+          c.timer = 15 + rand() * 25;
+          const ring = I.cols.ring.length ? U.pick(rand, I.cols.ring) : null;
+          if (ring && rand() < 0.5) flyTo(ring[0], K.WL + 0.1, ring[1], 'dive'); else toPerch();
+        }
+      } else if (c.state === 'fly') {
+        c.k = Math.min(1, c.k + dt / c.dur);
+        const k = U.smooth(0, 1, c.k);
+        pos.lerpVectors(c.from, c.to, k);
+        pos.y += Math.sin(Math.PI * c.k) * Math.min(6, c.dur * 1.5);
+        g.rotation.y = turnTo(g.rotation.y, yaw(c.to.x - c.from.x, c.to.z - c.from.z), 4, dt);
+        c.wings.forEach((w, j) => { w.rotation.z = (j ? -1 : 1) * Math.sin(t * 14 + c.p) * 0.9; });
+        if (c.k >= 1) {
+          if (c.next === 'dive') { c.state = 'dive'; c.timer = 3 + rand() * 4; W.addRipple(pos.x, pos.z, 0.5); splash(pos.x, pos.z, 6); audio('splash', W.panOf(pos), 0.3); }
+          else { c.state = 'perch'; c.timer = 15 + rand() * 25; }
+        }
+      } else if (c.state === 'dive') {
+        g.visible = false;
+        if (c.timer <= 0) { W.addRipple(pos.x, pos.z, 0.4); g.visible = true; toPerch(); }
+      }
+    };
+    c.tap = () => { if (c.state === 'perch') toPerch(); };
+  }
+
+  // Red squirrels on Old Tree Isle: they scamper about the roots and run up the trunk.
+  let oldTreeRec = null, oldTreeVer = -1;
+  const oldTree = () => {
+    if (oldTreeVer !== GD.version) { oldTreeVer = GD.version; oldTreeRec = GD.items.find((it) => it.k === 'oldtree') || null; }
+    return oldTreeRec;
+  };
+  function makeSquirrel(i) {
+    const I = K.ISLAND.oldtree, c = { see: 'squirrel', i, state: 'idle', timer: 1 + rand() * 3, from: new THREE.Vector3(), to: new THREE.Vector3(), k: 1, dur: 1, p: rand() * 10, cool: 0, a: 0, up: 0 };
+    const g = root(c), fur = 0xb8582a;
+    c.body = pivot(g, 0, 0, 0);
+    part(c.body, fur, 0.1, 0.1, 0.2, 0, 0.08, 0, true);
+    part(c.body, fur, 0.09, 0.09, 0.09, 0, 0.13, 0.12);
+    part(c.body, 0xf0e2cc, 0.06, 0.05, 0.04, 0, 0.1, 0.07);
+    part(c.body, 0x1a1410, 0.02, 0.02, 0.02, -0.035, 0.15, 0.165); part(c.body, 0x1a1410, 0.02, 0.02, 0.02, 0.035, 0.15, 0.165);
+    for (const sx of [-1, 1]) part(c.body, fur, 0.02, 0.05, 0.02, sx * 0.03, 0.2, 0.1);
+    c.tail = pivot(c.body, 0, 0.1, -0.1); part(c.tail, 0xc8683a, 0.09, 0.22, 0.08, 0, 0.12, -0.04);
+    const ground = () => { const tr = oldTree(), cx = tr ? tr.x : I.x, cz = tr ? tr.z : I.z; return pickNear(I.cols.grass, cx + (rand() - 0.5) * 10, cz + (rand() - 0.5) * 10, 4); };
+    const start = I.cols.grass[(i * 61 + 9) % I.cols.grass.length];
+    g.position.set(start[0], start[2], start[1]);
+    const run = (x, y, z) => { c.from.copy(g.position); c.to.set(x, y, z); c.k = 0; c.dur = Math.max(0.3, c.from.distanceTo(c.to) / 1.8); c.state = 'run'; };
+    const climb = () => {
+      const tr = oldTree();
+      if (!tr) return false;
+      c.a = rand() * TAU; c.tree = tr;
+      run(tr.x + Math.cos(c.a) * 1.55, tr.y, tr.z + Math.sin(c.a) * 1.55); c.then = 'climb';
+      audio('chatter', W.panOf(g.position));
+      return true;
+    };
+    c.update = (dt, t) => {
+      if (!fadeTo(c, S.night < 0.6 && S.weather.rain < 0.6 && nearIsland(I), dt, 0.6)) return;
+      const pos = g.position;
+      c.timer -= dt; c.cool -= dt;
+      c.tail.rotation.x = -0.4 + Math.sin(t * 3 + c.p) * 0.15;
+      if (L.walker && c.cool <= 0 && c.state !== 'climb' && pos.distanceTo(L.walker) < 2.6) { c.cool = 6; if (!climb()) { const p = ground(); if (p) run(p[0], p[2], p[1]); } }
+      if (c.state === 'run') {
+        c.k = Math.min(1, c.k + dt / c.dur);
+        pos.lerpVectors(c.from, c.to, c.k);
+        pos.y = U.lerp(c.from.y, c.to.y, c.k) + Math.abs(Math.sin(c.k * c.dur * 14)) * 0.08;
+        g.rotation.y = yaw(c.to.x - c.from.x, c.to.z - c.from.z);
+        c.body.rotation.x = 0;
+        if (c.k >= 1) { if (c.then === 'climb') { c.then = null; c.state = 'climb'; c.up = 0; c.timer = 0; } else { c.state = 'idle'; c.timer = 1 + rand() * 4; } }
+      } else if (c.state === 'climb') {
+        // up the bark, a pause on the trunk, then down again
+        const tr = c.tree, R = 1.5, top = 3 + (c.i % 2) * 0.6;
+        c.up += dt;
+        const k = c.up < 2 ? c.up / 2 : c.up < 6 ? 1 : Math.max(0, 1 - (c.up - 6) / 1.6);
+        pos.set(tr.x + Math.cos(c.a) * R, tr.y + k * top, tr.z + Math.sin(c.a) * R);
+        g.rotation.y = yaw(-Math.cos(c.a), -Math.sin(c.a));
+        c.body.rotation.x = c.up < 2 || c.up >= 6 ? (c.up < 2 ? -1.45 : 1.45) : -1.45;
+        if (c.up > 7.6) { c.body.rotation.x = 0; c.state = 'idle'; c.timer = 2; pos.y = tr.y; }
+      } else {
+        c.body.rotation.x = 0;
+        if (c.timer <= 0) {
+          if (rand() < 0.3 && climb()) return;
+          const p = ground(); if (p) run(p[0], p[2], p[1]);
+          if (rand() < 0.2 && nearFocus(pos, 25)) audio('chatter', W.panOf(pos));
+        }
+      }
+    };
+    c.tap = () => { if (c.state !== 'climb') climb(); };
+  }
+
+  // Plovers on Dune Isle: tiny shorebirds that run along the tideline, stop, and run again.
+  let tideline = null;
+  function makePlover(i) {
+    const I = K.ISLAND.dunes, c = { see: 'plover', i, state: 'stand', timer: rand() * 2, from: new THREE.Vector3(), to: new THREE.Vector3(), k: 1, dur: 1, hop: 0, p: rand() * 10, cool: 0 };
+    const g = root(c);
+    const line = () => tideline || (tideline = I.cols.sand.filter(([x, z, h]) => h <= 1 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => W.heightAt(x + a, z + b) < 0)));
+    part(g, 0xcbbba0, 0.1, 0.08, 0.15, 0, 0.11, 0, true); part(g, 0xf6f2ea, 0.09, 0.05, 0.12, 0, 0.08, 0.01);
+    part(g, 0x2a2420, 0.102, 0.02, 0.03, 0, 0.13, 0.06);
+    c.head = pivot(g, 0, 0.16, 0.07); part(c.head, 0xcbbba0, 0.07, 0.06, 0.07, 0, 0, 0.01); part(c.head, 0xe08a3a, 0.02, 0.02, 0.04, 0, -0.01, 0.06);
+    c.legs = [-1, 1].map((sx) => { const pv = pivot(g, sx * 0.025, 0.07, 0); part(pv, 0xe0a050, 0.015, 0.07, 0.015, 0, -0.035, 0); return pv; });
+    const start = line()[(i * 29 + 3) % Math.max(1, line().length)] || [I.x, I.z, 0];
+    g.position.set(start[0], start[2], start[1]);
+    const go = (r, hop) => {
+      const p = pickNear(line(), g.position.x + (rand() - 0.5) * r * 2, g.position.z + (rand() - 0.5) * r * 2, r);
+      if (!p) return;
+      c.from.copy(g.position); c.to.set(p[0] + (rand() - 0.5) * 0.6, p[2], p[1] + (rand() - 0.5) * 0.6);
+      c.k = 0; c.dur = Math.max(0.4, c.from.distanceTo(c.to) / (hop ? 4 : 1.6)); c.hop = hop ? 1 : 0; c.state = 'run';
+      if (hop) audio('pipe', W.panOf(g.position));
+    };
+    c.update = (dt, t) => {
+      if (!fadeTo(c, S.dayness > 0.4 && nearIsland(I), dt, 0.6)) return;
+      const pos = g.position;
+      c.timer -= dt; c.cool -= dt;
+      if (L.walker && c.cool <= 0 && pos.distanceTo(L.walker) < 2.5) { c.cool = 4; go(7, true); }
+      if (c.state === 'run') {
+        c.k = Math.min(1, c.k + dt / c.dur);
+        pos.lerpVectors(c.from, c.to, c.k);
+        pos.y += Math.sin(Math.PI * c.k) * 1.2 * c.hop;
+        g.rotation.y = yaw(c.to.x - c.from.x, c.to.z - c.from.z);
+        const sw = c.hop ? 0 : Math.sin(t * 40 + c.p) * 0.8;
+        c.legs[0].rotation.x = sw; c.legs[1].rotation.x = -sw;
+        if (c.k >= 1) { c.state = 'stand'; c.timer = 0.6 + rand() * 2.5; }
+      } else {
+        c.legs.forEach((l) => { l.rotation.x = 0; });
+        c.head.rotation.x = Math.sin(t * 2 + c.p) > 0.85 ? 0.8 : 0;
+        if (c.timer <= 0) go(3, false);
+      }
+    };
+    c.tap = () => go(7, true);
+  }
+
   L.init = function () {
     W = SW.world; GD = SW.garden; scene = W.scene;
     stoneMat = mat(0x8e938f);
@@ -1219,6 +1505,14 @@
     for (let i = 0; i < 4; i++) makeSeal(i);
     for (let i = 0; i < 6; i++) makePuffin(i);
     for (let i = 0; i < 3; i++) makeSchool(i);
+    const koiPond = W.pools.find((p) => p.koi);
+    if (koiPond) for (let i = 0; i < 3; i++) makeGoldfish(i, { island: K.ISLAND.bamboo, pond: { x: koiPond.x, z: koiPond.z, r: koiPond.r, y: koiPond.level - 0.6 } });
+    for (let i = 0; i < 2; i++) makeCrane(i);
+    for (let i = 0; i < 9; i++) makeBee(i);
+    for (let i = 0; i < 4; i++) makeCormorant(i);
+    for (let i = 0; i < 3; i++) makeSquirrel(i);
+    for (let i = 0; i < 3; i++) makeRabbit(i, { see: 'hare', island: K.ISLAND.stones, cols: K.ISLAND.stones.cols.grass, fur: [0x9a7a58, 0xa8865e, 0x8e7050][i], ear: 0.26, tips: true, scale: 1.25, flee: 3.5, hopT: 0.3, step: 0.75 });
+    for (let i = 0; i < 6; i++) makePlover(i);
     makeRowboat();
   };
   let seeTimer = 0;
