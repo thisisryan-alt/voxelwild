@@ -6,7 +6,19 @@ fonts from Google Fonts; everything else is in `js/`.
 
 ## What is out there
 
-- **Seventeen islands:** Home Island (your garden, the pond and the dock), Pine Isle (steep, rocky, deer),
+- **Four worlds**, each its own sea with its own islands, weather, music and garden. Sail between them
+  from the Islands menu; your journal comes with you.
+  - **Stillwater**, the original archipelago of seventeen islands (below).
+  - **Lantern Bay**, an evening lagoon where the days pass slowly: paper lanterns drift on the water,
+    houses stand on stilts over the shallows of Stilt Village, a lit pagoda crowns Pagoda Hill, cranes
+    wade Lotus Lagoon, fireflies fill Firefly Glade, and bats come out at dusk.
+  - **Frost Fjord**, always deep winter: snow on everything, ice cliffs with arctic foxes, drifting
+    icebergs, hot springs steaming in the snow, reindeer on Pine Ridge, seals and puffins, white hares
+    among the stones of North Point, a snowy owl, and the aurora on most nights.
+  - **Coral Cays**, always summer: white sand and turquoise shallows, a coral lagoon of reef fish,
+    flamingos on Flamingo Flats, plovers on Turtle Beach, a bamboo-covered Jungle Hill, and a pod of
+    dolphins that surfaces offshore now and then.
+- **Seventeen islands in Stillwater:** Home Island (your garden, the pond and the dock), Pine Isle (steep, rocky, deer),
   Blossom Isle (cherry trees around a pavilion), Meadow Isle (sheep, wildflowers and a turning windmill),
   Palm Atoll (a sand ring around a coral lagoon with reef fish), Seal Rocks (seals and puffins), Wreck
   Bar (a sandbar with an old boat), Waterfall Isle (a mesa whose stream falls off a sheer cliff), Hot
@@ -45,6 +57,9 @@ fonts from Google Fonts; everything else is in `js/`.
   crabs, a heron, dragonflies, an owl, a cat asleep on the dock, a sea turtle, leaping fish, sheep, deer,
   seals, puffins, reef fish, cranes that dance, bees, cormorants drying their wings, red squirrels,
   hares, plovers, a whale and a passing sailboat. Many can be tapped. A lighthouse turns its beam at dusk.
+- **Fishing:** choose Go fishing under Water and tap open water to cast (or press it while walking).
+  After a wait and a nibble or two the float dips: tap again to catch the fish, which leaps out and goes
+  straight back. Each world has its own fish, a few of them rare; the journal counts what you have let go.
 - **Rituals:** drop a pebble, skip a stone, let a thought go on a sky lantern (the words are never saved),
   plant a glowing flower for something good (kept in the journal), or sit for 3–20 minutes with a singing
   bowl at each end.
@@ -54,10 +69,11 @@ fonts from Google Fonts; everything else is in `js/`.
   archipelago from above, and a slow drifting camera.
 - **Sound:** all synthesised live, with a mixer for waves, wind, rain, wildlife, frogs and crickets, fire,
   chimes, music, the waterfall and springs, and footsteps.
-- **Journal:** field notes for 59 visitors, sights and places, the good things you have written, and the research
+- **Journal:** field notes for 84 visitors, sights, worlds and places, the good things you have written, and the research
   behind each design choice.
 
-The garden, tidied wild plants, current island, journal, settings and time of day are saved in the browser's local storage.
+Each world's garden, tidied wild plants, current island and time of day, plus the journal, settings and
+the last world visited, are saved in the browser's local storage.
 
 **Keys:** WASD or arrows walk · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
 
@@ -65,7 +81,7 @@ The garden, tidied wild plants, current island, journal, settings and time of da
 
 | File | Contents |
 |---|---|
-| `js/core.js` | Constants and the island list, noise, seasonal palettes, storage, shared state |
+| `js/core.js` | The worlds and their islands, constants, noise, seasonal palettes, storage, shared state |
 | `js/world.js` | Renderer, sky (sun, moon, stars, aurora, rainbow), weather, archipelago terrain, water, lighthouse, clouds, dock and jetties |
 | `js/garden.js` | Voxel growth system, seasonal recolouring, plant and building catalog, wild island growth, placement rules |
 | `js/life.js` | Creatures, the rowboat, windmill sails, particles, sky lanterns, skipping stones |
@@ -116,7 +132,7 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
 | Paced breathing near 6/min, long exhale | The world follows the breathing pattern; optional on-screen guide | Lehrer & Gevirtz 2014, *Front. Psychol.*; Zaccaro et al. 2018, *Front. Hum. Neurosci.* |
 | Cyclic sighing | One of the breathing patterns | Balban et al. 2023, *Cell Rep. Med.* |
 | Water and nature scenes | Island in a calm sea, plants, slow day–night cycle; night is deep blue | White et al. 2010, *J. Environ. Psychol.*; Ulrich et al. 1991, *J. Environ. Psychol.* |
-| Soft fascination, being away, extent | Clouds and their drifting shadows, koi, fireflies, falling leaves; seventeen islands, a slow row between them and paths to walk give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
+| Soft fascination, being away, extent | Clouds and their drifting shadows, koi, fireflies, falling leaves; four worlds, seventeen islands in the first, a slow row between them and paths to walk give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
 | Watching animals | Koi, reef fish, seals, otters, cranes, squirrels, turtle, ducks, whale | Cracknell et al. 2016, *Environ. Behav.* |
 | Mid-complexity fractals | Recursive tree branching; layered-noise clouds | Taylor et al. 2011, *Front. Hum. Neurosci.*; Hagerhall et al. 2008, *Perception* |
 | Natural sound | Surf, rain, wind, birds, frogs, crickets | Alvarsson, Wiens & Nilsson 2010, *IJERPH*; Gould van Praag et al. 2017, *Sci. Rep.* |

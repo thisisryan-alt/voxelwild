@@ -254,6 +254,17 @@
   .isle.here { border-color: rgba(143, 211, 199, 0.5); background: rgba(143, 211, 199, 0.08); }
   .isle-here { font-size: 0.82rem; color: var(--tide); letter-spacing: 0.04em; }
   .isle-far { font-weight: 400; font-size: 0.82rem; color: var(--ink-soft); }
+  .pop-sub { font-family: var(--display); font-weight: 400; font-size: 1.15rem; margin: 1.1rem 0 0.5rem; }
+  .isle.world { border-style: dashed; }
+  /* the crossing between worlds */
+  .voyage {
+    position: fixed; inset: 0; z-index: 70; display: grid; place-content: center; text-align: center; gap: 0.4rem;
+    padding: 16px; background: radial-gradient(120% 90% at 50% 60%, #1f4a5a 0%, #0c2028 70%, #08161c 100%);
+    opacity: 0; transition: opacity 1.6s ease;
+  }
+  .voyage.on { opacity: 1; }
+  .voyage h2 { font-family: var(--display); font-style: italic; font-weight: 400; font-size: clamp(2rem, 7vw, 3.6rem); margin: 0; }
+  .voyage p { color: var(--ink-soft); margin: 0; font-size: 1.05rem; }
   .isle-go { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
   .btn.small { font-size: 0.9rem; padding: 0.4em 0.95em; }
   .btn.ghost { background: transparent; }
@@ -335,7 +346,11 @@
   <h2 id="popIslandsTitle">Islands</h2>
   <ul id="islandList" class="isles"></ul>
   <p class="pop-note">Rowing takes a slow half minute or so; Arrive now skips ahead. Tap the moored boat while walking to come here.</p>
+  <h3 class="pop-sub">Other worlds</h3>
+  <ul id="worldList" class="isles"></ul>
+  <p class="pop-note">Each world keeps its own garden. Your journal comes with you.</p>
 </div>
+<div id="voyage" class="voyage" hidden aria-live="polite"><h2></h2><p></p></div>
 
 <div id="popSit" class="pop" hidden role="dialog" aria-labelledby="popSitTitle">
   <h2 id="popSitTitle">Sit for a while</h2>
@@ -573,7 +588,7 @@
 <section id="intro" class="intro" aria-labelledby="introTitle">
   <div class="intro-inner">
     <h1 id="introTitle">Stillwater</h1>
-    <p class="lede">A small archipelago that breathes with you. Row between seventeen islands, wander them on foot, grow a garden through the seasons, and meet whoever comes to visit.</p>
+    <p id="introLede" class="lede">A small archipelago that breathes with you. Row between seventeen islands, wander them on foot, grow a garden through the seasons, and meet whoever comes to visit.</p>
     <div class="actions">
       <button id="beginSound" class="btn primary">Begin with sound</button>
       <button id="beginQuiet" class="btn">Begin in silence</button>

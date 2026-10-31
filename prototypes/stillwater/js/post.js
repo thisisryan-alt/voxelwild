@@ -323,8 +323,8 @@
       gl_FragColor = vec4(empty, 0.0, 0.0, 1.0);
     }`, { tColor: { value: null }, uSize: { value: new THREE.Vector2() } });
   const checkBuf = new Uint8Array(8 * 8 * 4);
-  let frameNo = 0, checkAt = 40, badChecks = 0;
-  PP.recheck = () => { checkAt = frameNo + 40; badChecks = 0; };
+  let frameNo = 0, checkAt = 40, badChecks = 0, checks = 0;
+  PP.recheck = () => { checkAt = frameNo + 40; badChecks = 0; checks = 0; };
   PP.lastCheck = -1;
   function selfCheck() {
     checkMat.uniforms.tColor.value = rtB.texture; checkMat.uniforms.uSize.value.set(rtB.width, rtB.height);
@@ -335,8 +335,10 @@
     PP.lastCheck = empty;
     badChecks = empty >= 3 ? badChecks + 1 : 0;
     if (badChecks >= 2 && PP.onBroken) { badChecks = 0; PP.onBroken(empty); return; }
-    // early on check often, then rarely; each check costs one tiny read back from the GPU
-    checkAt = frameNo + (frameNo < 600 ? 45 : 900);
+    // a read back from the GPU makes it pause for a moment, so only a few checks, then none until the
+    // graphics change again
+    checks++;
+    checkAt = checks < 5 ? frameNo + 60 : Infinity;
   }
 
   // ------------------------------------------------------------------- render

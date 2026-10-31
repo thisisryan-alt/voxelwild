@@ -416,15 +416,18 @@
         this.nextCrackle = now + 0.04 + rand() * 0.25;
       }
       // music: slow pads with long rests, and a sparse melody now and then
+      // each world has its own colour: Lantern Bay keeps to the warm night chords, a tone lower; Frost
+      // Fjord sits higher and leaves longer rests; Coral Cays stays in the bright day chords
+      const mus = SW.K.WORLD.look.music, shift = mus === 'frost' ? 5 : mus === 'coral' ? 2 : mus === 'lantern' ? -2 : 0;
+      const night = mus === 'lantern' ? true : mus === 'coral' ? false : S.night > 0.55;
       if (now > this.nextChord - 0.1) {
-        const night = S.night > 0.55;
         const DAY = [[38, 45, 54, 57, 64], [35, 42, 50, 54, 57], [43, 50, 54, 59, 62], [45, 52, 57, 59, 64]];
         const NIGHT = [[35, 42, 50, 54, 59], [31, 38, 47, 50, 54], [33, 40, 47, 52, 57], [30, 37, 45, 49, 54]];
-        this.chord((night ? NIGHT : DAY)[this.chordIdx % 4], this.nextChord, night);
-        this.chordIdx++; this.nextChord += 26;
+        this.chord((night ? NIGHT : DAY)[this.chordIdx % 4].map((m) => m + shift), this.nextChord, night);
+        this.chordIdx++; this.nextChord += mus === 'frost' ? 34 : 26;
       }
       if (now > this.nextPhrase) {
-        const scale = S.night > 0.55 ? [71, 74, 76, 78, 81, 83] : [74, 76, 78, 81, 83, 86, 88];
+        const scale = (night ? [71, 74, 76, 78, 81, 83] : [74, 76, 78, 81, 83, 86, 88]).map((m) => m + shift);
         let idx = (rand() * scale.length) | 0, t = now + 0.1;
         const n = 3 + ((rand() * 4) | 0);
         for (let i = 0; i < n; i++) {

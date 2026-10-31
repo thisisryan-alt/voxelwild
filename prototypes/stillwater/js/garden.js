@@ -719,6 +719,64 @@
     o.feature('perch', { x: (L / 2 - 1) * ca * s, y: s * 2.2, z: (L / 2 - 1) * sa * s });
   }
 
+  // A house on tall legs over the shallows: plank deck, lit window, pitched roof, a lantern by the door.
+  function stilthouse(o, rng, rec) {
+    const s = 0.22, k = faceK(rec.x, rec.z), base = Math.max(0, K.WL + 1.5 - rec.y), legs = Math.ceil(base / s) + 1;
+    const wall = hex(U.pick(rng, [0xb08a62, 0xa47a54, 0xc49a6e])), roofC = hex(U.pick(rng, [0x5a3a2e, 0x4a4e58, 0x6a4030])), plank = hex(0x8a6a4c);
+    const P = (x, y, z, layer, c, ord, size) => { const [wx, wz] = rot(x, z, k); o.vox(layer, wx * s, s * (y + 0.5), wz * s, size || s, c, ord); };
+    for (const x of [-4, 4]) for (const z of [-4, 4]) for (let y = 0; y < legs; y++) P(x, y, z, 'w', hex(DARK), y * 0.3);
+    const fy = legs;
+    for (let x = -5; x <= 6; x++) for (let z = -5; z <= 5; z++) P(x, fy, z, 'w', plank.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.06), 4);
+    for (let y = fy + 1; y <= fy + 5; y++) for (let x = -4; x <= 3; x++) for (let z = -4; z <= 4; z++) {
+      if (Math.abs(z) < 4 && x > -4 && x < 3) continue;
+      const door = x === 3 && Math.abs(z) <= 1 && y <= fy + 3, win = (z === 4 || z === -4) && Math.abs(x) <= 1 && y === fy + 3;
+      if (door) continue;
+      if (win) P(x, y, z, 'g', hex(0xffc777), 6 + y - fy);
+      else P(x, y, z, 'w', wall.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.04), 6 + y - fy);
+    }
+    for (let i = 0; i <= 6; i++) for (let x = -5; x <= 4; x++) {
+      const z = 6 - i;
+      for (const sz of [-1, 1]) P(x, fy + 6 + i, sz * z, 'w', roofC.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.04), 12 + i);
+      if (z === 0) break;
+    }
+    P(5, fy + 3, 3, 'g', hex(0xffd59a), 16, s * 0.9); P(5, fy + 4, 3, 'w', hex(DARK), 16, s * 0.6);
+    const [lx, lz] = rot(5 * s, 3 * s, k);
+    o.feature('light', { x: lx, y: s * (fy + 3), z: lz, color: 0xffc98a, base: 0.8, distance: 9 });
+    o.feature('perch', { x: 0, y: s * (fy + 13.2), z: 0 });
+    const [ex, ez] = rot(5.6 * s, -2 * s, k);
+    o.feature('seat', { x: ex, y: s * (fy + 1), z: ez, angle: k * Math.PI / 2, kind: 'edge' });
+  }
+  // A pagoda of four shrinking storeys, each with upturned eaves and a lamp.
+  function pagoda(o, rng, rec) {
+    const s = 0.24, k = faceK(rec.x, rec.z), red = hex(0x9a3a2e), roofC = hex(0x3e4652), gold = hex(0xd8b04a);
+    const P = (x, y, z, layer, c, ord, size) => { const [wx, wz] = rot(x, z, k); o.vox(layer, wx * s, s * (y + 0.5), wz * s, size || s, c, ord); };
+    foundation(o, rng, rec, s, 5, k, P);
+    for (let x = -5; x <= 5; x++) for (let z = -5; z <= 5; z++) P(x, 0, z, 'w', stoneC(rng), 1);
+    let y = 1;
+    for (let f = 0; f < 4; f++) {
+      const h = 4 - (f > 1 ? 1 : 0), w = 4 - f;
+      for (let yy = 0; yy < h; yy++) for (let x = -w; x <= w; x++) for (let z = -w; z <= w; z++) {
+        const edge = Math.max(Math.abs(x), Math.abs(z)) === w;
+        if (!edge) continue;
+        const corner = Math.abs(x) === w && Math.abs(z) === w, win = !corner && yy === 1 && (Math.abs(x) === 0 || Math.abs(z) === 0);
+        P(x, y + yy, z, win ? 'g' : 'w', win ? hex(0xffcf8a) : corner ? red : hex(0xe8dcc4).offsetHSL(0, 0, (rng() - 0.5) * 0.04), y + yy);
+      }
+      y += h;
+      const e = w + 2;
+      for (let x = -e; x <= e; x++) for (let z = -e; z <= e; z++) {
+        const ring = Math.max(Math.abs(x), Math.abs(z));
+        if (ring > e || ring < w - 1) continue;
+        const up = Math.abs(x) === e && Math.abs(z) === e ? 1 : 0;   // the corners turn up
+        P(x, y + up, z, 'w', roofC.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.05), y + 1);
+      }
+      for (const [x, z] of [[e, e], [-e, e], [e, -e], [-e, -e]]) P(x, y - 1, z, 'g', hex(0xffc274), y, s * 0.7);
+      y += 1;
+    }
+    for (let i = 0; i < 4; i++) P(0, y + i, 0, 'w', gold, y + i, s * (0.8 - i * 0.12));
+    o.feature('light', { x: 0, y: s * 3, z: 0, color: 0xffc98a, base: 1.0, distance: 12 });
+    o.feature('perch', { x: 0, y: s * (y + 4.5), z: 0 });
+  }
+
   // ---------------------------------------------------------------- catalog
   const tree = (pal, label, swatch, extra) => Object.assign({ cat: 'trees', label, swatch, on: 'grass', rad: 1.2, solid: true, tree: true, span: 32, build: (o, rng) => branchTree(o, rng, TREES[pal]) }, extra);
   const CAT = GD.CAT = {
@@ -755,6 +813,8 @@
     coral: { cat: 'water', label: 'Coral', swatch: '#f28aa0', on: 'reef', rad: 0.7, span: 8, build: coral },
     wreck: { cat: 'scenery', label: 'Shipwreck', swatch: '#7a6650', on: 'land', rad: 2.6, solid: true, span: 1, build: wreck },
     snowpine: { cat: 'scenery', label: 'Snowy pine', swatch: '#e9eff2', on: 'land', rad: 1.1, solid: true, tree: true, span: 30, build: (o, rng, rec) => pine(o, rng, rec, 'pineSnow') },
+    stilthouse: { cat: 'scenery', label: 'Stilt house', swatch: '#b08a62', on: 'shore', rad: 1.5, solid: true, span: 12, build: stilthouse },
+    pagoda: { cat: 'scenery', label: 'Pagoda', swatch: '#9a3a2e', on: 'land', rad: 1.6, solid: true, span: 16, footprint: 1.1, build: pagoda },
     oldtree: { cat: 'scenery', label: 'Old tree', swatch: '#5e8e4a', on: 'land', rad: 2.4, solid: true, tree: true, span: 70, build: (o, rng) => branchTree(o, rng, TREES.ancient) },
     moongate: { cat: 'scenery', label: 'Moon gate', swatch: '#c9cdc8', on: 'land', rad: 1.2, solid: true, span: 10, footprint: 0.9, build: moongate },
     driftwood: { cat: 'scenery', label: 'Driftwood', swatch: '#d8d0c0', on: 'sand', rad: 1.1, solid: true, span: 3, build: driftwood },
@@ -902,8 +962,26 @@
     oldtree: [['oldtree', 1], ['mushroom', 8], ['fern', 8], ['bush', 2], ['flowers', 3]],
     stones: [['flowers', 9], ['bush', 3], ['oak', 1], ['tulips', 2]],
     dunes: [['driftwood', 4], ['dune', 18], ['palm', 2]],
+    // Lantern Bay
+    stilts: [['stilthouse', 6], ['reeds', 12], ['lily', 8], ['willow', 2], ['lantern', 2]],
+    lotus: [['lily', 16], ['reeds', 6], ['dune', 6], ['cherry', 1]],
+    pagoda: [['pagoda', 1], ['maple', 4], ['pine', 3], ['lantern', 4], ['fern', 4], ['stones', 2], ['bench', 1]],
+    willows: [['willow', 5], ['cherry', 4], ['bench', 2], ['flowers', 4], ['lily', 5], ['reeds', 4]],
+    glade: [['mushroom', 8], ['fern', 8], ['flowers', 6], ['birch', 3], ['campfire', 1], ['bench', 1], ['oak', 1]],
+    // Frost Fjord
+    icecliffs: [['snowpine', 6], ['cairn', 2]],
+    snowsprings: [['cabin', 1], ['lantern', 3], ['snowpine', 4], ['stones', 2]],
+    pineridge: [['snowpine', 14], ['birch', 3], ['cairn', 1]],
+    sealskerry: [['cairn', 1]],
+    northpoint: [['cairn', 3], ['campfire', 1], ['bench', 1], ['snowpine', 2]],
+    // Coral Cays
+    bluelagoon: [['palm', 9], ['coral', 16], ['dune', 4]],
+    flamingo: [['reeds', 14], ['lily', 4], ['flowers', 3], ['palm', 2]],
+    palmcay: [['palm', 4], ['dune', 4], ['driftwood', 1]],
+    turtlebeach: [['palm', 4], ['dune', 14], ['driftwood', 2], ['coral', 6]],
+    junglehill: [['bamboo', 9], ['fern', 9], ['bush', 4], ['sunflower', 3], ['birdhouse', 1], ['palm', 2]],
   };
-  const CENTRAL = new Set(['pavilion', 'windmill', 'wreck', 'oldtree', 'moongate']);
+  const CENTRAL = new Set(['pavilion', 'windmill', 'wreck', 'oldtree', 'moongate', 'pagoda']);
   let wildLayout = null;
   const wildGone = new Set();
   function layoutWild() {
@@ -917,6 +995,7 @@
       for (const [k, count] of specs) {
         const on = CAT[k].on, C = I.cols;
         let pool = on === 'grass' ? C.grass : on === 'sand' ? C.sand : on === 'reef' || on === 'water' ? C.shallow.concat(C.ring) : on === 'shore' ? C.shallow.concat(C.sand, C.grass) : C.grass.concat(C.sand, C.rock);
+        if (k === 'stilthouse') pool = C.shallow;   // houses on legs stand out over the shallows
         if (CENTRAL.has(k)) pool = pool.slice().sort((a, b) => Math.hypot(a[0] - I.x, a[1] - I.z) - Math.hypot(b[0] - I.x, b[1] - I.z));
         for (let placed = 0, tries = 0; placed < count && tries < 300 && pool.length; tries++) {
           const p = CENTRAL.has(k) ? pool[tries] : U.pick(rng, pool);
@@ -953,15 +1032,18 @@
     GD.version++;
   };
   GD.starter = function () {
-    const rng = mulberry32(2026), out = [], P = K.POND;
-    const spots = W.cols.grass.filter(([x, z, h]) => h >= 2 && Math.hypot(x - P.x, z - P.z) > P.r + 2.5);
+    const rng = mulberry32(2026), out = [], P = K.POND, list = K.WORLD.starter;
+    const away = (x, z) => !P || Math.hypot(x - P.x, z - P.z) > P.r + 2.5;
+    const spots = { grass: W.cols.grass.filter(([x, z, h]) => h >= 2 && away(x, z)), sand: W.cols.sand.filter(([x, z, h]) => h >= 0 && h <= 2) };
+    spots.land = spots.grass.concat(spots.sand);
     const add = (k, x, z) => out.push({ id: out.length + 1, k, x, y: CAT[k].on === 'water' ? K.WL : W.heightAt(x, z), z, seed: (rng() * 1e9) | 0, at: U.today() });
     const far = (x, z, d) => out.every((p) => Math.hypot(p.x - x, p.z - z) > d);
-    const place = (k, d) => { for (let i = 0; i < 400; i++) { const [x, z] = U.pick(rng, spots); if (far(x, z, d)) { add(k, x, z); return; } } };
-    for (const k of ['oak', 'cherry', 'pine', 'maple']) place(k, 5.5);
-    for (const k of ['flowers', 'flowers', 'lavender', 'tulips', 'fern', 'mushroom']) place(k, 2.2);
-    add('lily', P.x + 0.3, P.z - 0.2);
-    add('reeds', P.x - P.r - 0.6, P.z + 0.4);
+    const place = (k, d) => {
+      const pool = spots[CAT[k].on] || spots.grass;
+      for (let i = 0; i < 400 && pool.length; i++) { const [x, z] = U.pick(rng, pool); if (far(x, z, d) && GD.check(k, x, z).ok) { add(k, x, z); return; } }
+    };
+    for (const k of list) place(k, CAT[k].tree ? 5.5 : 2.2);
+    if (P) { add('lily', P.x + 0.3, P.z - 0.2); add('reeds', P.x - P.r - 0.6, P.z + 0.4); }
     const d = W.dock.start;
     for (let i = 0; i < 40; i++) {
       const x = d.x * 0.82 + (rng() - 0.5) * 3, z = d.z * 0.82 + (rng() - 0.5) * 3, c = W.colAt(x, z);

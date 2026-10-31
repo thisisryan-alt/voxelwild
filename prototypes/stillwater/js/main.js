@@ -2,6 +2,7 @@
 (function (SW) {
   'use strict';
   const { K, U } = SW;
+  const LOOK = K.WORLD.look;
   const S = SW.S;
   const $ = (id) => document.getElementById(id);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -39,11 +40,11 @@
   const saveSoon = () => { lastSave = Math.min(lastSave, performance.now() - 6500); };   // save within a couple of seconds
   function saveNow() {
     if (!W) return;
-    SW.store.set('garden2', GD.serialize());
+    SW.store.set(SW.store.w('garden2'), GD.serialize());
     SW.store.set('journal', journal);
     SW.store.set('prefs2', prefs);
-    SW.store.set('world', { tod: S.tod, day: S.day, season: S.season, island: S.island });
-    SW.store.set('wildGone', GD.wildGone());
+    SW.store.set(SW.store.w('world'), { tod: S.tod, day: S.day, season: S.season, island: S.island });
+    SW.store.set(SW.store.w('wildGone'), GD.wildGone());
   }
   window.addEventListener('pagehide', () => { if (S.started) saveNow(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.started) saveNow(); });
@@ -93,8 +94,20 @@
     ['squirrel', 'Red squirrels', 'They scamper among the roots and run up the trunk of the old tree.', 'Row to Old Tree Isle by day.'],
     ['hare', 'Hares', 'Bigger and quicker than rabbits, with black-tipped ears. They race between the stones.', 'Row to the Standing Stones.'],
     ['plover', 'Plovers', 'Tiny shorebirds that run along the tideline, stop, and run again.', 'Row to Dune Isle and watch the water’s edge.'],
+    ['fishing', 'Fishing', 'A float on the water, a long wait, a tug. Every fish goes back. Each world has its own, and a few are rare.', 'Choose Go fishing under Water, and tap open water.'],
+    ['bat', 'Bats', 'They come out at dusk and flit in loops over the water, catching moths.', 'Wait for evening in Lantern Bay.'],
+    ['flamingo', 'Flamingos', 'Pink and very upright, they wade the warm flats in a small flock.', 'Row to Flamingo Flats in Coral Cays. Tap one to see it dance.'],
+    ['dolphin', 'Dolphins', 'A pod passes offshore, each one surfacing in a low arc, again and again.', 'Watch the deeper water in Coral Cays.'],
+    ['reindeer', 'Reindeer', 'They browse among the snowy pines, carrying broad swept antlers.', 'Row to Pine Ridge in Frost Fjord.'],
+    ['snowyowl', 'Snowy owl', 'A white owl that watches from the tallest tree after dark.', 'Stay up past dark in Frost Fjord.'],
+    ['arctichare', 'Arctic hares', 'Pure white hares that race between the stones on the headland.', 'Row to North Point in Frost Fjord.'],
   ].map(([id, name, line, hint]) => ({ id, name, line, hint }));
-  for (const I of K.ISLANDS) if (I.id !== 'home') JOURNAL.push({ id: 'isle-' + I.id, name: I.name, line: I.line, hint: 'Row there from the Islands menu.' });
+  // every world, and every island in every world, has a page
+  for (const wid of K.WORLD_ORDER) {
+    const WD = K.WORLDS[wid];
+    if (wid !== 'stillwater') JOURNAL.push({ id: 'world-' + wid, name: WD.name, line: WD.line, hint: 'Sail there from the Islands menu.' });
+    for (const I of WD.islands) if (I.id !== 'home') JOURNAL.push({ id: 'isle-' + I.id, name: I.name, line: I.line, hint: wid === K.WORLD.id ? 'Row there from the Islands menu.' : 'In ' + WD.name + '.' });
+  }
   const JBY = Object.fromEntries(JOURNAL.map((j) => [j.id, j]));
   let pendingSeen = [], seenFlush = 0;
   SW.on('see', (id) => {
@@ -352,6 +365,13 @@
   // In walk mode the tray acts right where you stand.
   function actHere(k) {
     const WK = SW.walk, f = WK.front(1.3);
+    if (k === 'fish') {
+      if (L.fishing() === 'bite' || L.fishing() === 'wait') { strike(); return; }
+      const tgt = WK.front(6);
+      if (!L.cast(WK.pos, tgt.x, tgt.z)) { toast('Face the open water first.', 3, true); return; }
+      if (!prefs.fishTips) { prefs.fishTips = true; toast('Now wait. When the float dips, press Go fishing again.', 6, true); }
+      return;
+    }
     if (k === 'pebble' || k === 'skip') {
       const tgt = WK.front(k === 'pebble' ? 7 : 5);
       if (W.heightAt(tgt.x, tgt.z) >= -1) { toast('Face the open water first.', 3, true); return; }
@@ -365,6 +385,21 @@
     if (plantAt(kind, f.x, f.z)) WK.kneel();
   }
 
+  // Strike: if a fish has taken the float it is caught, admired and let go; otherwise the line comes in.
+  function strike() {
+    const r = L.reel();
+    if (!r) return;
+    if (r.early) { toast('Nothing on the line yet. Cast again whenever you like.', 3, true); return; }
+    journal.fish = (journal.fish || 0) + 1;
+    journal.fishKinds = journal.fishKinds || {};
+    const first = !journal.fishKinds[r.name];
+    journal.fishKinds[r.name] = (journal.fishKinds[r.name] || 0) + 1;
+    SW.emit('see', 'fishing');
+    toast((r.rare ? 'A rare one: a ' : 'A ') + r.name + ', about ' + r.size + ' cm. ' + (first ? 'Your first. ' : '') + 'You let it go.', 5);
+    saveSoon();
+  }
+  SW.on('fishbite', () => { if (tool === 'fish' || SW.walk.active) toast('A tug on the line!', 2, true); });
+  SW.on('fishmissed', () => { if (tool === 'fish' || SW.walk.active) toast('It slipped away. The float is still out.', 3, true); });
   function onLand(hit) {
     const b = W.blocks[hit.instanceId];
     if (!b || b[6] !== W.heightAt(b[0], b[2])) return;
@@ -372,7 +407,7 @@
     if (tool === 'tidy') { tidyAt(x, z); return; }
     const g = GD.nearest(x, z, 0.7, (it) => it.k === 'grat');
     if (g) { showNote(g); return; }
-    if (tool === 'pebble' || tool === 'skip') { toast(tool === 'skip' ? 'Tap the water to skip a stone.' : 'Tap the water to drop a pebble.', 3, true); return; }
+    if (tool === 'pebble' || tool === 'skip' || tool === 'fish') { toast(tool === 'skip' ? 'Tap the water to skip a stone.' : tool === 'fish' ? 'Tap open water to cast.' : 'Tap the water to drop a pebble.', 3, true); return; }
     const def = GD.CAT[tool];
     if (!def) return;
     let k = tool;
@@ -384,6 +419,14 @@
     if (tool === 'tidy') { tidyAt(x, z); return; }
     if (tool === 'lily' || tool === 'reeds' || tool === 'coral') { plantAt(tool, x, z); return; }
     if (tool === 'skip') { L.skipStone(x, z); return; }
+    if (tool === 'fish') {
+      // a tap while the float is out strikes; anywhere else casts there
+      const at = L.fishAt();
+      if (at && (L.fishing() === 'bite' || Math.hypot(at.x - x, at.z - z) < 3)) { strike(); return; }
+      if (!L.cast(SW.walk.active ? SW.walk.pos : null, x, z)) toast('Cast a little further out, where the water is deeper.', 3, true);
+      else if (!prefs.fishTips) { prefs.fishTips = true; toast('Now wait. When the float dips, tap the water.', 6, true); }
+      return;
+    }
     W.addRipple(x, z, 1);
     A.plop();
     L.splash(x, z, 5);
@@ -412,12 +455,12 @@
   const TOOLS = {
     trees: ['oak', 'maple', 'birch', 'cherry', 'apple', 'willow', 'pine', 'palm'],
     plants: ['flowers', 'tulips', 'lavender', 'sunflower', 'fern', 'mushroom', 'bush', 'bamboo'],
-    water: ['lily', 'reeds', 'coral', 'pebble', 'skip'],
+    water: ['lily', 'reeds', 'coral', 'pebble', 'skip', 'fish'],
     decor: ['lantern', 'chime', 'bench', 'campfire', 'cairn', 'birdhouse', 'hive', 'stones', 'cabin', 'pavilion', 'windmill'],
     rituals: ['letgo', 'grateful', 'tidy'],
   };
   const SPECIAL = {
-    pebble: { label: 'Pebble', swatch: '#8e938f' }, skip: { label: 'Skip a stone', swatch: '#b8bcb8' },
+    pebble: { label: 'Pebble', swatch: '#8e938f' }, skip: { label: 'Skip a stone', swatch: '#b8bcb8' }, fish: { label: 'Go fishing', swatch: '#d8402e' },
     letgo: { label: 'Let something go', swatch: '#ffc070' }, grateful: { label: 'Something good', swatch: '#faf3e0' },
     tidy: { label: 'Tidy away', swatch: '#c9d3d8' },
   };
@@ -444,12 +487,14 @@
   function chooseTool(k) {
     if (k === 'letgo' || k === 'grateful') { openComposer(k); return; }
     if (SW.walk.active) { actHere(k); return; }
+    if (k !== 'fish' && L.fishing()) L.reelIn();
     tool = k;
     renderDrawer(); renderCats();
     const hints = {
       lily: 'Tap calm water near the shore or on the pond.', reeds: 'Tap the water’s edge.', pebble: 'Tap the water.',
       skip: 'Tap the water. The stone flies from the nearest beach.', tidy: 'Tap a plant or decoration to tidy it away.',
       palm: 'Palms grow on the sandy beach.', cabin: 'The cabin needs a flat, dry spot.',
+      fish: 'Tap open water to cast. When the float dips, tap the water again.',
     };
     if (hints[k]) toast(hints[k], 3, true);
   }
@@ -513,8 +558,42 @@
       return `<li class="isle${here ? ' here' : ''}"><span class="opt-name">${I.name}${here ? '' : ` <span class="isle-far">· ${rowLabel(dist(I))}</span>`}</span><span class="opt-sub">${I.line}</span>` +
         (here ? '<span class="isle-here">You are here</span>' : `<span class="isle-go"><button class="btn small" data-row="${I.id}">Row there</button><button class="btn small ghost" data-look="${I.id}">Look now</button></span>`) + '</li>';
     }).join('');
+    $('worldList').innerHTML = K.WORLD_ORDER.filter((id) => id !== K.WORLD.id).map((id) => {
+      const WD = K.WORLDS[id];
+      return `<li class="isle world"><span class="opt-name">${WD.name} <span class="isle-far">· ${WD.short}</span></span><span class="opt-sub">${WD.line}</span>` +
+        `<span class="isle-go"><button class="btn small" data-sail="${id}">Sail there</button></span></li>`;
+    }).join('');
+    $$('[data-sail]').forEach((b) => b.addEventListener('click', () => sailTo(b.dataset.sail)));
     $$('[data-row]').forEach((b) => b.addEventListener('click', () => rowTo(b.dataset.row)));
     $$('[data-look]').forEach((b) => b.addEventListener('click', () => { closePops(); W.setIsland(b.dataset.look); setView('island'); }));
+  }
+  // Each world is loaded on its own: sailing away saves this one, says where you are going, and reloads
+  // the page into the next. The world's name travels in the #hash, and is remembered for next time.
+  function sailTo(id) {
+    const WD = K.WORLDS[id];
+    if (!WD || id === K.WORLD.id) return;
+    closePops();
+    if (SW.walk.active) stopWalking();
+    saveNow();
+    SW.store.set('worldSel', id);
+    const v = $('voyage');
+    v.querySelector('h2').textContent = 'Sailing to ' + WD.name;
+    v.querySelector('p').textContent = WD.short + '.';
+    v.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => v.classList.add('on')));
+    if (A.ctx && A.out) A.out.gain.setTargetAtTime(0, A.ctx.currentTime, 0.4);
+    setTimeout(() => {
+      try { location.hash = id; } catch (e) { /* the remembered choice is enough */ }
+      location.reload();
+    }, 1900);
+    setTimeout(() => { v.querySelector('p').textContent = 'Reload the page to arrive.'; }, 7000);
+  }
+  function showWorldTitle() {
+    const WD = K.WORLD;
+    document.body.dataset.world = WD.id;
+    if (WD.id === 'stillwater') return;
+    $('introTitle').textContent = WD.name;
+    $('introLede').textContent = WD.line;
   }
   function rowTo(id) {
     closePops();
@@ -630,6 +709,7 @@
     if (journal.sitMinutes) st.push(journal.sitMinutes + ' minute' + (journal.sitMinutes === 1 ? '' : 's') + ' sitting');
     if (journal.lanterns) st.push(journal.lanterns + ' lantern' + (journal.lanterns === 1 ? '' : 's') + ' let go');
     if (journal.wishes) st.push(journal.wishes + ' wish' + (journal.wishes === 1 ? '' : 'es'));
+    if (journal.fish) { const kinds = Object.keys(journal.fishKinds || {}).length; st.push(journal.fish + ' fish caught and let go (' + kinds + ' kind' + (kinds === 1 ? '' : 's') + ')'); }
     $('statsLine').textContent = st.length ? st.join(' · ') : '';
   }
   function setTab(name) {
@@ -697,6 +777,7 @@
   function begin(withSound) {
     if (S.started) return;
     S.started = true;
+    if (K.WORLD.id !== 'stillwater') setTimeout(() => SW.emit('see', 'world-' + K.WORLD.id), 1200);
     $('intro').classList.add('gone');
     setTimeout(() => { $('intro').hidden = true; }, 2300);
     $('hud').hidden = false;
@@ -796,9 +877,10 @@
     S.dt = dt; S.t += dt;
     const t = S.t;
     if (window.innerWidth !== lastW || window.innerHeight !== lastH) { lastW = window.innerWidth; lastH = window.innerHeight; W.resize(); }
-    const rate = prefs.flow === 'slow' ? 0.4 : prefs.flow === 'still' ? 0 : 1, dd = dt * rate / K.DAY_LEN;
+    const rate = (prefs.flow === 'slow' ? 0.4 : prefs.flow === 'still' ? 0 : 1) * (LOOK.daySpeed || 1), dd = dt * rate / K.DAY_LEN;
     S.tod = (S.tod + dd) % 1; S.day += dd;
-    if (prefs.season === 'auto') S.season = (S.season + dd) % 4;
+    if (LOOK.season != null) S.season = LOOK.season;   // some worlds keep to one season
+    else if (prefs.season === 'auto') S.season = (S.season + dd) % 4;
     else {
       let d = (+prefs.season + 0.45) - S.season;
       d = ((d % 4) + 6) % 4 - 2;
@@ -813,7 +895,7 @@
     let fire = 0;
     for (const f of GD.feat.fire) fire = Math.max(fire, U.clamp(1 - (W.camera.position.distanceTo(tmpFire.set(f.x, f.y, f.z)) - 8) / 45, 0, 1));
     const ear = SW.walk.active ? SW.walk.pos : W.camera.position;
-    const falls = U.clamp(1 - (ear.distanceTo(W.waterfall) - 6) / 55, 0, 1), springs = U.clamp(1 - (ear.distanceTo(W.springs) - 5) / 28, 0, 1);
+    const falls = W.waterfall ? U.clamp(1 - (ear.distanceTo(W.waterfall) - 6) / 55, 0, 1) : 0, springs = W.springs ? U.clamp(1 - (ear.distanceTo(W.springs) - 5) / 28, 0, 1) : 0;
     A.update({ fire, chimes: GD.feat.chime.length, trees: GD.feat.tree.length, falls, springs });
     for (let i = growing.length - 1; i >= 0; i--) {
       const g = growing[i];
@@ -895,8 +977,12 @@
     if (!window.THREE) { noGL('The 3D library did not load. Check your connection and reload.'); return; }
     W = SW.world; GD = SW.garden; L = SW.life; A = SW.audio;
     S.quality = prefs.quality; S.reduceMotion = reduceMQ || prefs.calm;
-    const ws = (data && data.world) || SW.store.get('world', null);
+    if (data && (data.worldId || 'stillwater') !== K.WORLD.id) data = { started: data.started };   // a snapshot from another world
+    const ws = (data && data.world) || SW.store.get(SW.store.w('world'), null);
     if (ws) { S.tod = ws.tod; S.day = ws.day; S.season = ws.season; S.island = K.ISLAND[ws.island] ? ws.island : 'home'; }
+    else if (LOOK.tod0 != null) S.tod = LOOK.tod0;
+    if (LOOK.season != null) S.season = LOOK.season;
+    showWorldTitle();
     try { W.init(); } catch (e) { noGL('Stillwater needs WebGL, which this browser has turned off.'); return; }
     GD.init(); L.init(); SW.walk.init();
     SW.post.dof = prefs.dof !== false;
@@ -904,9 +990,9 @@
     A.CHANNELS.forEach((c) => { A.levels[c] = prefs.levels[c] ?? 0.8; });
     W.setWeatherMode(prefs.weather);
     let items = data && data.items;
-    if (!items) items = SW.store.get('garden2', null);
-    if (!items) { const v1 = SW.store.get('garden.v1', null); if (Array.isArray(v1) && v1.length) items = v1.map((r, i) => Object.assign({ id: i + 1 }, r)); }
-    GD.reset(items && items.length ? items : GD.starter(), (data && data.wildGone) || SW.store.get('wildGone', []));
+    if (!items) items = SW.store.get(SW.store.w('garden2'), null);
+    if (!items && K.WORLD.id === 'stillwater') { const v1 = SW.store.get('garden.v1', null); if (Array.isArray(v1) && v1.length) items = v1.map((r, i) => Object.assign({ id: i + 1 }, r)); }
+    GD.reset(items && items.length ? items : GD.starter(), (data && data.wildGone) || SW.store.get(SW.store.w('wildGone'), []));
     W.setIsland(S.island);
     bindInput(); bindUI();
     renderCats();
@@ -928,9 +1014,9 @@
     W.renderer.setAnimationLoop(frame);
     if (data && data.started) begin(false);
   }
-  SW.ui = { setView: (v, instant) => setView(v, instant), toast, camera: cam, rowTo: (id) => rowTo(id), tick: (dt) => updateCamera(dt, S.t), walk: () => startWalking(), handpan: (i) => playPad(i) };
+  SW.ui = { setView: (v, instant) => setView(v, instant), toast, camera: cam, rowTo: (id) => rowTo(id), sailTo: (id) => sailTo(id), tick: (dt) => updateCamera(dt, S.t), walk: () => startWalking(), handpan: (i) => playPad(i) };
   const hot = window.claude && window.claude.hot;
-  if (hot && hot.snapshot) hot.snapshot(() => ({ items: GD ? GD.serialize() : null, wildGone: GD ? GD.wildGone() : null, world: { tod: S.tod, day: S.day, season: S.season, island: S.island }, started: S.started }));
+  if (hot && hot.snapshot) hot.snapshot(() => ({ worldId: K.WORLD.id, items: GD ? GD.serialize() : null, wildGone: GD ? GD.wildGone() : null, world: { tod: S.tod, day: S.day, season: S.season, island: S.island }, started: S.started }));
   const start = (data) => { try { boot(data || {}); } catch (e) { console.error(e); noGL('Something went wrong while starting. Reload to try again.'); } };
   if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});
 })(window.SW);
