@@ -110,7 +110,9 @@ fonts from Google Fonts; everything else is in `js/`.
   seals, puffins, reef fish, cranes that dance, bees, cormorants drying their wings, red squirrels,
   hares, plovers, a whale and a passing sailboat, and in the other worlds bats, flamingos, dolphins,
   reindeer, a snowy owl, arctic hares, doves, swans, winged horses, fire birds, salamanders and lava
-  fish. Many can be tapped. A lighthouse turns its beam at dusk.
+  fish. Many can be tapped. The grazing animals breathe, swish their tails (faster as they walk), lift
+  their heads now and then to look about, and nod as they step; sheep have woolly fleeces, foxes flick
+  their ears, and the winged horses stretch their wings. A lighthouse turns its beam at dusk.
 - **Fishing:** choose Go fishing under Water and tap open water to cast (or press it while walking).
   After a wait and a nibble or two the float dips: tap again to catch the fish, which leaps out and goes
   straight back. Each world has its own fish, a few of them rare; the journal counts what you have let go.

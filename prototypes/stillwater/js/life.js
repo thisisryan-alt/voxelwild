@@ -722,18 +722,29 @@
     const c = { see: rein ? 'reindeer' : kind, i, state: 'graze', timer: rand() * 4, speed: 0, goal: null, p: rand() * 10, look: 0, cool: 0 };
     const g = root(c), coat = sheep ? 0xf2efe6 : fox ? 0xf2f4f6 : peg ? 0xfaf8f4 : rein ? 0x8a7a6a : 0x9a6a44, dark = sheep ? 0x2a2624 : fox ? 0xd2d9de : peg ? 0xe8e2d8 : rein ? 0x5a4c40 : 0x7a5434;
     const legH = sheep ? 0.28 : fox ? 0.2 : peg ? 0.62 : 0.5, bodyY = legH + (sheep ? 0.2 : fox ? 0.1 : 0.16);
-    part(g, coat, sheep ? 0.5 : fox ? 0.22 : peg ? 0.42 : 0.36, sheep ? 0.4 : fox ? 0.2 : peg ? 0.4 : 0.32, sheep ? 0.66 : fox ? 0.46 : peg ? 0.9 : 0.72, 0, bodyY, 0, true);
+    c.body = part(g, coat, sheep ? 0.5 : fox ? 0.22 : peg ? 0.42 : 0.36, sheep ? 0.4 : fox ? 0.2 : peg ? 0.4 : 0.32, sheep ? 0.66 : fox ? 0.46 : peg ? 0.9 : 0.72, 0, bodyY, 0, true);
+    c.bodyH = c.body.scale.y;
+    // sheep are woolly: tufts break up the outline of the fleece
+    if (sheep) for (let k = 0; k < 9; k++) { const a = k / 9 * TAU; part(g, U.pick(rand, [0xf6f3ea, 0xece8dc, 0xfaf8f0]), 0.14, 0.12, 0.16, Math.cos(a) * 0.22, bodyY + 0.12 + (k % 3) * 0.04, Math.sin(a) * 0.28); }
     if (peg) {
       // a winged horse: gold mane and tail, and white wings folded along its back that open as it walks
-      part(g, 0xe8c86a, 0.06, 0.24, 0.3, 0, bodyY + 0.3, 0.32); part(g, 0xe8c86a, 0.08, 0.3, 0.1, 0, bodyY - 0.05, -0.5);
+      part(g, 0xe8c86a, 0.06, 0.24, 0.3, 0, bodyY + 0.3, 0.32);
+      c.tail = pivot(g, 0, bodyY + 0.12, -0.45); part(c.tail, 0xe8c86a, 0.08, 0.3, 0.1, 0, -0.17, -0.05);
       c.wings = [-1, 1].map((sx) => { const pv = pivot(g, sx * 0.2, bodyY + 0.18, 0.05); part(pv, 0xffffff, 0.5, 0.04, 0.34, sx * 0.25, 0, 0); part(pv, 0xf4f0e6, 0.36, 0.03, 0.26, sx * 0.62, 0, -0.04); return pv; });
     }
     c.legs = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([sx, sz]) => { const pv = pivot(g, sx * (sheep ? 0.15 : fox ? 0.07 : 0.12), legH, sz * (fox ? 0.16 : 0.24)); part(pv, dark, 0.07, legH, 0.07, 0, -legH / 2, 0); return pv; });
     c.head = pivot(g, 0, bodyY + (sheep ? 0.08 : fox ? 0.08 : 0.22), fox ? 0.26 : 0.36);
     part(c.head, fox ? coat : dark, sheep ? 0.18 : 0.14, sheep ? 0.2 : 0.16, sheep ? 0.22 : 0.26, 0, 0, 0.08);
     if (sheep) part(c.head, coat, 0.2, 0.08, 0.14, 0, 0.11, 0.02);
-    else if (fox) { part(c.head, 0x2a2a2a, 0.04, 0.04, 0.03, 0, -0.01, 0.22); for (const sx of [-1, 1]) part(c.head, coat, 0.05, 0.08, 0.04, sx * 0.05, 0.11, 0.02); part(g, coat, 0.13, 0.13, 0.32, 0, bodyY + 0.02, -0.36); }
-    else { part(g, rein ? 0xe8e2d6 : coat, 0.1, 0.32, 0.12, 0, bodyY + 0.14, 0.3); part(g, 0xf2ece0, 0.08, 0.1, 0.04, 0, bodyY + 0.06, -0.37); }
+    else if (fox) {
+      part(c.head, 0x2a2a2a, 0.04, 0.04, 0.03, 0, -0.01, 0.22);
+      c.ears = [-1, 1].map((sx) => { const pv = pivot(c.head, sx * 0.05, 0.07, 0.02); part(pv, coat, 0.05, 0.08, 0.04, 0, 0.04, 0); return pv; });
+      c.tail = pivot(g, 0, bodyY + 0.04, -0.22); part(c.tail, coat, 0.13, 0.13, 0.3, 0, -0.02, -0.16); part(c.tail, 0xc8d0d6, 0.11, 0.11, 0.06, 0, -0.02, -0.33);
+    } else if (!peg) {
+      part(g, rein ? 0xe8e2d6 : coat, 0.1, 0.32, 0.12, 0, bodyY + 0.14, 0.3);
+      c.tail = pivot(g, 0, bodyY + 0.1, -0.36); part(c.tail, 0xf2ece0, 0.08, 0.1, 0.04, 0, -0.04, -0.01);
+    }
+    if (sheep) { c.tail = pivot(g, 0, bodyY + 0.08, -0.33); part(c.tail, coat, 0.1, 0.12, 0.08, 0, -0.05, -0.02); }
     if (stag) for (const sx of [-1, 1]) { part(c.head, 0xd8c8a8, 0.03, 0.22, 0.03, sx * 0.06, 0.18, 0); part(c.head, 0xd8c8a8, 0.1, 0.03, 0.03, sx * 0.1, 0.24, 0); part(c.head, 0xd8c8a8, 0.03, 0.12, 0.03, sx * 0.13, 0.3, 0); }
     if (rein) for (const sx of [-1, 1]) { part(c.head, 0xd8c8a8, 0.03, 0.03, 0.14, sx * 0.13, 0.36, 0.06); part(c.head, 0xd8c8a8, 0.03, 0.1, 0.03, sx * 0.16, 0.38, -0.02); }   // reindeer carry broad, swept antlers
     const spot = cols[(i * 41 + 7) % cols.length];
@@ -744,9 +755,15 @@
       const pos = g.position;
       c.timer -= dt; c.cool -= dt;
       if (!sheep && L.walker && c.cool <= 0 && pos.distanceTo(L.walker) < (fox ? 3 : 4.5)) { c.cool = 4; c.tap(); }
+      // breathing, a swishing tail, and (foxes) ears that flick now and then
+      c.body.scale.y = c.bodyH * (1 + 0.035 * Math.sin(t * 1.6 + c.p));
+      if (c.tail) c.tail.rotation.y = Math.sin(t * (c.state === 'walk' ? 7 : 2.2) + c.p) * (c.state === 'walk' ? 0.45 : 0.25 + 0.2 * Math.max(0, Math.sin(t * 0.3 + c.p)));
+      if (c.ears) c.ears.forEach((e, j) => { e.rotation.z = (j ? -1 : 1) * (Math.sin(t * 0.7 + c.p * 3 + j) > 0.96 ? 0.5 : 0.05); });
       if (c.state === 'graze') {
-        c.head.rotation.x = c.look > 0 ? -0.2 : 0.7 + Math.sin(t * 3 + c.p) * 0.05;
+        c.head.rotation.x = c.look > 0 ? -0.2 : 0.7 + Math.sin(t * 3 + c.p) * 0.05 - 0.75 * smooth(0.6, 0.9, Math.sin(t * 0.13 + c.p));   // now and then lift the head
+        c.head.rotation.y = 0.45 * Math.sin(t * 0.37 + c.p) * smooth(0.3, 0.9, Math.sin(t * 0.13 + c.p));                               // and look about
         c.legs.forEach((l) => { l.rotation.x = 0; });
+        if (c.wings) c.wings.forEach((w, j) => { w.rotation.z = (j ? -1 : 1) * 0.9 * smooth(0.92, 0.99, Math.sin(t * 0.21 + c.p)); });   // a winged horse stretches its wings
         if (c.timer <= 0) {
           const goal = pickNear(cols, pos.x, pos.z, 4);
           if (goal) { c.goal = goal; c.state = 'walk'; c.speed = sheep ? 0.3 : fox ? 0.6 : 0.4; }
@@ -764,7 +781,7 @@
         const sw = Math.sin(t * c.speed * 22) * 0.5;
         c.legs.forEach((l, j) => { l.rotation.x = (j === 0 || j === 3 ? sw : -sw); });
         if (c.wings) c.wings.forEach((w, j) => { w.rotation.z = (j ? -1 : 1) * (0.3 + Math.sin(t * 5) * 0.35); });
-        c.head.rotation.x = 0.1;
+        c.head.rotation.x = 0.1 + Math.sin(t * c.speed * 44) * 0.06; c.head.rotation.y *= 0.9;   // the head nods with each step
         if (c.speed > 1) pos.y += Math.abs(Math.sin(t * 10)) * 0.15;
       }
       c.look = Math.max(0, c.look - dt);
