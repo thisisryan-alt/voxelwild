@@ -117,6 +117,7 @@
     uVoxAO: { value: 0.5 },                                                  // how dark the corners of the blocks get
     uGlitter: { value: 0 },                                                  // sun glints in snow, ice and white sand
     uRimCol: { value: new THREE.Color(0, 0, 0) },                            // sky light round the edges of creatures and the walker
+    uSnowCap: { value: 0 }, uLitter: { value: 0 }, uPetals: { value: 0 },    // snow on the tops of things; fallen leaves and petals
   };
   // Shade from the clouds overhead: 1 in sunlight, lower beneath a cloud. uCloudSh.xy turns height into the
   // sideways shift along the sun's rays; z is how dark the shadows are.
@@ -190,7 +191,7 @@
         vVD = -mvPosition.z;
         gl_Position = projectionMatrix * mvPosition;`);
       sh.fragmentShader = defs + CLOUD_GLSL + `
-        uniform float uTime, uWL, uWet, uEdge, uTexel, uTexAmt, uTrans, uFaceShade, uCrack, uVoxAO, uGlitter; uniform vec3 uCaus, uDirt, uUnder, uRimCol;
+        uniform float uTime, uWL, uWet, uEdge, uTexel, uTexAmt, uTrans, uFaceShade, uCrack, uVoxAO, uGlitter, uSnowCap, uLitter, uPetals; uniform vec3 uCaus, uDirt, uUnder, uRimCol;
         varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN; varying float vVD;
         #ifdef GRASS_SIDE
           varying float vKind;
@@ -203,6 +204,7 @@
         float vn2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(vxh(vec3(i, 0.0)), vxh(vec3(i + vec2(1.0, 0.0), 0.0)), f.x), mix(vxh(vec3(i + vec2(0.0, 1.0), 0.0)), vxh(vec3(i + vec2(1.0, 1.0), 0.0)), f.x), f.y); }
         ` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        float puddle = 0.0;
         {
           vec3 an = abs(vObjN), a = abs(vLocal) * 2.0;
           vec2 f = an.x > 0.5 ? a.yz : an.y > 0.5 ? a.xz : a.xy;
@@ -227,6 +229,29 @@
           diffuseColor.rgb *= 1.0 - uEdge * edge;
           #ifdef SWAY
             diffuseColor.rgb *= 1.0 + 0.08 * vFl;   // fluttering leaves catch the light and lose it again
+          #endif
+          #if !defined(RIM) && !defined(SWAY) && !defined(GRASS_SIDE)
+            // in winter snow settles on the tops of roofs, benches, bridges, lanterns and rocks
+            if (uSnowCap > 0.0 && vObjN.y > 0.5) {
+              float sn = vxh(floor(vWPos * 6.0) + 2.7);
+              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.95, 0.98) * (0.96 + 0.06 * sn), uSnowCap * smoothstep(0.1, 0.5, sn + uSnowCap * 0.6));
+            }
+          #endif
+          #ifdef GRASS_SIDE
+            if (vKind > 1.5 && vKind < 2.5 && vObjN.y > 0.5) {
+              // fallen leaves through autumn, a sprinkle of blossom petals in spring
+              vec3 tc = floor(vWPos * 6.0); float lh = vxh(tc + 5.3), lh2 = vxh(tc + 11.7);
+              float drift = vn2(vWPos.xz * 0.18 + 2.0);
+              if (uLitter > 0.0 && lh > 1.0 - 0.3 * uLitter * (0.4 + drift)) diffuseColor.rgb = mix(vec3(0.86, 0.44, 0.13), vec3(0.6, 0.2, 0.1), lh2) * (lh2 > 0.72 ? vec3(1.12, 1.05, 0.55) : vec3(1.0));
+              else if (uPetals > 0.0 && lh > 1.0 - 0.14 * uPetals * (0.4 + drift)) diffuseColor.rgb = mix(vec3(0.98, 0.78, 0.85), vec3(1.0, 0.97, 0.95), lh2);
+            }
+            #ifdef WET
+              // in rain, puddles gather on flat ground: darker, and glossy enough to catch the light
+              if (uWet > 0.15 && vObjN.y > 0.5 && vKind < 3.5) {
+                puddle = smoothstep(0.6, 0.68, vn2(vWPos.xz * 0.32 + 3.1)) * smoothstep(0.15, 0.7, uWet);
+                diffuseColor.rgb *= 1.0 - 0.4 * puddle;
+              }
+            #endif
           #endif
           #ifdef GRASS_SIDE
             // smooth voxel lighting: each corner of a block is darker the more of the blocks around it are
@@ -255,7 +280,8 @@
           // a rim of sky light round the silhouette, so creatures and the walker stand out from busy ground
           { float fr = 1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0); outgoingLight += uRimCol * pow(fr, 3.0) * diffuseColor.rgb * 1.6 + uRimCol * pow(fr, 6.0) * 0.25; }
         #endif
-        #include <envmap_fragment>`).replace('#include <lights_fragment_begin>', LIGHTS_CLOUDED).replace('#include <fog_fragment>', `
+        #include <envmap_fragment>`).replace('#include <specularmap_fragment>', `#include <specularmap_fragment>
+        specularStrength = mix(specularStrength, 9.0, puddle);`).replace('#include <lights_fragment_begin>', LIGHTS_CLOUDED).replace('#include <fog_fragment>', `
         #ifdef CAUSTICS
           if (vWPos.y < uWL - 0.02) {
             vec2 ca = vWPos.xz * 0.9 + vec2(sin(uTime * 0.4 + vWPos.z * 0.6), cos(uTime * 0.33 + vWPos.x * 0.5)) * 0.6;
@@ -2174,6 +2200,12 @@
     PU.uCaus.value.copy(P.sun).multiplyScalar(LOOK.sea ? 0 : P.si * (1 - over) * S.dayness * 0.55);
     if (LOOK.glow) PU.uUnder.value.setRGB(LOOK.glow[0], LOOK.glow[1], LOOK.glow[2]);
     PU.uCrack.value = LOOK.sea === 'lava' ? 1 : 0;
+    {
+      const sv = ((S.season % 4) + 4) % 4, sn = U.seasonIndex(S.season);
+      PU.uSnowCap.value = Math.max(sn === 3 ? smooth(3.08, 3.4, sv) : 0, clamp(wx.snow * 1.2, 0, 1));
+      PU.uLitter.value = sn === 2 ? smooth(2.05, 2.55, sv) : sn === 3 ? 1 - smooth(3.0, 3.2, sv) : 0;
+      PU.uPetals.value = sn === 0 ? smooth(0.08, 0.35, sv) * (1 - smooth(0.8, 1.0, sv)) : 0;
+    }
     PU.uRimCol.value.copy(E.hor).multiplyScalar(0.35 + 0.4 * S.dayness).lerp(tmpC.setRGB(0.45, 0.55, 0.8), P.night * 0.5);
     if (LOOK.sea === 'lava') PU.uRimCol.value.setRGB(0.9, 0.35, 0.1);
     PU.uGlitter.value = (LOOK.glitter != null ? LOOK.glitter : GLITTER[K.WORLD.id] || 0) * S.dayness * (1 - over) * smooth(0.04, 0.2, skySun.y);

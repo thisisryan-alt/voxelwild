@@ -446,7 +446,7 @@
     C.uTime.value = S.t;
     C.uCamPos.value.copy(camera.position); C.uCamFwd.value.copy(camFwd);
     const tod = S.tod, morning = (1 - smooth(0.06, 0.2, tod)) * smooth(0.0, 0.02, tod) + smooth(0.97, 1.0, tod);
-    C.uMist.value = (morning * 0.6 + S.weather.fog * 0.3) * (1 - S.weather.rain * 0.5);
+    C.uMist.value = (morning * 0.6 + S.weather.fog * 0.75) * (1 - S.weather.rain * 0.5);   // fog lies in banks on the sea
     C.uMistCol.value.copy(E.hor).lerp(WHITE, 0.25);
     const dofOn = PP.dof && S.quality === 'high';
     pass(compMat, dofOn ? rtD : rtC);

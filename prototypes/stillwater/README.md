@@ -98,9 +98,11 @@ fonts from Google Fonts; everything else is in `js/`.
 - **Build:** stone lantern, wind chime, bench, campfire, stone stack, birdhouse, beehive (bees come out
   to visit the flowers nearby), stepping stones, cabin with a smoking chimney and lit windows, pavilion
   and windmill, plus each world's own. Coral can be planted on the sea floor.
-- **Seasons:** one season per in-game day. Leaves turn and fall, cherry petals drift in spring, flowers rest
-  in winter, snow settles on the ground and the pines.
-- **Weather:** clear, cloudy, rain (with rings on the water), fog and snow, changing on its own or set by
+- **Seasons:** one season per in-game day. Leaves turn and fall and gather on the grass through
+  autumn, cherry petals drift in spring and sprinkle the meadows, flowers rest in winter, and snow
+  settles on the ground, the pines and the tops of roofs, benches, bridges, lanterns and rocks.
+- **Weather:** clear, cloudy, rain (with rings on the water, splashes on the ground and glossy puddles
+  gathering on flat ground), fog (lying in banks on the sea) and snow, changing on its own or set by
   hand. Rainbows after rain when the sun is low. Aurora on some nights, a moon with an eight-day cycle,
   shooting stars you can tap to make a wish, and glowing water at night.
 - **Visitors:** koi, pond goldfish, butterflies, gulls, songbirds, ducks with ducklings, frogs, rabbits,
