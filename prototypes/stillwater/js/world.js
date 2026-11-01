@@ -152,6 +152,7 @@
         varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN; varying float vVD;
         #ifdef SWAY
           ` + GUST_GLSL + `
+          varying float vFl;
         #endif
         #ifdef GRASS_SIDE
           attribute float aKind; varying float vKind;
@@ -163,11 +164,21 @@
           mvPosition = instanceMatrix * mvPosition;
         #endif
         #ifdef SWAY
+          vFl = 0.0;
           float sw = sin(uSway * 0.9 + mvPosition.x * 0.45 + mvPosition.z * 0.3) + 0.5 * sin(uSway * 1.7 + mvPosition.z * 0.8);
           // gusts roll across the islands: canopies lean downwind and toss harder as one passes
           float gu = gustAt((modelMatrix * mvPosition).xz);
           mvPosition.x += sw * 0.03 * uSwayAmp * (1.0 + 1.6 * gu) + gu * 0.05 * GUST_DIR.x;
           mvPosition.z += sw * 0.018 * uSwayAmp * (1.0 + 1.6 * gu) + gu * 0.05 * GUST_DIR.y;
+          #ifdef USE_INSTANCING
+            // and each leaf flutters on its own: a quick, small shiver with its own phase, livelier in a gust
+            vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+            float ph = fract(sin(dot(ip, vec3(12.9898, 78.233, 37.719))) * 43758.5453) * 6.2831;
+            float fl = sin(uSway * 4.3 + ph) * 0.55 + sin(uSway * 7.1 + ph * 1.7) * 0.3;
+            float famp = 0.014 * uSwayAmp * (1.0 + 2.5 * gu);
+            mvPosition.xyz += vec3(fl, 0.6 * fl, -0.7 * fl) * famp;
+            vFl = fl * (1.0 + gu);
+          #endif
         #endif
         vWPos = (modelMatrix * mvPosition).xyz;
         vLocal = position; vObjN = normal;
@@ -183,6 +194,9 @@
         #ifdef GRASS_SIDE
           varying float vKind;
           varying vec4 vAO0, vAO1;
+        #endif
+        #ifdef SWAY
+          varying float vFl;
         #endif
         float vxh(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
         float vn2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -210,6 +224,9 @@
           #endif
           float edge = smoothstep(0.8, 1.0, max(f.x, f.y));
           diffuseColor.rgb *= 1.0 - uEdge * edge;
+          #ifdef SWAY
+            diffuseColor.rgb *= 1.0 + 0.08 * vFl;   // fluttering leaves catch the light and lose it again
+          #endif
           #ifdef GRASS_SIDE
             // smooth voxel lighting: each corner of a block is darker the more of the blocks around it are
             // solid, blended across every face, so steps, hollows and the foot of every cliff sit in soft shade

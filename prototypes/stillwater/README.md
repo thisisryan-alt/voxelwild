@@ -179,7 +179,9 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
   eight corners, and the shader blends that across each face, so the foot of every step and cliff
   and every hollow sits in soft shade (on top of the screen-space ambient occlusion).
 - **Canopies:** each leaf is dimmer the more leaves lie above it and brighter toward the outside of
-  the crown, so trees read as rounded masses; the shading survives the seasons' recolouring.
+  the crown, so trees read as rounded masses; the shading survives the seasons' recolouring. On top of
+  the whole canopy's sway, every leaf flutters with its own phase, livelier in a gust, and catches and
+  loses the light as it moves.
 - **Glitter:** tiny facets in snow, ice and pale sand flash as the sun and your view line up with
   them, strongest in Frost Fjord and on the white sand of Coral Cays.
 - **Lamplight:** after dark each bridge lamp and the dock lantern lay a soft, faintly flickering pool
