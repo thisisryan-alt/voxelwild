@@ -225,11 +225,17 @@
       }
     } else if ((cam.mode === 'orbit' || (cam.mode === 'walk' && !SW.walk.moving)) && prefs.drift && !S.reduceMotion && t - lastInteract > 12) cam.tTheta += dt * 0.012 * U.smooth(12, 18, t - lastInteract);
     if (cam.mode === 'walk') {
-      const p = SW.walk.pos;
-      cam.tTarget.set(p.x, p.y + (SW.walk.pose === 'stand' ? 0.9 : 0.5), p.z);
-      if (SW.walk.moving && t - lastDrag > 1.5) {
-        const f = SW.walk.facing, behind = Math.atan2(-Math.cos(f), -Math.sin(f));
-        cam.tTheta += U.angDiff(cam.tTheta, behind) * Math.min(1, dt * 1.2);
+      const WKp = SW.walk, p = WKp.pos, fp = WKp.fp, swim = WKp.medium === 'swim';
+      const eye = fp ? (swim ? 0.95 : WKp.pose === 'stand' ? 1.45 : 0.95) : swim ? 0.7 : WKp.pose === 'stand' ? 0.9 : 0.5;
+      cam.tTarget.set(p.x, p.y + eye, p.z);
+      if (fp) cam.target.copy(cam.tTarget);
+      if (WKp.moving && t - lastDrag > 1.5) {
+        // follow behind along a route; under the keys or the stick, only while heading away from the
+        // camera, so that walking sideways doesn't spin the view round
+        const f = WKp.facing, behind = Math.atan2(-Math.cos(f), -Math.sin(f));
+        const away = -Math.cos(cam.theta) * Math.sin(f) - Math.sin(cam.theta) * Math.cos(f);
+        const gain = WKp.routing() ? (fp ? 3 : 1.2) : fp ? 0 : 1.1 * U.smooth(0.15, 0.8, away);
+        cam.tTheta += U.angDiff(cam.tTheta, behind) * Math.min(1, dt * gain);
       }
     }
     const bf = L.boatFwd();
@@ -285,7 +291,7 @@
           else if (cam.mode === 'look') { cam.tYaw -= dx * 0.004; cam.tPitch = U.clamp(cam.tPitch + dy * 0.003, -0.7, 0.6); }
           else {
             if (cam.mode === 'drift') { cam.mode = 'orbit'; cam.view = 'island'; setViewButtons(); }
-            cam.tTheta += dx * 0.005; cam.tPhi = U.clamp(cam.tPhi - dy * 0.004, 0.45, 1.42); lastDrag = S.t;
+            cam.tTheta += dx * 0.005; cam.tPhi = U.clamp(cam.tPhi - dy * 0.004, 0.45, cam.mode === 'walk' && SW.walk.fp ? 2.5 : 1.42); lastDrag = S.t;
           }
         }
       }
@@ -306,7 +312,8 @@
     canvas.addEventListener('pointercancel', end);
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      if (cam.mode !== 'look') cam.tR = U.clamp(cam.tR * (1 + e.deltaY * 0.001), cam.mode === 'walk' ? 3.5 : 16, cam.mode === 'walk' ? 30 : 100);
+      if (cam.mode === 'walk' && SW.walk.fp) { if (e.deltaY > 0) { walkCam = 1; walkCamOn(); } }
+      else if (cam.mode !== 'look') cam.tR = U.clamp(cam.tR * (1 + e.deltaY * 0.001), cam.mode === 'walk' ? 3.5 : 16, cam.mode === 'walk' ? 30 : 100);
       lastInteract = S.t;
     }, { passive: false });
   }
@@ -350,23 +357,39 @@
     const WK = SW.walk;
     if (L.tapBoat(raycaster)) { renderIslands(); togglePop('popIslands'); return; }
     if (L.tapAt(raycaster)) return;
-    const hit = raycaster.intersectObject(W.terrain, false)[0];
+    let hit = raycaster.intersectObject(W.terrain, false)[0];
+    const bHit = SW.bridges.meshes ? raycaster.intersectObjects(SW.bridges.meshes, false)[0] : null;
+    if (bHit && (!hit || bHit.distance < hit.distance)) hit = bHit;
     const wHit = raycaster.ray.intersectPlane(waterPlane, wp);
     const land = hit && hit.point.y > K.WL && (!wHit || hit.distance <= raycaster.ray.origin.distanceTo(wp));
     const pt = land ? hit.point : wHit ? wp : null;
     if (!pt) return;
     const st = WK.seatNear(pt.x, pt.z, 1.3);
-    if (st) { if (!WK.goSit(st)) toast('You can’t quite get there from here.', 3, true); return; }
+    if (st) { if (!WK.goSit(st)) walkFail(); return; }
     if (land) { const g = GD.nearest(pt.x, pt.z, 0.7, (it) => it.k === 'grat'); if (g && Math.hypot(g.x - WK.pos.x, g.z - WK.pos.z) < 3) { showNote(g); return; } }
-    if (land || W.heightAt(pt.x, pt.z) === -1 || W.deckAt(pt.x, pt.z) != null) {
-      if (!WK.goTo(pt.x, pt.z)) toast('You can’t quite get there from here.', 3, true);
+    const far = Math.hypot(pt.x - WK.pos.x, pt.z - WK.pos.z);
+    // out in deep water you swim where you tap; from the shore a near tap throws a pebble, a far one swims
+    const swimTo = !LOOK.sea && (WK.medium === 'swim' || far >= 16), cloud = LOOK.sea === 'cloud';
+    if (land || W.heightAt(pt.x, pt.z) === -1 || W.deckAt(pt.x, pt.z) != null || swimTo || cloud) {
+      if (!WK.goTo(pt.x, pt.z)) walkFail();
       return;
     }
-    if (Math.hypot(pt.x - WK.pos.x, pt.z - WK.pos.z) < 16) {
+    if (far < 16) {
       WK.facing = Math.atan2(pt.x - WK.pos.x, pt.z - WK.pos.z);
       L.throwPebble(WK.pos, pt.x, pt.z);
       pebbles++;
     } else toast('That is too far to throw a pebble.', 3, true);
+  }
+  function walkFail() {
+    const f = SW.walk.lastFail;
+    if (f && f.locked) toast(f.locked.name + ' opens when your garden here reaches ✿ ' + islandNeed(f.locked.id) + '.', 4, true);
+    else toast('You can’t quite get there from here.', 3, true);
+  }
+  // walk to an island, over the bridges
+  function walkToIsland(I) {
+    if (!islandOpen(I.id)) { toast(I.name + ' opens when your garden here reaches ✿ ' + islandNeed(I.id) + '.', 4, true); return; }
+    if (!SW.walk.active) startWalking();
+    if (SW.walk.goIsland(I)) toast('Walking to ' + I.name + '.', 3, true); else walkFail();
   }
   function takeBoat() {
     if (L.trip() || L.rowing()) return;
@@ -393,26 +416,44 @@
     SW.walk.hide(false); L.setRower(false);
     const b = L.boat().position;
     SW.walk.place(sh.x, sh.z, Math.atan2(sh.x - b.x, sh.z - b.z));
-    cam.mode = 'walk'; cam.view = 'walk'; cam.tR = 9; cam.tPhi = 1.18; cam.blend = 3;
+    cam.mode = 'walk'; cam.view = 'walk'; walkCamOn(); cam.blend = 3;
     cam.tTheta = Math.atan2(-Math.cos(SW.walk.facing), -Math.sin(SW.walk.facing));
     $('btnWalk').setAttribute('aria-pressed', 'true');
     setViewButtons(); saveSoon();
     return true;
+  }
+  // The walking camera: follow, close, far, or first person (C, or the Camera button).
+  const WALK_CAMS = [{ r: 9, name: 'Following' }, { r: 5, name: 'Close behind' }, { r: 17, name: 'Further back' }, { r: 0.05, name: 'First person. Drag to look around.', fp: true }];
+  let walkCam = 0;
+  function walkCamOn() {
+    const c = WALK_CAMS[walkCam];
+    cam.tR = c.r; SW.walk.setFirstPerson(!!c.fp);
+    cam.tPhi = c.fp ? 1.52 : 1.18;
+  }
+  function setWalkCam(i) {
+    if (cam.mode !== 'walk') return;
+    walkCam = ((i % WALK_CAMS.length) + WALK_CAMS.length) % WALK_CAMS.length;
+    walkCamOn();
+    toast(WALK_CAMS[walkCam].name, 2, true);
   }
   function startWalking() {
     if (L.trip()) { toast('Wait until you land.', 3, true); return; }
     if (L.rowing()) { stepAshore(); return; }
     if (cam.view === 'sky' || cam.mode === 'look' || cam.mode === 'drift') setView('island', true);
     SW.walk.enter();
-    cam.mode = 'walk'; cam.view = 'walk'; cam.tR = 9; cam.tPhi = 1.18; cam.blend = 3;
+    cam.mode = 'walk'; cam.view = 'walk'; walkCamOn(); cam.blend = 3;
     cam.tTheta = Math.atan2(-Math.cos(SW.walk.facing), -Math.sin(SW.walk.facing));
     setViewButtons();
     $('btnWalk').setAttribute('aria-pressed', 'true');
-    if (!prefs.walkTips) { prefs.walkTips = true; toast('Tap where to go, or use the arrow keys. Tap a bench, a jetty’s end or a hot spring to sit.', 8, true); }
+    if (!prefs.walkTips2) {
+      prefs.walkTips2 = true;
+      toast(document.body.classList.contains('touch') ? 'Walk with the stick, or tap where to go, even another island: the way goes over the bridges. Tap a bench to sit.'
+        : 'Tap where to go, even another island: the way goes over the bridges. Or walk with WASD, Shift to run, Space to jump, C for the camera, E to sit.', 10, true);
+    }
   }
   function stopWalking() {
     if (L.rowing()) return;
-    SW.walk.exit();
+    SW.walk.exit(); SW.walk.setFirstPerson(false);
     $('btnWalk').setAttribute('aria-pressed', 'false');
     cam.mode = 'orbit'; cam.view = 'island';
     cam.tTarget.copy(W.island.center); cam.tR = W.island.id === 'home' ? 46 : Math.max(26, W.island.r * 3.1) * (W.island.view || 1); cam.tPhi = 1.1; cam.blend = 3;
@@ -530,12 +571,15 @@
   const islandNeed = (id) => (id === 'home' ? 0 : (K.WORLD.islands.find((I) => I.id === id) ? (K.WORLD.islandBloom || {})[id] || 0 : 0));
   const islandOpen = (id) => islandNeed(id) <= worldBloom();
   const worldOpen = (id) => id === WID || !!profile.been[id] || (K.WORLDS[id].unlock || 0) <= totalBloom();
+  SW.progress = { islandOpen, islandNeed };
+  SW.on('lockedIsland', (I) => toast(I.name + ' opens when your garden here reaches ✿ ' + islandNeed(I.id) + '.', 4, true));
   function updateBloom(force) {
     if (!GD || (!force && GD.version === bloomVer)) return;
     bloomVer = GD.version;
     bloom = GD.bloom();
     if (bloom > (profile.best[WID] || 0)) { profile.best[WID] = bloom; SW.store.set('profile', profile); }
     $('bloomVal').textContent = worldBloom();
+    SW.bridges.setOpen(islandOpen);   // ropes across the bridges to islands still closed
     // announce what has just opened, once each; on a first visit everything already open is simply noted
     const first = !profile.told['seen:' + WID];
     const items = [], isles = [], worlds = [];
@@ -546,7 +590,7 @@
     SW.store.set('profile', profile);
     if (first || !S.started) return;
     if (items.length) toast('Your garden is blooming. New in the tray: ' + items.join(', ') + '.', 6);
-    if (isles.length) toast((isles.length > 1 ? isles.join(' and ') + ' are' : isles[0] + ' is') + ' open now. Row there from Islands.', 6);
+    if (isles.length) toast((isles.length > 1 ? isles.join(' and ') + ' are' : isles[0] + ' is') + ' open now. Walk over the bridge, or row there from Islands.', 6);
     if (worlds.length) toast('A new world is open: ' + worlds.join(', ') + '. Sail there from Islands.', 7);
     if (items.length || isles.length || worlds.length) { A.bloom(); renderDrawer(); }
   }
@@ -673,7 +717,7 @@
     const rowLabel = (d) => (d < 75 ? 'A short row' : d < 150 ? 'A gentle row' : 'A long row');
     $('islandList').innerHTML = K.ISLANDS.slice().sort((a, b) => dist(a) - dist(b)).map((I) => {
       const here = I === W.island, open = islandOpen(I.id);
-      const go = open ? `<button class="btn small" data-row="${I.id}">Row there</button>` : `<span class="isle-lock">Opens at ✿ ${islandNeed(I.id)}</span>`;
+      const go = open ? `<button class="btn small" data-walkto="${I.id}">Walk there</button><button class="btn small" data-row="${I.id}">Row there</button>` : `<span class="isle-lock">Opens at ✿ ${islandNeed(I.id)}</span>`;
       return `<li class="isle${here ? ' here' : ''}${open ? '' : ' locked'}"><span class="opt-name">${I.name}${here ? '' : ` <span class="isle-far">· ${rowLabel(dist(I))}</span>`}</span><span class="opt-sub">${I.line}</span>` +
         (here ? '<span class="isle-here">You are here</span>' : `<span class="isle-go">${go}<button class="btn small ghost" data-look="${I.id}">Look now</button></span>`) + '</li>';
     }).join('');
@@ -685,6 +729,7 @@
     }).join('');
     $$('[data-sail]').forEach((b) => b.addEventListener('click', () => sailTo(b.dataset.sail)));
     $$('[data-row]').forEach((b) => b.addEventListener('click', () => rowTo(b.dataset.row)));
+    $$('[data-walkto]').forEach((b) => b.addEventListener('click', () => { closePops(); if (L.rowing() || L.trip()) { toast('Step ashore first.', 3, true); return; } walkToIsland(K.ISLAND[b.dataset.walkto]); }));
     $$('[data-look]').forEach((b) => b.addEventListener('click', () => { closePops(); W.setIsland(b.dataset.look); setView('island'); }));
   }
   // Each world is loaded on its own: sailing away saves this one, says where you are going, and reloads
@@ -736,7 +781,7 @@
     cam.tTheta = cam.theta = Math.atan2(W.camera.position.z - I.z, W.camera.position.x - I.x);
     if (SW.walk.active) {
       SW.walk.spawn(); SW.walk.hide(false); L.setRower(false);
-      cam.mode = 'walk'; cam.view = 'walk'; cam.tR = 9; cam.tPhi = 1.18; cam.blend = 3;
+      cam.mode = 'walk'; cam.view = 'walk'; walkCamOn(); cam.blend = 3;
     } else setView('island');
     toast(I.name + '.', 4, true);
     saveSoon();
@@ -931,6 +976,7 @@
     $('tripSkip').addEventListener('click', () => { if (L.rowing()) stepAshore(); else L.arriveNow(); });
     $('btnBoatOut').addEventListener('click', () => takeBoat());
     $('btnWalk').addEventListener('click', () => { closePops(); if (SW.walk.active) stopWalking(); else startWalking(); });
+    bindWalkUi();
     $('btnPlay').addEventListener('click', () => { closePops(); toggleHandpan(); });
     $('panClose').addEventListener('click', () => toggleHandpan(false));
     buildHandpan();
@@ -996,6 +1042,11 @@
       if (!$('handpan').hidden && /^[1-9]$/.test(key)) { playPad(+key - 1); return; }
       if (key === 'r') { if (L.rowing()) stepAshore(); else takeBoat(); }
       if (key === 'f') { if (L.fishing() === 'bite') strike(); else chooseTool('fish'); }
+      if (key === 'c' && SW.walk.active) setWalkCam(walkCam + 1);
+      if (key === 'e' && SW.walk.active) {
+        if (SW.walk.isSitting()) SW.walk.standUp();
+        else { const st = SW.walk.seatNear(SW.walk.pos.x, SW.walk.pos.z, 3); if (st) SW.walk.goSit(st); else toast('Nothing to sit on just here.', 2, true); }
+      }
       if (key === 'v') { const vs = Object.keys(VIEWS); setView(vs[(vs.indexOf(cam.view) + 1) % vs.length]); toast(VIEWS[cam.view], 2, true); }
     });
   }
@@ -1019,6 +1070,81 @@
   }
   // rowing again after looking around from another view brings the camera back behind the boat
   function followBoat() { cam.mode = 'follow'; cam.view = 'follow'; cam.fYaw = 0; setViewButtons(); }
+
+  // --------------------------------------------------------------- walking ui
+  // A map of the whole archipelago while walking or out in the boat (tap an island to go there), and on
+  // touch screens a stick to walk with and buttons to jump, run and change the camera.
+  let mapEl, mapCtx, mapT = 0;
+  const MAPCOL = { stillwater: ['#9cc98a', '#c9d8c4'], lantern: ['#8fc493', '#d8c9a8'], frost: ['#e6eef2', '#b9c6cc'], coral: ['#9ad28a', '#f4ecd2'], heaven: ['#b8e08e', '#f6efd8'], hell: ['#c86a3a', '#6a5a58'] };
+  function mapXY(x, z) { const s = mapEl.width / K.G; return [(x - K.MINX) * s, (z - K.MINX) * s]; }
+  function drawMap() {
+    const c = mapCtx, Wd = mapEl.width, s = Wd / K.G, col = MAPCOL[K.WORLD.id] || MAPCOL.stillwater;
+    c.clearRect(0, 0, Wd, Wd);
+    c.lineCap = 'round';
+    c.strokeStyle = 'rgba(238, 244, 240, 0.5)'; c.lineWidth = Math.max(2.2, 1.6 * s);
+    for (const br of SW.bridges.list) { c.beginPath(); c.moveTo(...mapXY(br.ax, br.az)); c.lineTo(...mapXY(br.bx, br.bz)); c.stroke(); }
+    for (const I of K.ISLANDS) {
+      const [x, y] = mapXY(I.x, I.z), open = islandOpen(I.id);
+      c.beginPath(); c.arc(x, y, Math.max(3.5, I.r * s * 1.05), 0, 6.2832);
+      c.globalAlpha = open ? 0.9 : 0.35; c.fillStyle = open ? col[0] : col[1]; c.fill();
+      if (I === W.island) { c.globalAlpha = 0.9; c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke(); }
+      c.globalAlpha = 1;
+    }
+    const b = L.boat().position, [bx, by] = mapXY(b.x, b.z);
+    c.fillStyle = '#8a5a3a'; c.fillRect(bx - 3, by - 3, 6, 6);
+    // you, as an arrow pointing the way you face
+    const WKp = SW.walk, me = WKp.active && !WKp.hidden ? WKp.pos : b, f = WKp.active && !WKp.hidden ? WKp.facing : Math.atan2(L.boatFwd() ? L.boatFwd().x : 0, L.boatFwd() ? L.boatFwd().z : 1);
+    const [mx, my] = mapXY(me.x, me.z), r = 9;
+    c.save(); c.translate(mx, my); c.rotate(-f + Math.PI);
+    c.beginPath(); c.moveTo(0, -r); c.lineTo(r * 0.7, r * 0.75); c.lineTo(0, r * 0.35); c.lineTo(-r * 0.7, r * 0.75); c.closePath();
+    c.fillStyle = '#fff3c4'; c.strokeStyle = 'rgba(10, 26, 33, 0.8)'; c.lineWidth = 2; c.fill(); c.stroke();
+    c.restore();
+  }
+  function bindWalkUi() {
+    mapEl = $('miniMap'); mapCtx = mapEl.getContext('2d');
+    mapEl.addEventListener('pointerup', (e) => {
+      const r = mapEl.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * K.G + K.MINX, z = (e.clientY - r.top) / r.height * K.G + K.MINX;
+      let best = null, bd = 14;
+      for (const I of K.ISLANDS) { const d = Math.hypot(I.x - x, I.z - z) - I.r; if (d < bd) { bd = d; best = I; } }
+      if (!best) return;
+      if (L.rowing()) {
+        if (!islandOpen(best.id)) { toast(best.name + ' opens when your garden here reaches ✿ ' + islandNeed(best.id) + '.', 4, true); return; }
+        L.rowGoal(best.landing.x, best.landing.z); toast('Rowing to ' + best.name + '.', 3, true); return;
+      }
+      if (best === W.island && SW.walk.active) { toast('You are on ' + best.name + '.', 2, true); return; }
+      walkToIsland(best);
+    });
+    if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
+    window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') document.body.classList.add('touch'); }, { passive: true });
+    const joyEl = $('joy'), knob = joyEl.querySelector('.joy-knob');
+    let joyId = null, jcx = 0, jcy = 0;
+    const moveJoy = (e) => {
+      let dx = e.clientX - jcx, dy = e.clientY - jcy;
+      const m = Math.hypot(dx, dy), R = 44;
+      if (m > R) { dx *= R / m; dy *= R / m; }
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      SW.walk.stick(Math.abs(dx) < 4 ? 0 : dx / R, Math.abs(dy) < 4 ? 0 : -dy / R);
+      lastInteract = S.t;
+    };
+    joyEl.addEventListener('pointerdown', (e) => {
+      joyId = e.pointerId; try { joyEl.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      const r = joyEl.getBoundingClientRect(); jcx = r.left + r.width / 2; jcy = r.top + r.height / 2;
+      joyEl.classList.add('held'); moveJoy(e); e.preventDefault();
+    });
+    joyEl.addEventListener('pointermove', (e) => { if (e.pointerId === joyId) moveJoy(e); });
+    const endJoy = (e) => { if (e.pointerId !== joyId) return; joyId = null; joyEl.classList.remove('held'); knob.style.transform = ''; SW.walk.stick(0, 0); };
+    joyEl.addEventListener('pointerup', endJoy); joyEl.addEventListener('pointercancel', endJoy);
+    $('btnJump').addEventListener('click', () => SW.walk.jump());
+    $('btnRun').addEventListener('click', () => { SW.walk.runToggle = !SW.walk.runToggle; $('btnRun').setAttribute('aria-pressed', String(SW.walk.runToggle)); });
+    $('btnCam').addEventListener('click', () => setWalkCam(walkCam + 1));
+  }
+  function updateWalkUi(dt) {
+    if (!mapEl) return;
+    const walking = SW.walk.active && !SW.walk.hidden, show = (walking || L.rowing()) && S.started;
+    document.body.classList.toggle('walking', walking);
+    if (mapEl.hidden === show) mapEl.hidden = !show;
+    if (show && (mapT -= dt) <= 0) { mapT = 0.2; drawMap(); }
+  }
 
   // -------------------------------------------------------------------- loop
   let last = performance.now(), clockSync = 0, seasonShown = -1, lastHudH = 0, lastW = 0, lastH = 0, lastRing = '';
@@ -1045,6 +1171,7 @@
     L.update(dt, t);
     SW.walk.update(dt, t, cam.theta);   // before the camera, so the walk camera never trails a frame behind
     updateCamera(dt, t);
+    updateWalkUi(dt);
     let fire = 0;
     for (const f of GD.feat.fire) fire = Math.max(fire, U.clamp(1 - (W.camera.position.distanceTo(tmpFire.set(f.x, f.y, f.z)) - 8) / 45, 0, 1));
     const ear = SW.walk.active ? SW.walk.pos : W.camera.position;
@@ -1172,7 +1299,7 @@
     W.renderer.setAnimationLoop(frame);
     if (data && data.started) begin(false);
   }
-  SW.ui = { setView: (v, instant) => setView(v, instant), toast, camera: cam, rowTo: (id) => rowTo(id), sailTo: (id) => sailTo(id), tick: (dt) => updateCamera(dt, S.t), walk: () => startWalking(), handpan: (i) => playPad(i) };
+  SW.ui = { setView: (v, instant) => setView(v, instant), toast, camera: cam, rowTo: (id) => rowTo(id), sailTo: (id) => sailTo(id), tick: (dt) => { updateCamera(dt, S.t); updateWalkUi(dt); }, walk: () => startWalking(), handpan: (i) => playPad(i) };
   const hot = window.claude && window.claude.hot;
   if (hot && hot.snapshot) hot.snapshot(() => ({ worldId: K.WORLD.id, items: GD ? GD.serialize() : null, wildGone: GD ? GD.wildGone() : null, world: { tod: S.tod, day: S.day, season: S.season, island: S.island }, started: S.started }));
   const start = (data) => { try { boot(data || {}); } catch (e) { console.error(e); noGL('Something went wrong while starting. Reload to try again.'); } };

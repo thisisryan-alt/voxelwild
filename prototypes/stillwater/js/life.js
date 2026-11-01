@@ -1337,6 +1337,14 @@
     for (let i = 0; i < n; i++) puffs.emit({ x, y: K.WL + 0.05, z, vx: (rand() - 0.5) * 1.2, vy: 1.2 + rand() * 1.5, vz: (rand() - 0.5) * 1.2, grav: 6, life: 0.6 + rand() * 0.3, size: 0.6, size2: 0.3, alpha: 0.8, r: 0.9, g: 0.95, b: 1 });
   }
   L.splash = splash;
+  // dust kicked up by running feet and landings, and puffs of cloud underfoot in Heaven
+  const DUST = { sand: [0.86, 0.8, 0.66], snow: [0.95, 0.97, 1], grass: [0.66, 0.72, 0.5], cloud: [1, 1, 1], stone: [0.62, 0.62, 0.6] };
+  L.dust = function (x, y, z, kind, n) {
+    if (!puffs || !DUST[kind]) return;
+    const c = K.WORLD.look.sea === 'lava' && kind !== 'cloud' ? [0.42, 0.38, 0.37] : DUST[kind], big = kind === 'cloud';
+    if (kind === 'grass') n = Math.ceil(n / 2);
+    for (let i = 0; i < n; i++) puffs.emit({ x: x + (rand() - 0.5) * 0.3, y: y + 0.08, z: z + (rand() - 0.5) * 0.3, vx: (rand() - 0.5) * 0.8, vy: 0.35 + rand() * 0.5, vz: (rand() - 0.5) * 0.8, grav: 0.5, drag: 1.6, life: big ? 1.5 : 0.7 + rand() * 0.4, size: big ? 0.9 : 0.35, size2: big ? 1.9 : 0.9, alpha: big ? 0.65 : 0.4, r: c[0], g: c[1], b: c[2] });
+  };
   function updateParticles(dt, t) {
     const si = season(), glow = smooth(0.15, 0.75, S.night), density = [0.5, 1, 0.35, 0][si] * (1 - S.weather.rain);
     const n = Math.floor(FF * density);

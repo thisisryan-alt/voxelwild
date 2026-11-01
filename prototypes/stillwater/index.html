@@ -287,6 +287,35 @@
   .zen-show.awake { opacity: 1; }
   body.zen .hud, body.zen .toast, body.sitting .hud, body.sitting .toast { display: none; }
 
+  /* Walking: a map of the archipelago, and on touch screens a stick and buttons */
+  .minimap {
+    position: fixed; z-index: 9; top: max(14px, env(safe-area-inset-top, 0px)); left: max(14px, env(safe-area-inset-left, 0px));
+    width: 150px; height: 150px; border-radius: 18px; background: var(--glass); border: 1px solid var(--line);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); cursor: pointer; touch-action: none;
+  }
+  .minimap[hidden] { display: none; }
+  .walkpad {
+    position: fixed; z-index: 9; left: 0; right: 0; bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+    display: none; justify-content: space-between; align-items: flex-end; pointer-events: none;
+    padding: 0 max(18px, env(safe-area-inset-right, 0px)) 0 max(18px, env(safe-area-inset-left, 0px));
+  }
+  body.touch.walking .walkpad { display: flex; }
+  .walkpad > * { pointer-events: auto; }
+  .joy {
+    width: 118px; height: 118px; border-radius: 50%; position: relative; touch-action: none;
+    background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .joy-knob {
+    position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%;
+    background: rgba(238, 244, 240, 0.3); border: 1px solid var(--line); transition: transform 0.15s ease;
+  }
+  .joy.held .joy-knob { transition: none; }
+  .walk-btns { display: grid; gap: 10px; }
+  .walk-btns .btn { min-width: 78px; touch-action: manipulation; }
+  .walk-btns .btn[aria-pressed="true"] { background: rgba(238, 244, 240, 0.3); }
+  body.zen .minimap, body.zen .walkpad, body.sitting .walkpad, body.sitting .minimap { display: none; }
+  @media (max-width: 720px) { .minimap { width: 120px; height: 120px; } .walkpad { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); } }
+
   @media (prefers-reduced-motion: reduce) {
     .intro, .hud, .breath, .toast, .sit, .zen-show { transition-duration: 0.01s; }
     .pad.hit { animation: none; }
@@ -296,6 +325,15 @@
 <canvas id="scene" aria-label="A small voxel island in a calm sea. Tap grass to plant, tap water to drop a pebble, drag to look around."></canvas>
 
 <div id="toast" class="toast off" role="status" aria-live="polite"></div>
+<canvas id="miniMap" class="minimap" width="300" height="300" hidden aria-label="Map of the islands and bridges. Tap an island to go there."></canvas>
+<div id="walkPad" class="walkpad">
+  <div id="joy" class="joy" aria-label="Walk"><div class="joy-knob"></div></div>
+  <div class="walk-btns">
+    <button id="btnJump" class="btn">Jump</button>
+    <button id="btnRun" class="btn" aria-pressed="false">Run</button>
+    <button id="btnCam" class="btn">Camera</button>
+  </div>
+</div>
 
 <div id="breath" class="breath off" aria-hidden="true">
   <div id="ring" class="breath-ring"><span id="count" class="breath-count"></span></div>
@@ -561,7 +599,7 @@
   </section>
   <section class="set">
     <h3>Keys</h3>
-    <p class="set-note">W A S D or arrows walk, or row when out in the boat · R take the boat out or step ashore · F go fishing, and strike when the float dips · B breath guide · M sound · I islands · H hide controls · J journal · V next view · 1–9 handpan (when open) · Esc close</p>
+    <p class="set-note">W A S D or arrows walk, or row when out in the boat · Shift run · Space jump · C walking camera, up to first person · E sit or stand · R take the boat out or step ashore · F go fishing, and strike when the float dips · B breath guide · M sound · I islands · H hide controls · J journal · V next view · 1–9 handpan (when open) · Esc close</p>
   </section>
   <section class="set">
     <div id="resetRow" class="reset"></div>
@@ -609,7 +647,7 @@
 <section id="intro" class="intro" aria-labelledby="introTitle">
   <div class="intro-inner">
     <h1 id="introTitle">Stillwater</h1>
-    <p id="introLede" class="lede">A small archipelago that breathes with you. Row between seventeen islands, wander them on foot, grow a garden through the seasons, and meet whoever comes to visit.</p>
+    <p id="introLede" class="lede">A small archipelago that breathes with you. Walk its bridges and beaches from island to island, swim or row between them, grow a garden through the seasons, and meet whoever comes to visit.</p>
     <div class="actions">
       <button id="beginSound" class="btn primary">Begin with sound</button>
       <button id="beginQuiet" class="btn">Begin in silence</button>
@@ -621,6 +659,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/core.js"></script>
 <script src="js/world.js"></script>
+<script src="js/bridges.js"></script>
 <script src="js/garden.js"></script>
 <script src="js/life.js"></script>
 <script src="js/audio.js"></script>

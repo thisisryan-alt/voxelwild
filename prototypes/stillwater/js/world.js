@@ -21,7 +21,7 @@
     camera = new THREE.PerspectiveCamera(40, 1, 0.3, 2400);
     Object.assign(W, { renderer, scene, camera, canvas, boxGeo: new THREE.BoxGeometry(1, 1, 1) });
     initLights(); initSky(); initTerrain(); initWater(); initMountains(); initLighthouse();
-    initClouds(); initDock(); initWeatherFx(); initShootingStar(); initLandings(); initFeatures(); initWorldFeatures();
+    initClouds(); initDock(); initWeatherFx(); initShootingStar(); initLandings(); SW.bridges.init(); initFeatures(); initWorldFeatures();
     scene.traverse((o) => { if (o.isLight) o.layers.enableAll(); });
     SW.post.init();
     W.setQuality(S.quality);
@@ -1286,10 +1286,18 @@
   }
   W.decks = [];   // walkable planks: { ax, az, bx, bz, hw (half width), y }
   W.seats = [];   // places to sit or soak: { x, y, z, angle, kind }
-  W.deckAt = function (x, z) {
-    for (const d of W.decks) if (segDist(x, z, d.ax, d.az, d.bx, d.bz) < d.hw) return d.y;
+  // The planks under (x, z), if any: the deck, how far along it (0 to 1), and the height there. Bridges arch
+  // and slope from one end to the other; jetties and the dock are flat.
+  W.deckHit = function (x, z) {
+    for (const d of W.decks) {
+      if (!d.box) d.box = [Math.min(d.ax, d.bx) - d.hw, Math.max(d.ax, d.bx) + d.hw, Math.min(d.az, d.bz) - d.hw, Math.max(d.az, d.bz) + d.hw];
+      if (x < d.box[0] || x > d.box[1] || z < d.box[2] || z > d.box[3]) continue;
+      const vx = d.bx - d.ax, vz = d.bz - d.az, k = clamp(((x - d.ax) * vx + (z - d.az) * vz) / (vx * vx + vz * vz || 1), 0, 1);
+      if (Math.hypot(x - d.ax - vx * k, z - d.az - vz * k) < d.hw) return { d, t: k, y: d.yb == null ? d.y : d.y + (d.yb - d.y) * k + (d.arch || 0) * Math.sin(Math.PI * k) };
+    }
     return null;
   };
+  W.deckAt = function (x, z) { const h = W.deckHit(x, z); return h ? h.y : null; };
 
   // ------------------------------------------- springs, waterfall and sea arch
   const poolU = { uTime: { value: 0 } };
@@ -1875,6 +1883,7 @@
 
   W.update = function (dt) {
     const t = S.t;
+    SW.bridges.update(dt);
     updateWeather(dt);
     updateEnv(t);
     updateClouds(dt);

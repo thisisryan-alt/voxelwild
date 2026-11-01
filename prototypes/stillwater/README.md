@@ -7,27 +7,33 @@ fonts from Google Fonts; everything else is in `js/`.
 ## What is out there
 
 - **Six worlds**, each its own sea with its own islands, weather, music, garden and things to plant and
-  build. Sail between them from the Islands menu; your journal comes with you.
+  build. Sail between them from the Islands menu; your journal comes with you. Every island in a world
+  is joined to the others by **bridges**, so the whole archipelago can be walked.
   - **Stillwater**, the original archipelago of seventeen islands (below).
   - **Lantern Bay**, an evening lagoon where the days pass slowly: paper lanterns drift on the water
     and the nearest light it after dusk, houses stand on stilts over the shallows of Stilt Village, a lit pagoda crowns Pagoda Hill, cranes
-    wade Lotus Lagoon, fireflies fill Firefly Glade, and bats come out at dusk.
+    wade Lotus Lagoon, fireflies fill Firefly Glade, and bats come out at dusk. Further out: the Tea
+    Garden, Maple Hill and Lantern Rock, where the drifting lanterns gather.
   - **Frost Fjord**, always deep winter: snow on everything, ice cliffs with arctic foxes, drifting
     icebergs, hot springs steaming in the snow, reindeer on Pine Ridge, seals and puffins, white hares
-    among the stones of North Point, a snowy owl, and the aurora on most nights.
+    among the stones of North Point, a snowy owl, and the aurora on most nights. Further out: Birch Wood,
+    the Snowdrifts and the Black Cliffs.
   - **Coral Cays**, always summer: white sand and turquoise shallows, a coral lagoon of reef fish,
     flamingos on Flamingo Flats, plovers on Turtle Beach, a bamboo-covered Jungle Hill, and a pod of
-    dolphins that surfaces offshore now and then.
+    dolphins that surfaces offshore now and then. Further out: Reef Ring, Mangrove Isle and Shipwreck
+    Shoal.
   - **Heaven**, islands of white and gold floating above a sea of cloud in an endless bright morning:
     little islets drift overhead, gold motes float on the air, light comes down in shafts and a halo
     rings the sun. Doves, swans and cygnets on Swan Lagoon, winged horses on High Meadow, a ring of
     pillars at the Temple, Golden Fields and a harp on top of Harp Hill. Cloud trees, gold flowers,
-    marble pillars, fountains, harps and halo arches to build with.
+    marble pillars, fountains, harps and halo arches to build with. Further out: the Garden of Light,
+    the Golden Orchard and the Sky Stones.
   - **Hell**, black rock and ash above a slow sea of lava under an ember sky and a blood moon. The lava
     crusts over and splits into glowing veins, ember light seams the rock, the air shimmers with heat
     and sparks rise. Fire birds wheel overhead, salamanders bask on the warm stone, lava fish leap in
     showers of sparks, and bats come out. Ash trees with glowing embers, fire blooms, braziers,
-    obsidian spires and ember lanterns to build with. Strangely peaceful.
+    obsidian spires and ember lanterns to build with. Further out: Ash Wood, the Black Steps and the
+    Ember Ring. Strangely peaceful.
 - **Bloom and unlocking:** everything you plant or build adds to your world's **bloom** (the ✿ chip at
   the top). Trees and big builds count most, each more of the same kind a little less than the last,
   and every different kind adds a bonus, so a varied garden blooms fastest. Each world's best bloom is
@@ -47,12 +53,27 @@ fonts from Google Fonts; everything else is in `js/`.
   on grassy downs, with hares) and Dune Isle (dunes, driftwood to sit on, and plovers on the tideline).
   A rock sea arch stands north of home, and bare skerries are scattered over the open sea. Each island
   has its own wild plants, which you can tidy away like your own.
-- **Walking:** press **Walk** to step off the boat as a small figure in a straw hat. Tap where to go
-  (pathfinding climbs one block at a time) or use WASD or the arrow keys. Wade the shallows, sit on
-  benches, pavilions and the ends of jetties, and walk into a hot spring to soak. Footsteps change with
-  the ground, rabbits, deer, foxes, crabs, puffins and otters keep their distance, and the cat purrs
-  when you pass. In walk mode the tray plants and builds right in front of you, and tapping open water
-  throws a pebble. Tap the moored boat to choose where to row.
+- **Walking:** press **Walk** to step off the boat as a small figure in a straw hat, and go anywhere.
+  - **Bridges** join every island to the rest: arched, railed and lit at night, in each world's own
+    style (oak, red lacquer, weathered pale wood, bamboo, marble and gold, black glass with ember
+    lamps). The network is the shortest set of links joining every island, plus a few short extra ones
+    so there is more than one way round. Bridges to islands that have not opened yet are roped off.
+  - **Tap where to go**, even on another island: the route finds its way over the bridges (A* on
+    each island, the shortest chain of bridges between them), and long routes are taken at a jog.
+    Choose *Walk there* in Islands, or tap an island on the **map** in the corner.
+  - **Keys:** WASD or the arrows walk, **Shift** runs, **Space** jumps (up a ledge two blocks high, or
+    over a bridge's rail into the sea), **E** sits or stands, and **C** cycles the camera: following,
+    close, further back and **first person** (drag to look around). On touch screens a **stick** and
+    *Jump*, *Run* and *Camera* buttons appear.
+  - **Water:** wade the shallows, and in the seas of water swim out into the deep with a breaststroke
+    and ripples. In Heaven the cloud holds you up, puffing under your feet; Hell's lava does not, so
+    keep to the bridges there.
+  - The figure leans into a run, bends its knees and elbows, lands with a bump and a puff of dust,
+    looks about when standing still, and leaves footprints in sand, snow and cloud that slowly fill in.
+  - Sit on benches, pavilions and the ends of jetties, and walk into a hot spring to soak. Footsteps
+    change with the ground, rabbits, deer, foxes, crabs, puffins and otters keep their distance, and the
+    cat purrs when you pass. In walk mode the tray plants and builds right in front of you, and tapping
+    nearby open water throws a pebble. Tap the moored boat to choose where to row.
 - **Handpan:** press **Play** for a nine-note handpan in D major pentatonic (keys 1–9). Every note
   ripples the water nearby.
 - **Rowing:** a rowboat waits at whichever island you are on. Open **Islands** and choose *Row there*
@@ -97,14 +118,14 @@ fonts from Google Fonts; everything else is in `js/`.
   across Lantern Bay and insects from early evening, a colder wind and creaking ice in Frost Fjord,
   tropical birdsong and cicadas in Coral Cays, harp runs and bright chords in Heaven, and the low rumble
   and bubbling of the lava under darker chords in Hell.
-- **Journal:** field notes for 103 visitors, sights, worlds and places, the good things you have written, and the research
+- **Journal:** field notes for 118 visitors, sights, worlds and places, the good things you have written, and the research
   behind each design choice.
 
 Each world's garden, tidied wild plants, current island and time of day, plus your profile (each
 world's best bloom), the journal, settings and the last world visited, are saved in the browser's local
 storage.
 
-**Keys:** WASD or arrows walk, or row when out in the boat · R take the boat out or step ashore · F go fishing, and strike when the float dips · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
+**Keys:** WASD or arrows walk, or row when out in the boat · Shift run · Space jump · E sit or stand · C walking camera, up to first person · R take the boat out or step ashore · F go fishing, and strike when the float dips · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
 
 ## Files
 
@@ -116,7 +137,8 @@ storage.
 | `js/life.js` | Creatures, the rowboat, windmill sails, particles, sky lanterns, skipping stones |
 | `js/audio.js` | Synthesised soundscape and mixer |
 | `js/post.js` | The rendering pipeline: sea reflections, ambient occlusion, bloom, sun shafts, mist, grading, depth of field, FXAA |
-| `js/walk.js` | The walking figure, footing, A* pathfinding, sitting and soaking |
+| `js/bridges.js` | The bridges between the islands: planning the network, building it, lamps and closed ropes |
+| `js/walk.js` | The walking figure: running, jumping, swimming, footing, footprints, A* pathfinding and routes over the bridges, sitting and soaking |
 | `js/main.js` | Input, camera views, breathing patterns, journal, rituals, bloom and unlocks, saving and UI |
 
 ## Graphics
@@ -173,11 +195,11 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
 | Paced breathing near 6/min, long exhale | The world follows the breathing pattern; optional on-screen guide | Lehrer & Gevirtz 2014, *Front. Psychol.*; Zaccaro et al. 2018, *Front. Hum. Neurosci.* |
 | Cyclic sighing | One of the breathing patterns | Balban et al. 2023, *Cell Rep. Med.* |
 | Water and nature scenes | Island in a calm sea, plants, slow day–night cycle; night is deep blue | White et al. 2010, *J. Environ. Psychol.*; Ulrich et al. 1991, *J. Environ. Psychol.* |
-| Soft fascination, being away, extent | Clouds and their drifting shadows, koi, fireflies, falling leaves; six worlds, seventeen islands in the first, a slow row between them and paths to walk give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
+| Soft fascination, being away, extent | Clouds and their drifting shadows, koi, fireflies, falling leaves; six worlds, seventeen islands in the first, bridges and paths to walk and a slow row between them give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
 | Watching animals | Koi, reef fish, seals, otters, cranes, squirrels, turtle, ducks, whale | Cracknell et al. 2016, *Environ. Behav.* |
 | Mid-complexity fractals | Recursive tree branching; layered-noise clouds | Taylor et al. 2011, *Front. Hum. Neurosci.*; Hagerhall et al. 2008, *Perception* |
 | Natural sound | Surf, rain, wind, birds, frogs, crickets | Alvarsson, Wiens & Nilsson 2010, *IJERPH*; Gould van Praag et al. 2017, *Sci. Rep.* |
-| A short walk outdoors | Walk mode: wander, wade and sit | Barton & Pretty 2010, *Environ. Sci. Technol.* |
+| A short walk outdoors | Walk mode: wander the bridges and beaches, wade, swim and sit | Barton & Pretty 2010, *Environ. Sci. Technol.* |
 | Warm water | Hot springs you can soak in | Haghayegh et al. 2019, *Sleep Med. Rev.* |
 | Making music | A handpan with no wrong notes | Fancourt et al. 2016, *PLOS ONE* |
 | Firelight | Campfire with crackle | Lynn 2014, *Evol. Psychol.* |
