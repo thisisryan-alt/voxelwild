@@ -443,7 +443,8 @@
   function lantern(o, rng) {
     const s = 0.16;
     let ord = 0;
-    const L = (y, r) => { for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) o.vox('w', x * s, s * (y + 0.5), z * s, s, stoneC(rng), ord); ord++; };
+    const moss = (y) => (y === 0 || y >= 6) && rng() < 0.35;   // moss gathers on the cap and round the foot
+    const L = (y, r) => { for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) o.vox('w', x * s, s * (y + 0.5), z * s, s, moss(y) ? hex(U.pick(rng, [0x6a8a4a, 0x7a9a54, 0x5e7e44])) : stoneC(rng), ord); ord++; };
     L(0, 1); L(1, 0); L(2, 0); L(3, 1);
     for (const y of [4, 5]) {
       for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) o.vox('w', x * s, s * (y + 0.5), z * s, s, stoneC(rng), ord);
@@ -463,6 +464,10 @@
       const len = 4 + (b % 3) * 2, [a, c] = P((1.5 + b * 0.8) * s, 0);
       for (let j = 0; j < len; j++) o.vox('l', a, s * (14.8 - j * 0.6), c, s * 0.55, hex(metal[b % 3]), 23 + j);
     }
+    // a little peaked roof over the rods
+    for (let x = 0; x <= 6; x++) for (const dz of [-1, 0, 1]) { const [rx, rz] = P(x * s, dz * s); o.vox('w', rx, s * (16.5 + (dz ? 0 : 0.5)), rz, s, hex(0x6a4a34), 30); }
+    const glass = [0x7ad0c0, 0xa0d8f0, 0x8ac8e8];
+    for (let b = 0; b < 5; b++) { const len = 4 + (b % 3) * 2, [a, c] = P((1.5 + b * 0.8) * s, 0); o.vox('l', a, s * (14.8 - len * 0.6), c, s * 0.8, hex(glass[b % 3]), 30 + len); }
     const [hx, hz] = P(3 * s, 0);
     o.feature('chime', { x: hx, y: s * 12, z: hz });
     o.feature('perch', { x: 0, y: s * 16.4, z: 0 });
@@ -470,7 +475,9 @@
   function bench(o, rng, rec) {
     const s = 0.16, k = faceK(rec.x, rec.z);
     const put = (x, y, z, ord) => { const [wx, wz] = rot(x, z, k); o.vox('w', wx * s, s * (y + 0.5), wz * s, s, hex(rng() < 0.5 ? WOOD : WOOD2), ord); };
-    for (const z of [-3, 3]) for (const x of [-1, 0]) for (let y = 0; y < 2; y++) put(x, y, z, y);
+    const dark = (x, y, z, ord) => { const [wx, wz] = rot(x, z, k); o.vox('w', wx * s, s * (y + 0.5), wz * s, s, hex(DARK), ord); };
+    for (const z of [-3, 3]) for (const x of [-1, 0]) for (let y = 0; y < 2; y++) dark(x, y, z, y);
+    for (const z of [-3, 3]) { dark(0, 3, z, 7); dark(-1, 5, z, 7); }   // armrests, and posts for the back
     for (let z = -3; z <= 3; z++) for (const x of [-1, 0]) put(x, 2, z, 3 + Math.abs(z) * 0.2);
     for (let z = -3; z <= 3; z++) { put(-1, 3, z, 5); put(-1, 4, z, 6); }
     const [px, pz] = rot(-1, 2, k);
@@ -485,6 +492,8 @@
       o.vox('w', j * s, s * 0.6, 0, s * 0.9, hex(j % 2 ? WOOD2 : DARK), 10 + Math.abs(j));
       o.vox('w', 0, s * 1.3, j * s, s * 0.9, hex(j % 2 ? DARK : WOOD2), 13 + Math.abs(j));
     }
+    for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; o.vox('w', Math.cos(a) * 1.8 * s, s * 0.08, Math.sin(a) * 1.8 * s, s, hex(U.pick(rng, [0x5a5450, 0x4a4440, 0x6a625c])), 8, 0.15); }   // ash
+    for (let i = 0; i < 5; i++) { const a = rng() * Math.PI * 2, r = 0.6 + rng(); o.vox('g', Math.cos(a) * r * s, s * 0.15, Math.sin(a) * r * s, s * 0.45, hex(U.pick(rng, [0xff6a2a, 0xff9a3a, 0xffc04a])), 9, 0.5); }   // embers
     o.vox('g', 0, s * 0.4, 0, s * 1.4, hex(0xff8a3a), 9, 0.5);
     o.vox('g', s * 0.7, s * 0.35, s * 0.5, s, hex(0xffb050), 9, 0.5);
     o.feature('fire', { x: 0, y: s * 1.3, z: 0 });
@@ -664,13 +673,24 @@
       for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) {
         if (r === 2 && Math.abs(x) === 2 && Math.abs(z) === 2) continue;
         const door = x === r && z === 0 && y >= 1 && y <= 2, win = x === r && z === 0 && y === 6;
+        const frame = r === 2 && x === 2 && z === 0 && y === 3, shutter = r === 1 && x === 1 && Math.abs(z) === 1 && y === 6;
         if (win) P(x, y, z, 'g', hex(0xffc77a), y);
-        else P(x, y, z, 'w', y === 0 ? stoneC(rng) : door ? hex(DARK) : wall.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.04), y);
+        else P(x, y, z, 'w', y === 0 ? stoneC(rng) : door ? hex(DARK) : frame ? hex(0xe6dac4) : shutter ? hex(0x4a6a5a) : wall.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.04), y);
       }
     }
-    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) if (Math.abs(x) + Math.abs(z) < 4) P(x, 10, z, 'w', roofC, 11);
+    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) if (Math.abs(x) + Math.abs(z) < 4) P(x, 10, z, 'w', roofC.clone().offsetHSL(0, 0, Math.abs(x) + Math.abs(z) === 3 ? -0.06 : 0), 11);
     for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) P(x, 11, z, 'w', roofC, 12);
     P(0, 12, 0, 'w', roofC, 13);
+    P(0, 13, 0, 'w', hex(0xd8b04a), 14, s * 0.4);   // a finial
+    // a wooden gallery round the waist of the tower, with a rail
+    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
+      if (Math.max(Math.abs(x), Math.abs(z)) !== 2) continue;
+      P(x, 4, z, 'w', hex(x % 2 ? WOOD : WOOD2), 6);
+      if ((x + z) % 2 === 0) P(x, 5, z, 'w', hex(DARK), 7, s * 0.35);
+    }
+    // shutters by the window, a frame and step at the door, and flour sacks waiting outside
+    P(3, 0, 0, 'w', stoneC(rng), 1);
+    for (const [x, z] of [[3, 1.4], [3, -1.4], [3.6, 1.2]]) P(x, 0.7, z, 'w', hex(U.pick(rng, [0xe8dcc0, 0xdccfae])), 3, s * 0.7);
     P(1.7, 9, 0, 'w', hex(DARK), 14, s * 0.6);
     const [hx, hz] = rot(2.1, 0, k);
     o.feature('windmill', { x: hx * s, y: s * 9.5, z: hz * s, angle: k * Math.PI / 2 });

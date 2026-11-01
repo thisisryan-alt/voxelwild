@@ -192,7 +192,11 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
   chimney cap. Stilt houses have framed windows with painted shutters, a darker ridge and a ladder down
   to the water; pagodas have gold tips on their upturned eaves and a red railing round the base. Beach
   huts have lit windows, a striped awning, a surfboard against the wall and a lantern by the door;
-  igloos are laid in brick-like blocks of snow, with an ice window that glows.
+  igloos are laid in brick-like blocks of snow, with an ice window that glows. The windmill has a wooden
+  gallery with a rail round its waist, shutters, a framed door with a step, flour sacks waiting outside,
+  darker eaves and a gold finial; stone lanterns gather moss on the cap and round the foot; benches
+  have armrests and dark legs; campfires sit in a ring of ash with embers glowing among the logs; and
+  wind chimes hang under a little roof, with sea-glass beads at the ends of the rods.
 - **Contact shadow** under the walker's feet, and footprints that fill in slowly. The walker and every
   creature carry a soft rim of sky light round their silhouettes (ember-orange in Hell), so they stand
   out from busy ground.
