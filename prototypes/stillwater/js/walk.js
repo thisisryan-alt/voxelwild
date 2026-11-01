@@ -56,7 +56,18 @@
     fig.visible = false;
     W.scene.add(fig);
     initPrints();
+    // a soft contact shadow under the feet, which grounds the figure even where the sun's shadow is faint
+    const bg = new THREE.PlaneGeometry(1, 1); bg.rotateX(-Math.PI / 2);
+    blobU = { uA: { value: 1 } };
+    blob = new THREE.Mesh(bg, new THREE.ShaderMaterial({
+      uniforms: blobU, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform float uA; varying vec2 vUv; void main(){ float d = length(vUv - 0.5) * 2.0; float a = smoothstep(1.0, 0.15, d) * uA; gl_FragColor = vec4(vec3(1.0 - 0.5 * a), 1.0); }',
+    }));
+    blob.renderOrder = 2; blob.visible = false; blob.frustumCulled = false;
+    W.scene.add(blob);
   }
+  let blob = null, blobU = null;
 
   // -------------------------------------------------------------- footprints
   // Prints in sand and snow (and on the cloud in Heaven) that slowly fill in. They darken what is under
@@ -324,7 +335,7 @@
     WK.place(I.shore.x, I.shore.z, face);
   };
   WK.enter = function () { WK.active = true; WK.hidden = false; WK.spawn(); fig.visible = !WK.fp; L.setRower(false); };
-  WK.exit = function () { WK.active = false; fig.visible = false; path = []; legs = []; seat = null; L.setRower(true); L.walker = null; heldKeys.clear(); joy.x = joy.z = 0; };
+  WK.exit = function () { WK.active = false; fig.visible = false; if (blob) blob.visible = false; path = []; legs = []; seat = null; L.setRower(true); L.walker = null; heldKeys.clear(); joy.x = joy.z = 0; };
   WK.hide = function (hidden) { fig.visible = WK.active && !hidden && !WK.fp; WK.hidden = hidden; };
   WK.setFirstPerson = function (on) { WK.fp = on; fig.visible = WK.active && !WK.hidden && !on; };
   // Walk to (x, z): nearby by A*, further afield over the bridges. Returns false if there is no way, or
@@ -416,7 +427,7 @@
   window.addEventListener('blur', () => heldKeys.clear());
 
   WK.update = function (dt, t, camTheta) {
-    if (!WK.active || WK.hidden) { L.walker = null; return; }
+    if (!WK.active || WK.hidden) { L.walker = null; if (blob) blob.visible = false; return; }
     const pos = WK.pos;
     let dx = 0, dz = 0, want = 0;
     const has = (a, b) => heldKeys.has(a) || heldKeys.has(b);
@@ -530,6 +541,15 @@
     L.walker = pos;
     updatePrints(dt);
     animate(dt, t, here);
+    // the contact shadow lies on whatever is underfoot, fading as you rise in a jump
+    const gb = seat ? null : groundAt(pos.x, pos.z);
+    blob.visible = !!gb && gb.kind !== 'swim' && gb.kind !== 'water';
+    if (blob.visible) {
+      const up = Math.max(0, pos.y - gb.y);
+      blob.position.set(pos.x, gb.y + 0.035, pos.z);
+      blob.scale.setScalar((0.75 + 0.2 * WK.speed / RUN) * (1 + up * 0.3));
+      blobU.uA.value = clamp(1 - up / 2.2, 0, 1);
+    }
   };
 
   // ---------------------------------------------------------------- animation

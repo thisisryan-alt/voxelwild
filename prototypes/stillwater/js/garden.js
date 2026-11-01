@@ -79,6 +79,7 @@
       mesh, cap, n: 0, base: 0, pending: [], shrinking: [], cursor: 0, mLo: Infinity, mHi: -1, cLo: Infinity, cHi: -1,
       px: f(), py: f(), pz: f(), sz: f(), sy: f(), birth: f(), dur: f(), grow: f(), rr: f(),
       vis: new Float32Array(cap).fill(1), pal: new Int16Array(cap).fill(-1), dead: new Uint8Array(cap), col: new Float32Array(cap * 3),
+      shade: new Float32Array(cap).fill(1),   // light inside a canopy: dim under leaves, bright at the sunlit top
     };
   }
   // Only the range of voxels that changed is sent to the GPU, not the whole buffer.
@@ -90,8 +91,9 @@
     if (i < g.mLo) g.mLo = i;
     if (i > g.mHi) g.mHi = i;
   }
+  const shadeC = new THREE.Color();
   function setColor(g, i, c) {
-    g.mesh.setColorAt(i, c);
+    g.mesh.setColorAt(i, g.shade[i] === 1 ? c : shadeC.copy(c).multiplyScalar(g.shade[i]));
     if (i < g.cLo) g.cLo = i;
     if (i > g.cHi) g.cHi = i;
   }
@@ -99,8 +101,9 @@
     if (g.mHi >= g.mLo) { W.queueUpload(g.mesh.instanceMatrix, g.mLo, g.mHi); g.mLo = Infinity; g.mHi = -1; }
     if (g.cHi >= g.cLo) { W.queueUpload(g.mesh.instanceColor, g.cLo, g.cHi); g.cLo = Infinity; g.cHi = -1; }
   }
-  function addVoxel(g, x, y, z, s, sy, c, birth, dur, r) {
+  function addVoxel(g, x, y, z, s, sy, c, birth, dur, r, shade) {
     const i = g.n++;
+    g.shade[i] = shade == null ? 1 : shade;
     g.px[i] = x; g.py[i] = y; g.pz[i] = z; g.sz[i] = s; g.sy[i] = sy;
     g.birth[i] = birth; g.dur[i] = dur; g.rr[i] = r; g.dead[i] = 0; g.grow[i] = 0;
     if (typeof c === 'number') { g.pal[i] = c; g.vis[i] = U.seasonColor(PAL_LIST[c], r, S.season, tmpC); }
@@ -1099,15 +1102,33 @@
     if (woodG.n + out.w.length > woodG.cap || leafG.n + out.l.length > leafG.cap || glowG.n + out.g.length > glowG.cap) return false;
     const t0 = instant ? S.t - 1000 : S.t, kk = (def.span || 6) / out.maxO, r = mulberry32(rec.seed ^ 0x2f1);
     rec._r = {};
+    const shades = canopyShade(out.l);
     for (const [layer, g, dur] of [['w', woodG, def.tree ? 1.8 : 0.7], ['l', leafG, def.tree ? 2.6 : 1.2], ['g', glowG, 1.0]]) {
       const a = g.n;
-      for (const v of out[layer]) addVoxel(g, rec.x + v[0], rec.y + v[1], rec.z + v[2], v[3], v[4], v[5], t0 + v[6] * kk, dur, r());
+      out[layer].forEach((v, j) => addVoxel(g, rec.x + v[0], rec.y + v[1], rec.z + v[2], v[3], v[4], v[5], t0 + v[6] * kk, dur, r(), layer === 'l' && shades ? shades[j] : 1));
       rec._r[layer] = [a, g.n];
     }
     const ready = t0 + (def.span || 6) + 2;
     rec._f = out.f.map((f) => Object.assign({}, f, { x: rec.x + f.x, y: rec.y + f.y, z: rec.z + f.z, rec, ready }));
     GD.version++;
     return true;
+  }
+  // Light inside a canopy: each leaf is dimmer the more leaves lie above it (the sky it cannot see) and
+  // brighter toward the outside of the crown, so trees read as rounded masses instead of flat-lit blocks.
+  function canopyShade(list) {
+    if (list.length < 24) return null;
+    const s = list[0][3] || 0.36, key = (x, y, z) => Math.round(x / s) + ',' + Math.round(y / s) + ',' + Math.round(z / s);
+    const set = new Set(list.map((v) => key(v[0], v[1], v[2])));
+    let cx = 0, cz = 0, R = 0;
+    for (const v of list) { cx += v[0]; cz += v[2]; }
+    cx /= list.length; cz /= list.length;
+    for (const v of list) R = Math.max(R, Math.hypot(v[0] - cx, v[2] - cz));
+    return list.map((v) => {
+      let cover = 0;
+      for (let k = 1; k <= 4; k++) if (set.has(key(v[0], v[1] + k * s, v[2]))) cover++;
+      const out = R > 0.4 ? Math.min(1, Math.hypot(v[0] - cx, v[2] - cz) / R) : 1;
+      return 0.6 + 0.4 * Math.min(1, 0.62 * (1 - cover / 4) + 0.45 * out * out);
+    });
   }
   function rebuildFeatures() {
     const F = { perch: [], nectar: [], light: [], fire: [], smoke: [], pad: [], chime: [], leafSrc: [], tree: [], birdhouse: [], grat: [], reed: [], porch: [], seat: [], windmill: [], reef: [], hive: [], rustle: [], fountain: [] };

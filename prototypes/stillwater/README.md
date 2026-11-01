@@ -166,6 +166,18 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
   grass that wraps over the top of a block's sides, meadows that drift between lush and sun-faded
   patches, damp sand at the waterline, wet sheen in rain, and leaves that glow when the sun is
   behind them.
+- **Smooth voxel lighting:** every terrain block carries how many solid blocks share each of its
+  eight corners, and the shader blends that across each face, so the foot of every step and cliff
+  and every hollow sits in soft shade (on top of the screen-space ambient occlusion).
+- **Canopies:** each leaf is dimmer the more leaves lie above it and brighter toward the outside of
+  the crown, so trees read as rounded masses; the shading survives the seasons' recolouring.
+- **Glitter:** tiny facets in snow, ice and pale sand flash as the sun and your view line up with
+  them, strongest in Frost Fjord and on the white sand of Coral Cays.
+- **Lamplight:** after dark each bridge lamp and the dock lantern lay a soft, faintly flickering pool
+  of warm light on the planks and the water below.
+- **Contact shadow** under the walker's feet, and footprints that fill in slowly.
+- **Heaven** has mist pouring from the undersides of its drifting islets; **Hell** has smoke rising
+  from Mount Cinder, sparks from its vent, and fountains of sparks thrown up by the lava now and then.
 - **Sky:** a horizon haze band, a band of soft cumulus along the horizon, a warm glow on the sun's
   side at golden hour, an HDR sun disk, drifting high cirrus, varied stars, a phased moon, aurora and
   rainbows; a halo round Heaven's sun, and smoke lit from below with a blood moon in Hell. Voxel clouds

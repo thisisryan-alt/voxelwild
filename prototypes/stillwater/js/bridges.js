@@ -108,7 +108,7 @@
   dummy.rotation.order = 'YXZ';
   function build(list) {
     const st = STYLE[K.WORLD.id] || STYLE.stillwater;
-    const planks = [], frame = [], lamps = [];
+    const planks = [], frame = [], lamps = [], pools = [];
     const put = (arr, x, y, z, sx, sy, sz, yaw, pitch, col) => {
       dummy.position.set(x, y, z); dummy.rotation.set(pitch, yaw, 0); dummy.scale.set(sx, sy, sz); dummy.updateMatrix();
       arr.push({ m: dummy.matrix.clone(), c: col });
@@ -157,6 +157,10 @@
         put(frame, x, y + 1.44, z, 0.34, 0.06, 0.34, yaw, 0);
         put(lamps, x, y + 1.25, z, 0.26, 0.3, 0.26, yaw, 0);
         br.lamps.push(new THREE.Vector3(x, y + 1.25, z));
+        // where its light falls: on the planks beside it, and on the water below
+        const [cx, cy, cz] = P(s, side * (HW - 0.35), 0.04);
+        pools.push({ x: cx, y: cy, z: cz, r: 2.3, yaw, pitch: -slope(s), k: 1 });
+        if (W.heightAt(x, z) < -0.5 && !K.WORLD.look.sea) pools.push({ x: x + br.px * side * 0.6, y: K.WL + 0.03, z: z + br.pz * side * 0.6, r: 3.6, yaw: 0, pitch: 0, k: 0.55 });
       };
       br.lamps = [];
       lampAt(0.6 / L, -1); lampAt(0.6 / L, 1); lampAt(1 - 0.6 / L, -1); lampAt(1 - 0.6 / L, 1);
@@ -176,6 +180,13 @@
     const frameMat = W.voxelMat(st.frame, { edges: 0.16, texel: 10, texAmt: 0.06, wet: true });
     B.lampMat = W.patch(new THREE.MeshPhongMaterial({ color: st.lamp, emissive: st.glow, emissiveIntensity: 0.3, shininess: 30 }), { edges: 0.25 });
     B.meshes = [mk(planks, plankMat, true), mk(frame, frameMat, true), mk(lamps, B.lampMat, false)].filter(Boolean);
+    // and the dock's own lantern
+    if (W.dock && W.dock.lantern) {
+      const Ld = W.dock.lantern;
+      pools.push({ x: Ld.x, y: 0.26, z: Ld.z, r: 2.6, yaw: 0, pitch: 0, k: 1 });
+      if (!K.WORLD.look.sea) pools.push({ x: Ld.x, y: K.WL + 0.03, z: Ld.z, r: 4, yaw: 0, pitch: 0, k: 0.5 });
+    }
+    buildPools(pools, st.glow);
     // closed rope at the end of any bridge onto an island that has not opened yet
     const ropeMat = W.voxelMat(K.WORLD.id === 'hell' ? 0x8a2a1a : 0xc8a870, { edges: 0.1 });
     for (const br of list) {
@@ -189,6 +200,33 @@
         br.gates[I.id] = g;
       }
     }
+  }
+
+  // Pools of lamplight after dark: soft discs of warm light laid on the planks and the water, drawn after
+  // the ambient occlusion and added to what is there (see post.js), brightening as night falls.
+  const POOL_VS = `uniform float uI; varying vec2 vUv; varying float vK;
+    attribute float aK;
+    void main(){ vUv = uv; vK = aK; gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); }`;
+  const POOL_FS = `uniform vec3 uCol; uniform float uI, uT; varying vec2 vUv; varying float vK;
+    void main(){
+      float d = length(vUv - 0.5) * 2.0, a = pow(max(0.0, 1.0 - d), 2.2);
+      float flick = 0.94 + 0.06 * sin(uT * 7.0 + vK * 40.0) * sin(uT * 3.1 + vK * 17.0);
+      gl_FragColor = vec4(uCol * a * uI * vK * flick, 1.0);
+    }`;
+  function buildPools(pools, glow) {
+    if (!pools.length) return;
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2);
+    geo.setAttribute('aK', new THREE.InstancedBufferAttribute(new Float32Array(pools.map((p, i) => p.k * (0.92 + 0.08 * U.hash2(i, 3, 9)))), 1));
+    B.poolU = { uCol: { value: new THREE.Color(glow) }, uI: { value: 0 }, uT: { value: 0 } };
+    const mat = new THREE.ShaderMaterial({ uniforms: B.poolU, vertexShader: POOL_VS, fragmentShader: POOL_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const im = new THREE.InstancedMesh(geo, mat, pools.length);
+    pools.forEach((p, i) => { dummy.position.set(p.x, p.y, p.z); dummy.rotation.set(p.pitch, p.yaw, 0); dummy.scale.set(p.r * 2, 1, p.r * 2); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); });
+    im.instanceMatrix.needsUpdate = true;
+    im.frustumCulled = false; im.renderOrder = 4;
+    W.late(im);
+    W.scene.add(im);
+    B.pools = im;
   }
 
   // ------------------------------------------------------------------ public
@@ -217,5 +255,6 @@
   B.update = function () {
     if (!B.lampMat) return;
     B.lampMat.emissiveIntensity = 0.3 + 1.6 * clamp(S.glow, 0, 1);
+    if (B.poolU) { B.poolU.uI.value = 0.55 * U.smooth(0.15, 0.8, S.glow); B.poolU.uT.value = S.t; B.pools.visible = B.poolU.uI.value > 0.005; }
   };
 })(window.SW);
