@@ -231,6 +231,31 @@ window.SW = window.SW || {};
     ARCH: WORLD.arch || null,                                         // a rock arch you can row under
     BAMBOO_POND: { dx: 3, dz: -2.5, r: 2.3 },                          // a koi pond on Bamboo Isle, relative to its centre
   };
+  // Your own island: a patch of open sea in every world, near home but clear of the other islands, the
+  // sea stacks and the routes between islands (where the bridges run), where you raise and shape land of
+  // your own with the island builder (main.js). It goes last in the list so the others keep their layouts.
+  (function () {
+    const isl = WORLD.islands, lo = WORLD.grid[1] + 30, hi = WORLD.grid[1] + WORLD.grid[0] - 30, R = 16;
+    const seg = (x, z, ax, az, bx, bz) => { const vx = bx - ax, vz = bz - az, k = Math.min(1, Math.max(0, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz || 1))); return Math.hypot(x - ax - vx * k, z - az - vz * k); };
+    let best = null, bs = -Infinity;
+    for (const need of [R + 10, R + 2]) {
+      for (let x = lo; x <= hi; x += 6) for (let z = lo; z <= hi; z += 6) {
+        const home = Math.hypot(x, z);
+        if (home < 45) continue;
+        let clear = Infinity;
+        for (const I of isl) clear = Math.min(clear, Math.hypot(x - I.x, z - I.z) - (I.r || 10) * 1.9);
+        for (let i = 0; i < isl.length; i++) for (let j = i + 1; j < isl.length; j++) if (Math.hypot(isl[i].x - isl[j].x, isl[i].z - isl[j].z) < 150) clear = Math.min(clear, seg(x, z, isl[i].x, isl[i].z, isl[j].x, isl[j].z) - 6);
+        for (const s of WORLD.stacks || []) clear = Math.min(clear, Math.hypot(x - s[0], z - s[1]) - 6);
+        if (WORLD.islet) clear = Math.min(clear, Math.hypot(x - WORLD.islet.x, z - WORLD.islet.z) - 10);
+        if (WORLD.arch) clear = Math.min(clear, Math.hypot(x - WORLD.arch.x, z - WORLD.arch.z) - 14);
+        if (clear < need) continue;
+        const score = -home + Math.min(clear, 60) * 0.5;   // close to home, with room round it
+        if (score > bs) { bs = score; best = [x, z]; }
+      }
+      if (best) break;
+    }
+    if (best) isl.push({ id: 'myisle', shape: 'custom', name: 'Your Island', x: best[0], z: best[1], r: 13, line: 'An island you shape yourself, block by block, out of a patch of open sea.' });
+  })();
   WORLD.islands.forEach((I) => { I.shape = I.shape || I.id; });
   SW.K.ISLAND = Object.fromEntries(SW.K.ISLANDS.map((i) => [i.id, i]));
 

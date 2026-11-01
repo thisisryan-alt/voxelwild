@@ -113,7 +113,7 @@
   for (const wid of K.WORLD_ORDER) {
     const WD = K.WORLDS[wid];
     if (wid !== 'stillwater') JOURNAL.push({ id: 'world-' + wid, name: WD.name, line: WD.line, hint: 'Sail there from the Islands menu.' });
-    for (const I of WD.islands) if (I.id !== 'home') JOURNAL.push({ id: 'isle-' + I.id, name: I.name, line: I.line, hint: wid === K.WORLD.id ? 'Row there from the Islands menu.' : 'In ' + WD.name + '.' });
+    for (const I of WD.islands) if (I.id !== 'home') JOURNAL.push({ id: 'isle-' + I.id, name: I.name, line: I.line, hint: I.shape === 'custom' ? 'Open Islands and choose Shape your own island.' : wid === K.WORLD.id ? 'Row there from the Islands menu.' : 'In ' + WD.name + '.' });
   }
   const JBY = Object.fromEntries(JOURNAL.map((j) => [j.id, j]));
   let pendingSeen = [], seenFlush = 0;
@@ -334,6 +334,7 @@
     if (!S.started || sit) return;
     ndc.set((cx / window.innerWidth) * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
     raycaster.setFromCamera(ndc, W.camera);
+    if (builder.on) { builderTap(); return; }
     if (W.tryWish(cx, cy)) return;
     if (L.rowing()) { rowTap(); return; }
     if (SW.walk.active && !L.trip()) { walkTap(); return; }
@@ -447,6 +448,7 @@
     if (L.trip()) { toast('Wait until you land.', 3, true); return; }
     if (L.rowing()) { stepAshore(); return; }
     if (cam.view === 'sky' || cam.mode === 'look' || cam.mode === 'drift') setView('island', true);
+    if (W.island.shape === 'custom' && !W.myIsland.count()) W.setIsland('home');   // nowhere to stand yet on your own patch of sea
     SW.walk.enter();
     cam.mode = 'walk'; cam.view = 'walk'; walkCamOn(); cam.blend = 3;
     cam.tTheta = Math.atan2(-Math.cos(SW.walk.facing), -Math.sin(SW.walk.facing));
@@ -661,7 +663,7 @@
     const first = !profile.told['seen:' + WID];
     const items = [], isles = [], worlds = [];
     for (const [k] of K.WORLD.items) if (GD.CAT[k] && itemOpen(k) && !profile.told['i:' + WID + ':' + k]) { profile.told['i:' + WID + ':' + k] = 1; items.push(toolInfo(k).label); }
-    for (const I of K.ISLANDS) if (I.id !== 'home' && islandOpen(I.id) && !profile.told['l:' + I.id]) { profile.told['l:' + I.id] = 1; isles.push(I.name); }
+    for (const I of K.ISLANDS) if (I.id !== 'home' && I.shape !== 'custom' && islandOpen(I.id) && !profile.told['l:' + I.id]) { profile.told['l:' + I.id] = 1; isles.push(I.name); }
     for (const id of K.WORLD_ORDER) if (worldOpen(id) && !profile.told['w:' + id]) { profile.told['w:' + id] = 1; worlds.push(K.WORLDS[id].name); }
     profile.told['seen:' + WID] = 1;
     SW.store.set('profile', profile);
@@ -793,10 +795,11 @@
     const from = W.island, dist = (I) => Math.hypot(I.x - from.x, I.z - from.z);
     const rowLabel = (d) => (d < 75 ? 'A short row' : d < 150 ? 'A gentle row' : 'A long row');
     $('islandList').innerHTML = K.ISLANDS.slice().sort((a, b) => dist(a) - dist(b)).map((I) => {
-      const here = I === W.island, open = islandOpen(I.id);
-      const go = open ? `<button class="btn small" data-walkto="${I.id}">Walk there</button><button class="btn small" data-row="${I.id}">Row there</button>` : `<span class="isle-lock">Opens at ✿ ${islandNeed(I.id)}</span>`;
+      const here = I === W.island, open = islandOpen(I.id), mine = I.shape === 'custom', bare = mine && !(W.myIsland && W.myIsland.count());
+      const go = (mine ? `<button class="btn small" data-shape="1">${bare ? 'Shape it' : 'Reshape it'}</button>` : '') +
+        (bare || here ? '' : open ? `<button class="btn small" data-walkto="${I.id}">Walk there</button><button class="btn small" data-row="${I.id}">Row there</button>` : `<span class="isle-lock">Opens at ✿ ${islandNeed(I.id)}</span>`);
       return `<li class="isle${here ? ' here' : ''}${open ? '' : ' locked'}"><span class="opt-name">${I.name}${here ? '' : ` <span class="isle-far">· ${rowLabel(dist(I))}</span>`}</span><span class="opt-sub">${I.line}</span>` +
-        (here ? '<span class="isle-here">You are here</span>' : `<span class="isle-go">${go}<button class="btn small ghost" data-look="${I.id}">Look now</button></span>`) + '</li>';
+        (here && !mine ? '<span class="isle-here">You are here</span>' : `<span class="isle-go">${go}${here ? '' : `<button class="btn small ghost" data-look="${I.id}">Look now</button>`}</span>`) + '</li>';
     }).join('');
     $('worldList').innerHTML = K.WORLD_ORDER.filter((id) => id !== K.WORLD.id).map((id) => {
       const WD = K.WORLDS[id];
@@ -808,6 +811,102 @@
     $$('[data-row]').forEach((b) => b.addEventListener('click', () => rowTo(b.dataset.row)));
     $$('[data-walkto]').forEach((b) => b.addEventListener('click', () => { closePops(); if (L.rowing() || L.trip()) { toast('Step ashore first.', 3, true); return; } walkToIsland(K.ISLAND[b.dataset.walkto]); }));
     $$('[data-look]').forEach((b) => b.addEventListener('click', () => { closePops(); W.setIsland(b.dataset.look); setView('island'); }));
+    $$('[data-shape]').forEach((b) => b.addEventListener('click', () => startBuilder()));
+  }
+
+  // ------------------------------------------------------------- island builder
+  // Shape your own island in its patch of open sea: raise land out of the water a block at a time, lower
+  // it, flatten it, smooth it and paint its ground. It is saved as you go; when you are done the bridges
+  // are planned again, so new land joins the rest. Your own plants are never dug up.
+  const builder = { on: false, tool: 'raise', paint: 'grass', size: 1, dirty: false, undo: [], prev: null };
+  function startBuilder() {
+    const MI = W.myIsland;
+    if (!MI) return;
+    closePops(); closePanels();
+    if (L.rowing() || L.trip()) { toast('Come ashore first.', 3, true); return; }
+    if (SW.walk.active) stopWalking();
+    builder.on = true; builder.undo = []; builder.prev = W.island.id;
+    document.body.classList.add('building');
+    W.setIsland('myisle'); W.showSite(true);
+    cam.mode = 'orbit'; cam.view = 'island';
+    cam.tTarget.set(MI.site.x, 1, MI.site.z); cam.tR = 44 * (W.portrait ? 1.4 : 1); cam.tPhi = 0.92; cam.blend = 3;
+    $('builder').hidden = false;
+    renderBuilder();
+    if (!prefs.buildTips) { prefs.buildTips = true; toast('This patch of sea is yours. Tap inside the square to raise land, a block at a time. Choose a tool below; drag to look around.', 10, true); }
+  }
+  function endBuilder() {
+    if (!builder.on) return;
+    builder.on = false;
+    document.body.classList.remove('building');
+    $('builder').hidden = true; W.showSite(false);
+    if (builder.dirty) {
+      builder.dirty = false;
+      SW.bridges.rebuild();
+      const n = W.myIsland.count(), linked = SW.bridges.list.some((br) => br.a.id === 'myisle' || br.b.id === 'myisle');
+      toast(!n ? 'Your patch of sea is open water again.' : linked ? 'Your island is saved. The bridges reach it now: walk over and plant on it.'
+        : 'Your island is saved. Row over to plant on it, or give it more land and a bridge will reach it.', 6, true);
+    }
+    if (!W.myIsland.count()) W.setIsland(builder.prev && builder.prev !== 'myisle' ? builder.prev : 'home');   // nothing to stand on: back where you were
+    setView('island');
+  }
+  function renderBuilder() {
+    $$('[data-btool]').forEach((b) => b.setAttribute('aria-pressed', String(builder.tool === b.dataset.btool)));
+    $$('[data-bpaint]').forEach((b) => b.setAttribute('aria-pressed', String(builder.tool === 'paint' && builder.paint === b.dataset.bpaint)));
+    $$('[data-bsize]').forEach((b) => b.setAttribute('aria-pressed', String(builder.size === +b.dataset.bsize)));
+    $('bUndo').disabled = !builder.undo.length;
+  }
+  function builderTap() {
+    const MI = W.myIsland, site = MI.site;
+    const hit = raycaster.intersectObject(W.terrain, false)[0];
+    const wHit = raycaster.ray.intersectPlane(waterPlane, wp);
+    let x, z;
+    if (hit && (!wHit || hit.distance <= raycaster.ray.origin.distanceTo(wp))) {
+      // the column of the face that was hit (step back inside the block)
+      x = hit.point.x - hit.face.normal.x * 0.2; z = hit.point.z - hit.face.normal.z * 0.2;
+    } else if (wHit) { x = wp.x; z = wp.z; } else return;
+    const cx = Math.round(x), cz = Math.round(z);
+    if (Math.abs(cx - site.x) > MI.R || Math.abs(cz - site.z) > MI.R) { toast('That is outside your patch of sea. Build inside the square.', 3, true); return; }
+    const r = builder.size, center = W.heightAt(cx, cz), list = [], before = [];
+    let skipped = 0;
+    for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+      if (dx * dx + dz * dz > r * r + r * 0.9 + 0.1) continue;   // round brushes: a plus, a disc, a wider disc
+      const x2 = cx + dx, z2 = cz + dz;
+      if (Math.abs(x2 - site.x) > MI.R || Math.abs(z2 - site.z) > MI.R) continue;
+      if (GD.nearest(x2, z2, 0.8)) { skipped++; continue; }   // keep your plants and builds where they are
+      const h = W.heightAt(x2, z2), c = MI.cell(x2, z2), kd = c ? c[1] : builder.paint;
+      let nh = h, nk = kd;
+      if (builder.tool === 'raise') { nh = h < 0 ? 1 : Math.min(9, h + 1); if (!c) nk = builder.paint; }   // new land stands a step clear of the sea, so it can be planted
+      else if (builder.tool === 'lower') nh = h > 0 ? h - 1 : h === 0 ? -1 : -6;
+      else if (builder.tool === 'flatten') nh = center;
+      else if (builder.tool === 'smooth') {
+        let sum = 0, n = 0;
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { sum += Math.max(-2, W.heightAt(x2 + a, z2 + b)); n++; }
+        nh = Math.round(sum / n);
+      } else if (builder.tool === 'paint') { if (h < 0) continue; nk = builder.paint; }
+      if (nh < -1) nh = -6;
+      if (nh === h && nk === kd && c) continue;
+      before.push([x2, z2, c ? c[0] : -6, c ? c[1] : 'grass']);
+      list.push([x2, z2, nh, nk]);
+    }
+    if (!list.length) { if (skipped) toast('Your plants and builds are kept as they are: shape the ground around them.', 3, true); return; }
+    builder.undo.push(before);
+    if (builder.undo.length > 40) builder.undo.shift();
+    MI.edit(list);
+    builder.dirty = true;
+    // a little magic: sparks where the ground rises or falls, and a soft sound
+    const y = Math.max(K.WL, W.heightAt(cx, cz));
+    L.plantFx(cx, y, cz, false, true);
+    L.dust(cx, y, cz, builder.paint === 'ice' ? 'snow' : builder.paint === 'stone' ? 'stone' : builder.paint === 'grass' ? 'soil' : 'sand', 5);
+    if (builder.tool === 'raise' && W.heightAt(cx, cz) === 1) W.addRipple(cx, cz, 0.6);
+    A.plantNote();
+    renderBuilder();
+  }
+  function builderUndo() {
+    const last = builder.undo.pop();
+    if (!last) return;
+    W.myIsland.edit(last);
+    builder.dirty = true;
+    renderBuilder();
   }
   // Each world is loaded on its own: sailing away saves this one, says where you are going, and reloads
   // the page into the next. The world's name travels in the #hash, and is remembered for next time.
@@ -1052,6 +1151,12 @@
     $('btnBloom').addEventListener('click', () => { updateBloom(true); renderBloom(); togglePop('popBloom'); });
     $('tripSkip').addEventListener('click', () => { if (L.rowing()) stepAshore(); else L.arriveNow(); });
     $('btnBoatOut').addEventListener('click', () => takeBoat());
+    if (W.myIsland) $('btnShape').addEventListener('click', () => startBuilder()); else $('btnShape').hidden = true;
+    $$('[data-btool]').forEach((b) => b.addEventListener('click', () => { builder.tool = b.dataset.btool; renderBuilder(); }));
+    $$('[data-bpaint]').forEach((b) => b.addEventListener('click', () => { builder.tool = 'paint'; builder.paint = b.dataset.bpaint; renderBuilder(); }));
+    $$('[data-bsize]').forEach((b) => b.addEventListener('click', () => { builder.size = +b.dataset.bsize; renderBuilder(); }));
+    $('bUndo').addEventListener('click', builderUndo);
+    $('bDone').addEventListener('click', endBuilder);
     $('btnWalk').addEventListener('click', () => { closePops(); if (SW.walk.active) stopWalking(); else startWalking(); });
     bindWalkUi();
     $('btnPlay').addEventListener('click', () => { closePops(); toggleHandpan(); });
@@ -1105,6 +1210,7 @@
         if (!$('composer').hidden) closeComposer();
         else if (!$('noteCard').hidden) $('noteCard').hidden = true;
         else if (sit) endSit(false);
+        else if (builder.on) endBuilder();
         else if (document.body.classList.contains('zen')) document.body.classList.remove('zen');
         else { closePops(); closePanels(); openCat = null; renderDrawer(); renderCats(); }
         return;
@@ -1164,6 +1270,11 @@
     for (const br of SW.bridges.list) { c.beginPath(); c.moveTo(...mapXY(br.ax, br.az)); c.lineTo(...mapXY(br.bx, br.bz)); c.stroke(); }
     for (const I of K.ISLANDS) {
       const [x, y] = mapXY(I.x, I.z), open = islandOpen(I.id);
+      if (I.shape === 'custom' && !W.myIsland.count()) {   // your patch of sea, not yet shaped: a dashed ring
+        c.setLineDash([3, 3]); c.strokeStyle = 'rgba(255, 243, 196, 0.6)'; c.lineWidth = 1.5;
+        c.beginPath(); c.arc(x, y, Math.max(3.5, I.r * s * 1.05), 0, 6.2832); c.stroke(); c.setLineDash([]);
+        continue;
+      }
       c.beginPath(); c.arc(x, y, Math.max(3.5, I.r * s * 1.05), 0, 6.2832);
       c.globalAlpha = open ? 0.9 : 0.35; c.fillStyle = open ? col[0] : col[1]; c.fill();
       if (I === W.island) { c.globalAlpha = 0.9; c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke(); }
@@ -1184,7 +1295,7 @@
     mapEl.addEventListener('pointerup', (e) => {
       const r = mapEl.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * K.G + K.MINX, z = (e.clientY - r.top) / r.height * K.G + K.MINX;
       let best = null, bd = 14;
-      for (const I of K.ISLANDS) { const d = Math.hypot(I.x - x, I.z - z) - I.r; if (d < bd) { bd = d; best = I; } }
+      for (const I of K.ISLANDS) { if (I.shape === 'custom' && !W.myIsland.count()) continue; const d = Math.hypot(I.x - x, I.z - z) - I.r; if (d < bd) { bd = d; best = I; } }
       if (!best) return;
       if (L.rowing()) {
         if (!islandOpen(best.id)) { toast(best.name + ' opens when your garden here reaches ✿ ' + islandNeed(best.id) + '.', 4, true); return; }

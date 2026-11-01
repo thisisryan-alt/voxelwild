@@ -257,6 +257,16 @@
   /* bloom and what it opens */
   .bloom-chip { color: #f4d58a; font-variant-numeric: tabular-nums; }
   .plant-chip { color: #1a2a20; background: #bfe6a8; font-weight: 500; }
+  /* the island builder's tools, along the bottom while you shape your island */
+  .builder {
+    position: fixed; z-index: 12; left: 0; right: 0; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; pointer-events: none;
+    padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  }
+  .builder > * { pointer-events: auto; }
+  .bgroup { flex-wrap: wrap; justify-content: center; }
+  .chip:disabled { opacity: 0.4; cursor: default; }
+  body.building .hud, body.building .breath, body.building .minimap, body.building .seedbar { display: none; }
   .plant-chip:hover { background: #d4f0c2; color: #10201a; }
   .chip.item.locked { opacity: 0.55; }
   .chip.item .need, .bloom-list .need, .isle-lock { color: #e8c877; font-size: 0.8rem; margin-left: 0.4em; }
@@ -354,6 +364,28 @@
   </div>
 </div>
 
+<div id="builder" class="builder" hidden role="toolbar" aria-label="Shape your island">
+  <div class="group bgroup" role="group" aria-label="Shape">
+    <button class="chip" data-btool="raise">Raise</button>
+    <button class="chip" data-btool="lower">Lower</button>
+    <button class="chip" data-btool="flatten">Flatten</button>
+    <button class="chip" data-btool="smooth">Smooth</button>
+  </div>
+  <div class="group bgroup" role="group" aria-label="Paint the ground">
+    <button class="chip" data-bpaint="grass"><span class="vox" style="--c:#8fc46a"></span>Grass</button>
+    <button class="chip" data-bpaint="sand"><span class="vox" style="--c:#e6d6ab"></span>Sand</button>
+    <button class="chip" data-bpaint="stone"><span class="vox" style="--c:#8f948f"></span>Stone</button>
+    <button class="chip" data-bpaint="ice"><span class="vox" style="--c:#d6edf7"></span>Ice</button>
+  </div>
+  <div class="group bgroup" role="group" aria-label="Brush">
+    <button class="chip" data-bsize="0">Small</button>
+    <button class="chip" data-bsize="1">Medium</button>
+    <button class="chip" data-bsize="2">Large</button>
+    <button id="bUndo" class="chip">Undo</button>
+    <button id="bDone" class="chip plant-chip">Done</button>
+  </div>
+</div>
+
 <div id="breath" class="breath off" aria-hidden="true">
   <div id="ring" class="breath-ring"><span id="count" class="breath-count"></span></div>
   <div id="word" class="breath-word">breathe in</div>
@@ -422,6 +454,7 @@
 <div id="popIslands" class="pop wide" hidden role="dialog" aria-labelledby="popIslandsTitle">
   <h2 id="popIslandsTitle">Islands</h2>
   <p class="isle-out"><button id="btnBoatOut" class="btn small">Take the boat out</button> <span class="opt-sub">Row anywhere you like, and step ashore where there is land.</span></p>
+  <p class="isle-out"><button id="btnShape" class="btn small">Shape your own island</button> <span class="opt-sub">Raise land from a patch of open sea, shape it and paint it, then plant it.</span></p>
   <ul id="islandList" class="isles"></ul>
   <p class="pop-note">Rowing takes a slow half minute or so; Arrive now skips ahead. Tap the moored boat while walking to come here.</p>
   <h3 class="pop-sub">Other worlds</h3>
@@ -619,7 +652,7 @@
   </section>
   <section class="set">
     <h3>Keys</h3>
-    <p class="set-note">W A S D or arrows walk, or row when out in the boat · Shift run · Space jump · C walking camera, up to first person · E sit or stand · G plant your seed · Q sow as you walk · R take the boat out or step ashore · F go fishing, and strike when the float dips · B breath guide · M sound · I islands · H hide controls · J journal · V next view · 1–9 handpan (when open) · Esc close</p>
+    <p class="set-note">W A S D or arrows walk, or row when out in the boat · Shift run · Space jump · C walking camera, up to first person · E sit or stand · G plant your seed · Q sow as you walk · R take the boat out or step ashore · F go fishing, and strike when the float dips · B breath guide · M sound · I islands · H hide controls · J journal · V next view · 1–9 handpan (when open) · Esc close, or finish shaping your island</p>
   </section>
   <section class="set">
     <div id="resetRow" class="reset"></div>

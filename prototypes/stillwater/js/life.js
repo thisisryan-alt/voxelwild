@@ -1389,6 +1389,7 @@
     }
   }
   SW.on('island', () => { if (boat && !trip) mooring(); });
+  SW.on('reshape', (id) => { if (boat && !trip && W.island.id === id) mooring(); });   // your island's shore moved
 
   // ---------------------------------------------------------------- particles
   let fireflies, ffData, fall, fallData, flames, puffs, sparkle, wake, ffIdle = false, fallBusy = true, wakeT = 0;

@@ -747,11 +747,23 @@
   const G = K.G, MINX = K.MINX;
   const heights = new Int8Array(G * G), grassy = new Uint8Array(G * G), rocky = new Uint8Array(G * G), owner = new Int8Array(G * G);
   const tint = new Uint8Array(G * G);   // 1 sand all the way down (dunes), 2 black sand (Basalt Isle)
+  // Your own island: the height and ground you have given each column of its site, saved per world as
+  // { "dx,dz": [height, 'grass' | 'sand' | 'stone' | 'ice'] } relative to the site's centre.
+  const MY = K.ISLAND.myisle, MYR = 16;
+  let myCells = {};
+  if (MY) { const d = SW.store.get(SW.store.w('myisle'), null); if (d && d.cells) myCells = d.cells; }
+  const myKey = (x, z) => (Math.round(x) - MY.x) + ',' + (Math.round(z) - MY.z);
+  const myCell = (x, z) => myCells[myKey(x, z)];
   // Stacks of rock that make up Seal Rocks, relative to its centre: [dx, dz, radius, height]
   const SEAL_STACKS = [[0, 0, 3.2, 3], [4, 2.5, 2, 2], [-3.5, 3, 2.2, 1.6], [2, -4, 2.4, 2.2], [-4, -3, 1.6, 1]];
   function islandHeight(I, x, z) {
     const dx = x - I.x, dz = z - I.z, r = Math.hypot(dx, dz);
     if (I.id !== 'home' && r > I.r * 2.2) return null;
+    if (I.shape === 'custom') {
+      if (Math.abs(dx) > MYR + 0.5 || Math.abs(dz) > MYR + 0.5) return null;
+      const c = myCell(x, z);
+      return c ? c[0] : -6.4;   // open sea until you raise it
+    }
     const ang = Math.atan2(dz, dx);
     if (I.id === 'home') {
       // unchanged from the single-island version, so saved gardens still fit
@@ -852,6 +864,7 @@
     if (shape === 'rocks' || (shape === 'pine' && h >= 6) || (shape === 'springs' && h >= 3)) rock = 1;
     if (shape === 'glacier' && h >= 0) rock = 2;   // ice
     let tn = 0;
+    if (shape === 'custom' && h >= 0) { const kd = (myCell(x, z) || [0, 'grass'])[1]; if (kd === 'stone') rock = 1; else if (kd === 'ice') rock = 2; }
     if (shape === 'dunes' && h >= 0) tn = 1;
     if (shape === 'basalt' && h >= 0) {
       // moss and turf on some of the highest columns, black sand below the cliffs
@@ -939,22 +952,33 @@
   W.islands = K.ISLANDS;
 
   const NO_GRASS = new Set(['', 'atoll', 'rocks', 'wreck', 'glacier', 'dunes']);
-  function initTerrain() {
-    K.ISLANDS.forEach((I, idx) => { I.idx = idx; I.cols = { grass: [], sand: [], shallow: [], ring: [], rock: [] }; });
-    planPools(); planScenery();
-    for (let ix = 0; ix < G; ix++) for (let iz = 0; iz < G; iz++) {
+  function computeColumn(ix, iz) {
       const x = ix + MINX, z = iz + MINX, [h, rock, own, tn] = rawHeight(x, z), i = ix * G + iz;
       heights[i] = h; rocky[i] = rock; owner[i] = own; tint[i] = tn;
       const kind = own >= 0 ? K.ISLANDS[own].shape : '';
       const nearPond = !!K.POND && Math.hypot(x - K.POND.x, z - K.POND.z) < K.POND.r + 3;
-      const meadowy = kind === 'home' || kind === 'pine' ? h >= 2 || (h === 1 && (nearPond || fbm(x * 0.3, z * 0.3, 41, 2) > 0.42))
+      const meadowy = kind === 'custom' ? h >= 0 && (myCell(x, z) || [0, 'grass'])[1] === 'grass'
+        : kind === 'home' || kind === 'pine' ? h >= 2 || (h === 1 && (nearPond || fbm(x * 0.3, z * 0.3, 41, 2) > 0.42))
         : kind === 'blossom' || kind === 'meadow' || kind === 'springs' || kind === 'falls' || kind === 'bamboo' || kind === 'orchard' || kind === 'oldtree' || kind === 'stones' ? h >= 1
         : kind === 'basalt' ? h >= 5
         : kind === 'marsh' ? h >= 1 || (h === 0 && fbm(x * 0.4, z * 0.4, 52, 2) > 0.45)
         : NO_GRASS.has(kind) ? false : h >= 1;   // any other island is green above the beach
       grassy[i] = !rock && meadowy && tn !== 3 ? 1 : 0;
-    }
-    const blocks = W.blocks, rng = mulberry32(7);
+  }
+  function initTerrain() {
+    K.ISLANDS.forEach((I, idx) => { I.idx = idx; I.cols = { grass: [], sand: [], shallow: [], ring: [], rock: [] }; });
+    planPools(); planScenery();
+    for (let ix = 0; ix < G; ix++) for (let iz = 0; iz < G; iz++) computeColumn(ix, iz);
+    buildTerrain();
+    buildHeightTex();
+  }
+  // The blocks of every column, the islands' lists of grass, sand and rock, and the one instanced mesh
+  // that draws them all. Built at the start, and again whenever you reshape your own island.
+  let terrainMat = null;
+  function buildTerrain() {
+    const blocks = W.blocks;
+    blocks.length = 0;
+    for (const C of [W.cols].concat(K.ISLANDS.map((I) => I.cols))) for (const k in C) C[k].length = 0;
     for (let ix = 0; ix < G; ix++) for (let iz = 0; iz < G; iz++) {
       const i = ix * G + iz, h = heights[i], x = ix + MINX, z = iz + MINX;
       if (h <= -5) continue;   // too deep to see through the water
@@ -989,7 +1013,7 @@
     }
     Object.assign(K.ISLAND.home.cols, W.cols);
     W.local = W.island.cols;
-    const mat = W.voxelMat(0xffffff, { edges: 0.15, texel: 8, texAmt: 0.075, grassSide: true, caustics: true, wet: true, shininess: 10 });
+    const mat = terrainMat || (terrainMat = W.voxelMat(0xffffff, { edges: 0.15, texel: 8, texAmt: 0.075, grassSide: true, caustics: true, wet: true, shininess: 10 }));
     const tgeo = new THREE.BoxGeometry(1, 1, 1);
     tgeo.setAttribute('aKind', new THREE.InstancedBufferAttribute(new Float32Array(blocks.map((b) => b[3])), 1));
     // Corner occlusion for smooth voxel lighting: for each of a block's 8 corners, how many of the 7 other
@@ -1013,12 +1037,14 @@
     });
     tgeo.setAttribute('aAO0', new THREE.InstancedBufferAttribute(ao0, 4, true));
     tgeo.setAttribute('aAO1', new THREE.InstancedBufferAttribute(ao1, 4, true));
+    if (terrain) { scene.remove(terrain); terrain.geometry.dispose(); terrain.dispose(); }
     terrain = new THREE.InstancedMesh(tgeo, mat, blocks.length);
     tKind = new Uint8Array(blocks.length); tRand = new Float32Array(blocks.length); tJit = new Float32Array(blocks.length);
     const m = new THREE.Matrix4();
     blocks.forEach((b, i) => {
       m.makeTranslation(b[0], b[1], b[2]); terrain.setMatrixAt(i, m);
-      tKind[i] = b[3]; tRand[i] = rng(); tJit[i] = (rng() - 0.5) * 0.07;
+      // each block's shade comes from where it is, so rebuilding never reshuffles the colours
+      tKind[i] = b[3]; tRand[i] = U.hash2(b[4] * 3 + b[6] * 131, b[5] * 7 - b[6] * 17, 7); tJit[i] = (U.hash2(b[4], b[5] + b[6] * 57, 11) - 0.5) * 0.07;
       if (TPAL[b[3]]) U.seasonColor(TPAL[b[3]], tRand[i], S.season, tmpC);
       else tmpC.copy(TSTATIC[b[3]] || TSTATIC[0]);
       terrain.setColorAt(i, tmpC.multiplyScalar(1 + tJit[i]));
@@ -1026,21 +1052,58 @@
     terrain.castShadow = true; terrain.receiveShadow = true;
     scene.add(terrain);
     W.terrain = terrain;
-    lastTerrainS = S.season;
-
-    // seabed height texture for the water shader
-    const data = new Uint8Array(G * G * 4);
+    lastTerrainS = S.season; tCursor = -1;
+  }
+  // seabed height texture for the water shader: its shallows, foam and colour
+  function buildHeightTex() {
+    const data = W.heightTex ? W.heightTex.image.data : new Uint8Array(G * G * 4);
     for (let ix = 0; ix < G; ix++) for (let iz = 0; iz < G; iz++) {
       const v = clamp((heights[ix * G + iz] + 8) * 16, 0, 255), o = (iz * G + ix) * 4;
       data[o] = data[o + 1] = data[o + 2] = v; data[o + 3] = 255;
     }
-    W.heightTex = new THREE.DataTexture(data, G, G, THREE.RGBAFormat);
-    W.heightTex.magFilter = THREE.LinearFilter; W.heightTex.minFilter = THREE.LinearFilter;
+    if (!W.heightTex) {
+      W.heightTex = new THREE.DataTexture(data, G, G, THREE.RGBAFormat);
+      W.heightTex.magFilter = THREE.LinearFilter; W.heightTex.minFilter = THREE.LinearFilter;
+    }
     W.heightTex.needsUpdate = true;
   }
+  // Reshaping your own island: set the height and ground of some of its columns (world x, z), rebuild the
+  // terrain, and save. A height of -6 or below returns a column to the sea.
+  W.myIsland = MY ? {
+    site: MY, R: MYR,
+    cell: (x, z) => myCell(x, z),
+    count: () => Object.keys(myCells).length,
+    edit(list) {
+      for (const [x, z, h, kd] of list) {
+        if (Math.abs(Math.round(x) - MY.x) > MYR || Math.abs(Math.round(z) - MY.z) > MYR) continue;
+        const key = myKey(x, z);
+        if (h <= -6) delete myCells[key]; else myCells[key] = [Math.max(-5, Math.min(9, Math.round(h))), kd || 'grass'];
+      }
+      for (let x = MY.x - MYR - 1; x <= MY.x + MYR + 1; x++) for (let z = MY.z - MYR - 1; z <= MY.z + MYR + 1; z++) {
+        const ix = x - MINX, iz = z - MINX;
+        if (ix >= 0 && iz >= 0 && ix < G && iz < G) computeColumn(ix, iz);
+      }
+      buildTerrain(); buildHeightTex(); landing(MY);
+      SW.store.set(SW.store.w('myisle'), { cells: myCells });
+      SW.emit('reshape', MY.id);
+    },
+  } : null;
+  // a faint square on the water marking the patch of sea that is yours to shape, shown while you build
+  let siteLine = null;
+  W.showSite = function (on) {
+    if (!MY) return;
+    if (!siteLine) {
+      const r = MYR + 0.5, y = K.WL + 0.06, pts = [];
+      for (const [x, z] of [[-r, -r], [r, -r], [r, r], [-r, r]]) pts.push(new THREE.Vector3(MY.x + x, y, MY.z + z));
+      siteLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xfff3c4, transparent: true, opacity: 0.75, depthWrite: false }));
+      siteLine.renderOrder = 6; siteLine.frustumCulled = false;
+      W.late(siteLine); scene.add(siteLine);
+    }
+    siteLine.visible = !!on;
+  };
   // Seasonal recolouring is spread over several frames, and each frame uploads only the slice it touched,
   // so the turn of the seasons never stalls a frame. Rock, soil and ice keep the colours set at build time.
-  let tCursor = -1, tPassS = 0;
+  var tCursor = -1, tPassS = 0;
   function recolorTerrain(Sv, count) {
     if (tCursor < 0) { tCursor = 0; tPassS = Sv; }
     const n = tKind.length, from = tCursor, end = Math.min(n, from + count), attr = terrain.instanceColor;
@@ -1532,6 +1595,21 @@
   }
 
   // ------------------------------------------------------------- islands
+  // Where the rowboat comes to an island: the shore facing home, and a point just offshore for the boat.
+  // Worked out again whenever you reshape your own island.
+  function landing(I) {
+    let peak = 0;
+    for (const c of [].concat(I.cols.grass, I.cols.sand, I.cols.rock)) peak = Math.max(peak, c[2]);
+    I.center = new THREE.Vector3(I.x, clamp(peak * 0.35, 0.5, 3) + (I.lift || 0), I.z);
+    const a = Math.atan2(-I.z, -I.x), ox = Math.cos(a), oz = Math.sin(a);
+    let r = I.r * 2.2;
+    while (r > 0 && W.heightAt(I.x + ox * r, I.z + oz * r) < 0) r -= 0.25;
+    const sx = I.x + ox * r, sz = I.z + oz * r, sh = Math.max(0, W.heightAt(sx, sz));
+    I.out = new THREE.Vector2(ox, oz);
+    I.landing = new THREE.Vector3(sx + ox * 3.6, K.WL, sz + oz * 3.6);
+    I.shore = new THREE.Vector3(sx, sh, sz);
+    return { sx, sz, sh, ox, oz, a };
+  }
   // Each island gets a landing for the rowboat, facing home, and most get a small jetty.
   function initLandings() {
     const wood = W.voxelMat(0x9a7a5a, { edges: 0.2, texel: 10, texAmt: 0.08, wet: true }), dark = W.voxelMat(0x7a5d44, { edges: 0.2, texel: 10, texAmt: 0.08, wet: true });
@@ -1548,14 +1626,8 @@
         W.seats.push({ x: W.dock.end.x + I.out.x * 0.25, y: 0.19, z: W.dock.end.z + I.out.y * 0.25, angle: a, kind: 'edge' });
         continue;
       }
-      const a = Math.atan2(-I.z, -I.x), ox = Math.cos(a), oz = Math.sin(a);
-      let r = I.r * 2.2;
-      while (r > 0 && W.heightAt(I.x + ox * r, I.z + oz * r) < 0) r -= 0.25;
-      const sx = I.x + ox * r, sz = I.z + oz * r, sh = Math.max(0, W.heightAt(sx, sz));
-      I.out = new THREE.Vector2(ox, oz);
-      I.landing = new THREE.Vector3(sx + ox * 3.6, K.WL, sz + oz * 3.6);
-      I.shore = new THREE.Vector3(sx, sh, sz);
-      if (I.shape === 'rocks') continue;   // no jetty on bare rocks
+      const { sx, sz, sh, ox, oz, a } = landing(I);
+      if (I.shape === 'rocks' || I.shape === 'custom') continue;   // no jetty on bare rocks, or on the island you shape
       const g = new THREE.Group();
       g.position.set(sx, 0, sz);
       g.rotation.y = -a;

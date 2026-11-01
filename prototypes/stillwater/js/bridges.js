@@ -246,6 +246,17 @@
     B.ready = true;
   };
   B.yAt = yAt;
+  // Plan and build the bridges again, after you reshape your own island, so that new land is joined to the
+  // rest (and land you have taken away is let go).
+  B.rebuild = function () {
+    for (const m of B.meshes || []) { W.scene.remove(m); m.material.dispose(); m.dispose && m.dispose(); }   // the box geometry is shared: keep it
+    if (B.pools) { W.scene.remove(B.pools); B.pools.geometry.dispose(); B.pools = null; B.poolU = null; }
+    for (const br of B.list) for (const id in br.gates || {}) W.scene.remove(br.gates[id]);
+    for (let i = W.decks.length - 1; i >= 0; i--) if (W.decks[i].bridge) W.decks.splice(i, 1);
+    B.list = []; B.meshes = []; B.lampMat = null;
+    B.init();
+    if (SW.progress) B.setOpen(SW.progress.islandOpen);
+  };
   // which bridges lead onto islands that are still closed
   B.setOpen = function (isOpen) {
     for (const br of B.list) for (const id in br.gates) br.gates[id].visible = !isOpen(id);

@@ -101,6 +101,16 @@ fonts from Google Fonts; everything else is in `js/`.
 - **Build:** stone lantern, wind chime, bench, campfire, stone stack, birdhouse, beehive (bees come out
   to visit the flowers nearby), stepping stones, cabin with a smoking chimney and lit windows, pavilion
   and windmill, plus each world's own. Coral can be planted on the sea floor.
+- **Your own island:** every world keeps a patch of open sea for you, marked by a faint square while you
+  build. Open **Islands** and choose *Shape your own island*, then tap inside the square: each tap raises
+  the ground a block, and new land rises a step clear of the sea so it can be planted at once. *Lower*
+  digs it back down to beach, shallows and sea, *Flatten* levels it to the height you tap, *Smooth*
+  rounds off steps, and the swatches paint it grass, sand, stone or ice. Three brush sizes, *Undo* (up
+  to 40 steps), and sparks and a soft note with each change; plants and builds already there are kept
+  as they are. Choose *Done* (or Esc) and the bridges are planned again, so the nearest islands reach
+  your new land; then walk over and plant it, and its plants count towards the world's bloom like any
+  other. Each world's island is saved with that world, and *Reshape it* in Islands opens the builder
+  again.
 - **Seasons:** one season per in-game day. Leaves turn and fall and gather on the grass through
   autumn, cherry petals drift in spring and sprinkle the meadows, flowers rest in winter, and snow
   settles on the ground, the pines and the tops of roofs, benches, bridges, lanterns and rocks.
@@ -141,11 +151,11 @@ fonts from Google Fonts; everything else is in `js/`.
 - **Journal:** field notes for 118 visitors, sights, worlds and places, the good things you have written, and the research
   behind each design choice.
 
-Each world's garden, tidied wild plants, current island and time of day, plus your profile (each
+Each world's garden, your own island, tidied wild plants, current island and time of day, plus your profile (each
 world's best bloom), the journal, settings and the last world visited, are saved in the browser's local
 storage.
 
-**Keys:** WASD or arrows walk, or row when out in the boat · Shift run · Space jump · E sit or stand · C walking camera, up to first person · G plant · Q sow as you walk · R take the boat out or step ashore · F go fishing, and strike when the float dips · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
+**Keys:** WASD or arrows walk, or row when out in the boat · Shift run · Space jump · E sit or stand · C walking camera, up to first person · G plant · Q sow as you walk · R take the boat out or step ashore · F go fishing, and strike when the float dips · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close, or finish shaping your island.
 
 ## Files
 

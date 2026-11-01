@@ -366,6 +366,7 @@
   WK.goIsland = function (I) {
     // somewhere open and grassy near the middle, or the landing
     const C = I.cols, pool = (C.grass.length ? C.grass : C.sand.length ? C.sand : C.rock).slice().sort((a, b) => Math.hypot(a[0] - I.x, a[1] - I.z) - Math.hypot(b[0] - I.x, b[1] - I.z));
+    if (!pool.length && I.shape === 'custom') { WK.lastFail = null; return false; }   // your island, not shaped yet: only sea there
     for (const c of pool.slice(0, 12)) if (WK.goTo(c[0], c[1])) return true;
     return I.shore ? WK.goTo(I.shore.x, I.shore.z) : false;
   };
