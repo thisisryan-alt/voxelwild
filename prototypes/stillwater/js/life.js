@@ -274,6 +274,8 @@
     c.head = pivot(g, 0, (swan ? 0.42 : 0.2) * s, (swan ? 0.24 : 0.2) * s);
     part(c.head, swan ? body : drake ? 0x2f6b4a : baby ? 0xf6dc78 : 0x7a5e44, (swan ? 0.12 : 0.18) * s, (swan ? 0.1 : 0.18) * s, (swan ? 0.14 : 0.18) * s, 0, 0.1 * s, 0.02 * s);
     part(c.head, swan ? 0xe8702a : 0xe8a030, 0.08 * s, 0.04 * s, 0.12 * s, 0, 0.08 * s, 0.15 * s);
+    part(g, swan ? body : drake ? 0x3a3a34 : body, 0.12 * s, 0.1 * s, 0.08 * s, 0, 0.17 * s, -0.29 * s);   // a little upturned tail
+    c.up = 0;
     c.update = (dt, t) => {
       const si = season();
       fadeTo(c, !c.baby || si <= 1, dt, 0.6);
@@ -290,6 +292,11 @@
       g.rotation.z = Math.sin(t * 1.1 + c.p) * 0.05;
       c.dip = Math.max(0, c.dip - dt);
       if (!sleep && rand() < dt * 0.03) c.dip = 1.2;
+      // now and then a duck upends to feed, tail to the sky, and rights itself again
+      c.up = Math.max(0, c.up - dt);
+      if (!sleep && !c.dip && rand() < dt * 0.012) c.up = 2.4;
+      const tip = c.up > 0 ? smooth(0, 0.35, 2.4 - c.up) * smooth(0, 0.35, c.up) : 0;
+      g.rotation.x = 1.25 * tip; g.position.y -= 0.06 * s * tip;
       c.head.rotation.x = c.dip > 0 ? Math.sin(Math.PI * c.dip / 1.2) * 1.3 : 0;
       c.head.rotation.y = sleep ? 2.6 : Math.sin(t * 0.5 + c.p) * 0.3;
     };
@@ -348,7 +355,8 @@
     c.earR = pivot(c.head, 0.04, 0.07, -0.02); part(c.earR, fur, 0.04, ear, 0.06, 0, ear * 0.47, 0);
     if (o.tips) for (const e of [c.earL, c.earR]) part(e, 0x2a2420, 0.042, 0.04, 0.062, 0, ear * 0.94, 0);
     part(c.body, 0xf6f4ee, 0.08, 0.08, 0.06, 0, 0.16, -0.18);
-    c.body.scale.setScalar(o.scale || 1);
+    const sc = o.scale || 1;
+    c.body.scale.setScalar(sc); c.squash = 0; c.rear = 0;
     const spot = grass[(i * 97) % grass.length];
     g.position.set(spot[0], spot[2], spot[1]);
     c.update = (dt, t) => {
@@ -366,16 +374,25 @@
         pos.lerpVectors(c.from, c.to, k);
         pos.y += Math.sin(Math.PI * k) * (0.22 + c.binky * 0.4);
         c.body.rotation.x = -Math.sin(Math.PI * k) * 0.25;
+        c.squash = Math.max(0, c.squash - dt * 5);
+        c.body.scale.set(sc * (1 + 0.08 * c.squash), sc * (1 - 0.14 * c.squash + 0.1 * Math.sin(Math.PI * k)), sc);   // stretch in the air
         g.rotation.y += c.binky * dt * 6;
         if (k >= 1) {
-          c.binky = 0;
+          c.binky = 0; c.squash = 1;
           if (--c.hops > 0) c.nextHop(); else { c.state = rand() < 0.6 ? 'graze' : 'sit'; c.timer = 2 + rand() * 6; }
         }
         return;
       }
       c.timer -= dt;
-      c.body.rotation.x = 0;
-      c.head.rotation.x = c.state === 'graze' ? 0.6 + Math.sin(t * 6) * 0.05 : -0.1;
+      // sitting, a rabbit now and then rears up on its hind legs to look about; it breathes, its nose twitches,
+      // and it settles with a little squash after each landing
+      c.rear += ((c.state === 'sit' && Math.sin(t * 0.5 + c.p) > 0.55 ? 1 : 0) - c.rear) * Math.min(1, dt * 4);
+      c.squash = Math.max(0, c.squash - dt * 5);
+      c.body.rotation.x = -0.55 * c.rear;
+      c.body.scale.set(sc * (1 + 0.08 * c.squash), sc * (1 - 0.14 * c.squash + 0.03 * Math.sin(t * 2.4 + c.p)), sc);
+      c.head.rotation.x = c.state === 'graze' ? 0.6 + Math.sin(t * 6) * 0.05 : -0.1 + 0.45 * c.rear;
+      c.head.rotation.y = c.rear * 0.6 * Math.sin(t * 0.8 + c.p);
+      c.head.position.z = 0.15 + 0.006 * Math.sin(t * 28 + c.p) * (c.state === 'hop' ? 0 : 1);
       c.earL.rotation.z = Math.max(0, Math.sin(t * 0.9 + c.p)) * 0.3;
       c.earR.rotation.z = -Math.max(0, Math.sin(t * 1.1 + c.p * 2)) * 0.3;
       if (c.timer <= 0) {

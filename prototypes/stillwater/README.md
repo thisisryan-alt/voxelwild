@@ -112,7 +112,9 @@ fonts from Google Fonts; everything else is in `js/`.
   reindeer, a snowy owl, arctic hares, doves, swans, winged horses, fire birds, salamanders and lava
   fish. Many can be tapped. The grazing animals breathe, swish their tails (faster as they walk), lift
   their heads now and then to look about, and nod as they step; sheep have woolly fleeces, foxes flick
-  their ears, and the winged horses stretch their wings. A lighthouse turns its beam at dusk.
+  their ears, and the winged horses stretch their wings. Rabbits and hares sit up on their hind legs
+  to look about, twitch their noses, breathe, stretch in the air and squash a little as they land;
+  ducks and swans have upturned tails and now and then upend to feed, tail to the sky. A lighthouse turns its beam at dusk.
 - **Fishing:** choose Go fishing under Water and tap open water to cast (or press it while walking).
   After a wait and a nibble or two the float dips: tap again to catch the fish, which leaps out and goes
   straight back. Each world has its own fish, a few of them rare; the journal counts what you have let go.
