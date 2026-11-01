@@ -511,7 +511,17 @@
   // islands; all your worlds' bloom together opens new worlds. Once open, things stay open.
   const WID = K.WORLD.id;
   const profile = Object.assign({ best: {}, told: {} }, SW.store.get('profile', {}));
-  profile.best = profile.best || {}; profile.told = profile.told || {};
+  profile.best = profile.best || {}; profile.told = profile.told || {}; profile.been = profile.been || {};
+  // Gardens made before there was a profile still count, and a world you have already been to stays open.
+  for (const id of K.WORLD_ORDER) {
+    if (profile.best[id] != null) continue;
+    const saved = SW.store.get(id === 'stillwater' ? 'garden2' : 'garden2@' + id, null);
+    if (!Array.isArray(saved) || !saved.length) continue;
+    profile.best[id] = SW.garden.bloomFor(saved);
+    profile.been[id] = 1;
+  }
+  profile.been[WID] = 1;
+  SW.store.set('profile', profile);
   let bloom = 0, bloomVer = -1, bloomT = 0;
   const worldBloom = () => Math.max(bloom, profile.best[WID] || 0);
   const totalBloom = () => K.WORLD_ORDER.reduce((sum, id) => sum + (id === WID ? worldBloom() : profile.best[id] || 0), 0);
@@ -519,7 +529,7 @@
   const itemOpen = (k) => !!SPECIAL[k] || itemNeed(k) <= worldBloom();
   const islandNeed = (id) => (id === 'home' ? 0 : (K.WORLD.islands.find((I) => I.id === id) ? (K.WORLD.islandBloom || {})[id] || 0 : 0));
   const islandOpen = (id) => islandNeed(id) <= worldBloom();
-  const worldOpen = (id) => id === WID || (K.WORLDS[id].unlock || 0) <= totalBloom();
+  const worldOpen = (id) => id === WID || !!profile.been[id] || (K.WORLDS[id].unlock || 0) <= totalBloom();
   function updateBloom(force) {
     if (!GD || (!force && GD.version === bloomVer)) return;
     bloomVer = GD.version;

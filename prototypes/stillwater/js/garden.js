@@ -1540,9 +1540,10 @@
     if (d.cat === 'plants' || d.cat === 'water') return 2;
     return d.footprint || d.rad >= 1.4 ? 10 : 4;
   };
-  GD.bloom = function () {
+  GD.bloom = () => GD.bloomFor(GD.items);
+  GD.bloomFor = function (items) {
     const counts = {};
-    for (const it of GD.items) if (!it.wild) counts[it.k] = (counts[it.k] || 0) + 1;
+    for (const it of items) if (it && !it.wild && CAT[it.k]) counts[it.k] = (counts[it.k] || 0) + 1;
     let total = 0;
     for (const k in counts) total += GD.bloomOf(k) * (1 - Math.pow(0.85, counts[k])) / 0.15 + 3;
     return Math.round(total);

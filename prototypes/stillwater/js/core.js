@@ -186,7 +186,18 @@ window.SW = window.SW || {};
     let id = '';
     try { id = decodeURIComponent((location.hash || '').slice(1)); } catch (e) { /* no hash */ }
     if (!WORLDS[id]) { try { id = JSON.parse(localStorage.getItem('stillwater.worldSel')); } catch (e) { id = ''; } }
-    return WORLDS[id] ? id : 'stillwater';
+    return WORLDS[id] && canEnter(id) ? id : 'stillwater';
+  }
+  // A world can be loaded once it is open: by the bloom of all your worlds together, or because you have
+  // been there before (a garden saved there means it was open when you sailed).
+  function canEnter(id) {
+    if (id === 'stillwater') return true;
+    let P = null;
+    try { P = JSON.parse(localStorage.getItem('stillwater.profile')); if (localStorage.getItem('stillwater.garden2@' + id)) return true; } catch (e) { return true; }
+    P = P || {};
+    if (P.been && P.been[id]) return true;
+    const total = Object.values(P.best || {}).reduce((a, b) => a + (+b || 0), 0);
+    return (WORLDS[id].unlock || 0) <= total;
   }
   const WORLD = WORLDS[pickWorld()];
   WORLD.look = WORLD.look || {};
