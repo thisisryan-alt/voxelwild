@@ -141,13 +141,19 @@
     uniform sampler2D tColor, tBloom, tRays, tDepth;
     uniform vec2 uRes; uniform mat4 uInvProj, uCamWorld;
     uniform vec3 uSunDir, uSunCol, uHi, uLo, uLift, uCamPos, uCamFwd, uMistCol; uniform vec2 uSunUV; uniform float uMist, uWL;
-    uniform float uBloom, uRays, uInscatter, uSat, uContrast, uExposure, uVignette, uTime, uGrain, uFlare;
+    uniform float uBloom, uRays, uInscatter, uSat, uContrast, uExposure, uVignette, uTime, uGrain, uFlare, uHeat;
     varying vec2 vUv;
     vec3 shoulder(vec3 c){ return mix(c, 0.8 + 0.2 * (1.0 - exp(-(c - 0.8) / 0.2)), step(0.8, c)); }   // untouched below 0.8, a soft roll-off above
     void main(){
-      vec3 c = texture2D(tColor, vUv).rgb;
-      c += texture2D(tBloom, vUv).rgb * uBloom;
-      float d = texture2D(tDepth, vUv).a;
+      // heat shimmer: the air over a lava sea wavers, more with distance
+      vec2 uv = vUv;
+      if (uHeat > 0.0) {
+        float far = smoothstep(8.0, 90.0, min(texture2D(tDepth, vUv).a, 400.0));
+        uv += (vec2(vnoise(vUv * vec2(34.0, 22.0) + vec2(0.0, uTime * 1.7)), vnoise(vUv * vec2(28.0, 24.0) - vec2(uTime * 1.3, 0.0))) - 0.5) * uHeat * 0.006 * far;
+      }
+      vec3 c = texture2D(tColor, uv).rgb;
+      c += texture2D(tBloom, uv).rgb * uBloom;
+      float d = texture2D(tDepth, uv).a;
       vec4 vp = uInvProj * vec4(vUv * 2.0 - 1.0, 1.0, 1.0); vp /= vp.w;
       vec3 rd = normalize((uCamWorld * vec4(vp.xyz, 0.0)).xyz);
       float dist = d >= SKY ? 1500.0 : d;
@@ -191,7 +197,7 @@
     uSunDir: { value: new THREE.Vector3() }, uSunCol: { value: new THREE.Color() }, uHi: { value: new THREE.Color(1, 1, 1) }, uLo: { value: new THREE.Color(1, 1, 1) }, uLift: { value: new THREE.Color(0, 0, 0) },
     uBloom: { value: 0.6 }, uRays: { value: 0 }, uInscatter: { value: 0.3 }, uSat: { value: 1.08 }, uContrast: { value: 1.05 }, uExposure: { value: 1 },
     uVignette: { value: 0.35 }, uTime: { value: 0 }, uGrain: { value: 0.012 }, uSunUV: { value: new THREE.Vector2() }, uFlare: { value: 0 },
-    uCamPos: { value: new THREE.Vector3() }, uCamFwd: { value: new THREE.Vector3() }, uMistCol: { value: new THREE.Color() }, uMist: { value: 0 }, uWL: { value: -0.35 },
+    uCamPos: { value: new THREE.Vector3() }, uCamFwd: { value: new THREE.Vector3() }, uMistCol: { value: new THREE.Color() }, uMist: { value: 0 }, uWL: { value: -0.35 }, uHeat: { value: 0 },
   });
 
   // ------------------------------------------------------------ depth of field
@@ -350,7 +356,7 @@
     // Balanced redraws the shadow map every other frame; the sun and most shadows move slowly.
     frameNo++;
     if (S.quality !== 'balanced' || frameNo % 2) renderer.shadowMap.needsUpdate = true;
-    const reflOn = PP.reflections && renderReflection();
+    const reflOn = PP.reflections && !SW.K.WORLD.look.sea && renderReflection();   // cloud and lava do not mirror
     SW.world.setWaterInputs({ refl: reflOn ? rtRefl.texture : null, scene: rtB.texture, res: size, texMat, near, far });
 
     camera.layers.set(0); camera.layers.enable(2);
@@ -401,7 +407,8 @@
     sunScreen.copy(L).multiplyScalar(500).add(camera.position).project(camera);
     camera.getWorldDirection(camFwd);
     const facing = smooth(0.15, 0.6, camFwd.dot(L)), wx = S.weather;
-    const rayStrength = facing * clamp(1 - S.night * 1.6, 0, 1) * (1 - SW.world.env.over) * smooth(-0.02, 0.1, L.y) * (0.35 + 0.65 * (1 - smooth(0.25, 0.8, L.y)));
+    const rayStrength = facing * clamp(1 - S.night * 1.6, 0, 1) * (1 - SW.world.env.over) * smooth(-0.02, 0.1, L.y) * (0.35 + 0.65 * (1 - smooth(0.25, 0.8, L.y)))
+      * ((SW.K.WORLD.look.grade || {}).rays || 1);   // Heaven's light comes down in shafts
     if (rayStrength > 0.01) {
       rayMaskMat.uniforms.tDepth.value = rtB.texture;
       rayMaskMat.uniforms.uSun.value.set(sunScreen.x * 0.5 + 0.5, sunScreen.y * 0.5 + 0.5);
@@ -417,19 +424,25 @@
     C.uRes.value.copy(size);
     C.uInvProj.value.copy(camera.projectionMatrixInverse); C.uCamWorld.value.copy(camera.matrixWorld);
     C.uSunDir.value.copy(L); C.uSunCol.value.copy(E.sun);
-    C.uBloom.value = 0.55 + 0.35 * night;
+    const GR = SW.K.WORLD.look.grade || {};
+    C.uBloom.value = (0.55 + 0.35 * night) * (GR.bloom || 1);
+    C.uHeat.value = GR.heat || 0;
     C.uRays.value = rayStrength * 0.6;
     C.uSunUV.value.set(sunScreen.x * 0.5 + 0.5, sunScreen.y * 0.5 + 0.5);
     C.uFlare.value = sunScreen.z < 1 ? rayStrength : 0;
     C.uInscatter.value = (0.12 + 0.35 * gold) * (1 - E.over * 0.7) * S.dayness;
     C.uSat.value = 1.1 + 0.06 * gold - 0.18 * night - 0.2 * E.over;
     C.uContrast.value = 1.06 - 0.05 * E.over;
+    C.uSat.value *= (SW.K.WORLD.look.grade || {}).sat || 1;
     C.uExposure.value = 1.0 + 0.08 * night;
     // seasons tint the grade a little: fresh spring, warm autumn, cool winter
     const si = U.seasonIndex(S.season), autumn = si === 2 ? 1 : 0, winter = si === 3 ? 1 : 0, spring = si === 0 ? 1 : 0;
     C.uHi.value.setRGB(1 + 0.06 * gold - 0.04 * night + 0.03 * autumn - 0.02 * winter, 1 - 0.01 * gold - 0.02 * night + 0.01 * spring, 1 - 0.09 * gold + 0.06 * night - 0.03 * autumn + 0.03 * winter);
     C.uLo.value.setRGB(1 - 0.05 * gold - 0.08 * night - 0.02 * winter, 1 + 0.01 * gold - 0.02 * night, 1 + 0.05 * gold + 0.1 * night + 0.04 * winter);
     C.uLift.value.setRGB(0.005, 0.012, 0.025).multiplyScalar(0.5 + night);
+    // each world's own colour: Heaven warmer and brighter, Hell ember-red, and so on
+    if (GR.hi) { C.uHi.value.r *= GR.hi[0]; C.uHi.value.g *= GR.hi[1]; C.uHi.value.b *= GR.hi[2]; }
+    if (GR.lo) { C.uLo.value.r *= GR.lo[0]; C.uLo.value.g *= GR.lo[1]; C.uLo.value.b *= GR.lo[2]; }
     C.uTime.value = S.t;
     C.uCamPos.value.copy(camera.position); C.uCamFwd.value.copy(camFwd);
     const tod = S.tod, morning = (1 - smooth(0.06, 0.2, tod)) * smooth(0.0, 0.02, tod) + smooth(0.97, 1.0, tod);

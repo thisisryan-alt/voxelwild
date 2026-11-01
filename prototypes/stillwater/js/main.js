@@ -94,6 +94,13 @@
     ['squirrel', 'Red squirrels', 'They scamper among the roots and run up the trunk of the old tree.', 'Row to Old Tree Isle by day.'],
     ['hare', 'Hares', 'Bigger and quicker than rabbits, with black-tipped ears. They race between the stones.', 'Row to the Standing Stones.'],
     ['plover', 'Plovers', 'Tiny shorebirds that run along the tideline, stop, and run again.', 'Row to Dune Isle and watch the water’s edge.'],
+    ['dove', 'Doves', 'White doves that hop between the cloud trees and the pillars, and sing.', 'Grow cloud trees in Heaven.'],
+    ['swan', 'Swans', 'They glide on the sea of cloud around the islands of Heaven.', 'Look around the shores in Heaven.'],
+    ['cygnets', 'Cygnets', 'Grey and fluffy, they follow their parents in a line across the clouds.', 'Watch the swans in Heaven.'],
+    ['pegasus', 'Winged horses', 'They graze the high meadow and lift their white wings as they walk.', 'Row to High Meadow in Heaven.'],
+    ['firebird', 'Fire birds', 'Birds of flame wheeling slowly over the lava sea.', 'Look up in Hell.'],
+    ['salamander', 'Salamanders', 'Black and ember-spotted, they bask on the warm stone and dart away.', 'Look along the shores in Hell.'],
+    ['lavafish', 'Lava fish', 'A glowing fish that leaps from the lava in a shower of sparks.', 'Watch the lava sea in Hell.'],
     ['fishing', 'Fishing', 'A float on the water, a long wait, a tug. Every fish goes back. Each world has its own, and a few are rare.', 'Choose Go fishing under Water, and tap open water.'],
     ['bat', 'Bats', 'They come out at dusk and flit in loops over the water, catching moths.', 'Wait for evening in Lantern Bay.'],
     ['flamingo', 'Flamingos', 'Pink and very upright, they wade the warm flats in a small flock.', 'Row to Flamingo Flats in Coral Cays. Tap one to see it dance.'],
@@ -376,6 +383,8 @@
   function stepAshore() {
     const sh = L.shoreNear(3.2);
     if (!sh) { toast('Row up alongside a shore first.', 3, true); return false; }
+    const landI = W.islandAt(sh.x, sh.z);
+    if (!islandOpen(landI.id)) { toast(landI.name + ' opens when your garden here reaches ✿ ' + islandNeed(landI.id) + '.', 4, true); return false; }
     L.stopRowing();
     $('tripBar').hidden = true;
     const I = W.islandAt(sh.x, sh.z);
@@ -497,28 +506,80 @@
     GD.remove(it); A.remove(); saveSoon();
   }
 
+  // ------------------------------------------------------------------- bloom
+  // Your profile keeps the best bloom each world's garden has reached. A world's bloom opens its items and
+  // islands; all your worlds' bloom together opens new worlds. Once open, things stay open.
+  const WID = K.WORLD.id;
+  const profile = Object.assign({ best: {}, told: {} }, SW.store.get('profile', {}));
+  profile.best = profile.best || {}; profile.told = profile.told || {};
+  let bloom = 0, bloomVer = -1, bloomT = 0;
+  const worldBloom = () => Math.max(bloom, profile.best[WID] || 0);
+  const totalBloom = () => K.WORLD_ORDER.reduce((sum, id) => sum + (id === WID ? worldBloom() : profile.best[id] || 0), 0);
+  const itemNeed = (k) => { const e = K.WORLD.items.find((x) => x[0] === k); return e ? e[1] : Infinity; };
+  const itemOpen = (k) => !!SPECIAL[k] || itemNeed(k) <= worldBloom();
+  const islandNeed = (id) => (id === 'home' ? 0 : (K.WORLD.islands.find((I) => I.id === id) ? (K.WORLD.islandBloom || {})[id] || 0 : 0));
+  const islandOpen = (id) => islandNeed(id) <= worldBloom();
+  const worldOpen = (id) => id === WID || (K.WORLDS[id].unlock || 0) <= totalBloom();
+  function updateBloom(force) {
+    if (!GD || (!force && GD.version === bloomVer)) return;
+    bloomVer = GD.version;
+    bloom = GD.bloom();
+    if (bloom > (profile.best[WID] || 0)) { profile.best[WID] = bloom; SW.store.set('profile', profile); }
+    $('bloomVal').textContent = worldBloom();
+    // announce what has just opened, once each; on a first visit everything already open is simply noted
+    const first = !profile.told['seen:' + WID];
+    const items = [], isles = [], worlds = [];
+    for (const [k] of K.WORLD.items) if (GD.CAT[k] && itemOpen(k) && !profile.told['i:' + WID + ':' + k]) { profile.told['i:' + WID + ':' + k] = 1; items.push(toolInfo(k).label); }
+    for (const I of K.ISLANDS) if (I.id !== 'home' && islandOpen(I.id) && !profile.told['l:' + I.id]) { profile.told['l:' + I.id] = 1; isles.push(I.name); }
+    for (const id of K.WORLD_ORDER) if (worldOpen(id) && !profile.told['w:' + id]) { profile.told['w:' + id] = 1; worlds.push(K.WORLDS[id].name); }
+    profile.told['seen:' + WID] = 1;
+    SW.store.set('profile', profile);
+    if (first || !S.started) return;
+    if (items.length) toast('Your garden is blooming. New in the tray: ' + items.join(', ') + '.', 6);
+    if (isles.length) toast((isles.length > 1 ? isles.join(' and ') + ' are' : isles[0] + ' is') + ' open now. Row there from Islands.', 6);
+    if (worlds.length) toast('A new world is open: ' + worlds.join(', ') + '. Sail there from Islands.', 7);
+    if (items.length || isles.length || worlds.length) { A.bloom(); renderDrawer(); }
+  }
+  function renderBloom() {
+    const wb = worldBloom(), tb = totalBloom();
+    const nextItems = K.WORLD.items.filter(([k, n]) => GD.CAT[k] && n > wb).slice(0, 4).map(([k, n]) => `<li><span>${toolInfo(k).label}</span><span class="need">✿ ${n}</span></li>`);
+    const nextIsles = K.ISLANDS.filter((I) => I.id !== 'home' && !islandOpen(I.id)).sort((a, b) => islandNeed(a.id) - islandNeed(b.id)).slice(0, 3).map((I) => `<li><span>${I.name}</span><span class="need">✿ ${islandNeed(I.id)}</span></li>`);
+    const nextWorlds = K.WORLD_ORDER.filter((id) => !worldOpen(id)).map((id) => `<li><span>${K.WORLDS[id].name}</span><span class="need">✿ ${K.WORLDS[id].unlock} in all</span></li>`);
+    const nextUnlock = [...K.WORLD.items.filter(([k, n]) => GD.CAT[k] && n > wb).map((e) => e[1]), ...K.ISLANDS.map((I) => islandNeed(I.id)).filter((n) => n > wb)].sort((a, b) => a - b)[0];
+    $('bloomBody').innerHTML =
+      `<p class="bloom-big">✿ ${wb}<span>your garden in ${K.WORLD.name}${bloom < wb ? ' (best ' + wb + ', now ' + bloom + ')' : ''}</span></p>` +
+      (nextUnlock ? `<div class="bloom-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${nextUnlock}" aria-valuenow="${wb}"><span style="width:${Math.min(100, wb / nextUnlock * 100).toFixed(1)}%"></span></div>` : '') +
+      `<p class="opt-sub">All your worlds together: ✿ ${tb}</p>` +
+      (nextItems.length ? `<h3 class="pop-sub">Next in the tray</h3><ul class="bloom-list">${nextItems.join('')}</ul>` : '<p class="opt-sub">Everything this world grows is in your tray.</p>') +
+      (nextIsles.length ? `<h3 class="pop-sub">Islands still to open</h3><ul class="bloom-list">${nextIsles.join('')}</ul>` : '') +
+      (nextWorlds.length ? `<h3 class="pop-sub">Worlds still to open</h3><ul class="bloom-list">${nextWorlds.join('')}</ul>` : '') +
+      '<p class="pop-note">Bloom grows with every plant and build in this world’s garden. Trees and big builds count most, and every new kind adds a little more, so variety blooms fastest. What opens stays open, even if you tidy things away.</p>';
+  }
+
   // -------------------------------------------------------------------- tools
-  const TOOLS = {
-    trees: ['oak', 'maple', 'birch', 'cherry', 'apple', 'willow', 'pine', 'palm'],
-    plants: ['flowers', 'tulips', 'lavender', 'sunflower', 'fern', 'mushroom', 'bush', 'bamboo'],
-    water: ['lily', 'reeds', 'coral', 'pebble', 'skip', 'fish'],
-    decor: ['lantern', 'chime', 'bench', 'campfire', 'cairn', 'birdhouse', 'hive', 'stones', 'cabin', 'pavilion', 'windmill'],
-    rituals: ['letgo', 'grateful', 'tidy'],
-  };
+  // The tray offers what this world grows, in the order it opens up (see PROGRESS in core.js).
+  const TOOLS = { trees: [], plants: [], water: [], decor: [], rituals: ['letgo', 'grateful', 'tidy'] };
+  const catOf = (k) => { const d = GD.CAT[k]; return !d || d.cat === 'rituals' ? null : d.tree ? 'trees' : d.cat === 'plants' ? 'plants' : d.cat === 'water' ? 'water' : 'decor'; };
+  function buildTools() {
+    for (const c of ['trees', 'plants', 'water', 'decor']) TOOLS[c].length = 0;
+    for (const [k] of K.WORLD.items) { const c = catOf(k); if (c) TOOLS[c].push(k); }
+    TOOLS.water.push('pebble', 'skip', 'fish');
+    tool = TOOLS.trees.find((k) => itemOpen(k)) || TOOLS.plants[0] || 'pebble';
+  }
   const SPECIAL = {
     pebble: { label: 'Pebble', swatch: '#8e938f' }, skip: { label: 'Skip a stone', swatch: '#b8bcb8' }, fish: { label: 'Go fishing', swatch: '#d8402e' },
     letgo: { label: 'Let something go', swatch: '#ffc070' }, grateful: { label: 'Something good', swatch: '#faf3e0' },
     tidy: { label: 'Tidy away', swatch: '#c9d3d8' },
   };
-  let tool = 'oak', openCat = null;
+  let tool = 'pebble', openCat = null;
   const toolInfo = (k) => SPECIAL[k] || GD.CAT[k];
   function renderDrawer() {
     const d = $('drawer');
     if (!openCat) { d.hidden = true; return; }
     d.hidden = false;
     d.innerHTML = TOOLS[openCat].map((k) => {
-      const ti = toolInfo(k);
-      return `<button class="chip item" data-kind="${k}" aria-pressed="${k === tool}"><span class="vox" style="--c:${ti.swatch}"></span>${ti.label}</button>`;
+      const ti = toolInfo(k), open = itemOpen(k);
+      return `<button class="chip item${open ? '' : ' locked'}" data-kind="${k}" aria-pressed="${k === tool}"${open ? '' : ` aria-label="${ti.label}, opens at ${itemNeed(k)} bloom"`}><span class="vox" style="--c:${ti.swatch}"></span>${ti.label}${open ? '' : `<span class="need">✿ ${itemNeed(k)}</span>`}</button>`;
     }).join('');
     d.querySelectorAll('.item').forEach((b) => b.addEventListener('click', () => chooseTool(b.dataset.kind)));
   }
@@ -531,6 +592,7 @@
     });
   }
   function chooseTool(k) {
+    if (!itemOpen(k)) { toast(toolInfo(k).label + ' opens when your garden here reaches ✿ ' + itemNeed(k) + '. Every new plant and build adds bloom.', 5, true); return; }
     if (k === 'letgo' || k === 'grateful') { openComposer(k); return; }
     if (SW.walk.active) { actHere(k); return; }
     if (k !== 'fish' && L.fishing()) L.reelIn();
@@ -600,14 +662,16 @@
     const from = W.island, dist = (I) => Math.hypot(I.x - from.x, I.z - from.z);
     const rowLabel = (d) => (d < 75 ? 'A short row' : d < 150 ? 'A gentle row' : 'A long row');
     $('islandList').innerHTML = K.ISLANDS.slice().sort((a, b) => dist(a) - dist(b)).map((I) => {
-      const here = I === W.island;
-      return `<li class="isle${here ? ' here' : ''}"><span class="opt-name">${I.name}${here ? '' : ` <span class="isle-far">· ${rowLabel(dist(I))}</span>`}</span><span class="opt-sub">${I.line}</span>` +
-        (here ? '<span class="isle-here">You are here</span>' : `<span class="isle-go"><button class="btn small" data-row="${I.id}">Row there</button><button class="btn small ghost" data-look="${I.id}">Look now</button></span>`) + '</li>';
+      const here = I === W.island, open = islandOpen(I.id);
+      const go = open ? `<button class="btn small" data-row="${I.id}">Row there</button>` : `<span class="isle-lock">Opens at ✿ ${islandNeed(I.id)}</span>`;
+      return `<li class="isle${here ? ' here' : ''}${open ? '' : ' locked'}"><span class="opt-name">${I.name}${here ? '' : ` <span class="isle-far">· ${rowLabel(dist(I))}</span>`}</span><span class="opt-sub">${I.line}</span>` +
+        (here ? '<span class="isle-here">You are here</span>' : `<span class="isle-go">${go}<button class="btn small ghost" data-look="${I.id}">Look now</button></span>`) + '</li>';
     }).join('');
     $('worldList').innerHTML = K.WORLD_ORDER.filter((id) => id !== K.WORLD.id).map((id) => {
       const WD = K.WORLDS[id];
-      return `<li class="isle world"><span class="opt-name">${WD.name} <span class="isle-far">· ${WD.short}</span></span><span class="opt-sub">${WD.line}</span>` +
-        `<span class="isle-go"><button class="btn small" data-sail="${id}">Sail there</button></span></li>`;
+      const open = worldOpen(id);
+      return `<li class="isle world${open ? '' : ' locked'}"><span class="opt-name">${WD.name} <span class="isle-far">· ${WD.short}</span></span><span class="opt-sub">${WD.line}</span>` +
+        `<span class="isle-go">${open ? `<button class="btn small" data-sail="${id}">Sail there</button>` : `<span class="isle-lock">Opens when all your worlds together reach ✿ ${WD.unlock}</span>`}</span></li>`;
     }).join('');
     $$('[data-sail]').forEach((b) => b.addEventListener('click', () => sailTo(b.dataset.sail)));
     $$('[data-row]').forEach((b) => b.addEventListener('click', () => rowTo(b.dataset.row)));
@@ -618,6 +682,7 @@
   function sailTo(id) {
     const WD = K.WORLDS[id];
     if (!WD || id === K.WORLD.id) return;
+    if (!worldOpen(id)) { toast(WD.name + ' opens when all your worlds together reach ✿ ' + WD.unlock + '.', 4, true); return; }
     closePops();
     if (SW.walk.active) stopWalking();
     saveNow();
@@ -643,6 +708,7 @@
   }
   function rowTo(id) {
     closePops();
+    if (!islandOpen(id)) { toast(K.ISLAND[id].name + ' opens when your garden here reaches ✿ ' + islandNeed(id) + '.', 4, true); return; }
     if (L.trip()) return;
     if (cam.mode === 'look' || cam.view === 'sky') { setView('island'); }
     const tr = L.travel(id);
@@ -851,6 +917,7 @@
     }));
     $('btnJournal').addEventListener('click', () => openPanel('panelJournal'));
     $('btnIslands').addEventListener('click', () => { renderIslands(); togglePop('popIslands'); });
+    $('btnBloom').addEventListener('click', () => { updateBloom(true); renderBloom(); togglePop('popBloom'); });
     $('tripSkip').addEventListener('click', () => { if (L.rowing()) stepAshore(); else L.arriveNow(); });
     $('btnBoatOut').addEventListener('click', () => takeBoat());
     $('btnWalk').addEventListener('click', () => { closePops(); if (SW.walk.active) stopWalking(); else startWalking(); });
@@ -953,7 +1020,7 @@
     const t = S.t;
     if (window.innerWidth !== lastW || window.innerHeight !== lastH) { lastW = window.innerWidth; lastH = window.innerHeight; W.resize(); }
     const rate = (prefs.flow === 'slow' ? 0.4 : prefs.flow === 'still' ? 0 : 1) * (LOOK.daySpeed || 1), dd = dt * rate / K.DAY_LEN;
-    S.tod = (S.tod + dd) % 1; S.day += dd;
+    S.tod = LOOK.todLock != null ? LOOK.todLock : (S.tod + dd) % 1; S.day += dd;   // Heaven and Hell keep one hour
     if (LOOK.season != null) S.season = LOOK.season;   // some worlds keep to one season
     else if (prefs.season === 'auto') S.season = (S.season + dd) % 4;
     else {
@@ -998,6 +1065,8 @@
     }
     updateToast();
     flushSeen(dt);
+    bloomT -= dt;
+    if (bloomT <= 0) { bloomT = 1; updateBloom(false); }
     watchFrameRate(now, dt);
     clockSync -= dt;
     if (clockSync <= 0) {
@@ -1057,6 +1126,7 @@
     const ws = (data && data.world) || SW.store.get(SW.store.w('world'), null);
     if (ws) { S.tod = ws.tod; S.day = ws.day; S.season = ws.season; S.island = K.ISLAND[ws.island] ? ws.island : 'home'; }
     else if (LOOK.tod0 != null) S.tod = LOOK.tod0;
+    if (LOOK.todLock != null) S.tod = LOOK.todLock;
     if (LOOK.season != null) S.season = LOOK.season;
     showWorldTitle();
     try { W.init(); } catch (e) { noGL('Stillwater needs WebGL, which this browser has turned off.'); return; }
@@ -1070,7 +1140,9 @@
     if (!items && K.WORLD.id === 'stillwater') { const v1 = SW.store.get('garden.v1', null); if (Array.isArray(v1) && v1.length) items = v1.map((r, i) => Object.assign({ id: i + 1 }, r)); }
     GD.reset(items && items.length ? items : GD.starter(), (data && data.wildGone) || SW.store.get(SW.store.w('wildGone'), []));
     W.setIsland(S.island);
+    buildTools();
     bindInput(); bindUI();
+    updateBloom(true); buildTools();
     renderCats();
     $('btnBreath').setAttribute('aria-pressed', String(prefs.guide));
     W.resize();

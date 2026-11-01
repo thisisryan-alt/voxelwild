@@ -6,8 +6,8 @@ fonts from Google Fonts; everything else is in `js/`.
 
 ## What is out there
 
-- **Four worlds**, each its own sea with its own islands, weather, music and garden. Sail between them
-  from the Islands menu; your journal comes with you.
+- **Six worlds**, each its own sea with its own islands, weather, music, garden and things to plant and
+  build. Sail between them from the Islands menu; your journal comes with you.
   - **Stillwater**, the original archipelago of seventeen islands (below).
   - **Lantern Bay**, an evening lagoon where the days pass slowly: paper lanterns drift on the water
     and the nearest light it after dusk, houses stand on stilts over the shallows of Stilt Village, a lit pagoda crowns Pagoda Hill, cranes
@@ -18,6 +18,23 @@ fonts from Google Fonts; everything else is in `js/`.
   - **Coral Cays**, always summer: white sand and turquoise shallows, a coral lagoon of reef fish,
     flamingos on Flamingo Flats, plovers on Turtle Beach, a bamboo-covered Jungle Hill, and a pod of
     dolphins that surfaces offshore now and then.
+  - **Heaven**, islands of white and gold floating above a sea of cloud in an endless bright morning:
+    little islets drift overhead, gold motes float on the air, light comes down in shafts and a halo
+    rings the sun. Doves, swans and cygnets on Swan Lagoon, winged horses on High Meadow, a ring of
+    pillars at the Temple, Golden Fields and a harp on top of Harp Hill. Cloud trees, gold flowers,
+    marble pillars, fountains, harps and halo arches to build with.
+  - **Hell**, black rock and ash above a slow sea of lava under an ember sky and a blood moon. The lava
+    crusts over and splits into glowing veins, ember light seams the rock, the air shimmers with heat
+    and sparks rise. Fire birds wheel overhead, salamanders bask on the warm stone, lava fish leap in
+    showers of sparks, and bats come out. Ash trees with glowing embers, fire blooms, braziers,
+    obsidian spires and ember lanterns to build with. Strangely peaceful.
+- **Bloom and unlocking:** everything you plant or build adds to your world's **bloom** (the ✿ chip at
+  the top). Trees and big builds count most, each more of the same kind a little less than the last,
+  and every different kind adds a bonus, so a varied garden blooms fastest. Each world's best bloom is
+  saved to your profile and never goes down. A world's bloom opens its islands and its other plants and
+  builds one by one; the bloom of all your worlds together opens new worlds: Lantern Bay at 150, Frost
+  Fjord at 250, Coral Cays at 350, Heaven at 480 and Hell at 620. Locked things show what they need, and
+  the bloom panel lists what opens next.
 - **Seventeen islands in Stillwater:** Home Island (your garden, the pond and the dock), Pine Isle (steep, rocky, deer),
   Blossom Isle (cherry trees around a pavilion), Meadow Isle (sheep, wildflowers and a turning windmill),
   Palm Atoll (a sand ring around a coral lagoon with reef fish), Seal Rocks (seals and puffins), Wreck
@@ -44,13 +61,16 @@ fonts from Google Fonts; everything else is in `js/`.
   water or a shore sets a course, which finds its way round any land in between. The boat glides to a
   stop before it would run aground; *Step ashore* (or R) lands you wherever there is beach alongside.
   You can fish from the boat. Visitors, weather, shadows and lights follow you.
-- **Garden:** 8 trees (oak, maple, birch, cherry, apple, willow, pine, palm), 9 plants (wildflowers,
-  tulips, lavender, sunflowers, ferns, mushrooms, berry bush, bamboo, dune grass) and 2 water plants (lily
-  pads with lotus, reeds). Trees grow by recursive branching over about 30 seconds; apple trees blossom
-  in spring and carry green, then red, apples.
+- **Garden:** each world has its own catalog. Stillwater has 8 trees (oak, maple, birch, cherry, apple,
+  willow, pine, palm), 9 plants (wildflowers, tulips, lavender, sunflowers, ferns, mushrooms, berry bush,
+  bamboo, dune grass) and 2 water plants (lily pads with lotus, reeds). Lantern Bay adds lantern posts,
+  bonsai and moon gates; Frost Fjord snowy pines, snowmen, ice crystals, igloos and sleds; Coral Cays
+  hibiscus, tiki torches, hammocks and beach huts; Heaven and Hell their own (above). Trees grow by
+  recursive branching over about 30 seconds; apple trees blossom in spring and carry green, then red,
+  apples.
 - **Build:** stone lantern, wind chime, bench, campfire, stone stack, birdhouse, beehive (bees come out
   to visit the flowers nearby), stepping stones, cabin with a smoking chimney and lit windows, pavilion
-  and windmill. Coral can be planted on the sea floor.
+  and windmill, plus each world's own. Coral can be planted on the sea floor.
 - **Seasons:** one season per in-game day. Leaves turn and fall, cherry petals drift in spring, flowers rest
   in winter, snow settles on the ground and the pines.
 - **Weather:** clear, cloudy, rain (with rings on the water), fog and snow, changing on its own or set by
@@ -59,7 +79,9 @@ fonts from Google Fonts; everything else is in `js/`.
 - **Visitors:** koi, pond goldfish, butterflies, gulls, songbirds, ducks with ducklings, frogs, rabbits,
   crabs, a heron, dragonflies, an owl, a cat asleep on the dock, a sea turtle, leaping fish, sheep, deer,
   seals, puffins, reef fish, cranes that dance, bees, cormorants drying their wings, red squirrels,
-  hares, plovers, a whale and a passing sailboat. Many can be tapped. A lighthouse turns its beam at dusk.
+  hares, plovers, a whale and a passing sailboat, and in the other worlds bats, flamingos, dolphins,
+  reindeer, a snowy owl, arctic hares, doves, swans, winged horses, fire birds, salamanders and lava
+  fish. Many can be tapped. A lighthouse turns its beam at dusk.
 - **Fishing:** choose Go fishing under Water and tap open water to cast (or press it while walking).
   After a wait and a nibble or two the float dips: tap again to catch the fish, which leaps out and goes
   straight back. Each world has its own fish, a few of them rare; the journal counts what you have let go.
@@ -73,12 +95,14 @@ fonts from Google Fonts; everything else is in `js/`.
 - **Sound:** all synthesised live, with a mixer for waves, wind, rain, wildlife, frogs and crickets, fire,
   chimes, music, the waterfall and springs, and footsteps. Each world sounds like itself: a temple bell
   across Lantern Bay and insects from early evening, a colder wind and creaking ice in Frost Fjord,
-  tropical birdsong and cicadas in Coral Cays.
-- **Journal:** field notes for 84 visitors, sights, worlds and places, the good things you have written, and the research
+  tropical birdsong and cicadas in Coral Cays, harp runs and bright chords in Heaven, and the low rumble
+  and bubbling of the lava under darker chords in Hell.
+- **Journal:** field notes for 103 visitors, sights, worlds and places, the good things you have written, and the research
   behind each design choice.
 
-Each world's garden, tidied wild plants, current island and time of day, plus the journal, settings and
-the last world visited, are saved in the browser's local storage.
+Each world's garden, tidied wild plants, current island and time of day, plus your profile (each
+world's best bloom), the journal, settings and the last world visited, are saved in the browser's local
+storage.
 
 **Keys:** WASD or arrows walk, or row when out in the boat · R take the boat out or step ashore · F go fishing, and strike when the float dips · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
 
@@ -86,14 +110,14 @@ the last world visited, are saved in the browser's local storage.
 
 | File | Contents |
 |---|---|
-| `js/core.js` | The worlds and their islands, constants, noise, seasonal palettes, storage, shared state |
+| `js/core.js` | The worlds, their islands, looks, catalogs and unlocks; constants, noise, seasonal palettes, storage, shared state |
 | `js/world.js` | Renderer, sky (sun, moon, stars, aurora, rainbow), weather, archipelago terrain, water, lighthouse, clouds, dock and jetties |
-| `js/garden.js` | Voxel growth system, seasonal recolouring, plant and building catalog, wild island growth, placement rules |
+| `js/garden.js` | Voxel growth system, seasonal recolouring, plant and building catalog, wild island growth, placement rules, bloom |
 | `js/life.js` | Creatures, the rowboat, windmill sails, particles, sky lanterns, skipping stones |
 | `js/audio.js` | Synthesised soundscape and mixer |
 | `js/post.js` | The rendering pipeline: sea reflections, ambient occlusion, bloom, sun shafts, mist, grading, depth of field, FXAA |
 | `js/walk.js` | The walking figure, footing, A* pathfinding, sitting and soaking |
-| `js/main.js` | Input, camera views, breathing patterns, journal, rituals, saving and UI |
+| `js/main.js` | Input, camera views, breathing patterns, journal, rituals, bloom and unlocks, saving and UI |
 
 ## Graphics
 
@@ -109,15 +133,27 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
   FXAA.
 - **Sea:** planar reflections from a mirrored camera with an oblique clip plane, refraction of the
   sea floor tinted by how much water the light passes through, sun glints, whitecaps in wind, shore
-  foam, rain rings, ripples and night glow.
+  foam, lines of surf that roll in to the beaches, light through the backs of the waves, rain rings,
+  ripples and night glow.
+- **Cloud sea** (Heaven): billowing ridged noise with lit tops and soft blue creases, shaded from
+  its own normals, brightening everything above it from below.
+- **Lava sea** (Hell): a dark crust that drifts and cracks into glowing HDR veins, lighting the rock
+  from below; heat shimmer in the grade, ember light in seams through the rock, and sparks thrown up
+  by anything that touches it.
 - **Blocks:** per-pixel lighting, per-face shading, darkened block edges, a fine procedural grain,
-  grass that wraps over the top of a block's sides, damp sand at the waterline, wet sheen in rain,
-  and leaves that glow when the sun is behind them.
-- **Sky:** a horizon haze band, a warm glow on the sun's side at golden hour, an HDR sun disk,
-  drifting high cirrus, varied stars, a phased moon, aurora and rainbows. Voxel clouds have their own
-  shader with sunlit tops, cool undersides and silver linings.
-- **Meadow grass:** thousands of swaying blade tufts that change with the seasons and part around
-  paths and buildings.
+  grass that wraps over the top of a block's sides, meadows that drift between lush and sun-faded
+  patches, damp sand at the waterline, wet sheen in rain, and leaves that glow when the sun is
+  behind them.
+- **Sky:** a horizon haze band, a band of soft cumulus along the horizon, a warm glow on the sun's
+  side at golden hour, an HDR sun disk, drifting high cirrus, varied stars, a phased moon, aurora and
+  rainbows; a halo round Heaven's sun, and smoke lit from below with a blood moon in Hell. Voxel clouds
+  have their own shader with sunlit tops, cool undersides and silver linings.
+- **Each world its own light:** sky and light colours, fog distance and colour grade are set per world
+  (a cool grade for Frost Fjord, a saturated one for Coral Cays, strong sun shafts and soft bloom in
+  Heaven, heavy bloom and heat in Hell), with drifting motes in the air: gold in Heaven, embers and ash
+  in Hell, dust and diamond dust elsewhere.
+- **Meadow grass:** thousands of swaying blade tufts that change with the seasons, are flecked with
+  wildflowers in spring and summer, and part around paths and buildings.
 - **Wind and cloud:** gusts roll across the islands as travelling patches of stronger wind that flatten
   the grass (which catches the light as it bends) and toss the trees. Each cloud casts a soft shadow,
   projected along the sun's rays, that drifts over land, grass and sea; under it the water loses its
@@ -137,7 +173,7 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
 | Paced breathing near 6/min, long exhale | The world follows the breathing pattern; optional on-screen guide | Lehrer & Gevirtz 2014, *Front. Psychol.*; Zaccaro et al. 2018, *Front. Hum. Neurosci.* |
 | Cyclic sighing | One of the breathing patterns | Balban et al. 2023, *Cell Rep. Med.* |
 | Water and nature scenes | Island in a calm sea, plants, slow day–night cycle; night is deep blue | White et al. 2010, *J. Environ. Psychol.*; Ulrich et al. 1991, *J. Environ. Psychol.* |
-| Soft fascination, being away, extent | Clouds and their drifting shadows, koi, fireflies, falling leaves; four worlds, seventeen islands in the first, a slow row between them and paths to walk give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
+| Soft fascination, being away, extent | Clouds and their drifting shadows, koi, fireflies, falling leaves; six worlds, seventeen islands in the first, a slow row between them and paths to walk give a world worth wandering | Kaplan 1995, *J. Environ. Psychol.*; Berman, Jonides & Kaplan 2008, *Psychol. Sci.* |
 | Watching animals | Koi, reef fish, seals, otters, cranes, squirrels, turtle, ducks, whale | Cracknell et al. 2016, *Environ. Behav.* |
 | Mid-complexity fractals | Recursive tree branching; layered-noise clouds | Taylor et al. 2011, *Front. Hum. Neurosci.*; Hagerhall et al. 2008, *Perception* |
 | Natural sound | Surf, rain, wind, birds, frogs, crickets | Alvarsson, Wiens & Nilsson 2010, *IJERPH*; Gould van Praag et al. 2017, *Sci. Rep.* |
@@ -150,7 +186,7 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
 | Gratitude | Something good → a glowing flower | Seligman et al. 2005, *Am. Psychol.*; Emmons & McCullough 2003, *J. Pers. Soc. Psychol.* |
 | Discarding thoughts | Let something go → a sky lantern | Briñol, Gascó, Petty & Horcajo 2013, *Psychol. Sci.* |
 | Short meditation | Sit for 3–20 minutes | Goyal et al. 2014, *JAMA Intern. Med.* |
-| No evaluative threat | No score, timer, failure state or audience; the journal is not a checklist | Dickerson & Kemeny 2004, *Psychol. Bull.* |
+| No evaluative threat | No timer, failure state or audience; the journal is not a checklist. Bloom is the one number: it only opens things, and what it opens stays open | Dickerson & Kemeny 2004, *Psychol. Bull.* |
 | Low-demand nurturing task | Gardening as the main verb | Van Den Berg & Custers 2011, *J. Health Psychol.*; Russoniello, O'Brien & Parks 2009, *J. CyberTherapy & Rehabil.* |
 | Cool, low-saturation colours | Blue/green palette; warm light at golden hour | Valdez & Mehrabian 1994, *J. Exp. Psychol. Gen.* |
 

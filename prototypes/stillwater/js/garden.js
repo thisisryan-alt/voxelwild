@@ -40,6 +40,11 @@
     apple: pal4([0xfaeef2, 0xf4d8e2, 0xfdf6f8, 0x9fcf6a, 0xeccad6], [0x6a9e52, 0x5f9449, 0x77aa5c, 0x84b465], [0xc9b04a, 0xb89a3a, 0x9aa548, 0xd8a03e], null),
     fruit: pal4(null, [0x9cc45a, 0xa8cc62], [0xd8402e, 0xc8302a, 0xe25a34, 0xb82a26], null),
     bambooLeaf: pal4([0x9cc860, 0x8abd55, 0xa8d06c], [0x7fb04e, 0x6fa244, 0x8aba58], [0x9fb04e, 0x8aa048, 0xb0b45a], [0x7c9e52, 0x6c8e48, 0xe8eef0]),
+    cloudleaf: pal4(...Array(4).fill([0xfbf8ee, 0xf4eedc, 0xfff6d8, 0xf6e7b8, 0xeef2f4])),
+    goldpetal: pal4(...Array(4).fill([0xf4cf5a, 0xf8dc7a, 0xe8bc48])),
+    emberleaf: pal4(...Array(4).fill([0x5a1c14, 0x7a2416, 0x3a1410, 0x8a3a1a, 0x2a1210])),
+    hibiscus: pal4([0x5f9a4e, 0x4f8c44], [0x4f8c44, 0x5f9a4e, 0x46803c], [0x6a8a44], [0x5a7a44]),
+    bonsai: pal4(...Array(4).fill([0x3f6b4a, 0x47775a, 0x365e40, 0x4f8058])),
     ancient: pal4([0x9ccb62, 0x8cc058, 0xaad470, 0x7fb352], [0x5e8e4a, 0x6a9a52, 0x527f42, 0x76a45c], [0xd99a3a, 0xc97a2e, 0xb8642a, 0xe0b44a, 0xa0782c], null),
   };
   const PETALS = [[0xb9a6e0, 0xd6caf0], [0xf6f2ea, 0xfdfbf6], [0xf2d98d, 0xf7e6ad], [0x9cc8e8, 0xc2def2], [0xeeb0bf, 0xf6ccd6], [0xf4a6a0, 0xf9c8c0]];
@@ -161,7 +166,7 @@
       const ix = Math.round(x / TS), iy = Math.round(y / TS), iz = Math.round(z / TS);
       if (iy < 0) return;
       const key = ix + ',' + iy + ',' + iz, cur = map.get(key);
-      if (cur) { if (cur.type === 'l' && (type === 'w' || type === 'f')) { cur.type = type; cur.order = Math.min(cur.order, order); } return; }
+      if (cur) { if (cur.type === 'l' && (type === 'w' || type === 'f' || type === 'e')) { cur.type = type; cur.order = Math.min(cur.order, order); } return; }
       map.set(key, { ix, iy, iz, type, order });
     };
     const leaves = (cx, cy, cz, order) => {
@@ -200,6 +205,7 @@
       const x = v.ix * TS, y = v.iy * TS + TS * 0.5, z = v.iz * TS;
       if (v.type === 'w') o.vox('w', x, y, z, TS, c.wood(rng), v.order);
       else if (v.type === 'f') o.vox('l', x, y, z, TS * 0.8, c.fruit, v.order);
+      else if (v.type === 'e') o.vox('g', x, y, z, TS * 0.7, hex(U.pick(rng, c.embers)), v.order);
       else { o.vox('l', x, y, z, TS * 0.97, c.pal, v.order); top = Math.max(top, y); }
     }
     tips.sort((a, b) => b[1] - a[1]);
@@ -210,6 +216,12 @@
   }
   const mossWood = (rng) => (rng() < 0.16 ? hex(0x5f7a3e).offsetHSL(0, 0, (rng() - 0.5) * 0.06) : hex(0x5e4632).offsetHSL(0, 0, (rng() - 0.5) * 0.06));
   const TREES = {
+    cloud: { pal: 'cloudleaf', trunk: 2.3, depth: 3, spread: 0.5, ratio: 0.7, split3: 0.4, leafR: 2.8, squash: 1.5, wood: (rng) => hex(U.pick(rng, [0xf2ead8, 0xe8dcc0, 0xd8c08a])), leafSrc: 6 },
+    ash: {
+      pal: 'emberleaf', trunk: 2.0, depth: 3, spread: 0.62, ratio: 0.66, split3: 0.4, leafR: 1.7, squash: 1.3, wood: (rng) => hex(U.pick(rng, [0x2a2422, 0x1e1a1a, 0x3a302c])),
+      embers: [0xff7a2a, 0xff9a3a, 0xffb050, 0xe8501a],
+      extra(put, tips, rng, TS) { for (const [cx, cy, cz] of tips) for (let f = 0; f < 5; f++) put(cx + (rng() - 0.5) * TS * 6, cy + (rng() - 0.5) * TS * 4, cz + (rng() - 0.5) * TS * 6, 'e', 20 + f); },
+    },
     apple: {
       pal: 'apple', fruit: 'fruit', trunk: 1.5, depth: 3, spread: 0.66, ratio: 0.68, split3: 0.5, leafR: 2.2, squash: 1.35, wood: woodC(0x6a5040),
       extra(put, tips, rng, TS) {
@@ -691,8 +703,8 @@
     o.feature('hive', { x: hx, y: s * 2.8, z: hz });
     o.feature('perch', { x: 0, y: s * (top + 1.2), z: 0 });
   }
-  function moongate(o, rng, rec) {
-    const s = 0.3, k = faceK(rec.x, rec.z), R = 6;
+  function moongate(o, rng, rec, style) {
+    const s = 0.3, k = faceK(rec.x, rec.z), R = 6, marble = style === 'halo';
     const P = (x, y, z, c, ord) => { const [wx, wz] = rot(x, z, k); o.vox('w', wx * s, s * (y + 0.5), wz * s, s, c, ord); };
     // a round opening in a short stone wall, with a tiled cap
     for (let z = -R - 4; z <= R + 4; z++) for (let y = 0; y <= R * 2 + 1; y++) {
@@ -700,11 +712,16 @@
       const inWall = Math.abs(z) <= R + 1 ? d >= R - 0.3 && y <= R * 2 + 1 : y <= 5 - Math.max(0, Math.abs(z) - R - 2);
       if (!inWall || (Math.abs(z) > R + 1 && y > 5)) continue;
       if (d < R - 0.3 && Math.abs(z) <= R) continue;
-      for (const x of [0, 1]) P(x, y, z, stoneC(rng).offsetHSL(0, 0, 0.08), y + Math.abs(z) * 0.2);
+      for (const x of [0, 1]) P(x, y, z, marble ? hex(U.pick(rng, [0xf4f0e6, 0xece6d8, 0xf8f6ee])) : stoneC(rng).offsetHSL(0, 0, 0.08), y + Math.abs(z) * 0.2);
     }
     for (let z = -R - 2; z <= R + 2; z++) {
       const y = R * 2 + 2 - Math.max(0, Math.abs(z) - R + 1);
-      for (const x of [-1, 0, 1, 2]) P(x, y, z, hex(0x4a5560), 20 + Math.abs(z) * 0.2);
+      for (const x of [-1, 0, 1, 2]) P(x, y, z, hex(marble ? 0xe2c36a : 0x4a5560), 20 + Math.abs(z) * 0.2);
+    }
+    if (marble) {
+      // a ring of light just inside the opening
+      for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2, [wx, wz] = rot(0.5, Math.cos(a) * (R - 0.6), k); o.vox('g', wx * s, s * (R + 0.5 + Math.sin(a) * (R - 0.6)), wz * s, s * 0.45, hex(0xffe6a0), 24); }
+      o.feature('light', { x: 0, y: s * (R + 1), z: 0, color: 0xffe6b0, base: 0.7, distance: 9 });
     }
     o.feature('perch', { x: 0, y: s * (R * 2 + 3.2), z: 0 });
   }
@@ -777,6 +794,223 @@
     o.feature('perch', { x: 0, y: s * (y + 4.5), z: 0 });
   }
 
+  // ------------------------------------------------- each world's own things
+  // Lantern Bay: a post hung with paper lanterns, and a bonsai pine
+  function lanternpost(o, rng, rec) {
+    const s = 0.12, k = faceK(rec.x, rec.z), P = (x, y, z, layer, c, ord, size) => { const [wx, wz] = rot(x, z, k); o.vox(layer, wx * s, s * (y + 0.5), wz * s, size || s, c, ord); };
+    for (let y = 0; y < 16; y++) P(0, y, 0, 'w', hex(DARK), y);
+    for (let x = -4; x <= 4; x++) P(x, 16, 0, 'w', hex(WOOD2), 17);
+    const reds = [0xff7a4a, 0xffb060, 0xff9a5a];
+    for (const x of [-3, 0, 3]) {
+      if (x === 0 && rng() < 0.5) continue;
+      P(x, 15, 0, 'w', hex(0x3a3030), 18, s * 0.5);
+      for (let y = 12; y <= 14; y++) P(x, y, 0, 'g', hex(U.pick(rng, reds)), 19, s * (y === 13 ? 1.6 : 1.3));
+    }
+    o.feature('light', { x: 0, y: s * 13, z: 0, color: 0xff9a5a, base: 0.8, distance: 8 });
+    o.feature('perch', { x: 0, y: s * 17.2, z: 0 });
+  }
+  function bonsai(o, rng) {
+    const s = 0.1;
+    let x = 0, z = 0;
+    const lean = rng() * Math.PI * 2;
+    for (let y = 0; y < 10; y++) { if (y > 2 && y % 3 === 0) { x += Math.cos(lean) * s; z += Math.sin(lean) * s; } o.vox('w', x, s * (y + 0.5), z, s * 1.2, hex(0x5a4434), y); }
+    for (const [dy, r, dx] of [[10, 3, 0], [7, 2.4, -2.5], [8, 2.2, 2.5]]) {
+      for (let a = -Math.ceil(r); a <= r; a++) for (let b = -Math.ceil(r); b <= r; b++) {
+        if (a * a + b * b > r * r || rng() < 0.15) continue;
+        o.vox('l', x + (a + dx * Math.cos(lean + 1.6)) * s, s * (dy + 0.5), z + (b + dx * Math.sin(lean + 1.6)) * s, s, 'bonsai', 12 + Math.hypot(a, b), 0.7);
+      }
+    }
+    for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) if (Math.abs(a) + Math.abs(b) < 4) o.vox('w', a * s, s * 0.25, b * s, s, stoneC(rng), 0, 0.5);
+  }
+  // Frost Fjord: a snowman, ice crystals, an igloo and a sled
+  function snowman(o, rng) {
+    const s = 0.1, white = [0xf6f8fa, 0xeef2f6, 0xffffff];
+    let y = 0;
+    for (const r of [3.2, 2.4, 1.7]) {
+      const n = Math.ceil(r);
+      for (let a = -n; a <= n; a++) for (let b = -n; b <= n; b++) for (let c = -n; c <= n; c++) if (a * a + b * b + c * c <= r * r) o.vox('w', a * s, s * (y + n + b + 0.5), c * s, s, hex(U.pick(rng, white)), y + n + b);
+      y += n * 2 - 0.5;
+    }
+    const hy = y - 1.7;
+    o.vox('w', -0.06, s * (hy + 0.4), 0.16, s * 0.6, hex(0x1a1a1a), 30); o.vox('w', 0.06, s * (hy + 0.4), 0.16, s * 0.6, hex(0x1a1a1a), 30);
+    o.vox('w', 0, s * hy, 0.2, s * 0.6, hex(0xf08a2a), 31); o.vox('w', 0, s * hy, 0.26, s * 0.5, hex(0xf08a2a), 31);
+    for (let a = -2; a <= 2; a++) for (let c = -2; c <= 2; c++) if (Math.abs(a) === 2 || Math.abs(c) === 2) o.vox('w', a * s, s * (hy - 1.4), c * s, s, hex(0xc8382e), 32);
+    for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) o.vox('w', sx * (0.26 + i * 0.08), s * (y - 3.6 + i * 0.5), 0, s * 0.6, hex(0x5a4030), 33 + i);
+  }
+  function icecrystal(o, rng) {
+    const s = 0.12, cols = [0xd6f0fa, 0xc0e6f6, 0xe8f8fc, 0xa8dcf0];
+    const n = 4 + ((rng() * 4) | 0);
+    for (let i = 0; i < n; i++) {
+      const a = rng() * Math.PI * 2, r = i ? 0.15 + rng() * 0.3 : 0, h = (i ? 5 : 10) + ((rng() * 7) | 0), lx = (rng() - 0.5) * 0.04, lz = (rng() - 0.5) * 0.04;
+      for (let y = 0; y < h; y++) {
+        const w = y > h - 3 ? 0.55 : 1;
+        o.vox('w', Math.cos(a) * r + lx * y, s * (y + 0.5), Math.sin(a) * r + lz * y, s * w, hex(U.pick(rng, cols)), y);
+      }
+    }
+    o.vox('g', 0, s * 2, 0, s * 0.8, hex(0xbfe8ff), 2);
+    o.feature('light', { x: 0, y: 0.6, z: 0, color: 0xbfe0ff, base: 0.35, distance: 5 });
+  }
+  function igloo(o, rng, rec) {
+    const s = 0.2, k = faceK(rec.x, rec.z), R = 6, white = [0xf4f8fa, 0xe8f0f4, 0xdce8ee];
+    const P = (x, y, z, layer, c, ord) => { const [wx, wz] = rot(x, z, k); o.vox(layer, wx * s, s * (y + 0.5), wz * s, s, c, ord); };
+    for (let x = -R; x <= R; x++) for (let y = 0; y <= R; y++) for (let z = -R; z <= R; z++) {
+      const d = Math.hypot(x, y, z);
+      if (d > R + 0.4 || d < R - 0.6) continue;
+      if (x > 0 && Math.abs(z) <= 1 && y <= 2) continue;   // the doorway
+      P(x, y, z, 'w', hex(U.pick(rng, white)).offsetHSL(0, 0, (y % 2) * -0.03), y);
+    }
+    for (let x = R; x <= R + 2; x++) for (let z = -2; z <= 2; z++) for (let y = 0; y <= 3; y++) {
+      if (Math.abs(z) <= 1 && y <= 2) continue;
+      P(x, y, z, 'w', hex(U.pick(rng, white)), 8);
+    }
+    P(R - 1, 1, 0, 'g', hex(0xffc777), 9); P(R - 2, 1, 0, 'g', hex(0xffb050), 9);
+    const [lx, lz] = rot(R * s * 0.8, 0, k);
+    o.feature('light', { x: lx, y: s * 1.5, z: lz, color: 0xffb36b, base: 0.9, flicker: 0.5, distance: 7 });
+    o.feature('perch', { x: 0, y: s * (R + 1.3), z: 0 });
+  }
+  function sled(o, rng, rec) {
+    const s = 0.1, k = faceK(rec.x, rec.z) + 1, P = (x, y, z, c, ord) => { const [wx, wz] = rot(x, z, k % 4); o.vox('w', wx * s, s * (y + 0.5), wz * s, s, c, ord); };
+    for (let x = -6; x <= 6; x++) for (const z of [-3, 3]) P(x, 0, z, hex(0xb83a2e), x + 6);
+    P(7, 1, -3, hex(0xb83a2e), 14); P(7, 1, 3, hex(0xb83a2e), 14); P(8, 2, -3, hex(0xb83a2e), 15); P(8, 2, 3, hex(0xb83a2e), 15);
+    for (let x = -5; x <= 5; x += 2) for (const z of [-3, 3]) P(x, 1, z, hex(DARK), 16);
+    for (let x = -6; x <= 6; x++) for (let z = -3; z <= 3; z++) P(x, 2, z, hex(x % 2 ? WOOD : WOOD2), 18);
+    o.feature('seat', { x: 0, y: s * 3, z: 0, angle: (k % 4) * Math.PI / 2, kind: 'bench' });
+  }
+  // Coral Cays: hibiscus, a tiki torch, a hammock and a beach hut
+  function hibiscus(o, rng) {
+    const s = 0.12, n = Math.ceil(2.6);
+    for (let x = -n; x <= n; x++) for (let y = 0; y <= n; y++) for (let z = -n; z <= n; z++) {
+      const d = Math.sqrt(x * x + (y - 1) * (y - 1) * 1.4 + z * z);
+      if (d > 2.6 || rng() < 0.2) continue;
+      o.vox('l', x * s, s * (y + 0.5), z * s, s, 'hibiscus', d * 2);
+    }
+    const petal = hex(U.pick(rng, [0xe8303a, 0xf25a8a, 0xf6c040, 0xf07a3a]));
+    for (let f = 0; f < 6; f++) {
+      const a = rng() * Math.PI * 2, r = 2.2 + rng() * 0.6, fx = Math.cos(a) * r * s, fz = Math.sin(a) * r * s, fy = s * (1.5 + rng() * 2);
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) o.vox('l', fx + dx * s * 0.8, fy, fz + dz * s * 0.8, s * 0.9, petal, 10 + f);
+      o.vox('l', fx, fy + s * 0.3, fz, s * 0.5, hex(0xf6e27a), 11 + f);
+      o.feature('nectar', { x: fx, y: fy + 0.1, z: fz });
+    }
+  }
+  function tikitorch(o, rng) {
+    const s = 0.08;
+    for (let y = 0; y < 22; y++) o.vox('w', 0, s * (y + 0.5), 0, s * (y % 5 === 4 ? 1.2 : 1), hex(y % 5 === 4 ? 0x6a5030 : 0xb89a5a), y);
+    for (const [x, z] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) o.vox('w', x * s, s * 22.5, z * s, s, hex(0x5a4030), 23);
+    o.vox('g', 0, s * 24, 0, s * 1.8, hex(0xff8a3a), 24, 1.4); o.vox('g', 0, s * 25.5, 0, s * 1.1, hex(0xffc050), 25, 1.4);
+    o.feature('fire', { x: 0, y: s * 25, z: 0 });
+    o.feature('light', { x: 0, y: s * 25, z: 0, color: 0xff9a50, base: 1.1, flicker: 1, distance: 9 });
+  }
+  function hammock(o, rng, rec) {
+    const s = 0.1, k = faceK(rec.x, rec.z), P = (x, y, z, c, ord) => { const [wx, wz] = rot(x, z, k); o.vox('w', wx * s, s * (y + 0.5), wz * s, s, c, ord); };
+    for (const z of [-11, 11]) for (let y = 0; y < 14; y++) P(0, y, z, hex(y % 3 ? 0x9a7a52 : 0x8a6a46), y);
+    const stripes = [0xe86a5a, 0xf6e6c8, 0x5ab0c0];
+    for (let z = -9; z <= 9; z++) {
+      const sag = 9 - Math.round(4 * (1 - (z / 9) ** 2));
+      for (let x = -2; x <= 2; x++) P(x, sag, z, hex(stripes[(z + 9) % 3]), 14 + Math.abs(z) * 0.2);
+    }
+    for (const z of [-10, 10]) P(0, 10, z, hex(0xd8c8a8), 13);
+    o.feature('seat', { x: 0, y: s * 6, z: 0, angle: k * Math.PI / 2, kind: 'bench' });
+  }
+  function beachhut(o, rng, rec) {
+    const s = 0.2, k = faceK(rec.x, rec.z), wall = hex(U.pick(rng, [0x5ab0c0, 0xe8a05a, 0xf2e6c8])), straw = [0xd8c07a, 0xc8ac64, 0xe2cc8a];
+    const P = (x, y, z, layer, c, ord) => { const [wx, wz] = rot(x, z, k); o.vox(layer, wx * s, s * (y + 0.5), wz * s, s, c, ord); };
+    for (const x of [-3, 3]) for (const z of [-3, 3]) for (let y = 0; y < 3; y++) P(x, y, z, 'w', hex(DARK), y);
+    for (let x = -4; x <= 4; x++) for (let z = -3; z <= 3; z++) P(x, 3, z, 'w', hex(WOOD), 4);
+    for (let y = 4; y <= 7; y++) for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) {
+      const edge = Math.abs(x) === 3 || Math.abs(z) === 3;
+      if (!edge || (x === 3 && Math.abs(z) <= 1 && y <= 6)) continue;
+      P(x, y, z, 'w', wall.clone().offsetHSL(0, 0, ((x + z) % 2) * 0.04), y);
+    }
+    for (let i = 0; i <= 5; i++) for (let x = -5 + i; x <= 5 - i; x++) for (let z = -5 + i; z <= 5 - i; z++) {
+      if (i < 5 && Math.max(Math.abs(x), Math.abs(z)) < 5 - i - 1) continue;
+      P(x, 8 + i, z, 'w', hex(U.pick(rng, straw)), 10 + i);
+    }
+    o.feature('perch', { x: 0, y: s * 14, z: 0 });
+    const [ex, ez] = rot(4.4 * s, 0, k);
+    o.feature('seat', { x: ex, y: s * 4, z: ez, angle: k * Math.PI / 2, kind: 'edge' });
+  }
+  // Heaven: golden flowers, marble pillars, a fountain and a harp
+  function goldflower(o, rng) {
+    const s = 0.09, n = 3 + ((rng() * 3) | 0);
+    for (let i = 0; i < n; i++) {
+      const fx = (rng() - 0.5) * 0.8, fz = (rng() - 0.5) * 0.8, h = 4 + ((rng() * 4) | 0);
+      for (let j = 0; j < h; j++) o.vox('l', fx, s * (j + 0.5), fz, s * 0.7, 'stem', j);
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) o.vox('g', fx + dx * s, s * (h + 0.5), fz + dz * s, s, hex(U.pick(rng, [0xffd66a, 0xffe08a, 0xf8c850])), h + 1);
+      o.vox('g', fx, s * (h + 0.9), fz, s * 0.8, hex(0xfff2c0), h + 2);
+      o.feature('nectar', { x: fx, y: s * (h + 1), z: fz });
+    }
+  }
+  function pillar(o, rng) {
+    const s = 0.14, marble = [0xf6f2ea, 0xeee8dc, 0xfaf8f2], broken = rng() < 0.35, H = broken ? 12 + ((rng() * 6) | 0) : 22;
+    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) { o.vox('w', x * s, s * 0.5, z * s, s, hex(U.pick(rng, marble)), 0); if (Math.abs(x) < 2 && Math.abs(z) < 2) o.vox('w', x * s, s * 1.5, z * s, s, hex(U.pick(rng, marble)), 1); }
+    for (let y = 2; y < H; y++) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) {
+      if (Math.abs(x) === 1 && Math.abs(z) === 1) continue;
+      o.vox('w', x * s, s * (y + 0.5), z * s, s, hex(y % 6 === 0 ? 0xe2c36a : U.pick(rng, marble)), y);
+    }
+    if (!broken) for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) o.vox('w', x * s, s * (H + 0.5), z * s, s, hex(U.pick(rng, marble)), H);
+    o.feature('perch', { x: 0, y: s * (H + 1.2), z: 0 });
+  }
+  function fountain(o, rng, rec) {
+    const s = 0.16, R = 6, marble = [0xf6f2ea, 0xeee8dc, 0xfaf8f2];
+    for (let x = -R; x <= R; x++) for (let z = -R; z <= R; z++) {
+      const d = Math.hypot(x, z);
+      if (d > R + 0.4) continue;
+      o.vox('w', x * s, s * 0.5, z * s, s, hex(U.pick(rng, marble)), 0);
+      if (d > R - 0.8) o.vox('w', x * s, s * 1.5, z * s, s, hex(U.pick(rng, marble)), 1);
+      else o.vox('g', x * s, s * 1.1, z * s, s, hex(U.pick(rng, [0xbfe6f4, 0xd4f0f8, 0xa8dcee])), 2, 0.4);
+    }
+    for (let y = 1; y < 8; y++) o.vox('w', 0, s * (y + 0.5), 0, s * (y > 6 ? 1.8 : 1), hex(y === 7 ? 0xe2c36a : U.pick(rng, marble)), y + 2);
+    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; o.vox('g', Math.cos(a) * s * 1.6, s * 7.6, Math.sin(a) * s * 1.6, s * 0.5, hex(0xe8f8ff), 12); }
+    o.feature('light', { x: 0, y: s * 6, z: 0, color: 0xdff4ff, base: 0.5, distance: 7 });
+    o.feature('perch', { x: 0, y: s * 9, z: 0 });
+    o.feature('fountain', { x: 0, y: s * 7.6, z: 0 });
+  }
+  function harp(o, rng, rec) {
+    const s = 0.09, k = faceK(rec.x, rec.z), gold = hex(0xe2c36a), P = (x, y, z, layer, c, ord, size) => { const [wx, wz] = rot(x, z, k); o.vox(layer, wx * s, s * (y + 0.5), wz * s, size || s, c, ord); };
+    for (let y = 0; y < 18; y++) P(0, y, -5, 'w', gold, y);
+    for (let z = -5; z <= 4; z++) P(0, 17 - Math.round((z + 5) * 0.6 + Math.sin((z + 5) * 0.5) * 1.2), z, 'w', gold, 18 + z);
+    for (let z = -4; z <= 4; z++) P(0, Math.round(1 + (z + 5) * 0.5), z, 'w', gold, 20);
+    for (let z = -4; z <= 3; z++) { const top = 16 - Math.round((z + 5) * 0.6 + Math.sin((z + 5) * 0.5) * 1.2), bot = Math.round(2 + (z + 5) * 0.5); for (let y = bot; y < top; y++) P(0, y, z, 'g', hex(0xfff2c8), 24, s * 0.25); }
+    o.feature('chime', { x: 0, y: s * 9, z: 0 });
+    o.feature('perch', { x: 0, y: s * 19, z: 0 });
+  }
+  // Hell: fire blooms, obsidian spires, braziers and ember lanterns
+  function firebloom(o, rng) {
+    const s = 0.09, n = 3 + ((rng() * 3) | 0);
+    for (let i = 0; i < n; i++) {
+      const fx = (rng() - 0.5) * 0.8, fz = (rng() - 0.5) * 0.8, h = 3 + ((rng() * 4) | 0);
+      for (let j = 0; j < h; j++) o.vox('w', fx, s * (j + 0.5), fz, s * 0.6, hex(0x2a1a14), j);
+      for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]]) o.vox('g', fx + dx * s, s * (h + 0.5 + dy), fz + dz * s, s, hex(U.pick(rng, [0xff5a1a, 0xff7a2a, 0xffa040, 0xe8301a])), h + 1);
+      o.feature('nectar', { x: fx, y: s * (h + 1), z: fz });
+    }
+  }
+  function obsidian(o, rng) {
+    const s = 0.14, cols = [0x1a1622, 0x241c30, 0x14121a, 0x2e2440];
+    const n = 3 + ((rng() * 3) | 0);
+    for (let i = 0; i < n; i++) {
+      const a = rng() * Math.PI * 2, r = i ? 0.2 + rng() * 0.35 : 0, h = (i ? 5 : 11) + ((rng() * 6) | 0), lx = (rng() - 0.5) * 0.05, lz = (rng() - 0.5) * 0.05;
+      for (let y = 0; y < h; y++) o.vox('w', Math.cos(a) * r + lx * y, s * (y + 0.5), Math.sin(a) * r + lz * y, s * (y > h - 3 ? 0.6 : 1), hex(U.pick(rng, cols)), y);
+    }
+    for (let i = 0; i < 6; i++) { const a = rng() * Math.PI * 2; o.vox('g', Math.cos(a) * 0.35, s * 0.3, Math.sin(a) * 0.35, s * 0.6, hex(0xff5a1a), 1, 0.4); }
+  }
+  function brazier(o, rng) {
+    const s = 0.1, iron = hex(0x2a2626);
+    for (const [x, z] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) for (let y = 0; y < 6; y++) o.vox('w', x * s * (1 - y * 0.05), s * (y + 0.5), z * s * (1 - y * 0.05), s * 0.7, iron, y);
+    for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) { const d = Math.hypot(x, z); if (d > 3.3) continue; o.vox('w', x * s, s * 6.5, z * s, s, iron, 7); if (d > 2.4) o.vox('w', x * s, s * 7.5, z * s, s, iron, 8); }
+    for (let i = 0; i < 6; i++) o.vox('g', (rng() - 0.5) * s * 4, s * (7.6 + rng()), (rng() - 0.5) * s * 4, s * 1.4, hex(U.pick(rng, [0xff6a1a, 0xff9a3a, 0xffc050])), 9, 1.3);
+    o.feature('fire', { x: 0, y: s * 8, z: 0 });
+    o.feature('light', { x: 0, y: s * 9, z: 0, color: 0xff7a3a, base: 1.4, flicker: 1, distance: 12 });
+  }
+  function emberlantern(o, rng) {
+    const s = 0.12, iron = hex(0x221e1e);
+    for (let y = 0; y < 9; y++) o.vox('w', 0, s * (y + 0.5), 0, s * 0.7, iron, y);
+    for (const y of [9, 12]) for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) o.vox('w', x * s, s * (y + 0.5), z * s, s, iron, y);
+    for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (const y of [10, 11]) o.vox('w', x * s, s * (y + 0.5), z * s, s * 0.6, iron, y);
+    o.vox('g', 0, s * 10.5, 0, s * 1.6, hex(0xff5a2a), 10, 1.2);
+    o.feature('light', { x: 0, y: s * 10.5, z: 0, color: 0xff6a3a, base: 1, flicker: 0.6, distance: 9 });
+    o.feature('perch', { x: 0, y: s * 13.4, z: 0 });
+  }
+
   // ---------------------------------------------------------------- catalog
   const tree = (pal, label, swatch, extra) => Object.assign({ cat: 'trees', label, swatch, on: 'grass', rad: 1.2, solid: true, tree: true, span: 32, build: (o, rng) => branchTree(o, rng, TREES[pal]) }, extra);
   const CAT = GD.CAT = {
@@ -815,6 +1049,28 @@
     snowpine: { cat: 'scenery', label: 'Snowy pine', swatch: '#e9eff2', on: 'land', rad: 1.1, solid: true, tree: true, span: 30, build: (o, rng, rec) => pine(o, rng, rec, 'pineSnow') },
     stilthouse: { cat: 'scenery', label: 'Stilt house', swatch: '#b08a62', on: 'shore', rad: 1.5, solid: true, span: 12, build: stilthouse },
     pagoda: { cat: 'scenery', label: 'Pagoda', swatch: '#9a3a2e', on: 'land', rad: 1.6, solid: true, span: 16, footprint: 1.1, build: pagoda },
+    // each world's own
+    lanternpost: { cat: 'decor', label: 'Lantern post', swatch: '#ff9a5a', on: 'land', rad: 0.5, solid: true, span: 5, build: lanternpost },
+    bonsai: { cat: 'plants', label: 'Bonsai', swatch: '#3f6b4a', on: 'land', rad: 0.5, solid: true, span: 8, bloom: 4, build: bonsai },
+    snowman: { cat: 'decor', label: 'Snowman', swatch: '#f6f8fa', on: 'land', rad: 0.5, solid: true, span: 5, build: snowman },
+    icecrystal: { cat: 'decor', label: 'Ice crystal', swatch: '#c0e6f6', on: 'land', rad: 0.5, solid: true, span: 6, build: icecrystal },
+    igloo: { cat: 'decor', label: 'Igloo', swatch: '#e8f0f4', on: 'land', rad: 1.6, solid: true, span: 10, footprint: 1.1, build: igloo },
+    sled: { cat: 'decor', label: 'Sled', swatch: '#b83a2e', on: 'land', rad: 0.8, solid: true, span: 4, build: sled },
+    hibiscus: { cat: 'plants', label: 'Hibiscus', swatch: '#e8303a', on: 'land', rad: 0.6, solid: true, span: 8, build: hibiscus },
+    tikitorch: { cat: 'decor', label: 'Tiki torch', swatch: '#ff8a3a', on: 'land', rad: 0.3, solid: true, span: 4, build: tikitorch },
+    hammock: { cat: 'decor', label: 'Hammock', swatch: '#e86a5a', on: 'land', rad: 1.0, solid: true, span: 6, build: hammock },
+    beachhut: { cat: 'decor', label: 'Beach hut', swatch: '#5ab0c0', on: 'land', rad: 1.4, solid: true, span: 10, footprint: 0.9, build: beachhut },
+    cloudtree: tree('cloud', 'Cloud tree', '#fbf8ee'),
+    goldflower: { cat: 'plants', label: 'Golden flowers', swatch: '#f4cf5a', on: 'grass', rad: 0.45, span: 6, build: goldflower },
+    pillar: { cat: 'decor', label: 'Marble pillar', swatch: '#f6f2ea', on: 'land', rad: 0.5, solid: true, span: 8, build: pillar },
+    fountain: { cat: 'decor', label: 'Fountain', swatch: '#bfe6f4', on: 'land', rad: 1.2, solid: true, span: 8, footprint: 0.9, build: fountain },
+    harp: { cat: 'decor', label: 'Harp', swatch: '#e2c36a', on: 'land', rad: 0.6, solid: true, span: 6, build: harp },
+    haloarch: { cat: 'scenery', label: 'Halo arch', swatch: '#ffe6a0', on: 'land', rad: 1.2, solid: true, span: 10, footprint: 0.9, build: (o, rng, rec) => moongate(o, rng, rec, 'halo') },
+    ashtree: tree('ash', 'Ash tree', '#7a2416'),
+    firebloom: { cat: 'plants', label: 'Fire blooms', swatch: '#ff5a1a', on: 'land', rad: 0.45, span: 6, build: firebloom },
+    obsidian: { cat: 'decor', label: 'Obsidian spire', swatch: '#241c30', on: 'land', rad: 0.6, solid: true, span: 8, build: obsidian },
+    brazier: { cat: 'decor', label: 'Brazier', swatch: '#ff7a3a', on: 'land', rad: 0.5, solid: true, span: 5, build: brazier },
+    emberlantern: { cat: 'decor', label: 'Ember lantern', swatch: '#ff5a2a', on: 'land', rad: 0.4, solid: true, span: 4, build: emberlantern },
     oldtree: { cat: 'scenery', label: 'Old tree', swatch: '#5e8e4a', on: 'land', rad: 2.4, solid: true, tree: true, span: 70, build: (o, rng) => branchTree(o, rng, TREES.ancient) },
     moongate: { cat: 'scenery', label: 'Moon gate', swatch: '#c9cdc8', on: 'land', rad: 1.2, solid: true, span: 10, footprint: 0.9, build: moongate },
     driftwood: { cat: 'scenery', label: 'Driftwood', swatch: '#d8d0c0', on: 'sand', rad: 1.1, solid: true, span: 3, build: driftwood },
@@ -854,7 +1110,7 @@
     return true;
   }
   function rebuildFeatures() {
-    const F = { perch: [], nectar: [], light: [], fire: [], smoke: [], pad: [], chime: [], leafSrc: [], tree: [], birdhouse: [], grat: [], reed: [], porch: [], seat: [], windmill: [], reef: [], hive: [], rustle: [] };
+    const F = { perch: [], nectar: [], light: [], fire: [], smoke: [], pad: [], chime: [], leafSrc: [], tree: [], birdhouse: [], grat: [], reed: [], porch: [], seat: [], windmill: [], reef: [], hive: [], rustle: [], fountain: [] };
     for (const rec of GD.items) for (const f of rec._f || []) (F[f.type] = F[f.type] || []).push(f);
     GD.feat = F;
     featVersion = GD.version;
@@ -963,25 +1219,37 @@
     stones: [['flowers', 9], ['bush', 3], ['oak', 1], ['tulips', 2]],
     dunes: [['driftwood', 4], ['dune', 18], ['palm', 2]],
     // Lantern Bay
-    stilts: [['stilthouse', 6], ['reeds', 12], ['lily', 8], ['willow', 2], ['lantern', 2]],
+    stilts: [['stilthouse', 6], ['reeds', 12], ['lily', 8], ['willow', 2], ['lanternpost', 3], ['lantern', 2]],
     lotus: [['lily', 16], ['reeds', 6], ['dune', 6], ['cherry', 1]],
-    pagoda: [['pagoda', 1], ['maple', 4], ['pine', 3], ['lantern', 4], ['fern', 4], ['stones', 2], ['bench', 1]],
+    pagoda: [['pagoda', 1], ['maple', 4], ['pine', 3], ['lanternpost', 3], ['lantern', 2], ['bonsai', 3], ['fern', 4], ['stones', 2], ['bench', 1]],
     willows: [['willow', 5], ['cherry', 4], ['bench', 2], ['flowers', 4], ['lily', 5], ['reeds', 4]],
-    glade: [['mushroom', 8], ['fern', 8], ['flowers', 6], ['birch', 3], ['campfire', 1], ['bench', 1], ['oak', 1]],
+    glade: [['mushroom', 8], ['fern', 8], ['flowers', 6], ['birch', 3], ['campfire', 1], ['bench', 1], ['oak', 1], ['bonsai', 2]],
     // Frost Fjord
-    icecliffs: [['snowpine', 6], ['cairn', 2]],
-    snowsprings: [['cabin', 1], ['lantern', 3], ['snowpine', 4], ['stones', 2]],
+    icecliffs: [['snowpine', 6], ['icecrystal', 5], ['cairn', 2]],
+    snowsprings: [['cabin', 1], ['igloo', 1], ['lantern', 3], ['snowpine', 4], ['stones', 2], ['snowman', 1]],
     pineridge: [['snowpine', 14], ['birch', 3], ['cairn', 1]],
     sealskerry: [['cairn', 1]],
-    northpoint: [['cairn', 3], ['campfire', 1], ['bench', 1], ['snowpine', 2]],
+    northpoint: [['cairn', 3], ['campfire', 1], ['bench', 1], ['snowpine', 2], ['snowman', 2], ['sled', 1], ['icecrystal', 2]],
     // Coral Cays
-    bluelagoon: [['palm', 9], ['coral', 16], ['dune', 4]],
-    flamingo: [['reeds', 14], ['lily', 4], ['flowers', 3], ['palm', 2]],
+    bluelagoon: [['palm', 9], ['coral', 16], ['dune', 4], ['tikitorch', 3], ['hammock', 1]],
+    flamingo: [['reeds', 14], ['lily', 4], ['flowers', 3], ['palm', 2], ['hibiscus', 4]],
     palmcay: [['palm', 4], ['dune', 4], ['driftwood', 1]],
-    turtlebeach: [['palm', 4], ['dune', 14], ['driftwood', 2], ['coral', 6]],
-    junglehill: [['bamboo', 9], ['fern', 9], ['bush', 4], ['sunflower', 3], ['birdhouse', 1], ['palm', 2]],
+    turtlebeach: [['palm', 4], ['dune', 14], ['driftwood', 2], ['coral', 6], ['beachhut', 1], ['hammock', 1], ['tikitorch', 2]],
+    junglehill: [['bamboo', 9], ['fern', 9], ['bush', 4], ['sunflower', 3], ['birdhouse', 1], ['palm', 2], ['hibiscus', 5]],
+    // Heaven
+    temple: [['fountain', 1], ['goldflower', 8], ['cloudtree', 2], ['harp', 1], ['tulips', 3]],
+    goldfields: [['goldflower', 16], ['cloudtree', 3], ['flowers', 4], ['bench', 1]],
+    swanlagoon: [['pillar', 4], ['dune', 6], ['goldflower', 2]],
+    highmeadow: [['cloudtree', 4], ['goldflower', 8], ['flowers', 6], ['pillar', 2]],
+    harpisle: [['haloarch', 1], ['cloudtree', 5], ['pillar', 3], ['goldflower', 4], ['harp', 1]],
+    // Hell
+    cinder: [['obsidian', 6], ['brazier', 2], ['firebloom', 4]],
+    obsidian: [['obsidian', 5], ['emberlantern', 2], ['firebloom', 3]],
+    ashdunes: [['ashtree', 3], ['firebloom', 5], ['cairn', 2]],
+    brimstone: [['obsidian', 2], ['cairn', 1]],
+    firegarden: [['ashtree', 6], ['firebloom', 12], ['brazier', 4], ['emberlantern', 2], ['bench', 1]],
   };
-  const CENTRAL = new Set(['pavilion', 'windmill', 'wreck', 'oldtree', 'moongate', 'pagoda']);
+  const CENTRAL = new Set(['pavilion', 'windmill', 'wreck', 'oldtree', 'moongate', 'pagoda', 'haloarch', 'fountain']);
   let wildLayout = null;
   const wildGone = new Set();
   function layoutWild() {
@@ -1043,11 +1311,14 @@
       for (let i = 0; i < 400 && pool.length; i++) { const [x, z] = U.pick(rng, pool); if (far(x, z, d) && GD.check(k, x, z).ok) { add(k, x, z); return; } }
     };
     for (const k of list) place(k, CAT[k].tree ? 5.5 : 2.2);
-    if (P) { add('lily', P.x + 0.3, P.z - 0.2); add('reeds', P.x - P.r - 0.6, P.z + 0.4); }
-    const d = W.dock.start;
+    // the pond and the dock lamp use this world's own things: no lilies in a pool of lava or a frozen fjord
+    const has = (k) => !K.WORLD.items || K.WORLD.items.some((it) => it[0] === k);
+    if (P && has('lily')) add('lily', P.x + 0.3, P.z - 0.2);
+    if (P && has('reeds')) add('reeds', P.x - P.r - 0.6, P.z + 0.4);
+    const d = W.dock.start, lamp = ['lantern', 'emberlantern', 'tikitorch'].find(has) || 'lantern';
     for (let i = 0; i < 40; i++) {
       const x = d.x * 0.82 + (rng() - 0.5) * 3, z = d.z * 0.82 + (rng() - 0.5) * 3, c = W.colAt(x, z);
-      if (c.h >= 0 && far(x, z, 1.5)) { add('lantern', x, z); break; }
+      if (c.h >= 0 && far(x, z, 1.5)) { add(lamp, x, z); break; }
     }
     return out;
   };
@@ -1100,9 +1371,11 @@
   // ------------------------------------------------------------- meadow grass
   // Thin blades over every grass block. They sway with the wind, turn gold in autumn, vanish under
   // snow, and part around paths and buildings.
-  const GRASS_PAL = pal4([0x9ccc6a, 0xa8d476, 0x8fc460], [0x7fb062, 0x8ab86a, 0x74a65a, 0x6fa452], [0xbfae64, 0xb09a54, 0xc8b870, 0xa89a50], null);
-  const CLEAR = { stones: 0.95, cabin: 1.45, pavilion: 1.3, windmill: 0.9, campfire: 0.55, bench: 0.6, lantern: 0.4, cairn: 0.35, wreck: 2.4, birdhouse: 0.2, chime: 0.2, hive: 0.45, moongate: 0.9, oldtree: 1.6, bamboo: 0.5 };
+  const GRASS_PAL = K.WORLD.look.grassPal ? pal4(...Array(4).fill(K.WORLD.look.grassPal)) : pal4([0x9ccc6a, 0xa8d476, 0x8fc460], [0x7fb062, 0x8ab86a, 0x74a65a, 0x6fa452], [0xbfae64, 0xb09a54, 0xc8b870, 0xa89a50], null);
+  const CLEAR = { stones: 0.95, cabin: 1.45, pavilion: 1.3, windmill: 0.9, campfire: 0.55, bench: 0.6, lantern: 0.4, cairn: 0.35, wreck: 2.4, birdhouse: 0.2, chime: 0.2, hive: 0.45, moongate: 0.9, oldtree: 1.6, bamboo: 0.5,
+    igloo: 1.4, beachhut: 1.0, fountain: 1.1, haloarch: 0.9, hammock: 0.6, sled: 0.6, brazier: 0.4, pagoda: 1.2, snowman: 0.35 };
   let grass = null, gData = null, grassS = -99, grassVer = -1, grassDensity = 4;
+  const SPECKS = (K.WORLD.id === 'heaven' ? [0xffe08a, 0xfff6e0, 0xf8d060] : K.WORLD.id === 'hell' ? [0xff6a2a, 0xffa040, 0xe8401a] : [0xfaf6ee, 0xf6d860, 0xc8a8e8, 0xf4a6b8, 0xffffff]).map(hex);
   const grassWalker = { value: new THREE.Vector3(0, -99, 0) };
   function bladeGeometry() {
     const pos = [], hs = [], nrm = [];
@@ -1200,7 +1473,10 @@
     const end = Math.min(grass.count, grassCursor + 2500), start = grassCursor;
     for (let i = start; i < end; i++) {
       const vis = gData.hide[i] ? 0 : U.seasonColor(GRASS_PAL, gData.r[i], grassPassS, tmpC);
-      grass.setColorAt(i, tmpC.multiplyScalar(0.88 + ((gData.r[i] * 13.7) % 1) * 0.24));
+      // here and there a wildflower among the blades, in spring and summer
+      const fl = (gData.r[i] * 97.31) % 1, si = U.seasonIndex(grassPassS);
+      if (fl < 0.07 && (si === 0 || si === 1 || K.WORLD.look.grassPal)) grass.setColorAt(i, tmpC.copy(SPECKS[((gData.r[i] * 7919) | 0) % SPECKS.length]));
+      else grass.setColorAt(i, tmpC.multiplyScalar(0.88 + ((gData.r[i] * 13.7) % 1) * 0.24));
       const k = Math.max(gData.sc[i] * vis, 0.0001);
       gq.setFromAxisAngle(gUp, gData.rot[i]);
       M4.compose(gPos.set(gData.x[i], gData.y[i], gData.z[i]), gq, gScale.set(k * 2.2, k * (0.75 + gData.r[i] * 0.6) * 1.15, k * 2.2));
@@ -1214,9 +1490,9 @@
     W = SW.world;
     const leafMat = W.voxelMat(0xffffff, { edges: 0.24, texel: 12, texAmt: 0.06, sway: true, trans: 0.55, wet: true, shininess: 18 });
     glowMat = W.patch(new THREE.MeshBasicMaterial({ color: 0xffffff }), { edges: 0.12, faceShade: 0 });
-    woodG = makeGrower(40000, W.voxelMat(0xffffff, { edges: 0.2, texel: 12, texAmt: 0.07, wet: true }), true);
-    leafG = makeGrower(100000, leafMat, true);
-    glowG = makeGrower(4000, glowMat, false);
+    woodG = makeGrower(60000, W.voxelMat(0xffffff, { edges: 0.2, texel: 12, texAmt: 0.07, wet: true }), true);
+    leafG = makeGrower(150000, leafMat, true);
+    glowG = makeGrower(8000, glowMat, false);
     scatter();
     initGrass();
     rebuildFeatures();
@@ -1250,4 +1526,25 @@
   };
   let lightTimer = 0;
   GD.capacity = () => ({ leaf: leafG.n / leafG.cap, wood: woodG.n / woodG.cap });
+
+  // ------------------------------------------------------------------- bloom
+  // How lovely your garden is. Everything you have planted or built counts: trees and big builds most.
+  // Each more of the same kind counts a little less than the last, and every different kind adds a bonus,
+  // so a varied garden blooms fastest. Nothing ever takes bloom away except tidying your own things.
+  GD.bloomOf = (k) => {
+    const d = CAT[k];
+    if (!d) return 0;
+    if (d.bloom != null) return d.bloom;
+    if (k === 'grat') return 3;
+    if (d.tree) return 6;
+    if (d.cat === 'plants' || d.cat === 'water') return 2;
+    return d.footprint || d.rad >= 1.4 ? 10 : 4;
+  };
+  GD.bloom = function () {
+    const counts = {};
+    for (const it of GD.items) if (!it.wild) counts[it.k] = (counts[it.k] || 0) + 1;
+    let total = 0;
+    for (const k in counts) total += GD.bloomOf(k) * (1 - Math.pow(0.85, counts[k])) / 0.15 + 3;
+    return Math.round(total);
+  };
 })(window.SW);

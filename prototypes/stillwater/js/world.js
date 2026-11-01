@@ -111,6 +111,8 @@
     uSway: { value: 0 }, uSwayAmp: { value: 1 }, uDirt: { value: hex(0x8d6f50) },
     uCloudTex: { value: null }, uCloudSh: { value: new THREE.Vector3() },   // cloud shadows (see below)
     uGust: { value: new THREE.Vector3(0, 0, 0) },                           // wind gusts: travelled offset xy, strength z
+    uUnder: { value: new THREE.Color(0, 0, 0) },                            // light from the sea itself: lava's glow, the clouds' brightness
+    uCrack: { value: 0 },                                                    // Hell: ember light in the cracks of the rock
   };
   // Shade from the clouds overhead: 1 in sunlight, lower beneath a cloud. uCloudSh.xy turns height into the
   // sideways shift along the sun's rays; z is how dark the shadows are.
@@ -172,7 +174,7 @@
         vVD = -mvPosition.z;
         gl_Position = projectionMatrix * mvPosition;`);
       sh.fragmentShader = defs + CLOUD_GLSL + `
-        uniform float uTime, uWL, uWet, uEdge, uTexel, uTexAmt, uTrans, uFaceShade; uniform vec3 uCaus, uDirt;
+        uniform float uTime, uWL, uWet, uEdge, uTexel, uTexAmt, uTrans, uFaceShade, uCrack; uniform vec3 uCaus, uDirt, uUnder;
         varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN; varying float vVD;
         #ifdef GRASS_SIDE
           varying float vKind;
@@ -223,6 +225,26 @@
             float c = abs(sin(ca.x * 2.1 + uTime * 0.7) + sin(ca.y * 2.3 - uTime * 0.6) + sin((ca.x + ca.y) * 1.7 + uTime * 0.5));
             c = pow(clamp(1.0 - c * 0.45, 0.0, 1.0), 4.0);
             gl_FragColor.rgb += uCaus * c * (1.0 - clamp((uWL - vWPos.y) / 4.0, 0.0, 1.0));
+          }
+        #endif
+        // a sea of lava (or of bright cloud) lights everything from below, most strongly near it, and faces
+        // turned toward it most of all
+        {
+          float near = exp(-max(vWPos.y - uWL, 0.0) * 0.55), down = 0.55 + 0.45 * clamp(-vObjN.y + 0.5 * (1.0 - abs(vObjN.y)), 0.0, 1.0);
+          gl_FragColor.rgb += uUnder * near * down * (0.85 + 0.15 * sin(uTime * 0.9 + vWPos.x * 0.21 + vWPos.z * 0.17)) * diffuseColor.rgb * 2.2;
+        }
+        #ifdef GRASS_SIDE
+          // Hell: thin seams of ember light wander through the black rock, brightest near the lava, and
+          // breathe slowly. Snapped to the block texels so they read as part of the voxels.
+          if (uCrack > 0.0) {
+            vec3 cn = abs(vObjN);
+            vec2 cp = cn.y > 0.5 ? vWPos.xz : (cn.x > 0.5 ? vec2(vWPos.z, vWPos.y * 1.3) : vec2(vWPos.x, vWPos.y * 1.3));
+            cp = floor(cp * 8.0) / 8.0;
+            float cr = vn2(cp * 0.42) * 0.7 + vn2(cp * 1.1 + 5.0) * 0.3;
+            float seam = 1.0 - smoothstep(0.008, 0.036, abs(cr - 0.5));
+            float deep = exp(-max(vWPos.y - uWL, 0.0) * 0.22);
+            float pulse = 0.75 + 0.25 * sin(uTime * 0.7 + cp.x * 0.3 - cp.y * 0.2);
+            gl_FragColor.rgb += vec3(1.0, 0.38, 0.09) * seam * (0.35 + 1.4 * deep) * pulse * uCrack;
           }
         #endif
         #include <fog_fragment>`).replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.a = vVD;');
@@ -332,7 +354,7 @@
     uMoonDir: { value: new THREE.Vector3(0, 1, 0) }, uMoonPhase: { value: 0.5 },
     uNight: { value: 0 }, uTime: { value: 0 }, uOvercast: { value: 0 },
     uAurora: { value: 0 }, uRainbow: { value: 0 }, uAurDir: { value: new THREE.Vector2(0, 1) },
-    uGold: { value: 0 }, uCirrus: { value: 0.3 },
+    uGold: { value: 0 }, uCirrus: { value: 0.3 }, uCumulus: { value: 0.5 }, uHalo: { value: 0 }, uDark: { value: 0 },
   };
   function initSky() {
     sky = new THREE.Mesh(new THREE.SphereGeometry(950, 40, 20), new THREE.ShaderMaterial({
@@ -340,7 +362,7 @@
       vertexShader: `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: `
         uniform vec3 uTop, uHor, uSunCol, uSunDir, uMoonDir;
-        uniform float uNight, uTime, uOvercast, uAurora, uRainbow, uMoonPhase, uGold, uCirrus;
+        uniform float uNight, uTime, uOvercast, uAurora, uRainbow, uMoonPhase, uGold, uCirrus, uCumulus, uHalo, uDark;
         uniform vec2 uAurDir;
         varying vec3 vDir;
         float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -371,6 +393,23 @@
             vec3 cc = mix(vec3(1.0), uSunCol * 1.15, 0.25 + uGold * 0.6) * (1.0 - uNight * 0.8) + uHor * 0.12;
             cc += uSunCol * pow(s, 6.0) * 0.6 * sunUp;
             col = mix(col, cc, c * 0.65);
+          }
+          // a band of fair-weather cumulus piled low around the horizon, sunlit on the sun's side
+          if (uCumulus > 0.01 && h > -0.03 && h < 0.32) {
+            vec2 dxz = normalize(d.xz + 1e-5);
+            float cl = fbm(dxz * 3.4 + vec2(uTime * 0.0015, h * 11.0)) * 0.7 + fbm(dxz * 9.0 + vec2(h * 22.0, uTime * 0.003)) * 0.3;
+            float shape = smoothstep(0.48, 0.66, cl - h * 2.1 + 0.08) * smoothstep(-0.03, 0.02, h) * uCumulus;
+            float toward = dot(dxz, normalize(sd.xz + 1e-5)) * 0.5 + 0.5;
+            vec3 ctop = mix(vec3(1.0), uSunCol, 0.3 + uGold * 0.45) * (1.0 - uNight * 0.78);
+            vec3 cbase = mix(uHor, uTop, 0.35) * 0.82;
+            vec3 ccol = mix(cbase, ctop, clamp(0.35 + 0.5 * toward + (cl - 0.5) * 1.4, 0.0, 1.0));
+            ccol = mix(ccol, ccol * vec3(0.35, 0.16, 0.14), uDark);   // Hell's clouds are smoke, lit from below
+            col = mix(col, ccol, shape * 0.9);
+          }
+          // Heaven's sun wears a faint halo
+          if (uHalo > 0.01) {
+            float ang = acos(clamp(mu, -1.0, 1.0)), ring = exp(-pow((ang - 0.38) * 26.0, 2.0));
+            col += mix(vec3(1.0, 0.75, 0.6), vec3(0.7, 0.85, 1.0), smoothstep(0.36, 0.4, ang)) * ring * uHalo * 0.18 * sunUp;
           }
           float starVis = smoothstep(0.45, 0.95, uNight) * (1.0 - uOvercast) * smoothstep(0.02, 0.3, h);
           if (starVis > 0.01) {
@@ -417,6 +456,7 @@
               float ph = uMoonPhase * 6.28318;
               float lit = smoothstep(-0.05, 0.12, dot(n, vec3(sin(ph), 0.0, -cos(ph))));
               vec3 mcol = vec3(1.05, 1.03, 0.95) * (0.1 + 1.15 * lit) * (0.8 + 0.2 * n2(q * 4.0 + 7.0));
+              mcol *= mix(vec3(1.0), vec3(1.15, 0.32, 0.16), uDark);   // a blood moon over the fire world
               col = mix(col, mcol, (1.0 - smoothstep(0.85, 1.0, rr)) * vis);
             }
           }
@@ -448,6 +488,10 @@
     const k = smooth(0, 1, (tod - t0) / (t1 - t0));
     for (const c of ['top', 'hor', 'sun', 'hs', 'hg']) pal[c].copy(a[c]).lerp(b[c], k);
     pal.si = lerp(a.si, b.si, k); pal.hi = lerp(a.hi, b.hi, k); pal.night = lerp(a.night, b.night, k);
+    // some worlds paint their own sky and light: Heaven's cream and gold, Hell's embers
+    const sky = K.WORLD.look.sky, lt = K.WORLD.look.light;
+    if (sky) { pal.top.set(sky.top); pal.hor.set(sky.hor); pal.sun.set(sky.sun); }
+    if (lt) { pal.hs.set(lt.hs); pal.hg.set(lt.hg); pal.hi = lt.hi; }
     return pal;
   }
   W.moonPhase = () => (((S.day + 3.2) / 8) % 1 + 1) % 1;   // eight-day cycle; 0.5 is full
@@ -653,10 +697,13 @@
   };
   TPAL[6] = U.pal4(...Array(4).fill([0xd6edf7, 0xc6e3f0, 0xe2f3fa, 0xcfe8f3]));   // glacier ice, the same in every season
   if (K.WORLD.look.whiteSand) TPAL[1] = U.pal4(...Array(4).fill([0xf3ecd8, 0xece4cc, 0xf7f1e0]));
+  for (const [k, list] of Object.entries(K.WORLD.look.tpal || {})) TPAL[k] = U.pal4(...Array(4).fill(list));
   // 8 basalt column tops, 9 black sand, 10 basalt sides
   TPAL[8] = U.pal4([0x4f545b, 0x575c62, 0x484d54], [0x4f545b, 0x575c62, 0x484d54], [0x4f545b, 0x575c62, 0x4b4f53], [0xe6ecef, 0x575c62, 0xdde5e9]);
   TPAL[9] = U.pal4([0x484a4c, 0x404244, 0x515355], [0x484a4c, 0x404244, 0x515355], [0x46484a, 0x3f4143], [0x8e9296, 0x6c7074, 0x55585b]);
   const TSTATIC = { 0: hex(0xbca87f), 3: hex(0x8d6f50), 4: hex(0x9a9f9b), 7: hex(0xb8dbe6), 10: hex(0x44484f) };
+  for (const [k, c] of Object.entries(K.WORLD.look.tstatic || {})) TSTATIC[k] = hex(c);
+  PU.uDirt.value.copy(TSTATIC[3]);
   let terrain, tKind, tRand, tJit, lastTerrainS = -99;
   W.blocks = [];
   W.cols = { grass: [], sand: [], shallow: [], ring: [] };   // the home island's
@@ -774,6 +821,7 @@
     uClear: { value: 1 }, uWind: { value: 0.4 }, uPost: { value: 0 }, uReflOn: { value: 0 }, tRefl: { value: null }, tScene: { value: null },
     uRes: { value: new THREE.Vector2(1, 1) }, uTexMat: { value: new THREE.Matrix4() }, uNear: { value: 0.3 }, uFar: { value: 2400 },
     uCloudTex: PU.uCloudTex, uCloudSh: PU.uCloudSh,
+    uSea: { value: K.WORLD.look.sea === 'lava' ? 2 : K.WORLD.look.sea === 'cloud' ? 1 : 0 },
   };
   const WAVE = `
     uniform float uTime, uBreath, uAmp;
@@ -810,14 +858,64 @@
         }`,
       fragmentShader: WAVE + CLOUD_GLSL + `
         uniform vec3 uSunDir, uSunCol, uTop, uHor, uFog, uCam, uShallow, uDeep, uBioCol;
-        uniform float uFogNear, uFogFar, uNight, uWL, uRain, uBio, uPost, uReflOn, uNear, uFar, uClear, uWind;
+        uniform float uFogNear, uFogFar, uNight, uWL, uRain, uBio, uPost, uReflOn, uNear, uFar, uClear, uWind, uSea;
         uniform sampler2D uHeight, tRefl, tScene; uniform vec2 uHX, uRes; uniform vec4 uRip[10];
         varying vec3 vW; varying vec4 vRefl; varying float vVZ;
         float h12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
         float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(h12(i), h12(i + vec2(1, 0)), f.x), mix(h12(i + vec2(0, 1)), h12(i + vec2(1, 1)), f.x), f.y); }
+        // A sea of lava: dark crust drifting in plates, glowing veins between them that pulse slowly,
+        // and the brightest heat where it meets the shore.
+        vec3 lavaSea(vec2 p, float depth){
+          vec2 flow = vec2(uTime * 0.012, uTime * 0.007);
+          float w = vn(p * 0.11 + flow * 0.5) * 2.0;
+          float n = vn(p * 0.35 + flow + w) * 0.65 + vn(p * 0.9 - flow * 1.6 + w * 0.5) * 0.35;
+          float vein = 1.0 - smoothstep(0.0, 0.075, abs(n - 0.5));
+          float vein2 = 1.0 - smoothstep(0.0, 0.035, abs(vn(p * 1.7 + flow * 2.0) - 0.5));
+          float pulse = 0.75 + 0.25 * sin(uTime * 0.8 + n * 9.0);
+          vec3 crust = mix(vec3(0.07, 0.025, 0.02), vec3(0.16, 0.05, 0.03), vn(p * 3.1));
+          vec3 hot = mix(vec3(1.9, 0.42, 0.07), vec3(2.8, 1.25, 0.32), vein);
+          vec3 c = mix(crust, hot * pulse, max(vein, vein2 * 0.6));
+          c += vec3(2.2, 0.7, 0.12) * (1.0 - smoothstep(0.0, 1.6, depth)) * (0.7 + 0.3 * sin(uTime * 1.3 + p.x));
+          return c;
+        }
+        // A sea of cloud: puffy cumulus heaps (ridged noise, so each billow has a rounded top and a crease
+        // around it), lit warm on the sun side and shaded a sky-tinted blue in the hollows between them.
+        float billow(vec2 q){ return 1.0 - abs(vn(q) * 2.0 - 1.0); }
+        float cloudH(vec2 p){
+          vec2 drift = vec2(uTime * 0.005, uTime * 0.002);
+          return billow(p * 0.045 + drift) * 0.55 + billow(p * 0.12 - drift * 1.7) * 0.3 + billow(p * 0.34 + drift * 3.0) * 0.15;
+        }
+        vec3 cloudSea(vec2 p, vec3 L){
+          float e = 0.8, h = cloudH(p);
+          vec3 n = normalize(vec3((h - cloudH(p + vec2(e, 0.0))) * 7.0, 1.0, (h - cloudH(p + vec2(0.0, e))) * 7.0));
+          float lit = clamp(dot(n, L), 0.0, 1.0), crease = smoothstep(0.35, 0.75, h);
+          vec3 shadow = mix(vec3(0.6, 0.66, 0.86), uTop, 0.35), sunlit = mix(vec3(1.0, 0.97, 0.92), uSunCol, 0.3);
+          vec3 c = mix(shadow, sunlit, smoothstep(0.1, 0.95, lit * 0.75 + crease * 0.45));
+          // bright silver edges where a billow's top catches the light, a little gold in the deepest folds
+          c += sunlit * pow(lit, 6.0) * crease * 0.25;
+          c = mix(c * vec3(0.94, 0.9, 0.98), c, crease);
+          return c;
+        }
         void main(){
           vec2 p = vW.xz;
+          if (uSea > 0.5) {
+            float bed0 = texture2D(uHeight, (p - vec2(uHX.x) + 0.5) / uHX.y).r * 255.0 / 16.0 - 8.0;
+            vec3 c = uSea > 1.5 ? lavaSea(p, uWL - bed0) : cloudSea(p, normalize(uSunDir)) * swCloudShade(vW);
+            // ripples still spread over it: a stone dropped in lava, a boat through cloud
+            float ringL = 0.0;
+            for (int i = 0; i < 10; i++) {
+              vec4 r = uRip[i];
+              float age = uTime - r.z;
+              if (age < 0.0 || age > 10.0 || r.w <= 0.0) continue;
+              float dist = length(p - r.xy), rad = age * 1.1;
+              ringL += exp(-pow((dist - rad) * 1.6, 2.0)) * exp(-age * 0.5) * r.w;
+            }
+            c += (uSea > 1.5 ? vec3(1.6, 0.5, 0.1) : vec3(0.25)) * ringL;
+            float fl = smoothstep(uFogNear, uFogFar, length(uCam - vW));
+            gl_FragColor = vec4(mix(c, uFog, fl * (uSea > 1.5 ? 0.8 : 1.0)), 1.0);
+            return;
+          }
           float e = 0.15, hc = waveH(p);
           vec3 n = vec3(hc - waveH(p + vec2(e, 0.0)), e, hc - waveH(p + vec2(0.0, e)));
           // two drifting layers of fine ripples on top of the swell
@@ -876,6 +974,9 @@
             float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
             col = mix(body * mix(1.0, cs, 0.6), refl, clamp(fres * 1.1 + 0.06, 0.0, 1.0));
             col += uSunCol * (spec * 3.5 + glint * 2.5 * uClear) * (1.0 - uNight * 0.6) * (0.3 + 0.7 * uClear);
+            // light glowing through the backs of the waves when you look toward the sun
+            float back = pow(clamp(dot(-V, L) * 0.5 + 0.5, 0.0, 1.0), 4.0), lift = smoothstep(0.1, 0.9, hc / max(uAmp, 0.001));
+            col += uShallow * vec3(0.55, 1.0, 0.85) * back * lift * 0.35 * (1.0 - uNight) * uClear * smoothstep(1.0, 4.0, depth);
           } else {
             col = mix(uShallow, uDeep, smoothstep(0.0, 3.6, depth)) * mix(1.0, cs, 0.6);
             col = mix(col, skyc, 0.12 + 0.68 * pow(1.0 - ndv, 4.0));
@@ -885,6 +986,11 @@
           float line = 0.5 + 0.3 * uBreath + 0.07 * sin(uTime * 0.7 + p.x * 0.4 + p.y * 0.3);
           float foam = (1.0 - smoothstep(0.05, line, depth)) * smoothstep(0.3, 0.7, vn(p * 2.6 + uTime * 0.12));
           foam = max(foam, (1.0 - smoothstep(0.0, 0.25, depth)) * 0.6 * vn(p * 6.0 - uTime * 0.3));
+          // lines of surf rolling in toward every beach, breaking as the water shoals
+          float shoal = 1.0 - smoothstep(0.15, 2.6, depth);
+          float swell = sin(depth * 3.2 - uTime * 1.1 + vn(p * 0.25) * 4.0 + uBreath * 1.2);
+          float surf = smoothstep(0.82, 0.98, swell) * shoal * smoothstep(0.02, 0.25, depth) * (0.55 + 0.45 * vn(p * 1.8 + uTime * 0.2));
+          foam = max(foam, surf * 0.85);
           // whitecaps on the crests when the wind is up
           float crest = smoothstep(0.55, 0.95, hc / max(uAmp, 0.001)) * smoothstep(0.55, 1.0, uWind) * smoothstep(1.0, 4.0, depth);
           foam = max(foam, crest * smoothstep(0.55, 0.8, vn(p * 3.0 + uTime * 0.5)) * 0.8);
@@ -1342,9 +1448,83 @@
       }
       W.icebergs = bergs;
     }
+    // Heaven: little islands drifting high overhead, grass on top and rock tapering away beneath
+    if (L.islets) {
+      const mat = W.voxelMat(0xffffff, { edges: 0.15, texel: 8, texAmt: 0.06, shininess: 10 });
+      for (let n = 0; n < L.islets; n++) {
+        const a = rng() * Math.PI * 2, r = 25 + rng() * 120, R = 2.2 + rng() * 3.8, v = 0.6, vox = [], N = Math.ceil(R / v);
+        for (let x = -N; x <= N; x++) for (let z = -N; z <= N; z++) {
+          const d = Math.hypot(x, z) * v / R + (fbm(x * 0.4 + n * 5, z * 0.4, 97, 2) - 0.5) * 0.35;
+          if (d > 1) continue;
+          const depth = Math.round((1 - d) * R * 1.5 / v) + 1;
+          for (let y = 0; y > -depth; y--) vox.push([x * v, y * v, z * v, y === 0 ? 0 : y > -2 ? 1 : 2]);
+        }
+        // a cloud tree on most of them
+        const tree = rng() < 0.7, tx = (rng() - 0.5) * R * 0.6, tz = (rng() - 0.5) * R * 0.6;
+        if (tree) {
+          for (let y = 1; y <= 4; y++) vox.push([Math.round(tx / v) * v, y * v, Math.round(tz / v) * v, 3]);
+          for (let x = -2; x <= 2; x++) for (let y = 0; y <= 3; y++) for (let z = -2; z <= 2; z++) if (x * x + (y - 1.3) ** 2 * 1.6 + z * z < 5.5) vox.push([Math.round(tx / v) * v + x * v, (5 + y) * v, Math.round(tz / v) * v + z * v, 4]);
+        }
+        const cols = [[0x9ad874, 0x8fd06a, 0xa6de80], [0xc8b088, 0xbfa47a], [0xe2dccf, 0xd6cfc0, 0xeeeae0], [0xe8dcc0], [0xfbf8ee, 0xf6e7b8, 0xf4eedc]];
+        const im = new THREE.InstancedMesh(W.boxGeo, mat, vox.length), m = new THREE.Matrix4();
+        vox.forEach((q, i) => { m.makeScale(v, v, v); m.setPosition(q[0], q[1], q[2]); im.setMatrixAt(i, m); im.setColorAt(i, tmpC.setHex(U.pick(rng, cols[q[3]]))); });
+        im.castShadow = true; im.receiveShadow = true;
+        const y = 16 + rng() * 26;
+        im.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
+        scene.add(im);
+        bergs.push({ im, ax: im.position.x, az: im.position.z, y, a: rng() * Math.PI * 2, p: rng() * 10, spin: (rng() - 0.5) * 0.02, sky: true });
+      }
+    }
+    // drifting motes in the air around you: gold in Heaven, embers and ash in Hell, sunlit dust and
+    // diamond dust elsewhere
+    const kind = L.motes || (K.WORLD.id === 'frost' ? 'diamond' : K.WORLD.id === 'stillwater' ? 'dust' : null);
+    if (kind) {
+      const n = kind === 'embers' ? 260 : 200;
+      motes = { kind, P: W.makePoints(n, kind === 'dust' ? 'soft' : 'glow', kind !== 'dust', kind === 'embers' ? 140 : kind === 'gold' ? 120 : 70), d: [] };
+      for (let i = 0; i < n; i++) motes.d.push({ x: (rng() - 0.5) * 60, y: rng() * 20, z: (rng() - 0.5) * 60, p: rng() * 100, s: 0.5 + rng() });
+      const c = kind === 'embers' ? [1, 0.45, 0.12] : kind === 'gold' ? [1, 0.86, 0.5] : kind === 'diamond' ? [0.85, 0.95, 1] : [1, 0.96, 0.86];
+      for (let i = 0; i < n; i++) { motes.P.col[i * 3] = c[0]; motes.P.col[i * 3 + 1] = c[1] * (kind === 'embers' ? 0.8 + rng() * 0.4 : 1); motes.P.col[i * 3 + 2] = c[2]; motes.P.sz[i] = motes.d[i].s; }
+      if (kind === 'embers') {
+        ash = { P: W.makePoints(160, 'soft', false, 90), d: [] };
+        for (let i = 0; i < 160; i++) { ash.d.push({ x: (rng() - 0.5) * 60, y: rng() * 22, z: (rng() - 0.5) * 60, p: rng() * 100 }); ash.P.col.set([0.42, 0.4, 0.4], i * 3); ash.P.sz[i] = 0.6 + rng() * 0.6; }
+      }
+    }
+  }
+  let motes = null, ash = null;
+  function updateMotes(dt, t) {
+    const F = W.focus, k = motes.kind, P = motes.P, wind = S.weather.wind, sunny = S.dayness * (1 - W.env.over) * (1 - S.weather.rain);
+    // how many show: embers and gold always; dust in sunshine; diamond dust in clear, cold air
+    const show = k === 'dust' ? sunny * 0.55 : k === 'diamond' ? sunny * 0.9 : 1;
+    for (let i = 0; i < motes.d.length; i++) {
+      const m = motes.d[i];
+      if (k === 'embers') { m.y += (1.1 + m.s * 0.9) * dt; m.x += (Math.sin(t * 1.3 + m.p) * 0.6 + wind * 0.8) * dt; m.z += Math.cos(t * 1.1 + m.p) * 0.6 * dt; if (m.y > 22) m.y = 0; }
+      else if (k === 'gold') { m.y += 0.25 * m.s * dt; m.x += Math.sin(t * 0.4 + m.p) * 0.25 * dt; m.z += Math.cos(t * 0.35 + m.p) * 0.25 * dt; if (m.y > 20) m.y = 0; }
+      else if (k === 'diamond') { m.y -= 0.12 * dt; m.x += (wind * 0.5 + Math.sin(t * 0.3 + m.p) * 0.2) * dt; if (m.y < 0) m.y = 14; }
+      else { m.y += Math.sin(t * 0.3 + m.p) * 0.05 * dt; m.x += (wind * 0.3 + Math.sin(t * 0.2 + m.p) * 0.1) * dt; m.z += Math.cos(t * 0.25 + m.p) * 0.1 * dt; }
+      // keep them in a box around wherever you are looking
+      if (m.x - (F.x - 30) > 60 || m.x < F.x - 30) m.x = F.x + (((m.x - F.x + 30) % 60) + 60) % 60 - 30;
+      if (m.z - (F.z - 30) > 60 || m.z < F.z - 30) m.z = F.z + (((m.z - F.z + 30) % 60) + 60) % 60 - 30;
+      const base = Math.max(K.WL, W.heightAt(m.x, m.z));
+      P.pos[i * 3] = m.x; P.pos[i * 3 + 1] = base + 0.3 + m.y * (k === 'dust' ? 0.35 : 1); P.pos[i * 3 + 2] = m.z;
+      const tw = k === 'diamond' ? Math.pow(0.5 + 0.5 * Math.sin(t * (2 + m.s * 3) + m.p * 7), 8) : k === 'gold' ? 0.55 + 0.45 * Math.sin(t * 1.5 + m.p) : k === 'embers' ? 0.6 + 0.4 * Math.sin(t * 9 + m.p * 3) : 0.6;
+      P.al[i] = (i / motes.d.length < show ? 1 : 0) * tw * (k === 'embers' ? 0.95 * (1 - m.y / 24) : k === 'dust' ? 0.35 : 0.8);
+    }
+    P.dirty(false);
+    if (ash) {
+      for (let i = 0; i < ash.d.length; i++) {
+        const m = ash.d[i];
+        m.y -= 0.35 * dt; m.x += (Math.sin(t * 0.5 + m.p) * 0.3 + wind * 0.4) * dt; m.z += Math.cos(t * 0.4 + m.p) * 0.3 * dt;
+        if (m.y < 0) { m.y = 22; m.x = F.x + (Math.random() - 0.5) * 60; m.z = F.z + (Math.random() - 0.5) * 60; }
+        const base = Math.max(K.WL, W.heightAt(m.x, m.z));
+        ash.P.pos[i * 3] = m.x; ash.P.pos[i * 3 + 1] = base + m.y; ash.P.pos[i * 3 + 2] = m.z;
+        ash.P.al[i] = 0.5;
+      }
+      ash.P.dirty(false);
+    }
   }
   const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), VS = new THREE.Vector3(), VP = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
   function updateWorldFeatures(dt, t) {
+    if (motes) updateMotes(dt, t);
     if (lanternMesh) {
       const glow = 0.85 + 1.6 * S.glow;
       lanternMesh.material.color.setScalar(glow);
@@ -1363,6 +1543,12 @@
     }
     for (const b of bergs) {
       b.a += b.spin * dt;
+      if (b.sky) {
+        // drifting islets rise and fall slowly with your breath
+        b.im.position.set(b.ax + Math.sin(t * 0.02 + b.p) * 4, b.y + Math.sin(t * 0.15 + b.p) * 0.8 + (S.breath.b - 0.5) * 0.3, b.az + Math.cos(t * 0.017 + b.p) * 4);
+        b.im.rotation.y = b.a;
+        continue;
+      }
       b.im.position.set(b.ax + Math.sin(t * 0.03 + b.p) * 1.5, Math.sin(t * 0.4 + b.p) * 0.06 + (S.breath.b - 0.5) * 0.05, b.az + Math.cos(t * 0.025 + b.p) * 1.5);
       b.im.rotation.set(Math.sin(t * 0.3 + b.p) * 0.012, b.a, Math.cos(t * 0.27 + b.p) * 0.012);
     }
@@ -1596,7 +1782,7 @@
     const wx = S.weather, P = samplePalette(S.tod), E = W.env;
     const over = clamp(wx.cloud * 0.5 + wx.rain * 0.55 + wx.snow * 0.45 + wx.fog * 0.3, 0, 1);
     S.night = P.night;
-    S.glow = Math.max(smooth(0.15, 0.75, P.night), over * 0.45 + wx.fog * 0.2);
+    S.glow = Math.max(smooth(0.15, 0.75, P.night), over * 0.45 + wx.fog * 0.2, LOOK.glowMin || 0);
     S.dayness = 1 - smooth(0, 0.5, P.night);
     E.over = over;
     tmpC.copy(greyTop).lerp(greyNightTop, P.night); E.top.copy(P.top).lerp(tmpC, over * 0.7);
@@ -1614,8 +1800,9 @@
     scene.fog.color.copy(E.hor);
     const wet = clamp(wx.rain + wx.snow * 0.5, 0, 1);
     const extra = Math.max(0, camera.position.distanceTo(W.focus) - 50);   // see the whole archipelago from high up
-    scene.fog.near = lerp(80, 14, wx.fog) * lerp(1, 0.6, wet) + extra * 0.9;
-    scene.fog.far = lerp(270, 60, wx.fog) * lerp(1, 0.55, wet) + extra * 1.3;
+    const fogNF = LOOK.fog || [80, 270];
+    scene.fog.near = lerp(fogNF[0], 14, wx.fog) * lerp(1, 0.6, wet) + extra * 0.9;
+    scene.fog.far = lerp(fogNF[1], 60, wx.fog) * lerp(1, 0.55, wet) + extra * 1.3;
 
     Object.assign(skyU.uNight, { value: P.night }); skyU.uTime.value = t;
     skyU.uTop.value.copy(E.top); skyU.uHor.value.copy(E.hor); skyU.uSunCol.value.copy(P.sun);
@@ -1623,11 +1810,14 @@
     skyU.uOvercast.value = clamp(over * 1.15, 0, 1); skyU.uAurora.value = wx.aurora; skyU.uRainbow.value = wx.rainbow;
     skyU.uGold.value = W.golden();
     skyU.uCirrus.value = clamp(0.2 + 0.5 * fbm(S.day * 3.1, 2.2, 88, 2) + wx.cloud * 0.35 - wx.rain * 0.6 - wx.fog * 0.5, 0, 1);
+    skyU.uCumulus.value = clamp(0.3 + wx.cloud * 0.9 + (LOOK.sea === 'cloud' ? 0.35 : 0) - wx.rain * 0.5 - wx.fog * 0.6, 0, 1);
+    skyU.uHalo.value = LOOK.sea === 'cloud' ? 1 : 0;
+    skyU.uDark.value = LOOK.sea === 'lava' ? 1 : 0;
     sky.position.copy(camera.position);
 
     const si = U.seasonIndex(S.season), winter = si === 3 ? smooth(3, 3.3, S.season % 4) : 0;
     waterU.uTime.value = t; waterU.uBreath.value = S.breath.b;
-    waterU.uAmp.value = (S.reduceMotion ? 0.05 : 0.11) * (1 + wx.wind * 0.35 + wx.rain * 0.2);
+    waterU.uAmp.value = (S.reduceMotion ? 0.05 : LOOK.sea ? 0.04 : 0.11) * (1 + wx.wind * 0.35 + wx.rain * 0.2);
     waterU.uSunDir.value.copy(L); waterU.uSunCol.value.copy(P.sun).multiplyScalar((0.4 + P.si * 0.7) * (1 - over * 0.7));
     waterU.uTop.value.copy(E.top); waterU.uHor.value.copy(E.hor); waterU.uFog.value.copy(E.hor);
     waterU.uShallow.value.copy(shallowDay).lerp(shallowWinter, winter).lerp(shallowNight, P.night).lerp(E.hor, over * 0.2);
@@ -1639,7 +1829,9 @@
     waterU.uWind.value = wx.wind;
     waterU.uBio.value = smooth(0.5, 0.9, P.night) * [0.6, 1, 0.7, 0.15][si] * (1 - wx.snow);
     PU.uTime.value = t;
-    PU.uCaus.value.copy(P.sun).multiplyScalar(P.si * (1 - over) * S.dayness * 0.55);
+    PU.uCaus.value.copy(P.sun).multiplyScalar(LOOK.sea ? 0 : P.si * (1 - over) * S.dayness * 0.55);
+    if (LOOK.glow) PU.uUnder.value.setRGB(LOOK.glow[0], LOOK.glow[1], LOOK.glow[2]);
+    PU.uCrack.value = LOOK.sea === 'lava' ? 1 : 0;
     // surfaces darken and shine while it rains, and dry slowly afterwards
     PU.uWet.value += ((wx.rain > 0.2 ? 1 : 0) - PU.uWet.value) * (1 - Math.exp(-S.dt / (wx.rain > 0.2 ? 20 : 60)));
     for (const m of wetMats) { m.specular.setScalar(0.045 + 0.22 * PU.uWet.value); m.shininess = 14 + 40 * PU.uWet.value; }

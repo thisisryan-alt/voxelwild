@@ -253,6 +253,24 @@
         t += 0.2;
       }
     },
+    // a thick bubble of lava rising and bursting: a low thump with a crackle
+    lavaBubble(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, out = this.pan(pan, this.ch.waves), t = ctx.currentTime + 0.03;
+      const o = ctx.createOscillator(), g = ctx.createGain(), f0 = 60 + rand() * 50;
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * 0.55, t + 0.35);
+      this.env(g, t, 0.07, 0.02, 0.4);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.45);
+      this.noiseBurst(t + 0.18, 0.06, 900 + rand() * 600, 1.1, 0.025, this.ch.waves, pan);
+    },
+    // a soft harp run, rising through a bright pentatonic scale
+    harpRun(pan) {
+      if (!this.ready()) return;
+      const ctx = this.ctx, notes = [74, 76, 79, 81, 83, 86, 88, 91];
+      let t = ctx.currentTime + 0.05;
+      const start = (rand() * 3) | 0, n = 5 + ((rand() * 3) | 0);
+      for (let i = 0; i < n; i++) { this.bell(midi(notes[Math.min(notes.length - 1, start + i)]), 0.022, pan + (i - n / 2) * 0.06, t, this.ch.music); t += 0.16 + rand() * 0.05; }
+    },
     // a deep temple bell far across the water, its long hum beating slowly
     templeBell(pan) {
       if (!this.ready()) return;
@@ -435,10 +453,12 @@
       const glide = !(now < this.nextGlide);
       if (glide) {
         this.nextGlide = now + 0.05;
-        this.surf.gain.setTargetAtTime(0.16 + 0.3 * b, now, tc);
-        this.surfLP.frequency.setTargetAtTime(260 + 520 * b, now, tc);
+        // a sea of cloud barely whispers; a sea of lava rumbles low
+        const sea = SW.K.WORLD.look.sea, seaVol = sea === 'cloud' ? 0.2 : sea === 'lava' ? 0.5 : 1;
+        this.surf.gain.setTargetAtTime((0.16 + 0.3 * b) * seaVol, now, tc);
+        this.surfLP.frequency.setTargetAtTime(sea === 'lava' ? 110 + 80 * b : 260 + 520 * b, now, tc);
         const x = S.breath.outT, w = x < 0.9 ? x / 0.9 : Math.exp(-(x - 0.9) * 0.75);
-        this.wash.gain.setTargetAtTime(0.012 + 0.11 * w, now, tc);
+        this.wash.gain.setTargetAtTime((0.012 + 0.11 * w) * (sea ? 0.15 : 1), now, tc);
         this.washBP.frequency.setTargetAtTime(900 + 1500 * w, now, tc);
         this.wind.gain.setTargetAtTime((0.03 + 0.05 * wx.wind) * (1 - wx.snow * 0.4) * (SW.K.WORLD.id === 'frost' ? 1.7 : 1), now, 0.5);
         this.windBP.frequency.setTargetAtTime(330 + 260 * wx.wind + 80 * Math.sin(S.t * 0.031), now, 0.5);
@@ -465,13 +485,13 @@
       // music: slow pads with long rests, and a sparse melody now and then
       // each world has its own colour: Lantern Bay keeps to the warm night chords, a tone lower; Frost
       // Fjord sits higher and leaves longer rests; Coral Cays stays in the bright day chords
-      const mus = SW.K.WORLD.look.music, shift = mus === 'frost' ? 5 : mus === 'coral' ? 2 : mus === 'lantern' ? -2 : 0;
-      const night = mus === 'lantern' ? true : mus === 'coral' ? false : S.night > 0.55;
+      const mus = SW.K.WORLD.look.music, shift = mus === 'frost' ? 5 : mus === 'coral' ? 2 : mus === 'lantern' ? -2 : mus === 'heaven' ? 7 : mus === 'hell' ? -5 : 0;
+      const night = mus === 'lantern' || mus === 'hell' ? true : mus === 'coral' || mus === 'heaven' ? false : S.night > 0.55;
       if (now > this.nextChord - 0.1) {
         const DAY = [[38, 45, 54, 57, 64], [35, 42, 50, 54, 57], [43, 50, 54, 59, 62], [45, 52, 57, 59, 64]];
         const NIGHT = [[35, 42, 50, 54, 59], [31, 38, 47, 50, 54], [33, 40, 47, 52, 57], [30, 37, 45, 49, 54]];
         this.chord((night ? NIGHT : DAY)[this.chordIdx % 4].map((m) => m + shift), this.nextChord, night);
-        this.chordIdx++; this.nextChord += mus === 'frost' ? 34 : 26;
+        this.chordIdx++; this.nextChord += mus === 'frost' || mus === 'hell' ? 34 : 26;
       }
       if (now > this.nextPhrase) {
         const scale = (night ? [71, 74, 76, 78, 81, 83] : [74, 76, 78, 81, 83, 86, 88]).map((m) => m + shift);
@@ -506,6 +526,14 @@
       if (wid === 'frost' && !(now < this.nextCreak)) {
         if (this.nextCreak) this.iceCreak(rand() * 1.6 - 0.8);
         this.nextCreak = now + 18 + rand() * 30;
+      }
+      if (wid === 'hell' && !(now < this.nextBubble2)) {
+        if (this.nextBubble2) this.lavaBubble(rand() * 1.6 - 0.8);
+        this.nextBubble2 = now + 1.2 + rand() * 3.5;
+      }
+      if (wid === 'heaven' && !(now < this.nextHarp)) {
+        if (this.nextHarp) this.harpRun(rand() * 1.2 - 0.6);
+        this.nextHarp = now + 25 + rand() * 30;
       }
       if (wid === 'coral' && S.dayness > 0.7 && wx.rain < 0.3 && !(now < this.nextCicada)) {
         if (this.nextCicada) this.cicada(rand() * 1.4 - 0.7);

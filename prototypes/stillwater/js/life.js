@@ -21,6 +21,8 @@
     parent.add(m);
     return m;
   }
+  const glowMats = new Map();
+  const glowMat = (c, k = 1.6) => { const key = c + ':' + k; if (!glowMats.has(key)) glowMats.set(key, new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k) })); return glowMats.get(key); };
   function pivot(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; }
   function root(c) { const g = new THREE.Group(); g.userData.creature = c; g.visible = false; scene.add(g); c.g = g; c.fade = 0; creatures.push(c); return g; }
   // Creatures appear and leave by growing and shrinking, never popping.
@@ -165,13 +167,14 @@
 
   // -------------------------------------------------------------------- gulls
   function makeGull(i) {
-    const c = { see: 'gull', a: rand() * TAU, w: (0.08 + rand() * 0.05) * (i % 2 ? 1 : -1), r0: 18 + rand() * 12, p: rand() * 10, off: 120 };
-    const g = root(c);
-    part(g, 0xf4f4f0, 0.16, 0.14, 0.5, 0, 0, 0); part(g, 0xf4f4f0, 0.13, 0.13, 0.14, 0, 0.05, 0.28);
-    part(g, 0xf2c04a, 0.04, 0.04, 0.1, 0, 0.04, 0.39); part(g, 0x9aa2aa, 0.12, 0.04, 0.14, 0, 0.02, -0.28);
+    const fire = !!K.WORLD.look.fireBirds;   // in Hell the gulls are birds of fire
+    const c = { see: fire ? 'firebird' : 'gull', a: rand() * TAU, w: (0.08 + rand() * 0.05) * (i % 2 ? 1 : -1), r0: 18 + rand() * 12, p: rand() * 10, off: 120 };
+    const g = root(c), body = fire ? glowMat(0xff7a2a, 1.4) : 0xf4f4f0, wing = fire ? glowMat(0xffa040, 1.8) : 0xe8eaec, tip = fire ? glowMat(0xffd070, 2.2) : 0x7a828a;
+    part(g, body, 0.16, 0.14, 0.5, 0, 0, 0); part(g, body, 0.13, 0.13, 0.14, 0, 0.05, 0.28);
+    part(g, fire ? 0x2a1a14 : 0xf2c04a, 0.04, 0.04, 0.1, 0, 0.04, 0.39); part(g, fire ? tip : 0x9aa2aa, fire ? 0.2 : 0.12, 0.04, fire ? 0.4 : 0.14, 0, 0.02, fire ? -0.4 : -0.28);
     c.L = pivot(g, -0.08, 0.04, 0); c.R = pivot(g, 0.08, 0.04, 0);
-    part(c.L, 0xe8eaec, 0.4, 0.03, 0.2, -0.2, 0, 0); part(c.L, 0x7a828a, 0.3, 0.03, 0.15, -0.55, 0, -0.02);
-    part(c.R, 0xe8eaec, 0.4, 0.03, 0.2, 0.2, 0, 0); part(c.R, 0x7a828a, 0.3, 0.03, 0.15, 0.55, 0, -0.02);
+    part(c.L, wing, 0.4, 0.03, 0.2, -0.2, 0, 0); part(c.L, tip, 0.3, 0.03, 0.15, -0.55, 0, -0.02);
+    part(c.R, wing, 0.4, 0.03, 0.2, 0.2, 0, 0); part(c.R, tip, 0.3, 0.03, 0.15, 0.55, 0, -0.02);
     c.update = (dt, t) => {
       const active = S.dayness > 0.4 && S.weather.rain < 0.6 && S.weather.snow < 0.6;
       c.off += ((active ? 0 : 140) - c.off) * (1 - Math.exp(-dt / 20));
@@ -189,9 +192,10 @@
 
   // ---------------------------------------------------------------- songbirds
   function makeSongbird(i) {
-    const kinds = [[0x7a5a40, 0xe0773a], [0x5a8ac0, 0xf2d35a], [0x8a6a4a, 0xc84a3a], [0x6a6a5a, 0xe8e0c8]];
+    const doves = !!K.WORLD.look.doves;
+    const kinds = doves ? [[0xf6f4ee, 0xfaf8f2], [0xeeece6, 0xf6f2ea]] : [[0x7a5a40, 0xe0773a], [0x5a8ac0, 0xf2d35a], [0x8a6a4a, 0xc84a3a], [0x6a6a5a, 0xe8e0c8]];
     const [body, breast] = kinds[i % kinds.length];
-    const c = { see: 'songbird', i, state: 'away', from: new THREE.Vector3(), to: new THREE.Vector3(), k: 0, dur: 1, timer: 0, p: rand() * 10 };
+    const c = { see: doves ? 'dove' : 'songbird', i, state: 'away', from: new THREE.Vector3(), to: new THREE.Vector3(), k: 0, dur: 1, timer: 0, p: rand() * 10 };
     const g = root(c);
     part(g, body, 0.12, 0.1, 0.16, 0, 0.07, 0, true); part(g, breast, 0.1, 0.07, 0.06, 0, 0.06, 0.06);
     c.head = pivot(g, 0, 0.14, 0.06); part(c.head, body, 0.09, 0.08, 0.09, 0, 0, 0); part(c.head, 0x3a3030, 0.03, 0.03, 0.05, 0, -0.01, 0.06);
@@ -260,22 +264,23 @@
     return ringR[i % 72] * (1 - k) + ringR[(i + 1) % 72] * k;
   }
   function makeDuck(i) {
-    const baby = i >= 2, drake = i === 0;
-    const c = { see: baby ? 'ducklings' : 'duck', i, baby, p: rand() * 10, a: 0.2 - i * 0.05, dip: 0 };
-    const g = root(c), s = baby ? 0.5 : 1;
-    const body = drake ? 0xc9c4b8 : baby ? 0xf2d36a : 0x8a6e52;
+    const baby = i >= 2, drake = i === 0, swan = !!K.WORLD.look.swans;   // in Heaven, swans and grey cygnets
+    const c = { see: swan ? (baby ? 'cygnets' : 'swan') : baby ? 'ducklings' : 'duck', i, baby, p: rand() * 10, a: 0.2 - i * 0.05, dip: 0 };
+    const g = root(c), s = (baby ? 0.5 : 1) * (swan ? 1.5 : 1);
+    const body = swan ? (baby ? 0xb8b4ae : 0xf8f8f4) : drake ? 0xc9c4b8 : baby ? 0xf2d36a : 0x8a6e52;
     part(g, body, 0.32 * s, 0.2 * s, 0.5 * s, 0, 0.08 * s, 0, true);
-    part(g, drake ? 0x5a4a3a : body, 0.2 * s, 0.1 * s, 0.14 * s, 0, 0.16 * s, -0.24 * s);
-    c.head = pivot(g, 0, 0.2 * s, 0.2 * s);
-    part(c.head, drake ? 0x2f6b4a : baby ? 0xf6dc78 : 0x7a5e44, 0.18 * s, 0.18 * s, 0.18 * s, 0, 0.1 * s, 0.02 * s);
-    part(c.head, 0xe8a030, 0.08 * s, 0.04 * s, 0.12 * s, 0, 0.08 * s, 0.15 * s);
+    part(g, swan ? body : drake ? 0x5a4a3a : body, 0.2 * s, 0.1 * s, 0.14 * s, 0, 0.16 * s, -0.24 * s);
+    if (swan) part(g, body, 0.08 * s, 0.32 * s, 0.08 * s, 0, 0.3 * s, 0.2 * s);   // the long neck
+    c.head = pivot(g, 0, (swan ? 0.42 : 0.2) * s, (swan ? 0.24 : 0.2) * s);
+    part(c.head, swan ? body : drake ? 0x2f6b4a : baby ? 0xf6dc78 : 0x7a5e44, (swan ? 0.12 : 0.18) * s, (swan ? 0.1 : 0.18) * s, (swan ? 0.14 : 0.18) * s, 0, 0.1 * s, 0.02 * s);
+    part(c.head, swan ? 0xe8702a : 0xe8a030, 0.08 * s, 0.04 * s, 0.12 * s, 0, 0.08 * s, 0.15 * s);
     c.update = (dt, t) => {
       const si = season();
       fadeTo(c, !c.baby || si <= 1, dt, 0.6);
       const sleep = S.night > 0.7;
       if (c.i === 0) c.a += dt * (sleep ? 0.002 : 0.011);
       else {
-        const lead = creatures.find((o) => o.see && (o.see === 'duck' || o.see === 'ducklings') && o.i === c.i - 1);
+        const lead = creatures.find((o) => o.see && (o.see === 'duck' || o.see === 'ducklings' || o.see === 'swan' || o.see === 'cygnets') && o.i === c.i - 1);
         if (lead) { const gap = c.baby ? 0.035 : 0.06; c.a += clamp((lead.a - gap) - c.a, -0.03, 0.03) * dt * 2; }
       }
       const r = ringAt(c.a) + Math.sin(t * 0.07 + c.p) * 0.6 + (c.i % 2) * 0.4;
@@ -392,13 +397,22 @@
 
   // -------------------------------------------------------------------- crabs
   function makeCrab(i, sand) {
-    const c = { see: 'crab', i, timer: rand() * 3, dir: 1, moving: 0, p: rand() * 10 };
+    const sal = K.WORLD.look.sea === 'lava';   // in Hell, salamanders bask on the warm stone instead
+    const c = { see: sal ? 'salamander' : 'crab', i, timer: rand() * 3, dir: 1, moving: 0, p: rand() * 10 };
     const g = root(c);
-    part(g, 0xd0604a, 0.2, 0.08, 0.14, 0, 0.06, 0, true);
-    part(g, 0xe07058, 0.06, 0.05, 0.06, -0.13, 0.06, 0.07); part(g, 0xe07058, 0.06, 0.05, 0.06, 0.13, 0.06, 0.07);
-    part(g, 0x2a2420, 0.025, 0.04, 0.025, -0.04, 0.12, 0.05); part(g, 0x2a2420, 0.025, 0.04, 0.025, 0.04, 0.12, 0.05);
     c.legs = pivot(g, 0, 0.03, 0);
-    for (const s of [-1, 1]) for (let j = 0; j < 3; j++) part(c.legs, 0xb85040, 0.08, 0.02, 0.02, s * 0.13, 0, -0.04 + j * 0.04);
+    if (sal) {
+      part(g, 0x1a1414, 0.36, 0.06, 0.1, 0, 0.05, 0, true);
+      for (const x of [-0.12, -0.02, 0.08]) part(g, glowMat(0xff7a2a, 1.5), 0.04, 0.02, 0.06, x, 0.085, 0);
+      part(g, 0x1a1414, 0.08, 0.05, 0.08, 0.2, 0.06, 0); part(g, glowMat(0xffb050, 1.8), 0.02, 0.02, 0.02, 0.24, 0.08, 0.03);
+      part(g, 0x1a1414, 0.18, 0.03, 0.04, -0.26, 0.04, 0);
+      for (const s of [-1, 1]) for (const x of [-0.1, 0.1]) part(c.legs, 0x2a1e1a, 0.03, 0.02, 0.07, x, 0, s * 0.07);
+    } else {
+      part(g, 0xd0604a, 0.2, 0.08, 0.14, 0, 0.06, 0, true);
+      part(g, 0xe07058, 0.06, 0.05, 0.06, -0.13, 0.06, 0.07); part(g, 0xe07058, 0.06, 0.05, 0.06, 0.13, 0.06, 0.07);
+      part(g, 0x2a2420, 0.025, 0.04, 0.025, -0.04, 0.12, 0.05); part(g, 0x2a2420, 0.025, 0.04, 0.025, 0.04, 0.12, 0.05);
+      for (const s of [-1, 1]) for (let j = 0; j < 3; j++) part(c.legs, 0xb85040, 0.08, 0.02, 0.02, s * 0.13, 0, -0.04 + j * 0.04);
+    }
     const spot = sand[(i * 53 + 11) % sand.length];
     g.position.set(spot[0], spot[2], spot[1]);
     g.rotation.y = rand() * TAU;
@@ -677,9 +691,10 @@
 
   // ---------------------------------------------------------------- leaping fish
   function makeLeaper() {
-    const c = { see: 'leapfish', timer: 30, k: 1, from: new THREE.Vector3(), dir: 0 };
+    const lava = K.WORLD.look.sea === 'lava';
+    const c = { see: lava ? 'lavafish' : 'leapfish', timer: 30, k: 1, from: new THREE.Vector3(), dir: 0 };
     const g = root(c);
-    part(g, 0xc8d4dc, 0.07, 0.11, 0.28, 0, 0, 0); part(g, 0x9aa8b2, 0.02, 0.1, 0.1, 0, 0, -0.17);
+    part(g, lava ? glowMat(0xff8a2a, 1.8) : 0xc8d4dc, 0.07, 0.11, 0.28, 0, 0, 0); part(g, lava ? glowMat(0xffc050, 2.2) : 0x9aa8b2, 0.02, 0.1, 0.1, 0, 0, -0.17);
     c.update = (dt) => {
       if (c.k >= 1) {
         fadeTo(c, false, dt, 4);
@@ -700,14 +715,19 @@
 
   // ------------------------------------------------- grazers: sheep and deer
   function makeGrazer(i, kind) {
-    const fox = kind === 'fox', sheep = kind === 'sheep', rein = kind === 'deer' && !!LOOK.reindeer, stag = kind === 'deer' && (i === 0 || rein);
-    const I = sheep ? K.ISLAND.meadow : byShape(fox ? 'glacier' : 'pine');
+    const fox = kind === 'fox', sheep = kind === 'sheep', peg = kind === 'pegasus', rein = kind === 'deer' && !!LOOK.reindeer, stag = kind === 'deer' && (i === 0 || rein);
+    const I = sheep ? K.ISLAND.meadow : peg ? K.ISLAND.highmeadow : byShape(fox ? 'glacier' : 'pine');
     if (!I) return;
     const cols = fox ? I.cols.rock : I.cols.grass, canWalk = fox ? (x, z) => W.heightAt(x, z) >= 0 && !W.isGrass(x, z) : W.isGrass;
     const c = { see: rein ? 'reindeer' : kind, i, state: 'graze', timer: rand() * 4, speed: 0, goal: null, p: rand() * 10, look: 0, cool: 0 };
-    const g = root(c), coat = sheep ? 0xf2efe6 : fox ? 0xf2f4f6 : rein ? 0x8a7a6a : 0x9a6a44, dark = sheep ? 0x2a2624 : fox ? 0xd2d9de : rein ? 0x5a4c40 : 0x7a5434;
-    const legH = sheep ? 0.28 : fox ? 0.2 : 0.5, bodyY = legH + (sheep ? 0.2 : fox ? 0.1 : 0.16);
-    part(g, coat, sheep ? 0.5 : fox ? 0.22 : 0.36, sheep ? 0.4 : fox ? 0.2 : 0.32, sheep ? 0.66 : fox ? 0.46 : 0.72, 0, bodyY, 0, true);
+    const g = root(c), coat = sheep ? 0xf2efe6 : fox ? 0xf2f4f6 : peg ? 0xfaf8f4 : rein ? 0x8a7a6a : 0x9a6a44, dark = sheep ? 0x2a2624 : fox ? 0xd2d9de : peg ? 0xe8e2d8 : rein ? 0x5a4c40 : 0x7a5434;
+    const legH = sheep ? 0.28 : fox ? 0.2 : peg ? 0.62 : 0.5, bodyY = legH + (sheep ? 0.2 : fox ? 0.1 : 0.16);
+    part(g, coat, sheep ? 0.5 : fox ? 0.22 : peg ? 0.42 : 0.36, sheep ? 0.4 : fox ? 0.2 : peg ? 0.4 : 0.32, sheep ? 0.66 : fox ? 0.46 : peg ? 0.9 : 0.72, 0, bodyY, 0, true);
+    if (peg) {
+      // a winged horse: gold mane and tail, and white wings folded along its back that open as it walks
+      part(g, 0xe8c86a, 0.06, 0.24, 0.3, 0, bodyY + 0.3, 0.32); part(g, 0xe8c86a, 0.08, 0.3, 0.1, 0, bodyY - 0.05, -0.5);
+      c.wings = [-1, 1].map((sx) => { const pv = pivot(g, sx * 0.2, bodyY + 0.18, 0.05); part(pv, 0xffffff, 0.5, 0.04, 0.34, sx * 0.25, 0, 0); part(pv, 0xf4f0e6, 0.36, 0.03, 0.26, sx * 0.62, 0, -0.04); return pv; });
+    }
     c.legs = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([sx, sz]) => { const pv = pivot(g, sx * (sheep ? 0.15 : fox ? 0.07 : 0.12), legH, sz * (fox ? 0.16 : 0.24)); part(pv, dark, 0.07, legH, 0.07, 0, -legH / 2, 0); return pv; });
     c.head = pivot(g, 0, bodyY + (sheep ? 0.08 : fox ? 0.08 : 0.22), fox ? 0.26 : 0.36);
     part(c.head, fox ? coat : dark, sheep ? 0.18 : 0.14, sheep ? 0.2 : 0.16, sheep ? 0.22 : 0.26, 0, 0, 0.08);
@@ -743,6 +763,7 @@
         pos.x = nx; pos.z = nz; pos.y += (gh - pos.y) * Math.min(1, dt * 6);
         const sw = Math.sin(t * c.speed * 22) * 0.5;
         c.legs.forEach((l, j) => { l.rotation.x = (j === 0 || j === 3 ? sw : -sw); });
+        if (c.wings) c.wings.forEach((w, j) => { w.rotation.z = (j ? -1 : 1) * (0.3 + Math.sin(t * 5) * 0.35); });
         c.head.rotation.x = 0.1;
         if (c.speed > 1) pos.y += Math.abs(Math.sin(t * 10)) * 0.15;
       }
@@ -959,6 +980,8 @@
   const FISH = {
     stillwater: [['mackerel', 0x5f8098, 25, 38], ['pollock', 0x8a9a78, 30, 55], ['brown trout', 0xa88a5a, 25, 45], ['perch', 0x8aa050, 15, 30], ['salmon', 0xc8a0a0, 60, 85, 1]],
     lantern: [['golden carp', 0xe0a040, 25, 50], ['catfish', 0x5a5a50, 30, 60], ['loach', 0xa08a6a, 10, 20], ['koi', 0xf2efe8, 40, 70, 1]],
+    heaven: [['cloud carp', 0xf4f0e8, 30, 55], ['sky perch', 0x9ec4f0, 15, 30], ['golden minnow', 0xf4cf5a, 8, 15], ['rainbow trout', 0xe8a0c0, 35, 60, 1]],
+    hell: [['ember eel', 0xff6a2a, 40, 90], ['cinder carp', 0x3a2420, 30, 55], ['glowfin', 0xffb050, 15, 30], ['phoenix fish', 0xffd070, 50, 80, 1]],
     frost: [['arctic char', 0xc87a5a, 30, 55], ['cod', 0x8a8a6a, 40, 80], ['herring', 0xa8b8c8, 20, 30], ['halibut', 0x6a6a5a, 80, 140, 1]],
     coral: [['parrotfish', 0x4ac0b0, 25, 45], ['snapper', 0xd85a4a, 30, 60], ['bonefish', 0xc8ccd0, 40, 70], ['triggerfish', 0x6a7ab0, 20, 40], ['flying fish', 0x7aa0d0, 20, 30, 1]],
   };
@@ -1307,6 +1330,10 @@
     wake = W.makeEmitter(320, 'soft', false, 280);
   }
   function splash(x, z, n) {
+    if (K.WORLD.look.sea === 'lava') {
+      for (let i = 0; i < n; i++) flames.emit({ x, y: K.WL + 0.1, z, vx: (rand() - 0.5) * 1.4, vy: 1.5 + rand() * 2, vz: (rand() - 0.5) * 1.4, grav: 5, life: 0.7 + rand() * 0.5, size: 1.2, size2: 0.3, r: 1, g: 0.45 + rand() * 0.3, b: 0.12, alpha: 0.9 });
+      return;
+    }
     for (let i = 0; i < n; i++) puffs.emit({ x, y: K.WL + 0.05, z, vx: (rand() - 0.5) * 1.2, vy: 1.2 + rand() * 1.5, vz: (rand() - 0.5) * 1.2, grav: 6, life: 0.6 + rand() * 0.3, size: 0.6, size2: 0.3, alpha: 0.8, r: 0.9, g: 0.95, b: 1 });
   }
   L.splash = splash;
@@ -1816,24 +1843,32 @@
     haloTex = makeHaloTexture();
     initParticles();
     spout = W.makeEmitter(120, 'soft', false, 300);
-    for (let i = 0; i < 6; i++) makeKoi(i);
-    for (let i = 0; i < 2; i++) makeGoldfish(i);
-    for (let i = 0; i < 10; i++) makeButterfly(i);
+    // which everyday visitors live here: a sea of cloud or lava has no fish, ducks or whales, and Hell
+    // has salamanders for crabs, birds of fire for gulls, and no butterflies or songbirds
+    const realSea = !LOOK.sea, hellish = LOOK.sea === 'lava';
+    if (realSea) { for (let i = 0; i < 6; i++) makeKoi(i); for (let i = 0; i < 2; i++) makeGoldfish(i); }
+    if (!hellish) for (let i = 0; i < 10; i++) makeButterfly(i);
     for (let i = 0; i < 5; i++) makeGull(i);
-    for (let i = 0; i < 6; i++) makeSongbird(i);
-    for (let i = 0; i < 5; i++) makeDuck(i);
-    for (let i = 0; i < 4; i++) makeFrog(i);
-    for (let i = 0; i < 3; i++) makeRabbit(i);
-    for (let i = 0; i < 3; i++) makeCrab(i, W.cols.sand);
+    if (!hellish) for (let i = 0; i < 6; i++) makeSongbird(i);
+    if (realSea || LOOK.swans) for (let i = 0; i < 5; i++) makeDuck(i);
+    if (realSea) for (let i = 0; i < 4; i++) makeFrog(i);
+    if (!hellish) for (let i = 0; i < 3; i++) makeRabbit(i);
+    if (!LOOK.sea || hellish) for (let i = 0; i < 3; i++) makeCrab(i, W.cols.sand);
     // the visitors of particular islands, wherever a world has an island of that kind
-    const atoll = byShape('atoll'), wreck = byShape('wreck'), rocks = byShape('rocks'), basalt = byShape('basalt'), dunes = byShape('dunes'), stones = byShape('stones');
+    // (Heaven and Hell have none of the shape-borrowing natives: no seals on Brimstone Rocks)
+    const nat = realSea, by = (shape) => (nat ? byShape(shape) : null);
+    const atoll = by('atoll'), wreck = by('wreck'), rocks = by('rocks'), basalt = by('basalt'), dunes = by('dunes'), stones = by('stones');
     if (atoll) for (let i = 0; i < 3; i++) makeCrab(i + 3, atoll.cols.sand);
     if (wreck) for (let i = 0; i < 2; i++) makeCrab(i + 6, wreck.cols.sand);
-    for (let i = 0; i < 3; i++) makeDragonfly(i);
-    makeHeron(); makeOwl(); makeCat(); makeWhale(); makeBoat(); makeTurtle(); makeLeaper();
+    if (hellish && K.ISLAND.brimstone) for (let i = 0; i < 4; i++) makeCrab(i + 3, K.ISLAND.brimstone.cols.rock.concat(K.ISLAND.brimstone.cols.sand));
+    if (realSea) for (let i = 0; i < 3; i++) makeDragonfly(i);
+    makeOwl(); makeCat();
+    if (realSea) { makeHeron(); makeWhale(); makeBoat(); makeTurtle(); }
+    if (realSea || hellish) makeLeaper();
     for (let i = 0; i < 5; i++) makeGrazer(i, 'sheep');
-    if (LOOK.deer !== false) for (let i = 0; i < 3; i++) makeGrazer(i, 'deer');
-    for (let i = 0; i < 3; i++) makeGrazer(i, 'fox');
+    if (LOOK.deer !== false && nat) for (let i = 0; i < 3; i++) makeGrazer(i, 'deer');
+    if (nat) for (let i = 0; i < 3; i++) makeGrazer(i, 'fox');
+    if (K.ISLAND.highmeadow) for (let i = 0; i < 4; i++) makeGrazer(i, 'pegasus');
     if (K.ISLAND.marsh) for (let i = 0; i < 3; i++) makeOtter(i);
     if (rocks) { for (let i = 0; i < 4; i++) makeSeal(i, rocks); for (let i = 0; i < 6; i++) makePuffin(i, rocks); }
     if (atoll) for (let i = 0; i < 3; i++) makeSchool(i, atoll);
@@ -1867,7 +1902,7 @@
     updateLanterns(dt, t);
     updateSkips(dt);
     updateFishing(dt, t);
-    if (rand() < dt * 0.05) { const k = creatures.filter((c) => c.see === 'koi'); const p = U.pick(rand, k).g.position; W.addRipple(p.x, p.z, 0.35); }
+    if (rand() < dt * 0.05) { const k = creatures.filter((c) => c.see === 'koi'); if (k.length) { const p = U.pick(rand, k).g.position; W.addRipple(p.x, p.z, 0.35); } }
     seeTimer -= dt;
     if (seeTimer <= 0) {
       seeTimer = 1;

@@ -254,6 +254,18 @@
   .isle.here { border-color: rgba(143, 211, 199, 0.5); background: rgba(143, 211, 199, 0.08); }
   .isle-here { font-size: 0.82rem; color: var(--tide); letter-spacing: 0.04em; }
   .isle-far { font-weight: 400; font-size: 0.82rem; color: var(--ink-soft); }
+  /* bloom and what it opens */
+  .bloom-chip { color: #f4d58a; font-variant-numeric: tabular-nums; }
+  .chip.item.locked { opacity: 0.55; }
+  .chip.item .need, .bloom-list .need, .isle-lock { color: #e8c877; font-size: 0.8rem; margin-left: 0.4em; }
+  .isle.locked { opacity: 0.75; }
+  .isle-lock { margin-left: 0; align-self: center; }
+  .bloom-big { font-family: var(--display); font-size: 2.2rem; margin: 0.4rem 0 0.2rem; color: #f4d58a; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+  .bloom-big span { font-family: var(--sans, inherit); font-size: 0.92rem; color: var(--ink-soft); }
+  .bloom-bar { height: 6px; border-radius: 3px; background: rgba(238, 244, 240, 0.12); overflow: hidden; margin: 0.3rem 0 0.6rem; }
+  .bloom-bar span { display: block; height: 100%; background: linear-gradient(90deg, #8fd3c7, #f4d58a); border-radius: 3px; }
+  .bloom-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .bloom-list li { display: flex; justify-content: space-between; gap: 1rem; }
   .isle-out { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0.6rem 0 0.8rem; }
   .pop-sub { font-family: var(--display); font-weight: 400; font-size: 1.15rem; margin: 1.1rem 0 0.5rem; }
   .isle.world { border-style: dashed; }
@@ -302,6 +314,7 @@
     </div>
   </div>
   <div class="group side" role="group" aria-label="Settings">
+    <button id="btnBloom" class="chip bloom-chip" aria-expanded="false" data-popid="popBloom" aria-label="Your garden's bloom">✿ <span id="bloomVal">0</span></button>
     <button id="btnBreath" class="chip" data-pop="popBreath" aria-expanded="false">Breathe</button>
     <button id="btnSound" class="chip" data-pop="popSound" aria-expanded="false">Sound</button>
     <button id="btnView" class="chip" data-pop="popView" aria-expanded="false">View</button>
@@ -313,6 +326,11 @@
     <button id="btnSettings" class="chip">Settings</button>
     <button id="btnHide" class="chip">Hide</button>
   </div>
+</div>
+
+<div id="popBloom" class="pop" hidden role="dialog" aria-labelledby="popBloomTitle">
+  <h2 id="popBloomTitle">Bloom</h2>
+  <div id="bloomBody"></div>
 </div>
 
 <div id="popBreath" class="pop" hidden role="dialog" aria-labelledby="popBreathTitle">

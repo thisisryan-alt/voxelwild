@@ -53,16 +53,16 @@ window.SW = window.SW || {};
         { id: 'willows', name: 'Willow Isle', x: 28, z: -66, r: 11, h: 3, line: 'Weeping willows and cherry trees over a quiet shore.' },
         { id: 'glade', name: 'Firefly Glade', x: 80, z: -46, r: 10, h: 3.5, line: 'A mossy meadow where the fireflies rise thickest on warm nights.' },
       ],
-      look: { season: 1.6, tod0: 0.64, daySpeed: 0.6, shallow: 0x55ad9f, deep: 0x1c4866, lanterns: 54, fireflies: 2.2, bats: true, music: 'lantern' },
+      look: { season: 1.6, tod0: 0.64, daySpeed: 0.6, grade: { hi: [1.04, 0.99, 0.93], lo: [0.96, 1.0, 1.06], bloom: 1.2 }, shallow: 0x55ad9f, deep: 0x1c4866, lanterns: 54, fireflies: 2.2, bats: true, music: 'lantern' },
       weather: { clear: 0.45, fair: 0.35, rain: 0.1, fog: 0.1 }, aurora: 0,
-      starter: ['cherry', 'willow', 'maple', 'cherry', 'lavender', 'tulips', 'flowers', 'bamboo', 'fern', 'mushroom'],
+      starter: ['cherry', 'willow', 'maple', 'cherry', 'lavender', 'tulips', 'flowers', 'bamboo', 'bonsai', 'lanternpost'],
     },
     frost: {
       id: 'frost', name: 'Frost Fjord', homeName: 'Fjord Haven', short: 'A fjord in deep winter',
       line: 'A cold, bright fjord in deep winter: ice cliffs, drifting icebergs, hot springs steaming in the snow, reindeer, and the aurora on most nights.',
       grid: [320, -160], skerries: 12, homeSeed: 13,
       pond: { x: 4.5, z: 5, r: 2.4 },
-      stacks: [[-24, 14, 1.2, 2], [22, 16, 1.0, 1], [-18, -22, 1.4, 2]],
+      stacks: [[-29, 24, 1.2, 2], [22, 16, 1.0, 1], [-18, -22, 1.4, 2]],
       islands: [
         { id: 'home', name: 'Fjord Haven', x: 0, z: 0, r: 15, line: 'Your garden under the snow, by a frozen pond.' },
         { id: 'icecliffs', shape: 'glacier', name: 'Ice Cliffs', x: -60, z: -18, r: 14, h: 8, line: 'Towering blue-white ice. Arctic foxes trot along the top.' },
@@ -71,9 +71,9 @@ window.SW = window.SW || {};
         { id: 'sealskerry', shape: 'rocks', name: 'Seal Skerry', x: -8, z: 72, r: 7, line: 'Icy rocks where seals haul out and puffins nest.' },
         { id: 'northpoint', shape: 'stones', name: 'North Point', x: -62, z: 56, r: 11, h: 4, line: 'A bare headland with a ring of stones: the best place to watch the aurora. White hares live here.' },
       ],
-      look: { season: 3.5, shallow: 0x6aa2b0, deep: 0x173a55, icebergs: 16, snowyOwl: true, reindeer: true, whiteHares: true, music: 'frost' },
+      look: { season: 3.5, grade: { hi: [0.98, 1.0, 1.04], lo: [0.95, 0.99, 1.06] }, shallow: 0x6aa2b0, deep: 0x173a55, icebergs: 16, snowyOwl: true, reindeer: true, whiteHares: true, music: 'frost' },
       weather: { clear: 0.35, fair: 0.25, snow: 0.3, fog: 0.1 }, aurora: 0.85,
-      starter: ['pine', 'birch', 'pine', 'pine', 'cairn', 'campfire', 'lantern', 'cairn'],
+      starter: ['snowpine', 'birch', 'snowpine', 'snowpine', 'cairn', 'campfire', 'snowman', 'cairn'],
     },
     coral: {
       id: 'coral', name: 'Coral Cays', homeName: 'Coral Key', short: 'Turquoise shallows and white sand',
@@ -89,12 +89,98 @@ window.SW = window.SW || {};
         { id: 'turtlebeach', shape: 'dunes', name: 'Turtle Beach', x: -56, z: -36, r: 12, h: 3, line: 'Low dunes and a long beach where plovers run the tideline.' },
         { id: 'junglehill', shape: 'pine', name: 'Jungle Hill', x: 74, z: -28, r: 10, h: 7, line: 'A steep green hill thick with bamboo and ferns.' },
       ],
-      look: { season: 1.45, shallow: 0x58d6cc, deep: 0x1b7aa6, whiteSand: true, dolphins: true, flamingos: true, deer: false, music: 'coral' },
+      look: { season: 1.45, grade: { hi: [1.02, 1.01, 0.97], lo: [0.96, 1.02, 1.04], sat: 1.08 }, shallow: 0x58d6cc, deep: 0x1b7aa6, whiteSand: true, dolphins: true, flamingos: true, deer: false, music: 'coral' },
       weather: { clear: 0.6, fair: 0.3, rain: 0.1 }, aurora: 0,
-      starter: ['palm', 'palm', 'palm', 'sunflower', 'flowers', 'flowers', 'tulips', 'dune', 'dune'],
+      starter: ['palm', 'palm', 'palm', 'hibiscus', 'flowers', 'flowers', 'hibiscus', 'dune', 'dune'],
+    },
+    heaven: {
+      id: 'heaven', name: 'Heaven', homeName: 'Cloud Garden', short: 'Islands above a sea of cloud',
+      line: 'Gardens of white and gold on islands above a sea of cloud, with little islands drifting overhead. Marble and light, doves and swans, and winged horses on the high meadow.',
+      grid: [320, -160], skerries: 10, homeSeed: 37,
+      pond: { x: 4.5, z: 5, r: 2.4 },
+      stacks: [[-29, 24, 1.0, 2], [21, -17, 1.0, 1]],
+      islands: [
+        { id: 'home', name: 'Cloud Garden', x: 0, z: 0, r: 15, line: 'Your garden in the light, by a pool of cloud.' },
+        { id: 'temple', shape: 'stones', name: 'Temple of Pillars', x: 58, z: 18, r: 12, h: 4, line: 'A ring of white pillars on a green rise, open to the sky.' },
+        { id: 'goldfields', name: 'Golden Fields', x: -50, z: 44, r: 12, h: 3, line: 'Soft hills of golden flowers that glow as the light goes.' },
+        { id: 'swanlagoon', shape: 'atoll', name: 'Swan Lagoon', x: 40, z: -58, r: 11, line: 'A ring of white sand around a lagoon of cloud. Swans glide there.' },
+        { id: 'highmeadow', name: 'High Meadow', x: -62, z: -30, r: 12, h: 5, line: 'A tall meadow where winged horses graze.' },
+        { id: 'harpisle', shape: 'pine', name: 'Harp Hill', x: 74, z: -26, r: 9, h: 7, line: 'A steep hill of marble and cloud trees, with a harp at the top.' },
+      ],
+      look: { season: 1.2, todLock: 0.33, sea: 'cloud', grassPal: [0x9ad874, 0xa6de80, 0xc4e488, 0x8fd06a], motes: 'gold', islets: 12, doves: true, swans: true, deer: false, music: 'heaven',
+        sky: { top: 0x6fa6e8, hor: 0xf6e6c8, sun: 0xfff0d0 }, light: { hs: 0xdce8f6, hg: 0xd8c49a, hi: 0.62 }, glow: [0.035, 0.032, 0.026], fog: [130, 420],
+        tpal: { 1: [0xf2ead6, 0xeae0c8, 0xf6f0e0], 2: [0x8fd06a, 0x9ad874, 0xa6de80, 0x86c862], 5: [0xeeeae0, 0xe2dccf, 0xf4f2ea] }, tstatic: { 3: 0xc8b088, 4: 0xddd6c8, 0: 0xeeeae0 },
+        grade: { hi: [1.02, 1.0, 0.97], lo: [0.98, 0.99, 1.04], bloom: 1.15, rays: 2.2 } },
+      weather: { clear: 0.75, fair: 0.25 }, aurora: 0,
+      starter: ['cloudtree', 'cloudtree', 'goldflower', 'goldflower', 'goldflower', 'pillar', 'tulips', 'flowers', 'fountain'],
+    },
+    hell: {
+      id: 'hell', name: 'Hell', homeName: 'Ember Rest', short: 'A lava sea under a red sky',
+      line: 'Black rock and ash above a slow sea of lava, under a sky the colour of embers. Ash trees glow, braziers burn, salamanders bask on the warm stone and fire birds wheel overhead. Strangely peaceful.',
+      grid: [320, -160], skerries: 14, homeSeed: 43,
+      pond: { x: 4.5, z: 5, r: 2.4 },
+      stacks: [[-29, 24, 1.2, 2], [22, 16, 1.0, 2], [-18, -22, 1.4, 3], [8, -25, 0.9, 1]],
+      islands: [
+        { id: 'home', name: 'Ember Rest', x: 0, z: 0, r: 15, line: 'Your garden on warm black stone, by a pool of lava.' },
+        { id: 'cinder', shape: 'glacier', name: 'Mount Cinder', x: -58, z: -24, r: 14, h: 8, line: 'A cone of black glass with ember light in its cracks.' },
+        { id: 'obsidian', shape: 'basalt', name: 'Obsidian Columns', x: 52, z: -46, r: 12, h: 7, line: 'Dark columns rising from the lava, and fire birds above them.' },
+        { id: 'ashdunes', shape: 'dunes', name: 'Ash Dunes', x: -52, z: 46, r: 12, h: 3, line: 'Soft grey dunes of ash, warm underfoot.' },
+        { id: 'brimstone', shape: 'rocks', name: 'Brimstone Rocks', x: 6, z: 70, r: 8, line: 'Warm rocks where salamanders bask.' },
+        { id: 'firegarden', name: 'Fire Garden', x: 66, z: 30, r: 11, h: 3, line: 'Ash trees and fire blooms around a ring of braziers.' },
+      ],
+      look: { season: 1.5, todLock: 0.665, sea: 'lava', grassPal: [0x6a3a26, 0x5a2e20, 0x7a4a2a, 0x8a3a1e], motes: 'embers', bats: true, deer: false, fireBirds: true, music: 'hell', glowMin: 0.55, fog: [45, 190],
+        sky: { top: 0x2a0a0c, hor: 0xd8502a, sun: 0xff7a3a }, light: { hs: 0x6a2a24, hg: 0xff7030, hi: 0.85 }, glow: [0.55, 0.16, 0.04],
+        tpal: { 1: [0x4a4644, 0x3e3a38, 0x55504c], 2: [0x5a3a2a, 0x4a2e22, 0x6a4430, 0x3e2a20], 5: [0x2e2a2c, 0x26222a, 0x36302e], 6: [0x1c1822, 0x241e2c, 0x2a2232], 8: [0x2a2628, 0x222024], 9: [0x2a2624, 0x221e1e] },
+        tstatic: { 3: 0x3a2420, 4: 0x2a2628, 7: 0x1e1a24, 10: 0x1a1618, 0: 0x2a1a14 },
+        grade: { hi: [1.06, 0.98, 0.9], lo: [1.05, 0.96, 0.95], bloom: 1.3, heat: 1, rays: 1.4 } },
+      weather: { clear: 0.55, fair: 0.25, fog: 0.2 }, aurora: 0,
+      starter: ['ashtree', 'ashtree', 'firebloom', 'firebloom', 'firebloom', 'brazier', 'obsidian', 'emberlantern'],
     },
   };
-  const WORLD_ORDER = ['stillwater', 'lantern', 'frost', 'coral'];
+  // What each world offers, and when. items: [kind, bloom needed in this world]; islands open at the bloom
+  // shown; a world opens once the bloom of all your worlds together reaches its unlock.
+  const PROGRESS = {
+    stillwater: {
+      unlock: 0,
+      items: [['oak', 0], ['flowers', 0], ['lantern', 0], ['tulips', 0], ['bench', 0], ['birch', 10], ['fern', 10], ['lily', 15], ['reeds', 15],
+        ['cherry', 20], ['lavender', 20], ['chime', 25], ['maple', 30], ['mushroom', 30], ['stones', 35], ['apple', 40], ['sunflower', 45],
+        ['cairn', 50], ['willow', 60], ['campfire', 60], ['birdhouse', 70], ['pine', 80], ['bush', 80], ['hive', 90], ['palm', 100], ['dune', 100],
+        ['coral', 110], ['cabin', 130], ['pavilion', 160], ['windmill', 200]],
+      islandBloom: { pine: 30, blossom: 45, meadow: 60, atoll: 75, wreck: 90, rocks: 105, marsh: 120, falls: 140, springs: 160, glacier: 180, bamboo: 200, orchard: 220, basalt: 240, oldtree: 260, stones: 280, dunes: 300 },
+    },
+    lantern: {
+      unlock: 150,
+      items: [['cherry', 0], ['lanternpost', 0], ['lily', 0], ['flowers', 0], ['bamboo', 10], ['willow', 20], ['tulips', 25], ['bonsai', 30], ['maple', 40],
+        ['reeds', 45], ['lantern', 50], ['moongate', 70], ['lavender', 80], ['stones', 90], ['chime', 100], ['stilthouse', 120], ['pagoda', 160]],
+      islandBloom: { stilts: 25, lotus: 50, pagoda: 80, willows: 110, glade: 140 },
+    },
+    frost: {
+      unlock: 250,
+      items: [['snowpine', 0], ['snowman', 0], ['cairn', 0], ['lantern', 0], ['birch', 10], ['icecrystal', 20], ['campfire', 30], ['stones', 40], ['pine', 50],
+        ['igloo', 60], ['bench', 80], ['chime', 90], ['sled', 100], ['cabin', 130]],
+      islandBloom: { icecliffs: 25, snowsprings: 50, pineridge: 80, sealskerry: 110, northpoint: 140 },
+    },
+    coral: {
+      unlock: 350,
+      items: [['palm', 0], ['flowers', 0], ['dune', 0], ['hibiscus', 0], ['coral', 10], ['tikitorch', 15], ['sunflower', 25], ['lily', 35], ['reeds', 40],
+        ['hammock', 60], ['bush', 70], ['beachhut', 90], ['campfire', 100], ['bench', 110], ['cairn', 120]],
+      islandBloom: { bluelagoon: 25, flamingo: 50, palmcay: 80, turtlebeach: 110, junglehill: 140 },
+    },
+    heaven: {
+      unlock: 480,
+      items: [['cloudtree', 0], ['goldflower', 0], ['pillar', 0], ['tulips', 0], ['flowers', 10], ['harp', 20], ['bench', 30], ['birch', 35], ['fountain', 45],
+        ['cherry', 55], ['lavender', 65], ['chime', 75], ['lantern', 85], ['haloarch', 110], ['pavilion', 150]],
+      islandBloom: { temple: 25, goldfields: 50, swanlagoon: 80, highmeadow: 110, harpisle: 140 },
+    },
+    hell: {
+      unlock: 620,
+      items: [['ashtree', 0], ['firebloom', 0], ['brazier', 0], ['obsidian', 0], ['cairn', 10], ['emberlantern', 20], ['mushroom', 30], ['campfire', 40],
+        ['bench', 50], ['stones', 60], ['fern', 70], ['cabin', 110]],
+      islandBloom: { cinder: 25, obsidian: 50, ashdunes: 80, brimstone: 110, firegarden: 140 },
+    },
+  };
+  for (const [id, P] of Object.entries(PROGRESS)) Object.assign(WORLDS[id], P);
+  const WORLD_ORDER = ['stillwater', 'lantern', 'frost', 'coral', 'heaven', 'hell'];
   // The world to load: named in the page's #hash on the way through a voyage, otherwise the last one visited.
   function pickWorld() {
     let id = '';
