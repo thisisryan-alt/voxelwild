@@ -453,6 +453,8 @@
         // soil flies as the hands dig, then the seed goes in
         if (act.digs < 3 && act.t > 0.42 + act.digs * 0.2) { act.digs++; if (g) L.dust(f.x, g.y, f.z, g.kind === 'grass' ? 'soil' : g.kind, 4); A.step(g && g.kind === 'snow' ? 'snow' : 'sand', W.panOf(pos)); }
         if (!act.placed && act.t > 1.02) { act.placed = true; if (act.place) act.place(); }
+        // arms up, and a little hop for joy as it starts to grow
+        if (!act.hopped && act.t > 1.42 && !WK.airborne) { act.hopped = true; vy = 3.4; WK.airborne = true; }
       }
       if (act.t >= act.dur) act = null;
     }

@@ -70,9 +70,12 @@ fonts from Google Fonts; everything else is in `js/`.
     keep to the bridges there.
   - The figure leans into a run, bends its knees and elbows, lands with a bump and a puff of dust,
     looks about when standing still, and leaves footprints in sand, snow and cloud that slowly fill in.
-  - **Plant as you go:** press **G** (or *Plant*) and the figure kneels, digs with both hands, sets
-    your seed in and rises with its arms lifted as a ring of light spreads over the ground and sparks
-    spiral up in the world's colour (gold in Heaven, embers in Hell), with leaves fluttering out. Press
+  - **Plant as you go:** press **G** (or *✿ Plant* in the controls, or *Plant* under the map) and the
+    camera swoops in beside the figure as it kneels, digs with both hands and sets your seed in; a ring
+    of light spreads over the ground, a column of light shoots up, sparks spiral up in the world's
+    colour (gold in Heaven, embers in Hell) and leaves flutter out; then the figure rises with its arms
+    lifted, hops for joy, and the plant springs up in a few seconds (a tree in about eight) with sparks
+    spiralling up beside it as it grows, to a rising run of chimes. Press
     **Q** (or *Sow*) to scatter seed as you walk: the figure tosses it from the hand mid-stride and
     little plants spring up along your path. The seed is whatever you last chose from the tray (shown
     under the map); choosing from the tray while walking plants it straight away.

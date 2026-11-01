@@ -256,6 +256,8 @@
   .isle-far { font-weight: 400; font-size: 0.82rem; color: var(--ink-soft); }
   /* bloom and what it opens */
   .bloom-chip { color: #f4d58a; font-variant-numeric: tabular-nums; }
+  .plant-chip { color: #1a2a20; background: #bfe6a8; font-weight: 500; }
+  .plant-chip:hover { background: #d4f0c2; color: #10201a; }
   .chip.item.locked { opacity: 0.55; }
   .chip.item .need, .bloom-list .need, .isle-lock { color: #e8c877; font-size: 0.8rem; margin-left: 0.4em; }
   .isle.locked { opacity: 0.75; }
@@ -375,6 +377,7 @@
     <button id="btnView" class="chip" data-pop="popView" aria-expanded="false">View</button>
     <button id="btnIslands" class="chip" aria-expanded="false" data-popid="popIslands">Islands</button>
     <button id="btnWalk" class="chip" aria-pressed="false">Walk</button>
+    <button id="btnPlantHud" class="chip plant-chip" hidden>✿ Plant</button>
     <button id="btnPlay" class="chip" aria-pressed="false">Play</button>
     <button id="btnSit" class="chip" data-pop="popSit" aria-expanded="false">Sit</button>
     <button id="btnJournal" class="chip">Journal</button>

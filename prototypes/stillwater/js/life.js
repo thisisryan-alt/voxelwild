@@ -1440,6 +1440,27 @@
     r.k = 0; r.dur = 1.3; r.m.position.set(x, y + 0.04, z); r.m.scale.set(size * 2, 1, size * 2); r.m.visible = true;
     r.u.uCol.value.setRGB(col[0], col[1], col[2]);
   }
+  // a column of light that shoots up from the seed and fades, and sparks that spiral up beside the
+  // plant for as long as it is growing
+  const beams = [], trails = [];
+  const BEAM_FS = `uniform float uA; uniform vec3 uCol; varying vec2 vUv;
+    void main(){ float a = pow(1.0 - vUv.y, 1.6) * (0.55 + 0.45 * sin(vUv.x * 6.2832 * 3.0 + vUv.y * 4.0)); gl_FragColor = vec4(uCol * a * uA, 1.0); }`;
+  function beam(x, y, z, hgt, col) {
+    let b = beams.find((q) => q.k >= 1);
+    if (!b) {
+      if (beams.length >= 4) return;
+      const geo = new THREE.CylinderGeometry(0.32, 0.12, 1, 18, 1, true); geo.translate(0, 0.5, 0);
+      const u = { uA: { value: 0 }, uCol: { value: new THREE.Color() } };
+      const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms: u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: BEAM_FS }));
+      m.renderOrder = 5; m.frustumCulled = false;
+      W.late(m); scene.add(m);
+      b = { m, u, k: 1 };
+      beams.push(b);
+    }
+    b.k = 0; b.h = hgt; b.m.position.set(x, y, z); b.m.visible = true;
+    b.u.uCol.value.setRGB(col[0], col[1], col[2]);
+  }
   function updateRings(dt) {
     for (const r of rings) {
       if (r.k >= 1) { r.m.visible = false; continue; }
@@ -1447,10 +1468,33 @@
       r.u.uR.value = 1 - Math.pow(1 - r.k, 2.2);
       r.u.uA.value = Math.pow(1 - r.k, 1.6) * 0.9;
     }
+    for (const b of beams) {
+      if (b.k >= 1) { b.m.visible = false; continue; }
+      b.k = Math.min(1, b.k + dt / 1.7);
+      const up = 1 - Math.pow(1 - Math.min(1, b.k * 3), 3);
+      b.m.scale.set(1 + b.k * 0.8, b.h * up, 1 + b.k * 0.8);
+      b.m.rotation.y += dt * 2;
+      b.u.uA.value = (b.k < 0.2 ? b.k / 0.2 : Math.pow(1 - (b.k - 0.2) / 0.8, 1.5)) * 0.85;
+    }
+    for (let i = trails.length - 1; i >= 0; i--) {
+      const tr = trails[i];
+      tr.t += dt;
+      if (tr.t > tr.dur) { trails.splice(i, 1); continue; }
+      const n = Math.floor(tr.acc += dt * 26);
+      tr.acc -= n;
+      for (let j = 0; j < n; j++) {
+        const k = tr.t / tr.dur, a = tr.t * 5 + j * 2.1 + tr.p, r = tr.r * (0.5 + 0.5 * k), c = tr.col[j % 2];
+        sparkle.emit({ x: tr.x + Math.cos(a) * r, y: tr.y + tr.h * k * (0.6 + 0.4 * rand()), z: tr.z + Math.sin(a) * r, vx: -Math.sin(a) * 0.4, vy: 0.5 + rand() * 0.6, vz: Math.cos(a) * 0.4,
+          grav: -0.1, drag: 1, life: 0.8 + rand() * 0.5, size: 0.45 + rand() * 0.3, size2: 0.08, r: c[0], g: c[1], b: c[2], alpha: 0.7 });
+      }
+    }
   }
-  L.plantFx = function (x, y, z, big, small) {
+  // grow: how long the plant takes to grow, and how tall it gets, for the spiral of sparks beside it
+  L.plantFx = function (x, y, z, big, small, grow) {
     const C = PLANT_COL[K.WORLD.id] || PLANT_COL.stillwater, n = small ? 10 : big ? 54 : 34;
     ring(x, y, z, small ? 0.8 : big ? 2.8 : 1.8, C[0]);
+    if (!small) beam(x, y, z, big ? 11 : 6, C[1]);
+    if (grow) trails.push({ x, y, z, t: 0, dur: grow.dur, h: grow.h, r: big ? 1.4 : 0.6, acc: 0, p: rand() * 6, col: C });
     for (let i = 0; i < n; i++) {
       const a = i / n * Math.PI * (small ? 2 : 4) + rand() * 0.3, r = 0.2 + rand() * 0.35, sp = (small ? 0.7 : 1.3) + rand() * 0.6, c = C[i % 2];
       sparkle.emit({ x: x + Math.cos(a) * r, y: y + 0.12, z: z + Math.sin(a) * r, vx: -Math.sin(a) * sp + Math.cos(a) * 0.3, vy: (small ? 0.9 : 1.5) + rand() * 1.8 + (big ? 1 : 0), vz: Math.cos(a) * sp + Math.sin(a) * 0.3,

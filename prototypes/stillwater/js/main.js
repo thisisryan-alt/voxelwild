@@ -228,6 +228,13 @@
       const WKp = SW.walk, p = WKp.pos, fp = WKp.fp, swim = WKp.medium === 'swim';
       const eye = fp ? (swim ? 0.95 : WKp.pose === 'stand' ? 1.45 : 0.95) : swim ? 0.7 : WKp.pose === 'stand' ? 0.9 : 0.5;
       cam.tTarget.set(p.x, p.y + eye, p.z);
+      // while planting, the camera swoops in low beside the figure, looking at the spot, then eases back
+      if (WKp.busy() && !fp) {
+        if (!cam.cine) cam.cine = { r: cam.tR, phi: cam.tPhi, theta: cam.tTheta };
+        const f = WKp.facing, sx = Math.cos(f) + 0.7 * Math.sin(f), sz = -Math.sin(f) + 0.7 * Math.cos(f);
+        cam.tTheta = cam.theta + U.angDiff(cam.theta, Math.atan2(sz, sx)); cam.tR = 3.4; cam.tPhi = 1.22;
+        if (plantSpot) cam.tTarget.set((p.x + plantSpot.x) / 2, p.y + 0.6, (p.z + plantSpot.z) / 2);
+      } else if (cam.cine && !WKp.busy()) { cam.tR = cam.cine.r; cam.tPhi = cam.cine.phi; cam.tTheta = cam.cine.theta; cam.cine = null; }
       if (fp) cam.target.copy(cam.tTarget);
       if (WKp.moving && t - lastDrag > 1.5) {
         // follow behind along a route; under the keys or the stick, only while heading away from the
@@ -510,11 +517,13 @@
     if (def.cat === 'plants' && def.on === 'grass' && !W.isGrass(f.x, f.z) && W.heightAt(f.x, f.z) >= 0 && W.heightAt(f.x, f.z) <= 2) kind = 'dune';
     const chk = GD.check(kind, f.x, f.z);
     if (!chk.ok) { toast(chk.msg || 'That won’t grow just there. Try another spot.', 3, true); return; }
+    plantSpot = f;
     WK.plantAnim(() => {
-      if (!plantAt(kind, f.x, f.z)) return;
-      const big = !!(def.tree || def.footprint || def.rad >= 1.4);
-      L.plantFx(f.x, chk.y, f.z, big);
-      A.bloom();
+      // planted by hand, it springs up in a few seconds, in a column of light, with sparks spiralling up beside it
+      if (!plantAt(kind, f.x, f.z, { fast: true })) return;
+      const big = !!(def.tree || def.footprint || def.rad >= 1.4), span = (def.span || 6) * 0.22;
+      L.plantFx(f.x, chk.y, f.z, big, false, { dur: span + 1.5, h: def.tree ? 5 : big ? 3 : 1 });
+      A.wish();
     });
   }
   function toggleSow(on) {
@@ -597,14 +606,15 @@
     pebbles++;
     if (prefs.tutorial === 1) tutorialStep(2);
   }
-  function plantAt(k, x, z) {
-    const r = GD.tryPlace(k, x, z);
+  let plantSpot = null;   // where the walker is planting, for the camera to look at
+  function plantAt(k, x, z, opts) {
+    const r = GD.tryPlace(k, x, z, opts);
     if (!r.ok) { if (r.msg) toast(r.msg, 4, true); return false; }
     A.plantNote();
     planted++;
     saveSoon();
     const def = GD.CAT[k];
-    if (def.tree || def.span >= 8) growing.push({ at: S.t + def.span + 1.5, x: r.rec.x, y: r.rec.y + (def.tree ? 4 : 0.6), z: r.rec.z });
+    if (def.tree || def.span >= 8) growing.push({ at: S.t + def.span * (opts && opts.fast ? 0.22 : 1) + 1.5, x: r.rec.x, y: r.rec.y + (def.tree ? 4 : 0.6), z: r.rec.z });
     if (prefs.tutorial === 0) tutorialStep(1);
     return true;
   }
@@ -1207,6 +1217,7 @@
     $('btnRun').addEventListener('click', () => { SW.walk.runToggle = !SW.walk.runToggle; $('btnRun').setAttribute('aria-pressed', String(SW.walk.runToggle)); });
     $('btnCam').addEventListener('click', () => setWalkCam(walkCam + 1));
     $('btnPlantHere').addEventListener('click', () => plantHere());
+    $('btnPlantHud').addEventListener('click', () => plantHere());
     $('btnPlantPad').addEventListener('click', () => plantHere());
     $('btnSow').addEventListener('click', () => toggleSow());
     $('btnSowPad').addEventListener('click', () => toggleSow());
@@ -1218,7 +1229,7 @@
     document.body.classList.toggle('walking', walking);
     if (mapEl.hidden === show) mapEl.hidden = !show;
     const seedBar = $('seedBar');
-    if (seedBar.hidden === walking) { seedBar.hidden = !walking; if (walking) showSeed(); }
+    if (seedBar.hidden === walking) { seedBar.hidden = !walking; $('btnPlantHud').hidden = !walking; if (walking) showSeed(); }
     if (!walking && sowing) toggleSow(false);
     if (show && (mapT -= dt) <= 0) { mapT = 0.2; drawMap(); }
   }

@@ -1160,20 +1160,21 @@
     CAT[rec.k].build(o, rng, rec);
     return out;
   }
-  function plant(rec, instant) {
+  // fast: planted by hand while walking, it grows in a few seconds instead of half a minute
+  function plant(rec, instant, fast) {
     const def = CAT[rec.k];
     if (!def) return false;
     const out = collect(rec);
     if (woodG.n + out.w.length > woodG.cap || leafG.n + out.l.length > leafG.cap || glowG.n + out.g.length > glowG.cap) return false;
-    const t0 = instant ? S.t - 1000 : S.t, kk = (def.span || 6) / out.maxO, r = mulberry32(rec.seed ^ 0x2f1);
+    const sp = fast ? 0.22 : 1, t0 = instant ? S.t - 1000 : S.t, kk = (def.span || 6) / out.maxO * sp, r = mulberry32(rec.seed ^ 0x2f1);
     rec._r = {};
     const shades = canopyShade(out.l);
     for (const [layer, g, dur] of [['w', woodG, def.tree ? 1.8 : 0.7], ['l', leafG, def.tree ? 2.6 : 1.2], ['g', glowG, 1.0]]) {
       const a = g.n;
-      out[layer].forEach((v, j) => addVoxel(g, rec.x + v[0], rec.y + v[1], rec.z + v[2], v[3], v[4], v[5], t0 + v[6] * kk, dur, r(), layer === 'l' && shades ? shades[j] : 1));
+      out[layer].forEach((v, j) => addVoxel(g, rec.x + v[0], rec.y + v[1], rec.z + v[2], v[3], v[4], v[5], t0 + v[6] * kk, dur * (fast ? 0.6 : 1), r(), layer === 'l' && shades ? shades[j] : 1));
       rec._r[layer] = [a, g.n];
     }
-    const ready = t0 + (def.span || 6) + 2;
+    const ready = t0 + (def.span || 6) * sp + 2;
     rec._f = out.f.map((f) => Object.assign({}, f, { x: rec.x + f.x, y: rec.y + f.y, z: rec.z + f.z, rec, ready }));
     GD.version++;
     return true;
@@ -1299,7 +1300,7 @@
     if (!chk.ok) return chk;
     const rec = { id: nextId++, k, x: +x.toFixed(2), y: chk.y, z: +z.toFixed(2), seed: (Math.random() * 1e9) | 0, at: U.today() };
     if (opts.note) rec.note = opts.note;
-    if (!plant(rec, false)) return { ok: false, msg: 'The island is as full as it can be. Tidy something away to make room.' };
+    if (!plant(rec, false, !!opts.fast)) return { ok: false, msg: 'The island is as full as it can be. Tidy something away to make room.' };
     GD.items.push(rec);
     return { ok: true, rec };
   };
