@@ -186,7 +186,9 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
   them, strongest in Frost Fjord and on the white sand of Coral Cays.
 - **Lamplight:** after dark each bridge lamp and the dock lantern lay a soft, faintly flickering pool
   of warm light on the planks and the water below.
-- **Contact shadow** under the walker's feet, and footprints that fill in slowly.
+- **Contact shadow** under the walker's feet, and footprints that fill in slowly. The walker and every
+  creature carry a soft rim of sky light round their silhouettes (ember-orange in Hell), so they stand
+  out from busy ground.
 - **Heaven** has mist pouring from the undersides of its drifting islets; **Hell** has smoke rising
   from Mount Cinder, sparks from its vent, and fountains of sparks thrown up by the lava now and then.
 - **Physically based sky:** the colour of every part of the sky comes from single scattering in a

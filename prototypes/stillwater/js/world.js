@@ -116,6 +116,7 @@
     uCrack: { value: 0 },                                                    // Hell: ember light in the cracks of the rock
     uVoxAO: { value: 0.5 },                                                  // how dark the corners of the blocks get
     uGlitter: { value: 0 },                                                  // sun glints in snow, ice and white sand
+    uRimCol: { value: new THREE.Color(0, 0, 0) },                            // sky light round the edges of creatures and the walker
   };
   // Shade from the clouds overhead: 1 in sunlight, lower beneath a cloud. uCloudSh.xy turns height into the
   // sideways shift along the sun's rays; z is how dark the shadows are.
@@ -139,7 +140,7 @@
   W.GUST_GLSL = GUST_GLSL;
   const wetMats = [];
   W.patch = function (material, o = {}) {
-    const defs = (o.sway ? '#define SWAY\n' : '') + (o.grassSide ? '#define GRASS_SIDE\n' : '') + (o.caustics ? '#define CAUSTICS\n' : '') + (o.trans ? '#define TRANS\n' : '') + (o.wet ? '#define WET\n' : '');
+    const defs = (o.sway ? '#define SWAY\n' : '') + (o.grassSide ? '#define GRASS_SIDE\n' : '') + (o.caustics ? '#define CAUSTICS\n' : '') + (o.trans ? '#define TRANS\n' : '') + (o.wet ? '#define WET\n' : '') + (o.rim ? '#define RIM\n' : '');
     if (o.wet && material.isMeshPhongMaterial) wetMats.push(material);
     // three.js keys cached programs on the patch's source text, so name each variant explicitly
     material.customProgramCacheKey = () => 'sw-voxel|' + defs.replace(/\n/g, ',');
@@ -189,7 +190,7 @@
         vVD = -mvPosition.z;
         gl_Position = projectionMatrix * mvPosition;`);
       sh.fragmentShader = defs + CLOUD_GLSL + `
-        uniform float uTime, uWL, uWet, uEdge, uTexel, uTexAmt, uTrans, uFaceShade, uCrack, uVoxAO, uGlitter; uniform vec3 uCaus, uDirt, uUnder;
+        uniform float uTime, uWL, uWet, uEdge, uTexel, uTexAmt, uTrans, uFaceShade, uCrack, uVoxAO, uGlitter; uniform vec3 uCaus, uDirt, uUnder, uRimCol;
         varying vec3 vWPos; varying vec3 vLocal; varying vec3 vObjN; varying float vVD;
         #ifdef GRASS_SIDE
           varying float vKind;
@@ -249,6 +250,10 @@
             float tr = pow(clamp(dot(normalize(-vViewPosition), directionalLights[0].direction), 0.0, 1.0), 5.0);
             outgoingLight += diffuseColor.rgb * directionalLights[0].color * tr * uTrans;
           }
+        #endif
+        #ifdef RIM
+          // a rim of sky light round the silhouette, so creatures and the walker stand out from busy ground
+          { float fr = 1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0); outgoingLight += uRimCol * pow(fr, 3.0) * diffuseColor.rgb * 1.6 + uRimCol * pow(fr, 6.0) * 0.25; }
         #endif
         #include <envmap_fragment>`).replace('#include <lights_fragment_begin>', LIGHTS_CLOUDED).replace('#include <fog_fragment>', `
         #ifdef CAUSTICS
@@ -2169,6 +2174,8 @@
     PU.uCaus.value.copy(P.sun).multiplyScalar(LOOK.sea ? 0 : P.si * (1 - over) * S.dayness * 0.55);
     if (LOOK.glow) PU.uUnder.value.setRGB(LOOK.glow[0], LOOK.glow[1], LOOK.glow[2]);
     PU.uCrack.value = LOOK.sea === 'lava' ? 1 : 0;
+    PU.uRimCol.value.copy(E.hor).multiplyScalar(0.35 + 0.4 * S.dayness).lerp(tmpC.setRGB(0.45, 0.55, 0.8), P.night * 0.5);
+    if (LOOK.sea === 'lava') PU.uRimCol.value.setRGB(0.9, 0.35, 0.1);
     PU.uGlitter.value = (LOOK.glitter != null ? LOOK.glitter : GLITTER[K.WORLD.id] || 0) * S.dayness * (1 - over) * smooth(0.04, 0.2, skySun.y);
     // surfaces darken and shine while it rains, and dry slowly afterwards
     PU.uWet.value += ((wx.rain > 0.2 ? 1 : 0) - PU.uWet.value) * (1 - Math.exp(-S.dt / (wx.rain > 0.2 ? 20 : 60)));

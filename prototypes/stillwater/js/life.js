@@ -14,7 +14,7 @@
 
   // ------------------------------------------------------------------ models
   const mats = new Map();
-  const mat = (c) => { if (!mats.has(c)) mats.set(c, W.voxelMat(c, { edges: 0.14, shininess: 20 })); return mats.get(c); };
+  const mat = (c) => { if (!mats.has(c)) mats.set(c, W.voxelMat(c, { edges: 0.14, shininess: 20, rim: true })); return mats.get(c); };
   function part(parent, c, sx, sy, sz, x, y, z, shadow) {
     const m = new THREE.Mesh(W.boxGeo, typeof c === 'number' ? mat(c) : c);
     m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = !!shadow;
