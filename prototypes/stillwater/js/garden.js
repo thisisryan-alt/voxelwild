@@ -536,22 +536,42 @@
       for (let y = -below; y < 0; y++) P(x, y, z, 'w', stoneC(rng), 0);
       P(x, 0, z, 'w', stoneC(rng), 1);
     }
+    // log walls with dark corner posts; windows in cream frames with painted shutters and a box of
+    // flowers beneath each; a step and a lantern at the door
+    const shutC = hex(U.pick(rng, [0x4a6a5a, 0x3e5a7a, 0x7a3a34])), frameC = hex(0xe8dcc8), FLOW = [0xe86a7a, 0xf2c94a, 0xb87ae0, 0xf28a4a, 0xffffff];
+    const winCol = (x, z) => (Math.abs(z) === half && Math.abs(x) <= 1) || (x === -half && Math.abs(z) <= 1);
+    const shutCol = (x, z) => (Math.abs(z) === half && Math.abs(x) === 2) || (x === -half && Math.abs(z) === 2);
     for (let y = 1; y <= 6; y++) for (let x = -half; x <= half; x++) for (let z = -half; z <= half; z++) {
       if (Math.abs(x) !== half && Math.abs(z) !== half) continue;
+      const corner = Math.abs(x) === half && Math.abs(z) === half;
       const door = x === half && z === 0 && y <= 3;
-      const win = y >= 3 && y <= 4 && ((Math.abs(z) === half && Math.abs(x) <= 1) || (x === -half && Math.abs(z) <= 1));
+      const win = y >= 3 && y <= 4 && winCol(x, z);
       if (win) P(x, y, z, 'g', hex(0xffc77a), 2 + y);
-      else P(x, y, z, 'w', hex(door ? DARK : (y + (Math.abs(x) === half && Math.abs(z) === half ? 1 : 0)) % 2 ? WOOD : WOOD2), 2 + y);
+      else if ((y === 2 || y === 5) && winCol(x, z)) P(x, y, z, 'w', frameC, 2 + y);
+      else if (y >= 3 && y <= 4 && shutCol(x, z)) P(x, y, z, 'w', shutC, 2 + y);
+      else P(x, y, z, 'w', hex(door ? DARK : corner ? 0x5e4432 : y % 2 ? WOOD : WOOD2), 2 + y);
     }
+    for (let i = -1; i <= 1; i++) {
+      for (const [bx, bz] of [[i, half + 1], [i, -half - 1], [-half - 1, i]]) {
+        P(bx, 2, bz, 'w', hex(DARK), 5);
+        P(bx, 3, bz, 'l', hex(U.pick(rng, FLOW)), 7, s * 0.8);
+      }
+    }
+    P(half + 1, 0, 0, 'w', stoneC(rng), 2);
+    P(half + 1, 4, 1, 'g', hex(0xffd08a), 7, s * 0.7);
+    P(half + 1, 5, 1, 'w', hex(DARK), 8, s * 0.5);
     for (let y = 7; y <= 11; y++) {
       const r = half + 1 - (y - 7);
       for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) {
         const ring = Math.max(Math.abs(x), Math.abs(z));
         if (y === 7 ? ring < half : (ring < r && y < 11)) continue;
-        P(x, y, z, 'w', roofC.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.04), 10 + y);
+        // a darker trim along the eaves and the ridge
+        const shade = y === 11 || (y === 7 && ring === half + 1) ? -0.07 : (rng() - 0.5) * 0.04;
+        P(x, y, z, 'w', roofC.clone().offsetHSL(0, 0, shade), 10 + y);
       }
     }
     for (let y = 7; y <= 12; y++) P(-2, y, -2, 'w', stoneC(rng), 12 + y);
+    P(-2, 13, -2, 'w', hex(0x4a4846), 25);   // chimney cap
     const [cx, cz] = rot(-2, -2, k);
     o.feature('smoke', { x: cx * s, y: s * 13.2, z: cz * s });
     o.feature('light', { x: 0, y: s * 3.5, z: 0, color: 0xffb060, base: 0.9, distance: 10 });
@@ -1135,6 +1155,51 @@
     for (const rec of GD.items) for (const f of rec._f || []) (F[f.type] = F[f.type] || []).push(f);
     GD.feat = F;
     featVersion = GD.version;
+    rebuildPools(F.light);
+  }
+  // Pools of light after dark: every window, lantern, torch and brazier lays a soft disc of its own colour
+  // on the ground (or the water) around it, which fades in once the thing has finished growing and
+  // flickers where a flame does. Drawn after the ambient occlusion and added to what is there.
+  const POOL_MAX = 600;
+  let pools = null;
+  const poolU = { uI: { value: 0 }, uT: { value: 0 } };
+  function rebuildPools(list) {
+    if (!pools) {
+      const ig = new THREE.PlaneGeometry(1, 1); ig.rotateX(-Math.PI / 2);
+      ig.setAttribute('aCol', new THREE.InstancedBufferAttribute(new Float32Array(POOL_MAX * 3), 3));
+      ig.setAttribute('aInfo', new THREE.InstancedBufferAttribute(new Float32Array(POOL_MAX * 3), 3));   // ready time, flicker, strength
+      const mat = new THREE.ShaderMaterial({
+        uniforms: poolU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+        vertexShader: `attribute vec3 aCol, aInfo; uniform float uT; varying vec2 vUv; varying vec3 vCol; varying float vK;
+          void main(){ vUv = uv; vCol = aCol;
+            float on = smoothstep(aInfo.x, aInfo.x + 2.5, uT), fl = 1.0 - aInfo.y * (0.18 + 0.12 * sin(uT * 9.0 + aInfo.x * 3.0) * sin(uT * 5.3 + aInfo.x));
+            vK = on * fl * aInfo.z;
+            gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); }`,
+        fragmentShader: `uniform float uI; varying vec2 vUv; varying vec3 vCol; varying float vK;
+          void main(){ float d = length(vUv - 0.5) * 2.0, a = pow(max(0.0, 1.0 - d), 2.0); gl_FragColor = vec4(vCol * a * uI * vK, 1.0); }`,
+      });
+      pools = new THREE.InstancedMesh(ig, mat, POOL_MAX);
+      pools.frustumCulled = false; pools.renderOrder = 4; pools.count = 0;
+      W.late(pools);
+      W.scene.add(pools);
+    }
+    const dm = new THREE.Object3D(), col = pools.geometry.attributes.aCol, info = pools.geometry.attributes.aInfo;
+    let n = 0;
+    for (const f of list) {
+      if (n >= POOL_MAX) break;
+      const deck = W.deckAt(f.x, f.z), h = W.heightAt(f.x, f.z);
+      const gy = deck != null ? deck : h >= 0 ? h : K.WL + 0.03;
+      if (f.y - gy > 8) continue;   // a light high up in a pagoda's eaves throws no pool on the ground
+      const r = clamp((f.distance || 8) * 0.36, 1.6, 4.6);
+      dm.position.set(f.x, gy + 0.04, f.z); dm.scale.set(r * 2, 1, r * 2); dm.updateMatrix();
+      pools.setMatrixAt(n, dm.matrix);
+      tmpC.setHex(f.color || 0xffb060);
+      col.setXYZ(n, tmpC.r, tmpC.g, tmpC.b);
+      info.setXYZ(n, f.ready || 0, f.flicker || 0, clamp((f.base || 1) * (h < 0 && deck == null ? 0.6 : 1), 0.3, 1.4));
+      n++;
+    }
+    pools.count = n;
+    pools.instanceMatrix.needsUpdate = true; col.needsUpdate = true; info.needsUpdate = true;
   }
 
   GD.check = function (k, x, z) {
@@ -1545,6 +1610,10 @@
     flush(leafG);
     glowMat.color.setScalar(0.75 + 1.5 * S.glow);
     if (featVersion !== GD.version) rebuildFeatures();
+    if (pools) {
+      poolU.uI.value = 0.9 * U.smooth(0.15, 0.8, S.glow); poolU.uT.value = t;
+      pools.visible = poolU.uI.value > 0.005 && pools.count > 0;
+    }
     updateGrass();
     if (SW.life && SW.life.walker) grassWalker.value.copy(SW.life.walker); else grassWalker.value.y = -99;
     lightTimer -= dt;

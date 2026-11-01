@@ -185,7 +185,11 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
 - **Glitter:** tiny facets in snow, ice and pale sand flash as the sun and your view line up with
   them, strongest in Frost Fjord and on the white sand of Coral Cays.
 - **Lamplight:** after dark each bridge lamp and the dock lantern lay a soft, faintly flickering pool
-  of warm light on the planks and the water below.
+  of warm light on the planks and the water below; so does every window, lantern, torch and brazier in
+  the gardens, each in its own colour, fading in once a build has finished growing.
+- **Cabins** have dark corner posts, windows in cream frames with painted shutters and a box of flowers
+  beneath each, a step and a lantern at the door, a darker trim along the eaves and ridge, and a
+  chimney cap.
 - **Contact shadow** under the walker's feet, and footprints that fill in slowly. The walker and every
   creature carry a soft rim of sky light round their silhouettes (ember-orange in Hell), so they stand
   out from busy ground.
