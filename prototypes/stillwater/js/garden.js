@@ -892,7 +892,10 @@
       const d = Math.hypot(x, y, z);
       if (d > R + 0.4 || d < R - 0.6) continue;
       if (x > 0 && Math.abs(z) <= 1 && y <= 2) continue;   // the doorway
-      P(x, y, z, 'w', hex(U.pick(rng, white)).offsetHSL(0, 0, (y % 2) * -0.03), y);
+      // blocks of snow laid like bricks: each row offset, with a fine darker seam between blocks
+      const seam = (Math.floor((Math.atan2(z, x) + Math.PI) * R * 0.5 + (y % 2) * 0.5) % 2) === 0;
+      if (z <= -5 && Math.abs(x) <= 1 && y >= 2 && y <= 3) { P(x, y, z, 'g', hex(0xbfe6ff), y); continue; }   // an ice window
+      P(x, y, z, 'w', hex(U.pick(rng, white)).offsetHSL(0, 0, (y % 2) * -0.03 + (seam ? -0.045 : 0)), y);
     }
     for (let x = R; x <= R + 2; x++) for (let z = -2; z <= 2; z++) for (let y = 0; y <= 3; y++) {
       if (Math.abs(z) <= 1 && y <= 2) continue;
@@ -954,8 +957,18 @@
     for (let y = 4; y <= 7; y++) for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) {
       const edge = Math.abs(x) === 3 || Math.abs(z) === 3;
       if (!edge || (x === 3 && Math.abs(z) <= 1 && y <= 6)) continue;
+      // a lit window in each side wall
+      if (Math.abs(z) === 3 && Math.abs(x) <= 1 && (y === 5 || y === 6)) { P(x, y, z, 'g', hex(0xffd08a), y); continue; }
       P(x, y, z, 'w', wall.clone().offsetHSL(0, 0, ((x + z) % 2) * 0.04), y);
     }
+    // a striped awning over the door, a surfboard against the wall and a lantern by the door
+    const stripes = [0xf2e6c8, U.pick(rng, [0xe86a5a, 0x5ab0c0, 0xf2b84a])];
+    for (let z = -2; z <= 2; z++) for (const [x, y] of [[4, 7], [5, 6]]) P(x, y, z, 'w', hex(stripes[(z + 2) % 2]), 9);
+    const board = hex(U.pick(rng, [0xf2c94a, 0xe86a5a, 0x5ab0c0, 0x8ad08a]));
+    for (let y = 4; y <= 8; y++) P(2, y, -4, 'w', y === 6 ? hex(0xf6f0e0) : board, y);
+    P(4, 6, 2, 'g', hex(0xffc777), 9); P(4, 7, 2, 'w', hex(DARK), 9);
+    const [bl, bz] = rot(4 * s, 2 * s, k);
+    o.feature('light', { x: bl, y: s * 6.5, z: bz, color: 0xffc070, base: 0.8, distance: 8 });
     for (let i = 0; i <= 5; i++) for (let x = -5 + i; x <= 5 - i; x++) for (let z = -5 + i; z <= 5 - i; z++) {
       if (i < 5 && Math.max(Math.abs(x), Math.abs(z)) < 5 - i - 1) continue;
       P(x, 8 + i, z, 'w', hex(U.pick(rng, straw)), 10 + i);
