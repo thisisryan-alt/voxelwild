@@ -173,8 +173,10 @@
     part(g, body, 0.16, 0.14, 0.5, 0, 0, 0); part(g, body, 0.13, 0.13, 0.14, 0, 0.05, 0.28);
     part(g, fire ? 0x2a1a14 : 0xf2c04a, 0.04, 0.04, 0.1, 0, 0.04, 0.39); part(g, fire ? tip : 0x9aa2aa, fire ? 0.2 : 0.12, 0.04, fire ? 0.4 : 0.14, 0, 0.02, fire ? -0.4 : -0.28);
     c.L = pivot(g, -0.08, 0.04, 0); c.R = pivot(g, 0.08, 0.04, 0);
-    part(c.L, wing, 0.4, 0.03, 0.2, -0.2, 0, 0); part(c.L, tip, 0.3, 0.03, 0.15, -0.55, 0, -0.02);
-    part(c.R, wing, 0.4, 0.03, 0.2, 0.2, 0, 0); part(c.R, tip, 0.3, 0.03, 0.15, 0.55, 0, -0.02);
+    part(c.L, wing, 0.4, 0.03, 0.2, -0.2, 0, 0); part(c.R, wing, 0.4, 0.03, 0.2, 0.2, 0, 0);
+    // the outer wing hangs from an elbow, so the wing bends as it beats instead of flapping like a board
+    c.Lt = pivot(c.L, -0.4, 0, 0); c.Rt = pivot(c.R, 0.4, 0, 0);
+    part(c.Lt, tip, 0.3, 0.03, 0.15, -0.15, 0, -0.02); part(c.Rt, tip, 0.3, 0.03, 0.15, 0.15, 0, -0.02);
     c.update = (dt, t) => {
       const active = S.dayness > 0.4 && S.weather.rain < 0.6 && S.weather.snow < 0.6;
       c.off += ((active ? 0 : 140) - c.off) * (1 - Math.exp(-dt / 20));
@@ -184,8 +186,11 @@
       const r = c.r0 + 4 * Math.sin(t * 0.05 + c.p) + c.off, cx = gullC.x + 5 * Math.sin(t * 0.01), cz = gullC.z + 5 * Math.cos(t * 0.013);
       g.position.set(cx + Math.cos(c.a) * r, 14 + 3 * Math.sin(t * 0.07 + c.p) + c.off * 0.1, cz + Math.sin(c.a) * r);
       g.rotation.set(0, yaw(-Math.sin(c.a) * Math.sign(c.w), Math.cos(c.a) * Math.sign(c.w)), -Math.sign(c.w) * 0.25);
-      const flapping = Math.sin(t * 0.3 + c.p) > 0.55, wing = flapping ? Math.sin(t * 7 + c.p) * 0.6 : 0.12;
+      const flapping = Math.sin(t * 0.3 + c.p) > 0.55, wing = flapping ? Math.sin(t * 7 + c.p) * 0.6 : 0.12 + 0.04 * Math.sin(t * 1.3 + c.p);
       c.L.rotation.z = wing; c.R.rotation.z = -wing;
+      const elbow = flapping ? -Math.sin(t * 7 + c.p - 0.8) * 0.45 : -0.08;   // the tips trail the beat
+      c.Lt.rotation.z = elbow; c.Rt.rotation.z = -elbow;
+      g.rotation.x = flapping ? Math.sin(t * 7 + c.p) * 0.04 : 0;
       if (active && i === 0 && rand() < dt * 0.025) audio('gull', W.panOf(g.position));
     };
   }
@@ -197,10 +202,11 @@
     const [body, breast] = kinds[i % kinds.length];
     const c = { see: doves ? 'dove' : 'songbird', i, state: 'away', from: new THREE.Vector3(), to: new THREE.Vector3(), k: 0, dur: 1, timer: 0, p: rand() * 10 };
     const g = root(c);
-    part(g, body, 0.12, 0.1, 0.16, 0, 0.07, 0, true); part(g, breast, 0.1, 0.07, 0.06, 0, 0.06, 0.06);
+    part(g, body, 0.12, 0.1, 0.16, 0, 0.07, 0, true); c.breast = part(g, breast, 0.1, 0.07, 0.06, 0, 0.06, 0.06);
     c.head = pivot(g, 0, 0.14, 0.06); part(c.head, body, 0.09, 0.08, 0.09, 0, 0, 0); part(c.head, 0x3a3030, 0.03, 0.03, 0.05, 0, -0.01, 0.06);
-    part(g, body, 0.06, 0.03, 0.1, 0, 0.09, -0.11);
+    c.tail = pivot(g, 0, 0.09, -0.07); part(c.tail, body, 0.06, 0.03, 0.1, 0, 0, -0.04);
     c.L = pivot(g, -0.06, 0.09, 0); c.R = pivot(g, 0.06, 0.09, 0);
+    c.hopY = 0; c.sing = 0;
     part(c.L, body, 0.16, 0.02, 0.1, -0.08, 0, 0); part(c.R, body, 0.16, 0.02, 0.1, 0.08, 0, 0);
     const perches = () => {
       const F = GD.feat, list = F.perch.filter((p) => S.t > p.ready && nearFocus(p)).map((p) => [p.x, p.y, p.z]);
@@ -230,14 +236,25 @@
         c.L.rotation.z = flap; c.R.rotation.z = -flap;
         if (k >= 1) {
           if (c.state === 'leave') { c.state = 'away'; c.fade = 0; g.visible = false; return; }
-          c.state = 'perch'; c.timer = 4 + rand() * 10; c.L.rotation.z = c.R.rotation.z = 0;
+          c.state = 'perch'; c.timer = 4 + rand() * 10; c.L.rotation.z = c.R.rotation.z = 0; c.baseY = c.to.y;
         }
         return;
       }
       c.timer -= dt;
       c.head.rotation.y = Math.sin(t * 1.3 + c.p) * 0.7 * (Math.sin(t * 0.4 + c.p) > 0 ? 1 : 0);
-      c.head.rotation.x = Math.max(0, Math.sin(t * 2.2 + c.p * 3)) * 0.4;
-      if (rand() < dt * 0.12) audio('bird', W.panOf(pos));
+      c.head.rotation.x = Math.max(0, Math.sin(t * 2.2 + c.p * 3)) * 0.4 - 0.5 * c.sing;   // beak up to sing
+      // little hops on the perch, a flick of the tail, a ruffle of the wings, and a puffed chest to sing
+      c.sing = Math.max(0, c.sing - dt * 1.5);
+      if (c.hopY <= 0 && rand() < dt * 0.25) { c.hopY = 0.25; g.rotation.y += (rand() - 0.5) * 1.6; }
+      const hk = c.hopY > 0 ? Math.sin(Math.PI * (1 - c.hopY / 0.25)) : 0;
+      c.hopY = Math.max(0, c.hopY - dt);
+      if (c.baseY == null) c.baseY = pos.y;
+      pos.y = c.baseY + 0.05 * hk;
+      c.tail.rotation.x = -0.5 * Math.max(0, Math.sin(t * 3.1 + c.p * 2)) ** 8 - 0.3 * hk;
+      const ruffle = Math.max(0, Math.sin(t * 0.9 + c.p * 5)) ** 12;
+      c.L.rotation.z = 0.5 * ruffle * Math.sin(t * 40); c.R.rotation.z = -c.L.rotation.z;
+      c.breast.scale.set(0.1 * (1 + 0.35 * c.sing), 0.07 * (1 + 0.35 * c.sing), 0.06 * (1 + 0.5 * c.sing));
+      if (rand() < dt * 0.12) { audio('bird', W.panOf(pos)); c.sing = 1; }
       if (c.timer <= 0) { const list = perches(); if (list.length) c.flyTo(U.pick(rand, list)); else c.timer = 3; }
     };
     c.flyTo = (p) => {
@@ -820,7 +837,8 @@
     c.body = part(g, grey, 0.36, 0.26, 0.9, 0, 0.13, 0, true);
     c.head = pivot(g, 0, 0.2, 0.42);
     part(c.head, grey, 0.24, 0.22, 0.26, 0, 0.04, 0.08); part(c.head, 0x2a2a2a, 0.05, 0.04, 0.03, 0, 0.02, 0.22);
-    part(g, grey, 0.4, 0.04, 0.16, 0, 0.04, 0.15); part(g, grey, 0.3, 0.05, 0.14, 0, 0.06, -0.48);
+    c.flip = [-1, 1].map((sx) => { const pv = pivot(g, sx * 0.16, 0.05, 0.15); part(pv, grey, 0.14, 0.04, 0.16, sx * 0.06, -0.01, 0); return pv; });
+    part(g, grey, 0.3, 0.05, 0.14, 0, 0.06, -0.48);
     const rocks = () => I.cols.rock.filter((r) => r[2] >= 1 && r[2] <= 3);
     const home = rocks()[(i * 7 + 3) % Math.max(1, rocks().length)] || [I.x, I.z, 1];
     c.rock = home; g.position.set(home[0], home[2], home[1]); g.rotation.y = rand() * TAU;
@@ -831,6 +849,9 @@
       if (c.state === 'bask') {
         c.head.rotation.x = Math.sin(t * 0.3 + c.p) > 0.7 ? -0.6 : 0.15;
         c.body.scale.y = 0.26 * (1 + 0.05 * S.breath.b);
+        // now and then a lazy wave of a flipper, or a scratch
+        const wave = Math.max(0, Math.sin(t * 0.23 + c.p * 2)) ** 10;
+        c.flip[0].rotation.z = wave * (0.6 + 0.4 * Math.sin(t * 6)); c.flip[1].rotation.z = -0.1 * wave;
         if (rand() < dt * 0.01 && nearFocus(pos, 35)) audio('bark', W.panOf(pos));
         if (c.timer <= 0) { c.state = 'slide'; c.k = 0; c.from.copy(pos); c.a = Math.atan2(pos.z - I.z, pos.x - I.x); }
       } else if (c.state === 'slide' || c.state === 'haul') {
