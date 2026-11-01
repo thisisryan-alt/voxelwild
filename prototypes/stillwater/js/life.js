@@ -67,9 +67,16 @@
     const rng = mulberry32(31 + i), colors = [0xf08a4b, 0xf4efe6, 0xf3b04a, 0xe86f3c, 0xf6f1e4, 0xe8a060];
     const c = { see: 'koi', rng, a: rng() * TAU, hurry: 0, p: rng() * 10, retarget: 5 };
     const g = root(c), m = colors[i % colors.length];
-    part(g, m, 0.3, 0.17, 0.62, 0, 0, 0); part(g, i % 2 ? 0xe0643a : m, 0.24, 0.15, 0.2, 0, 0, 0.38);
-    if (i % 2 === 0) part(g, 0xe0643a, 0.31, 0.05, 0.22, 0, 0.07, 0.05);
-    c.tail = pivot(g, 0, 0, -0.31); part(c.tail, m, 0.05, 0.2, 0.3, 0, 0, -0.15);
+    // a body in two halves, so it bends as it swims, with the tail on the end of the rear half; fins that
+    // paddle; a dorsal fin; and each koi's own markings
+    part(g, m, 0.3, 0.17, 0.34, 0, 0, 0.14); part(g, i % 2 ? 0xe0643a : m, 0.24, 0.15, 0.2, 0, 0, 0.38);
+    part(g, m, 0.03, 0.08, 0.22, 0, 0.12, 0.06);
+    c.mid = pivot(g, 0, 0, -0.03); part(c.mid, m, 0.26, 0.15, 0.3, 0, 0, -0.15);
+    c.tail = pivot(c.mid, 0, 0, -0.3); part(c.tail, m, 0.05, 0.2, 0.3, 0, 0, -0.15);
+    c.fins = [-1, 1].map((sx) => { const pv = pivot(g, sx * 0.15, -0.04, 0.2); part(pv, 0xf6e6d8, 0.12, 0.02, 0.09, sx * 0.06, 0, 0); return pv; });
+    const spot = i % 3 === 0 ? 0x2a2624 : 0xe0643a;
+    for (let k = 0; k < 2 + (i % 3); k++) part(k % 2 ? c.mid : g, spot, 0.12, 0.03, 0.1, (rng() - 0.5) * 0.12, 0.08, k % 2 ? -0.12 : 0.05 + rng() * 0.15);
+    c.rise = 0;
     const [x, z] = shoreTarget(rng); g.position.set(x, K.WL - 0.55, z); c.target = shoreTarget(rng);
     c.update = (dt, t) => {
       fadeTo(c, true, dt);
@@ -84,9 +91,18 @@
       c.hurry = Math.max(0, c.hurry - dt * 0.12);
       const speed = 0.65 + c.hurry * 0.9;
       pos.x += Math.cos(c.a) * speed * dt; pos.z += Math.sin(c.a) * speed * dt;
-      pos.y = K.WL - 0.55 + Math.sin(t * 0.5 + c.p) * 0.06;
+      // now and then a koi rises to the surface to gulp, and leaves a ring
+      c.rise = Math.max(0, c.rise - dt);
+      if (!c.rise && c.rng() < dt * 0.006) c.rise = 2.5;
+      const up = c.rise > 0 ? Math.sin(Math.PI * c.rise / 2.5) : 0;
+      if (c.rise > 1.2 && c.rise - dt <= 1.25) W.addRipple(pos.x, pos.z, 0.35);
+      pos.y = K.WL - 0.55 + Math.sin(t * 0.5 + c.p) * 0.06 + up * 0.38;
       g.rotation.y = yaw(Math.cos(c.a), Math.sin(c.a));
-      c.tail.rotation.y = Math.sin(t * (4 + speed * 3) + c.p) * 0.45;
+      g.rotation.x = -0.25 * up;
+      const ph = t * (4 + speed * 3) + c.p;
+      c.mid.rotation.y = Math.sin(ph) * 0.22;
+      c.tail.rotation.y = Math.sin(ph - 1.1) * 0.45;
+      c.fins.forEach((f, j) => { f.rotation.z = (j ? -1 : 1) * (0.2 + 0.25 * Math.sin(t * 3 + c.p + j)); });
       if (c.hurry > 0.3 && Math.hypot(dx, dz) < 1.2 && rand() < dt * 0.8) W.addRipple(pos.x + Math.cos(c.a) * 0.4, pos.z + Math.sin(c.a) * 0.4, 0.3);
     };
   }
@@ -327,7 +343,7 @@
     part(g, 0x5f9a4e, 0.17, 0.08, 0.18, 0, 0.05, 0, true);
     part(g, 0x6aa857, 0.13, 0.07, 0.08, 0, 0.08, 0.07);
     part(g, 0x2a2a20, 0.035, 0.035, 0.035, -0.045, 0.12, 0.08); part(g, 0x2a2a20, 0.035, 0.035, 0.035, 0.045, 0.12, 0.08);
-    part(g, 0x4f8a44, 0.05, 0.04, 0.12, -0.09, 0.03, -0.05); part(g, 0x4f8a44, 0.05, 0.04, 0.12, 0.09, 0.03, -0.05);
+    c.legs = [-1, 1].map((sx) => { const pv = pivot(g, sx * 0.09, 0.03, 0.0); part(pv, 0x4f8a44, 0.05, 0.04, 0.12, 0, 0, -0.05); return pv; });
     c.th = part(g, 0xd8e0a0, 0.08, 0.04, 0.05, 0, 0.04, 0.12);
     c.hop = () => {
       const pads = GD.feat.pad.filter((p) => S.t > p.ready && nearFocus(p, 30));
@@ -347,8 +363,9 @@
         c.k = Math.min(1, c.k + dt / 0.6);
         g.position.lerpVectors(c.from, tmpV.set(c.pad.x, c.pad.y, c.pad.z), c.k);
         g.position.y += Math.sin(Math.PI * c.k) * 0.5;
+        c.legs.forEach((l) => { l.rotation.x = -1.1 * Math.sin(Math.PI * Math.min(1, c.k * 1.6)); });   // legs kick out behind
         if (c.k >= 1) W.addRipple(c.pad.x, c.pad.z, 0.45);
-      } else if (rand() < dt / 25) c.hop();
+      } else { c.legs.forEach((l) => { l.rotation.x = 0; }); if (rand() < dt / 25) c.hop(); }
       const croaky = S.night > 0.3 || season() === 0;
       if (croaky && rand() < dt * 0.05) { c.throat = 0.5; audio('croak', W.panOf(g.position)); }
       c.throat = Math.max(0, c.throat - dt);
@@ -915,8 +932,9 @@
     const cols = [[0xf2d35a, 0x3a6ac0], [0x4aa8e8, 0xf2d35a], [0xf08a3a, 0xf6f2ea]][i % 3];
     for (let j = 0; j < 8; j++) {
       const f = pivot(g, 0, 0, 0);
-      part(f, cols[0], 0.05, 0.1, 0.16, 0, 0, 0); part(f, cols[1], 0.055, 0.04, 0.04, 0, 0.01, 0.02); part(f, cols[0], 0.02, 0.07, 0.06, 0, 0, -0.1);
-      c.fish.push({ f, ox: (rand() - 0.5) * 1.4, oz: (rand() - 0.5) * 1.4, oy: (rand() - 0.5) * 0.25, p: rand() * 10 });
+      part(f, cols[0], 0.05, 0.1, 0.16, 0, 0, 0); part(f, cols[1], 0.055, 0.04, 0.04, 0, 0.01, 0.02);
+      const tl = pivot(f, 0, 0, -0.08); part(tl, cols[0], 0.02, 0.07, 0.06, 0, 0, -0.03);
+      c.fish.push({ f, tl, ox: (rand() - 0.5) * 1.4, oz: (rand() - 0.5) * 1.4, oy: (rand() - 0.5) * 0.25, p: rand() * 10 });
     }
     c.update = (dt, t) => {
       if (!fadeTo(c, true, dt)) return;
@@ -924,12 +942,16 @@
       const r = I.r * 0.28 + Math.sin(t * 0.17 + c.p) * 0.8;
       g.position.set(I.x + Math.cos(c.a) * r, K.WL - 0.55, I.z + Math.sin(c.a) * r);
       const heading = yaw(-Math.sin(c.a) * (i % 2 ? 1 : -1), Math.cos(c.a) * (i % 2 ? 1 : -1));
+      // startled, the school bursts apart and draws back together
+      c.burst = Math.max(0, (c.burst || 0) - dt * 0.6);
+      const spread = 1 + 2.2 * Math.sin(Math.PI * Math.min(1, c.burst)) * c.burst;
       for (const o of c.fish) {
-        o.f.position.set(o.ox + Math.sin(t * 0.9 + o.p) * 0.2, o.oy, o.oz + Math.cos(t * 0.7 + o.p) * 0.2);
-        o.f.rotation.y = heading + Math.sin(t * 3 + o.p) * 0.25;
+        o.f.position.set((o.ox + Math.sin(t * 0.9 + o.p) * 0.2) * spread, o.oy, (o.oz + Math.cos(t * 0.7 + o.p) * 0.2) * spread);
+        o.f.rotation.y = c.burst > 0.3 ? Math.atan2(o.ox, o.oz) : heading + Math.sin(t * 3 + o.p) * 0.25;
+        o.tl.rotation.y = Math.sin(t * (c.burst > 0.3 ? 30 : 12) + o.p) * 0.5;
       }
     };
-    c.tap = () => { for (const o of c.fish) { o.ox *= -1; o.oz *= -1; } };
+    c.tap = () => { c.burst = 1; };
   }
 
   // -------------------------------------------------------------- windmill sails

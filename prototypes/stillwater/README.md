@@ -116,7 +116,10 @@ fonts from Google Fonts; everything else is in `js/`.
   to look about, twitch their noses, breathe, stretch in the air and squash a little as they land;
   ducks and swans have upturned tails and now and then upend to feed, tail to the sky. Gulls' wings
   bend at the elbow as they beat; songbirds hop along their perches, flick their tails, ruffle their
-  wings and puff up their chests with the beak raised to sing; basking seals wave a lazy flipper. A lighthouse turns its beam at dusk.
+  wings and puff up their chests with the beak raised to sing; basking seals wave a lazy flipper. Koi
+  bend through the body as they swim, paddle their fins, wear their own markings and rise now and then
+  to gulp at the surface; a startled school of reef fish bursts apart and draws back together; and
+  frogs kick out their back legs as they leap between the lily pads. A lighthouse turns its beam at dusk.
 - **Fishing:** choose Go fishing under Water and tap open water to cast (or press it while walking).
   After a wait and a nibble or two the float dips: tap again to catch the fish, which leaps out and goes
   straight back. Each world has its own fish, a few of them rare; the journal counts what you have let go.
