@@ -448,7 +448,7 @@
     if (!prefs.walkTips2) {
       prefs.walkTips2 = true;
       toast(document.body.classList.contains('touch') ? 'Walk with the stick, or tap where to go, even another island: the way goes over the bridges. Tap a bench to sit.'
-        : 'Tap where to go, even another island: the way goes over the bridges. Or walk with WASD, Shift to run, Space to jump, C for the camera, E to sit.', 10, true);
+        : 'Tap where to go, even another island: the way goes over the bridges. Or walk with WASD, Shift to run, Space to jump, C for the camera, E to sit. G plants your seed, Q sows as you walk.', 11, true);
     }
   }
   function stopWalking() {
@@ -475,10 +475,77 @@
       return;
     }
     if (k === 'tidy') { tidyAt(f.x, f.z); return; }
-    const def = GD.CAT[k];
+    if (PLANTABLE(k)) { walkSeed = k; showSeed(); }
+    plantHere(k);
+  }
+
+  // ------------------------------------------------------- planting on foot
+  // While walking, G (or Plant) kneels and plants your chosen seed just ahead: the figure digs, sets it in
+  // and rises as a ring of light spreads and sparks spiral up. Q (or Sow) scatters seed as you walk, and
+  // little plants spring up along your path. Choosing from the tray while walking plants that, and makes
+  // it your seed.
+  const PLANTABLE = (k) => { const d = GD && GD.CAT[k]; return !!d && ['trees', 'plants', 'water', 'decor'].includes(d.cat) && k !== 'grat'; };
+  let walkSeed = null, sowing = false, sowDist = 0, sowSide = 1;
+  function seedKind(onlyPlants) {
+    const ok = (k) => PLANTABLE(k) && itemOpen(k) && (!onlyPlants || GD.CAT[k].cat === 'plants');
+    if (walkSeed && ok(walkSeed)) return walkSeed;
+    const first = K.WORLD.items.map((e) => e[0]).find((k) => ok(k) && GD.CAT[k].cat === 'plants');
+    return first || (ok('flowers') ? 'flowers' : null);
+  }
+  function showSeed() {
+    const k = seedKind(false), el = $('seedName');
+    if (el) el.textContent = k ? toolInfo(k).label : 'Nothing yet';
+    const sw = $('seedSwatch');
+    if (sw && k) sw.style.setProperty('--c', toolInfo(k).swatch || '#8c6');
+    $('btnSow').setAttribute('aria-pressed', String(sowing)); $('btnSowPad').setAttribute('aria-pressed', String(sowing));
+  }
+  function plantHere(k) {
+    const WK = SW.walk;
+    if (!WK.active || WK.busy()) return;
+    k = k || seedKind(false);
+    if (!k) { toast('Choose something to plant from the tray first.', 3, true); return; }
+    if (!itemOpen(k)) { toast(toolInfo(k).label + ' opens when your garden here reaches ✿ ' + itemNeed(k) + '.', 4, true); return; }
+    const f = WK.front(1.3), def = GD.CAT[k];
     let kind = k;
     if (def.cat === 'plants' && def.on === 'grass' && !W.isGrass(f.x, f.z) && W.heightAt(f.x, f.z) >= 0 && W.heightAt(f.x, f.z) <= 2) kind = 'dune';
-    if (plantAt(kind, f.x, f.z)) WK.kneel();
+    const chk = GD.check(kind, f.x, f.z);
+    if (!chk.ok) { toast(chk.msg || 'That won’t grow just there. Try another spot.', 3, true); return; }
+    WK.plantAnim(() => {
+      if (!plantAt(kind, f.x, f.z)) return;
+      const big = !!(def.tree || def.footprint || def.rad >= 1.4);
+      L.plantFx(f.x, chk.y, f.z, big);
+      A.bloom();
+    });
+  }
+  function toggleSow(on) {
+    sowing = on == null ? !sowing : on;
+    sowDist = 0;
+    showSeed();
+    if (sowing) {
+      const k = seedKind(true);
+      if (!k) { sowing = false; showSeed(); toast('Nothing to sow yet: choose a plant from the tray.', 3, true); return; }
+      toast('Sowing ' + toolInfo(k).label.toLowerCase() + ' as you walk. Press Q again to stop.', 4, true);
+    }
+  }
+  function updateSowing(dt) {
+    const WK = SW.walk;
+    if (!sowing || !WK.active || WK.hidden || !WK.moving || WK.airborne || WK.busy()) return;
+    if ((sowDist += WK.speed * dt) < 1.7) return;
+    sowDist = 0;
+    const k = seedKind(true);
+    if (!k) { toggleSow(false); return; }
+    sowSide = -sowSide;
+    const back = 0.7, x = WK.pos.x - Math.sin(WK.facing) * back + Math.cos(WK.facing) * 0.45 * sowSide, z = WK.pos.z - Math.cos(WK.facing) * back - Math.sin(WK.facing) * 0.45 * sowSide;
+    let kind = k;
+    if (GD.CAT[k].on === 'grass' && !W.isGrass(x, z) && W.heightAt(x, z) >= 0 && W.heightAt(x, z) <= 2) kind = 'dune';
+    const chk = GD.check(kind, x, z);
+    if (!chk.ok) return;
+    const r = GD.tryPlace(kind, x, z);
+    if (!r.ok) { if (r.msg) { toast(r.msg, 4, true); toggleSow(false); } return; }
+    planted++; saveSoon();
+    WK.toss();
+    L.plantFx(x, chk.y, z, false, true);
+    A.plantNote();
   }
 
   // Strike: if a fish has taken the float it is caught, admired and let go; otherwise the line comes in.
@@ -1043,6 +1110,8 @@
       if (key === 'r') { if (L.rowing()) stepAshore(); else takeBoat(); }
       if (key === 'f') { if (L.fishing() === 'bite') strike(); else chooseTool('fish'); }
       if (key === 'c' && SW.walk.active) setWalkCam(walkCam + 1);
+      if (key === 'g' && SW.walk.active) plantHere();
+      if (key === 'q' && SW.walk.active) toggleSow();
       if (key === 'e' && SW.walk.active) {
         if (SW.walk.isSitting()) SW.walk.standUp();
         else { const st = SW.walk.seatNear(SW.walk.pos.x, SW.walk.pos.z, 3); if (st) SW.walk.goSit(st); else toast('Nothing to sit on just here.', 2, true); }
@@ -1137,12 +1206,20 @@
     $('btnJump').addEventListener('click', () => SW.walk.jump());
     $('btnRun').addEventListener('click', () => { SW.walk.runToggle = !SW.walk.runToggle; $('btnRun').setAttribute('aria-pressed', String(SW.walk.runToggle)); });
     $('btnCam').addEventListener('click', () => setWalkCam(walkCam + 1));
+    $('btnPlantHere').addEventListener('click', () => plantHere());
+    $('btnPlantPad').addEventListener('click', () => plantHere());
+    $('btnSow').addEventListener('click', () => toggleSow());
+    $('btnSowPad').addEventListener('click', () => toggleSow());
   }
   function updateWalkUi(dt) {
     if (!mapEl) return;
+    updateSowing(dt);
     const walking = SW.walk.active && !SW.walk.hidden, show = (walking || L.rowing()) && S.started;
     document.body.classList.toggle('walking', walking);
     if (mapEl.hidden === show) mapEl.hidden = !show;
+    const seedBar = $('seedBar');
+    if (seedBar.hidden === walking) { seedBar.hidden = !walking; if (walking) showSeed(); }
+    if (!walking && sowing) toggleSow(false);
     if (show && (mapT -= dt) <= 0) { mapT = 0.2; drawMap(); }
   }
 
@@ -1299,7 +1376,7 @@
     W.renderer.setAnimationLoop(frame);
     if (data && data.started) begin(false);
   }
-  SW.ui = { setView: (v, instant) => setView(v, instant), toast, camera: cam, rowTo: (id) => rowTo(id), sailTo: (id) => sailTo(id), tick: (dt) => { updateCamera(dt, S.t); updateWalkUi(dt); }, walk: () => startWalking(), handpan: (i) => playPad(i) };
+  SW.ui = { setView: (v, instant) => setView(v, instant), toast, camera: cam, rowTo: (id) => rowTo(id), sailTo: (id) => sailTo(id), tick: (dt) => { updateCamera(dt, S.t); updateWalkUi(dt); }, plantHere: (k) => plantHere(k), toggleSow: (on) => toggleSow(on), walk: () => startWalking(), handpan: (i) => playPad(i) };
   const hot = window.claude && window.claude.hot;
   if (hot && hot.snapshot) hot.snapshot(() => ({ worldId: K.WORLD.id, items: GD ? GD.serialize() : null, wildGone: GD ? GD.wildGone() : null, world: { tod: S.tod, day: S.day, season: S.season, island: S.island }, started: S.started }));
   const start = (data) => { try { boot(data || {}); } catch (e) { console.error(e); noGL('Something went wrong while starting. Reload to try again.'); } };

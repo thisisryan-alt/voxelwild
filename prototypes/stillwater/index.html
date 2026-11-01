@@ -313,8 +313,18 @@
   .walk-btns { display: grid; gap: 10px; }
   .walk-btns .btn { min-width: 78px; touch-action: manipulation; }
   .walk-btns .btn[aria-pressed="true"] { background: rgba(238, 244, 240, 0.3); }
-  body.zen .minimap, body.zen .walkpad, body.sitting .walkpad, body.sitting .minimap { display: none; }
-  @media (max-width: 720px) { .minimap { width: 120px; height: 120px; } .walkpad { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); } }
+  .seedbar {
+    position: fixed; z-index: 9; left: max(14px, env(safe-area-inset-left, 0px)); top: calc(max(14px, env(safe-area-inset-top, 0px)) + 158px);
+    display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 10px; border-radius: 999px;
+    background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    font-size: 0.9rem; color: var(--ink-soft);
+  }
+  .seedbar[hidden] { display: none; }
+  .seedbar .btn { padding: 0.3em 0.75em; font-size: 0.86rem; }
+  .seedbar .btn[aria-pressed="true"] { background: rgba(238, 244, 240, 0.3); color: var(--ink); }
+  #seedName { color: var(--ink); white-space: nowrap; }
+  body.zen .minimap, body.zen .walkpad, body.sitting .walkpad, body.sitting .minimap, body.zen .seedbar, body.sitting .seedbar { display: none; }
+  @media (max-width: 720px) { .minimap { width: 120px; height: 120px; } .walkpad { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); } .seedbar { top: calc(max(14px, env(safe-area-inset-top, 0px)) + 128px); } .seedbar .key { display: none; } }
 
   @media (prefers-reduced-motion: reduce) {
     .intro, .hud, .breath, .toast, .sit, .zen-show { transition-duration: 0.01s; }
@@ -326,9 +336,16 @@
 
 <div id="toast" class="toast off" role="status" aria-live="polite"></div>
 <canvas id="miniMap" class="minimap" width="300" height="300" hidden aria-label="Map of the islands and bridges. Tap an island to go there."></canvas>
+<div id="seedBar" class="seedbar" hidden role="group" aria-label="Planting">
+  <span id="seedSwatch" class="vox"></span><span id="seedName">Wildflowers</span>
+  <button id="btnPlantHere" class="btn">Plant<span class="key"> · G</span></button>
+  <button id="btnSow" class="btn" aria-pressed="false">Sow<span class="key"> · Q</span></button>
+</div>
 <div id="walkPad" class="walkpad">
   <div id="joy" class="joy" aria-label="Walk"><div class="joy-knob"></div></div>
   <div class="walk-btns">
+    <button id="btnPlantPad" class="btn">Plant</button>
+    <button id="btnSowPad" class="btn" aria-pressed="false">Sow</button>
     <button id="btnJump" class="btn">Jump</button>
     <button id="btnRun" class="btn" aria-pressed="false">Run</button>
     <button id="btnCam" class="btn">Camera</button>
@@ -599,7 +616,7 @@
   </section>
   <section class="set">
     <h3>Keys</h3>
-    <p class="set-note">W A S D or arrows walk, or row when out in the boat · Shift run · Space jump · C walking camera, up to first person · E sit or stand · R take the boat out or step ashore · F go fishing, and strike when the float dips · B breath guide · M sound · I islands · H hide controls · J journal · V next view · 1–9 handpan (when open) · Esc close</p>
+    <p class="set-note">W A S D or arrows walk, or row when out in the boat · Shift run · Space jump · C walking camera, up to first person · E sit or stand · G plant your seed · Q sow as you walk · R take the boat out or step ashore · F go fishing, and strike when the float dips · B breath guide · M sound · I islands · H hide controls · J journal · V next view · 1–9 handpan (when open) · Esc close</p>
   </section>
   <section class="set">
     <div id="resetRow" class="reset"></div>

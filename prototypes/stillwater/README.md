@@ -70,6 +70,12 @@ fonts from Google Fonts; everything else is in `js/`.
     keep to the bridges there.
   - The figure leans into a run, bends its knees and elbows, lands with a bump and a puff of dust,
     looks about when standing still, and leaves footprints in sand, snow and cloud that slowly fill in.
+  - **Plant as you go:** press **G** (or *Plant*) and the figure kneels, digs with both hands, sets
+    your seed in and rises with its arms lifted as a ring of light spreads over the ground and sparks
+    spiral up in the world's colour (gold in Heaven, embers in Hell), with leaves fluttering out. Press
+    **Q** (or *Sow*) to scatter seed as you walk: the figure tosses it from the hand mid-stride and
+    little plants spring up along your path. The seed is whatever you last chose from the tray (shown
+    under the map); choosing from the tray while walking plants it straight away.
   - Sit on benches, pavilions and the ends of jetties, and walk into a hot spring to soak. Footsteps
     change with the ground, rabbits, deer, foxes, crabs, puffins and otters keep their distance, and the
     cat purrs when you pass. In walk mode the tray plants and builds right in front of you, and tapping
@@ -125,7 +131,7 @@ Each world's garden, tidied wild plants, current island and time of day, plus yo
 world's best bloom), the journal, settings and the last world visited, are saved in the browser's local
 storage.
 
-**Keys:** WASD or arrows walk, or row when out in the boat · Shift run · Space jump · E sit or stand · C walking camera, up to first person · R take the boat out or step ashore · F go fishing, and strike when the float dips · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
+**Keys:** WASD or arrows walk, or row when out in the boat · Shift run · Space jump · E sit or stand · C walking camera, up to first person · G plant · Q sow as you walk · R take the boat out or step ashore · F go fishing, and strike when the float dips · 1–9 handpan · B breath guide · M sound · I islands · H hide controls · J journal · V next view · Esc close.
 
 ## Files
 
@@ -178,6 +184,17 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
 - **Contact shadow** under the walker's feet, and footprints that fill in slowly.
 - **Heaven** has mist pouring from the undersides of its drifting islets; **Hell** has smoke rising
   from Mount Cinder, sparks from its vent, and fountains of sparks thrown up by the lava now and then.
+- **Physically based sky:** the colour of every part of the sky comes from single scattering in a
+  spherical atmosphere (Rayleigh and Mie scattering, with ozone), marched per pixel, so the zenith is
+  deep blue, the horizon pales, the air glows round the sun and sunsets run through orange to pink and
+  violet. The same model, evaluated on the CPU, gives the sunlight its colour and tints the sky light,
+  fog and sea, so the scene is lit by the sky you see. Each world's palette keeps the brightness and
+  the night; Heaven and Hell paint their own skies.
+- **Volumetric clouds:** a layer of cumulus is ray-marched across the whole sky, each sample lit by
+  how much cloud lies toward the sun, with dark bases, bright tops, silver linings when backlit and
+  far clouds fading into the haze; they drift with the wind, thicken with the weather and show in
+  the sea's reflection. (Sharp: 10 steps, Balanced: 6, Light: the older painted band.) The sky is drawn
+  after everything solid, so this work is done only where sky shows.
 - **Sky:** a horizon haze band, a band of soft cumulus along the horizon, a warm glow on the sun's
   side at golden hour, an HDR sun disk, drifting high cirrus, varied stars, a phased moon, aurora and
   rainbows; a halo round Heaven's sun, and smoke lit from below with a blood moon in Hell. Voxel clouds

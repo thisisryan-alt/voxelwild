@@ -1338,7 +1338,54 @@
   }
   L.splash = splash;
   // dust kicked up by running feet and landings, and puffs of cloud underfoot in Heaven
-  const DUST = { sand: [0.86, 0.8, 0.66], snow: [0.95, 0.97, 1], grass: [0.66, 0.72, 0.5], cloud: [1, 1, 1], stone: [0.62, 0.62, 0.6] };
+  const DUST = { sand: [0.86, 0.8, 0.66], snow: [0.95, 0.97, 1], grass: [0.66, 0.72, 0.5], cloud: [1, 1, 1], stone: [0.62, 0.62, 0.6], soil: [0.5, 0.38, 0.26] };
+  // The moment something is planted by hand: a ring of light spreads over the ground, sparks spiral up
+  // around the spot in the world's own colour, and a few leaves flutter up and drift down.
+  const PLANT_COL = { stillwater: [[0.75, 1, 0.55], [1, 0.95, 0.6]], lantern: [[1, 0.8, 0.45], [1, 0.62, 0.4]], frost: [[0.75, 0.92, 1], [1, 1, 1]], coral: [[0.6, 1, 0.85], [1, 0.85, 0.5]], heaven: [[1, 0.92, 0.55], [1, 1, 0.85]], hell: [[1, 0.5, 0.15], [1, 0.78, 0.3]] };
+  const LEAF_COL = { hell: [0.55, 0.22, 0.12], heaven: [0.95, 0.9, 0.7], frost: [0.85, 0.92, 0.95] };
+  const rings = [];
+  const RING_FS = `uniform float uR, uA; uniform vec3 uCol; varying vec2 vUv;
+    void main(){ float d = length(vUv - 0.5) * 2.0; float band = exp(-pow((d - uR) / 0.07, 2.0)) + 0.35 * exp(-pow((d - uR * 0.6) / 0.05, 2.0));
+      float fill = 0.22 * (1.0 - smoothstep(0.0, uR, d)) * (1.0 - uR); gl_FragColor = vec4(uCol * (band + fill) * uA, 1.0); }`;
+  function ring(x, y, z, size, col) {
+    let r = rings.find((q) => q.k >= 1);
+    if (!r) {
+      if (rings.length >= 6) return;
+      const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
+      const u = { uR: { value: 0 }, uA: { value: 0 }, uCol: { value: new THREE.Color() } };
+      const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms: u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: RING_FS }));
+      m.renderOrder = 5; m.frustumCulled = false;
+      W.late(m); scene.add(m);
+      r = { m, u, k: 1 };
+      rings.push(r);
+    }
+    r.k = 0; r.dur = 1.3; r.m.position.set(x, y + 0.04, z); r.m.scale.set(size * 2, 1, size * 2); r.m.visible = true;
+    r.u.uCol.value.setRGB(col[0], col[1], col[2]);
+  }
+  function updateRings(dt) {
+    for (const r of rings) {
+      if (r.k >= 1) { r.m.visible = false; continue; }
+      r.k = Math.min(1, r.k + dt / r.dur);
+      r.u.uR.value = 1 - Math.pow(1 - r.k, 2.2);
+      r.u.uA.value = Math.pow(1 - r.k, 1.6) * 0.9;
+    }
+  }
+  L.plantFx = function (x, y, z, big, small) {
+    const C = PLANT_COL[K.WORLD.id] || PLANT_COL.stillwater, n = small ? 10 : big ? 54 : 34;
+    ring(x, y, z, small ? 0.8 : big ? 2.8 : 1.8, C[0]);
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * (small ? 2 : 4) + rand() * 0.3, r = 0.2 + rand() * 0.35, sp = (small ? 0.7 : 1.3) + rand() * 0.6, c = C[i % 2];
+      sparkle.emit({ x: x + Math.cos(a) * r, y: y + 0.12, z: z + Math.sin(a) * r, vx: -Math.sin(a) * sp + Math.cos(a) * 0.3, vy: (small ? 0.9 : 1.5) + rand() * 1.8 + (big ? 1 : 0), vz: Math.cos(a) * sp + Math.sin(a) * 0.3,
+        grav: -0.25, drag: 1.5, life: (small ? 0.9 : 1.4) + rand() * 0.8, size: 0.55 + rand() * 0.4, size2: 0.1, r: c[0], g: c[1], b: c[2], alpha: 0.75 });
+    }
+    if (small) return;
+    const lc = LEAF_COL[K.WORLD.id] || [0.42, 0.7, 0.3];
+    for (let i = 0; i < (big ? 14 : 8); i++) {
+      const a = rand() * Math.PI * 2;
+      puffs.emit({ x, y: y + 0.2, z, vx: Math.cos(a) * (0.6 + rand()), vy: 2.4 + rand() * 1.6, vz: Math.sin(a) * (0.6 + rand()), grav: 2.2, drag: 1.6, life: 1.6 + rand() * 0.8, size: 0.32, size2: 0.22, alpha: 0.95, r: lc[0] * (0.85 + rand() * 0.3), g: lc[1] * (0.85 + rand() * 0.3), b: lc[2], wind: 1.2 });
+    }
+  };
   L.dust = function (x, y, z, kind, n) {
     if (!puffs || !DUST[kind]) return;
     const c = K.WORLD.look.sea === 'lava' && kind !== 'cloud' ? [0.42, 0.38, 0.37] : DUST[kind], big = kind === 'cloud';
@@ -1424,7 +1471,7 @@
       if (rand() > dt * 0.4) continue;
       sparkle.emit({ x: f.x + (rand() - 0.5) * 0.2, y: f.y + 0.15, z: f.z + (rand() - 0.5) * 0.2, vy: 0.25, vx: (rand() - 0.5) * 0.1, life: 4, size: 1.4, size2: 0.4, r: 1, g: 0.92, b: 0.7, alpha: 0.8 });
     }
-    flames.update(dt); puffs.update(dt); sparkle.update(dt); wake.update(dt);
+    flames.update(dt); puffs.update(dt); sparkle.update(dt); wake.update(dt); updateRings(dt);
   }
 
   // ------------------------------------------------------------- sky lanterns

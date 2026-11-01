@@ -388,6 +388,18 @@
     return true;
   }
   WK.front = (d) => ({ x: WK.pos.x + Math.sin(WK.facing) * d, z: WK.pos.z + Math.cos(WK.facing) * d });
+  // Planting by hand: kneel, dig a little hole with both hands, set the seed in, then rise with the arms
+  // lifted as it begins to grow. place() is called as the seed goes in. Sowing as you walk is a quick toss
+  // of seed from the hand that doesn't break your stride.
+  let act = null;   // { type: 'plant' | 'toss', t, dur, place, placed, digs }
+  WK.plantAnim = function (place) {
+    if (!WK.active || (act && act.type === 'plant')) return false;
+    seat = null; path = []; legs = []; seatGoal = null; vx = vz = 0; WK.pose = 'stand';
+    act = { type: 'plant', t: 0, dur: 1.75, place, placed: false, digs: 0 };
+    return true;
+  };
+  WK.toss = function () { if (!act) act = { type: 'toss', t: 0, dur: 0.55 }; };
+  WK.busy = () => !!act && act.type === 'plant';
   WK.kneel = () => { kneel = 0.9; };
   WK.seatNear = function (x, z, r = 1.3) {
     let best = null, bd = r;
@@ -431,8 +443,19 @@
     const pos = WK.pos;
     let dx = 0, dz = 0, want = 0;
     const has = (a, b) => heldKeys.has(a) || heldKeys.has(b);
-    const fwd = (has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0) + joy.z;
-    const side = (has('d', 'arrowright') ? 1 : 0) - (has('a', 'arrowleft') ? 1 : 0) + joy.x;
+    const planting = !!act && act.type === 'plant';
+    const fwd = planting ? 0 : (has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0) + joy.z;
+    const side = planting ? 0 : (has('d', 'arrowright') ? 1 : 0) - (has('a', 'arrowleft') ? 1 : 0) + joy.x;
+    if (act) {
+      act.t += dt;
+      if (planting) {
+        const f = WK.front(0.75), g = groundAt(f.x, f.z);
+        // soil flies as the hands dig, then the seed goes in
+        if (act.digs < 3 && act.t > 0.42 + act.digs * 0.2) { act.digs++; if (g) L.dust(f.x, g.y, f.z, g.kind === 'grass' ? 'soil' : g.kind, 4); A.step(g && g.kind === 'snow' ? 'snow' : 'sand', W.panOf(pos)); }
+        if (!act.placed && act.t > 1.02) { act.placed = true; if (act.place) act.place(); }
+      }
+      if (act.t >= act.dur) act = null;
+    }
     const here = groundAt(pos.x, pos.z) || { y: pos.y, kind: 'sand' };
     const swimming = here.kind === 'swim';
     WK.running = heldKeys.has('shift') || WK.runToggle;
@@ -468,7 +491,7 @@
     if (!WK.running && path.length && !(fwd || side) && routeLeft > 14) top = swimming ? SWIM_FAST : JOG;
     if (here.kind === 'water') top *= 0.6;
     if (here.kind === 'cloud') top *= 0.85;
-    if (seat) { want = 0; }
+    if (seat || planting) { want = 0; }
     const ax = dx * top * want, az = dz * top * want;
     const acc = 1 - Math.exp(-dt * (WK.airborne ? 2.5 : want > 0 ? 9 : 11));
     vx += (ax - vx) * acc; vz += (az - vz) * acc;
@@ -602,9 +625,26 @@
     if (WK.pose === 'sit' || WK.pose === 'soak') { hipsY = 0.02; legL = legR = -1.5; shinL = shinR = 1.4; armL = armR = -0.35; foreL = foreR = -0.6; }
     else if (WK.pose === 'edge') { hipsY = 0.02; legL = legR = -1.45; shinL = 1.3 + Math.sin(t * 1.3) * 0.25; shinR = 1.3 - Math.sin(t * 1.3) * 0.25; armL = armR = 0.25; }
     if (kneel > 0) { const k = Math.sin(Math.PI * kneel / 0.9); hipsY -= 0.22 * k; torsoX = 0.5 * k; armL = -1.0 * k; armR = -1.0 * k; legL = -0.9 * k; legR = 0.4 * k; shinL = 1.4 * k; shinR = 0.6 * k; }
+    if (act && act.type === 'plant') {
+      // down on one knee, dig with alternating hands, cup the seed in, then rise with arms lifted to the sky
+      const k = act.t, down = smooth(0, 0.32, k) * (1 - smooth(1.12, 1.45, k));
+      const dig = smooth(0.32, 0.4, k) * (1 - smooth(0.86, 0.94, k)), cup = smooth(0.86, 0.94, k) * (1 - smooth(1.08, 1.16, k));
+      const rise = smooth(1.1, 1.38, k) * (1 - smooth(1.5, 1.75, k));
+      hipsY = 0.5 - 0.3 * down; torsoX = 0.75 * down - 0.18 * rise;
+      legL = -1.25 * down; shinL = 1.35 * down; legR = 0.15 * down; shinR = 1.95 * down;
+      const sw = Math.sin(k * 24);
+      armL = (-1.0 - 0.45 * sw) * dig - 1.05 * cup - 2.75 * rise; armR = (-1.0 + 0.45 * sw) * dig - 1.05 * cup - 2.75 * rise;
+      armLz = -0.06 - 0.12 * dig + 0.08 * cup - 0.55 * rise; armRz = 0.06 + 0.12 * dig - 0.08 * cup + 0.55 * rise;
+      foreL = foreR = -0.55 * dig - 0.9 * cup - 0.1 * rise;
+      headX = 0.35 * (dig + cup) - 0.45 * rise; headY = 0;
+    } else if (act && act.type === 'toss') {
+      // an easy underarm throw of seed from the right hand, mid-stride
+      const k = act.t / act.dur, sw = Math.sin(Math.PI * k);
+      armR = -0.4 + 0.9 * Math.cos(Math.PI * k) * sw - 1.1 * sw; armRz = 0.06 + 0.35 * sw; foreR = -0.4 * sw;
+    }
     hipsY -= 0.12 * squash;
     // ease toward the pose so changes are never abrupt
-    const e = 1 - Math.exp(-dt * (moving ? 18 : 9));
+    const e = 1 - Math.exp(-dt * (moving || act ? 18 : 9));
     const to = (o, prop, v) => { o[prop] += (v - o[prop]) * e; };
     to(P.body.rotation, 'x', bodyX); to(P.body.position, 'y', 0.75 + bodyY);
     to(P.hips.position, 'y', hipsY - 0.75);

@@ -65,6 +65,7 @@
 
   W.setQuality = function (q) {
     S.quality = q;
+    skyU.uVolSteps.value = q === 'high' ? 10 : q === 'balanced' ? 6 : 0;   // the volumetric cloud layer
     W.renderScale = 1;
     applyPixelRatio();
     const shadows = q !== 'low', size = q === 'high' ? 4096 : 2048;
@@ -381,7 +382,109 @@
     uNight: { value: 0 }, uTime: { value: 0 }, uOvercast: { value: 0 },
     uAurora: { value: 0 }, uRainbow: { value: 0 }, uAurDir: { value: new THREE.Vector2(0, 1) },
     uGold: { value: 0 }, uCirrus: { value: 0.3 }, uCumulus: { value: 0.5 }, uHalo: { value: 0 }, uDark: { value: 0 },
+    uPhys: { value: 0 },                                                  // how much of the sky is the physically based one
+    uVolSteps: { value: 0 }, uCover: { value: 0.45 }, uAmb: { value: new THREE.Color() },   // the volumetric cloud layer
+    uSkyLut: { value: null },
   };
+  // ---------------------------------------------------------- atmosphere
+  // Single scattering in a spherical atmosphere (Rayleigh and Mie, units of km), marched 8 steps along the
+  // view and 4 toward the sun. The sky shader runs it per pixel for the colour of each part of the sky;
+  // the same function here gives the sun's colour and the colours of the zenith and horizon, which light
+  // the scene, tint the fog and colour the sea, so that light and sky always agree.
+  const ATMO_GLSL = `
+    const float R_PL = 6371.0, R_AT = 6471.0;
+    const vec3 K_RLH = vec3(5.5e-3, 13.0e-3, 22.4e-3), K_OZO = vec3(0.65e-3, 1.881e-3, 0.085e-3);
+    const float K_MIE = 21e-3, SH_RLH = 8.0, SH_MIE = 1.2, G_MIE = 0.758;
+    vec2 rsi(vec3 r0, vec3 rd, float sr){ float b = dot(rd, r0), c = dot(r0, r0) - sr * sr, d = b * b - c; if (d < 0.0) return vec2(1e5, -1e5); d = sqrt(d); return vec2(-b - d, -b + d); }
+    vec3 atmosphere(vec3 rd, vec3 ps){
+      vec3 r0 = vec3(0.0, R_PL + 0.4, 0.0);
+      vec2 p = rsi(r0, rd, R_AT); p.x = max(p.x, 0.0);
+      vec2 pg = rsi(r0, rd, R_PL); if (pg.x > 0.0) p.y = min(p.y, pg.x);
+      float st = (p.y - p.x) / 8.0, t = p.x, odR = 0.0, odM = 0.0;
+      vec3 sumR = vec3(0.0), sumM = vec3(0.0);
+      float mu = dot(rd, ps), gg = G_MIE * G_MIE;
+      float pR = 0.0596831 * (1.0 + mu * mu);
+      float pM = 0.1193662 * ((1.0 - gg) * (mu * mu + 1.0)) / (pow(1.0 + gg - 2.0 * mu * G_MIE, 1.5) * (2.0 + gg));
+      for (int i = 0; i < 8; i++) {
+        vec3 ip = r0 + rd * (t + st * 0.5);
+        float hgt = length(ip) - R_PL, dR = exp(-hgt / SH_RLH) * st, dM = exp(-hgt / SH_MIE) * st;
+        odR += dR; odM += dM;
+        float js = rsi(ip, ps, R_AT).y / 4.0, jt = 0.0, jR = 0.0, jM = 0.0;
+        for (int j = 0; j < 4; j++) { vec3 jp = ip + ps * (jt + js * 0.5); float jh = length(jp) - R_PL; jR += exp(-jh / SH_RLH) * js; jM += exp(-jh / SH_MIE) * js; jt += js; }
+        vec3 att = exp(-(K_MIE * 1.1 * (odM + jM) + K_RLH * (odR + jR) + K_OZO * 2.5 * (odR + jR)));
+        sumR += dR * att; sumM += dM * att;
+        t += st;
+      }
+      return pR * K_RLH * sumR + pM * K_MIE * sumM;
+    }`;
+  const A_RLH = [5.5e-3, 13.0e-3, 22.4e-3], A_OZO = [0.65e-3, 1.881e-3, 0.085e-3], A_MIE = 21e-3;
+  function rsiJS(o, d, sr) { const b = o[0] * d[0] + o[1] * d[1] + o[2] * d[2], c = o[0] * o[0] + o[1] * o[1] + o[2] * o[2] - sr * sr, q = b * b - c; return q < 0 ? [1e5, -1e5] : [-b - Math.sqrt(q), -b + Math.sqrt(q)]; }
+  function atmoJS(rd, ps, out) {
+    const r0 = [0, 6371.4, 0], p = rsiJS(r0, rd, 6471); p[0] = Math.max(p[0], 0);
+    const pg = rsiJS(r0, rd, 6371); if (pg[0] > 0) p[1] = Math.min(p[1], pg[0]);
+    const st = (p[1] - p[0]) / 8, mu = rd[0] * ps[0] + rd[1] * ps[1] + rd[2] * ps[2], gg = 0.758 * 0.758;
+    const pR = 0.0596831 * (1 + mu * mu), pM = 0.1193662 * ((1 - gg) * (mu * mu + 1)) / (Math.pow(1 + gg - 2 * mu * 0.758, 1.5) * (2 + gg));
+    let t = p[0], odR = 0, odM = 0;
+    const sR = [0, 0, 0], sM = [0, 0, 0];
+    for (let i = 0; i < 8; i++) {
+      const ip = [r0[0] + rd[0] * (t + st / 2), r0[1] + rd[1] * (t + st / 2), r0[2] + rd[2] * (t + st / 2)];
+      const hg = Math.hypot(ip[0], ip[1], ip[2]) - 6371, dR = Math.exp(-hg / 8) * st, dM = Math.exp(-hg / 1.2) * st;
+      odR += dR; odM += dM;
+      const js = rsiJS(ip, ps, 6471)[1] / 4;
+      let jt = 0, jR = 0, jM = 0;
+      for (let j = 0; j < 4; j++) { const jh = Math.hypot(ip[0] + ps[0] * (jt + js / 2), ip[1] + ps[1] * (jt + js / 2), ip[2] + ps[2] * (jt + js / 2)) - 6371; jR += Math.exp(-jh / 8) * js; jM += Math.exp(-jh / 1.2) * js; jt += js; }
+      for (let k = 0; k < 3; k++) { const att = Math.exp(-(A_MIE * 1.1 * (odM + jM) + A_RLH[k] * (odR + jR) + A_OZO[k] * 2.5 * (odR + jR))); sR[k] += dR * att; sM[k] += dM * att; }
+      t += st;
+    }
+    return out.setRGB(pR * A_RLH[0] * sR[0] + pM * A_MIE * sM[0], pR * A_RLH[1] * sR[1] + pM * A_MIE * sM[1], pR * A_RLH[2] * sR[2] + pM * A_MIE * sM[2]);
+  }
+  // the colour of sunlight after its path through the air
+  function sunlightJS(ps, out) {
+    const r0 = [0, 6371.4, 0], q = rsiJS(r0, ps, 6471), st = q[1] / 8;
+    let odR = 0, odM = 0;
+    for (let i = 0; i < 8; i++) { const y = r0[1] + ps[1] * st * (i + 0.5), x = ps[0] * st * (i + 0.5), z = ps[2] * st * (i + 0.5), hg = Math.hypot(x, y, z) - 6371; odR += Math.exp(-Math.max(hg, 0) / 8) * st; odM += Math.exp(-Math.max(hg, 0) / 1.2) * st; }
+    return out.setRGB(Math.exp(-(A_RLH[0] + A_OZO[0] * 2.5) * odR - A_MIE * 1.1 * odM), Math.exp(-(A_RLH[1] + A_OZO[1] * 2.5) * odR - A_MIE * 1.1 * odM), Math.exp(-(A_RLH[2] + A_OZO[2] * 2.5) * odR - A_MIE * 1.1 * odM));
+  }
+  W.atmoJS = atmoJS; W.sunlightJS = sunlightJS;
+  // The sky table: the atmosphere for every bearing from the sun (across) and height in the sky (up, on a
+  // square-root scale so the horizon gets most of the rows), redrawn only when the sun has moved. The sky
+  // shader reads it instead of marching the atmosphere for every pixel.
+  let lut = null;
+  function initSkyLut() {
+    const rt = new THREE.WebGLRenderTarget(128, 64, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false, stencilBuffer: false });
+    rt.texture.wrapS = THREE.ClampToEdgeWrapping; rt.texture.wrapT = THREE.ClampToEdgeWrapping;
+    const u = { uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uAtmoGain: { value: new THREE.Vector2(1, 1) }, uHor: { value: new THREE.Color() } };
+    const mat = new THREE.ShaderMaterial({ uniforms: u, depthTest: false, depthWrite: false,
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: ATMO_GLSL + `
+        uniform vec3 uSunDir, uHor; uniform vec2 uAtmoGain; varying vec2 vUv;
+        void main(){
+          float phi = vUv.x * 3.14159265, h = vUv.y * vUv.y;
+          vec3 sd = normalize(vec3(uSunDir.x, max(uSunDir.y, -0.08), uSunDir.z));
+          vec2 sh = normalize(sd.xz + 1e-5), az = vec2(sh.x * cos(phi) - sh.y * sin(phi), sh.x * sin(phi) + sh.y * cos(phi));
+          float ch = sqrt(max(1.0 - h * h, 0.0));
+          vec3 d = normalize(vec3(az.x * ch, max(h, 0.004), az.y * ch));
+          vec3 atm = atmosphere(d, sd) * mix(uAtmoGain.x, uAtmoGain.y, pow(h, 0.6));
+          float al = dot(atm, vec3(0.2126, 0.7152, 0.0722)), cap = dot(uHor, vec3(0.2126, 0.7152, 0.0722)) * 1.15;
+          atm *= al > cap ? (cap + (al - cap) / (1.0 + (al - cap) * 2.5)) / al : 1.0;   // soften the glare round a low sun
+          gl_FragColor = vec4(atm * 0.5, 1.0);
+        }` });
+    const sc = new THREE.Scene(), cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); q.frustumCulled = false; sc.add(q);
+    lut = { rt, u, sc, cam, key: '' };
+    skyU.uSkyLut.value = rt.texture;
+  }
+  function updateSkyLut(ps, gh, gz, hor) {
+    if (!lut) initSkyLut();
+    const key = ps.map((v) => v.toFixed(3)).join() + '|' + gh.toFixed(2) + '|' + gz.toFixed(2) + '|' + hor.getHexString();
+    if (key === lut.key) return;
+    lut.key = key;
+    lut.u.uSunDir.value.set(ps[0], ps[1], ps[2]); lut.u.uAtmoGain.value.set(gh, gz); lut.u.uHor.value.copy(hor);
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(lut.rt);
+    renderer.render(lut.sc, lut.cam);
+    renderer.setRenderTarget(prev);
+  }
   function initSky() {
     sky = new THREE.Mesh(new THREE.SphereGeometry(950, 40, 20), new THREE.ShaderMaterial({
       uniforms: skyU, side: THREE.BackSide, depthWrite: false,
@@ -389,6 +492,7 @@
       fragmentShader: `
         uniform vec3 uTop, uHor, uSunCol, uSunDir, uMoonDir;
         uniform float uNight, uTime, uOvercast, uAurora, uRainbow, uMoonPhase, uGold, uCirrus, uCumulus, uHalo, uDark;
+        uniform float uPhys, uVolSteps, uCover; uniform vec3 uAmb; uniform sampler2D uSkyLut;
         uniform vec2 uAurDir;
         varying vec3 vDir;
         float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -402,6 +506,18 @@
           vec3 col = mix(uHor, uTop, pow(clamp(h, 0.0, 1.0), 0.48));
           col = mix(col, uHor * 1.05 + 0.015, exp(-max(h, 0.0) * 22.0) * 0.55);
           vec3 sd = normalize(uSunDir);
+          // the physically based sky: deep blue overhead, paling to the horizon, glowing warm round the sun
+          // and through the long sunsets; scaled to each world's own brightness and greyed under cloud
+          if (uPhys > 0.001) {
+            // looked up from the sky table: angle from the sun's bearing across, height in the sky up
+            float phi = acos(clamp(dot(normalize(d.xz + 1e-5), normalize(sd.xz + 1e-5)), -1.0, 1.0)) / 3.14159265;
+            vec3 atm = texture2D(uSkyLut, vec2(phi, sqrt(clamp(h, 0.004, 1.0)))).rgb * 2.0;
+            // right at the horizon single scattering reddens too much (real air scatters many times over and
+            // pales it): ease the lowest band toward the palette's haze, except toward a low sun
+            atm = mix(atm, uHor, exp(-max(h, 0.0) * 28.0) * 0.75 * (1.0 - 0.6 * smoothstep(0.6, 1.0, dot(normalize(d.xz + 1e-5), normalize(sd.xz + 1e-5))) * (1.0 - smoothstep(0.05, 0.3, sd.y))));
+            atm = mix(atm, vec3(dot(atm, vec3(0.3, 0.59, 0.11))) * 0.95 + uHor * 0.08, uOvercast * 0.85);
+            col = mix(col, atm, uPhys);
+          }
           float mu = dot(d, sd), s = max(mu, 0.0), sunUp = smoothstep(-0.1, 0.02, sd.y);
           // at golden hour the horizon glows warm on the sun's side of the sky
           vec2 dh = normalize(d.xz + 1e-5), sh = normalize(sd.xz + 1e-5);
@@ -420,8 +536,45 @@
             cc += uSunCol * pow(s, 6.0) * 0.6 * sunUp;
             col = mix(col, cc, c * 0.65);
           }
+          // A layer of volumetric cumulus: the view ray is marched through a slab of cloud above the sea, each
+          // sample lit by how much cloud lies between it and the sun (with the bright rim of forward
+          // scattering when the sun is behind), and the far clouds fade into the haze toward the horizon.
+          if (uVolSteps > 0.5 && h > 0.012) {
+            float CB = 1.0, CT = 0.55;
+            float t0 = CB / h, t1 = min((CB + CT) / h, t0 + 5.0);
+            if (t0 < 26.0) {
+              float dt = (t1 - t0) / uVolSteps, t = t0 + dt * h21(gl_FragCoord.xy + fract(uTime) * 37.0);
+              float T = 1.0; vec3 S = vec3(0.0);
+              float cover = uCover, hg = 0.08 * (1.0 + 0.64) / pow(1.0 + 0.64 - 1.6 * mu, 1.5);
+              vec2 wind = vec2(uTime * 0.006, uTime * 0.0025);
+              vec3 sunC = uSunCol * smoothstep(-0.05, 0.08, sd.y) * (1.0 - uNight * 0.8);
+              for (int i = 0; i < 12; i++) {
+                if (float(i) >= uVolSteps || T < 0.04) break;
+                vec3 p = d * t;
+                float hf = clamp((p.y - CB) / CT, 0.0, 1.0);
+                vec2 q = p.xz * 1.15 + wind;
+                float n = n2(q) * 0.55 + n2(q * 2.1 + 3.7) * 0.28 + n2(q * 4.6 + 9.1) * 0.17;
+                float den = clamp((n - (1.0 - cover) - hf * 0.22 - (1.0 - smoothstep(0.0, 0.18, hf)) * 0.12) * 5.0, 0.0, 1.0);
+                if (den > 0.01) {
+                  // a little cloud between here and the sun?
+                  vec3 lp = p + sd * 0.22;
+                  vec2 lq = lp.xz * 1.15 + wind;
+                  float ln = n2(lq) * 0.6 + n2(lq * 2.1 + 3.7) * 0.4, lhf = clamp((lp.y - CB) / CT, 0.0, 1.0);
+                  float ld = clamp((ln - (1.0 - cover) - lhf * 0.22) * 5.0, 0.0, 1.0);
+                  float lit = exp(-ld * 2.2) * (1.0 - exp(-den * 3.0) * 0.4);
+                  vec3 lc = sunC * lit * (0.55 + 4.0 * hg) + uAmb * (0.5 + 0.55 * hf);
+                  lc = mix(lc, lc * vec3(0.32, 0.16, 0.14) + vec3(0.9, 0.3, 0.08) * (1.0 - hf) * 0.35, uDark);   // Hell: smoke lit from below
+                  float a = 1.0 - exp(-den * dt * 4.0);
+                  S += T * a * lc; T *= 1.0 - a;
+                }
+                t += dt;
+              }
+              float fade = exp(-t0 * 0.06) * smoothstep(0.012, 0.05, h);
+              col = mix(col, col * T + S, fade);
+            }
+          }
           // a band of fair-weather cumulus piled low around the horizon, sunlit on the sun's side
-          if (uCumulus > 0.01 && h > -0.03 && h < 0.32) {
+          if (uVolSteps < 0.5 && uCumulus > 0.01 && h > -0.03 && h < 0.32) {
             vec2 dxz = normalize(d.xz + 1e-5);
             float cl = fbm(dxz * 3.4 + vec2(uTime * 0.0015, h * 11.0)) * 0.7 + fbm(dxz * 9.0 + vec2(h * 22.0, uTime * 0.003)) * 0.3;
             float shape = smoothstep(0.48, 0.66, cl - h * 2.1 + 0.08) * smoothstep(-0.03, 0.02, h) * uCumulus;
@@ -491,7 +644,8 @@
           gl_FragColor = vec4(col, 5000.0);   // alpha: distance, beyond everything (see post.js)
         }`,
     }));
-    sky.renderOrder = -10;
+    // drawn after everything solid, so the sky's work is done only where sky shows through
+    sky.renderOrder = 1000;
     scene.add(sky);
   }
 
@@ -1875,8 +2029,39 @@
   const shallowDay = hex(LOOK.shallow || 0x62c2bf), deepDay = hex(LOOK.deep || 0x2b6f8c), shallowNight = hex(0x2c5260), deepNight = hex(0x10243a);
   const shallowWinter = hex(0x86b6bc), deepWinter = hex(0x2f5d74);
   W.env = { top: new THREE.Color(), hor: new THREE.Color(), sun: new THREE.Color(), over: 0 };
+  // Blend the physically based atmosphere into the time-of-day palette: the zenith, horizon, sunlight and
+  // sky light all take their colour from it by day, while each world's palette keeps the brightness (and
+  // owns the night). Heaven and Hell paint their own skies.
+  const PHYS = LOOK.sky ? 0 : (LOOK.phys != null ? LOOK.phys : 0.8);
+  const aZ = new THREE.Color(), aH = new THREE.Color(), aT = new THREE.Color(), aS = new THREE.Color();
+  const lum = (c) => c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722;
+  let atmoT = -1;
+  function physicalSky(P) {
+    const dayK = 1 - smooth(0.25, 0.8, P.night);
+    skyU.uPhys.value = PHYS * dayK;
+    if (PHYS <= 0 || dayK <= 0) return;
+    computeSunMoon(S.tod, P.night);
+    const l = Math.hypot(skySun.x, Math.max(skySun.y, -0.08), skySun.z), ps = [skySun.x / l, Math.max(skySun.y, -0.08) / l, skySun.z / l];
+    if (Math.abs(S.tod - atmoT) > 0.0004) {   // the sun moves slowly: recompute now and then
+      atmoT = S.tod;
+      atmoJS([0, 1, 0], ps, aZ);
+      const hx = ps[0], hz = ps[2], hn = Math.hypot(hx, hz) || 1, ux = hx / hn, uz = hz / hn;
+      aH.setRGB(0, 0, 0);
+      for (const [x, z] of [[ux, uz], [-ux, -uz], [-uz, ux], [uz, -ux]]) { const n = Math.hypot(x, 0.05, z); atmoJS([x / n, 0.05 / n, z / n], ps, aT); aH.r += aT.r / 4; aH.g += aT.g / 4; aH.b += aT.b / 4; }
+      sunlightJS(ps, aS);
+      const m = Math.max(aS.r, aS.g, aS.b, 1e-6); aS.multiplyScalar(1 / m);
+    }
+    const lz = Math.max(lum(aZ), 1e-6), lh = Math.max(lum(aH), 1e-6), gz = clamp(lum(P.top) / lz, 0, 900), gh = clamp(lum(P.hor) / lh, 0, 900);
+    updateSkyLut(ps, gh, gz, P.hor);
+    const k = PHYS * dayK;
+    P.top.lerp(tmpC.copy(aZ).multiplyScalar(gz), k * 0.8);
+    P.hor.lerp(tmpC.copy(aH).multiplyScalar(gh), k * 0.8);
+    P.sun.lerp(tmpC.copy(aS).multiplyScalar(Math.max(lum(P.sun), 0.2) / Math.max(lum(aS), 0.05)), k * 0.7);
+    P.hs.lerp(tmpC.copy(aZ).multiplyScalar(lum(P.hs) / lz), k * 0.45);
+  }
   function updateEnv(t) {
     const wx = S.weather, P = samplePalette(S.tod), E = W.env;
+    physicalSky(P);
     const over = clamp(wx.cloud * 0.5 + wx.rain * 0.55 + wx.snow * 0.45 + wx.fog * 0.3, 0, 1);
     S.night = P.night;
     S.glow = Math.max(smooth(0.15, 0.75, P.night), over * 0.45 + wx.fog * 0.2, LOOK.glowMin || 0);
@@ -1908,6 +2093,8 @@
     skyU.uGold.value = W.golden();
     skyU.uCirrus.value = clamp(0.2 + 0.5 * fbm(S.day * 3.1, 2.2, 88, 2) + wx.cloud * 0.35 - wx.rain * 0.6 - wx.fog * 0.5, 0, 1);
     skyU.uCumulus.value = clamp(0.3 + wx.cloud * 0.9 + (LOOK.sea === 'cloud' ? 0.35 : 0) - wx.rain * 0.5 - wx.fog * 0.6, 0, 1);
+    skyU.uCover.value = clamp(0.47 + wx.cloud * 0.3 + wx.rain * 0.3 + (LOOK.sea === 'lava' ? 0.12 : 0) + 0.08 * fbm(S.day * 2.3, 5.1, 91, 2) - wx.fog * 0.2, 0.2, 0.9);
+    skyU.uAmb.value.copy(E.hor).lerp(E.top, 0.45).multiplyScalar(0.95 - over * 0.25);
     skyU.uHalo.value = LOOK.sea === 'cloud' ? 1 : 0;
     skyU.uDark.value = LOOK.sea === 'lava' ? 1 : 0;
     sky.position.copy(camera.position);
