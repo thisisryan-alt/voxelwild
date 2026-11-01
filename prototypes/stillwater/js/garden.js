@@ -763,6 +763,7 @@
   function stilthouse(o, rng, rec) {
     const s = 0.22, k = faceK(rec.x, rec.z), base = Math.max(0, K.WL + 1.5 - rec.y), legs = Math.ceil(base / s) + 1;
     const wall = hex(U.pick(rng, [0xb08a62, 0xa47a54, 0xc49a6e])), roofC = hex(U.pick(rng, [0x5a3a2e, 0x4a4e58, 0x6a4030])), plank = hex(0x8a6a4c);
+    const shutC = hex(U.pick(rng, [0x9a3a2e, 0x3e5a7a, 0x4a6a5a]));
     const P = (x, y, z, layer, c, ord, size) => { const [wx, wz] = rot(x, z, k); o.vox(layer, wx * s, s * (y + 0.5), wz * s, size || s, c, ord); };
     for (const x of [-4, 4]) for (const z of [-4, 4]) for (let y = 0; y < legs; y++) P(x, y, z, 'w', hex(DARK), y * 0.3);
     const fy = legs;
@@ -770,13 +771,18 @@
     for (let y = fy + 1; y <= fy + 5; y++) for (let x = -4; x <= 3; x++) for (let z = -4; z <= 4; z++) {
       if (Math.abs(z) < 4 && x > -4 && x < 3) continue;
       const door = x === 3 && Math.abs(z) <= 1 && y <= fy + 3, win = (z === 4 || z === -4) && Math.abs(x) <= 1 && y === fy + 3;
+      const frame = (z === 4 || z === -4) && Math.abs(x) <= 1 && (y === fy + 2 || y === fy + 4), shutter = (z === 4 || z === -4) && Math.abs(x) === 2 && y === fy + 3;
       if (door) continue;
       if (win) P(x, y, z, 'g', hex(0xffc777), 6 + y - fy);
+      else if (frame) P(x, y, z, 'w', hex(0xe6dac4), 6 + y - fy);
+      else if (shutter) P(x, y, z, 'w', shutC, 6 + y - fy);
       else P(x, y, z, 'w', wall.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.04), 6 + y - fy);
     }
+    // a ladder down from the deck to the water
+    for (let y = 0; y < fy; y++) { for (const z of [-1, 1]) P(7, y, z, 'w', hex(DARK), y * 0.3, s * 0.6); if (y % 2) P(7, y, 0, 'w', plank, y * 0.3, s * 0.7); }
     for (let i = 0; i <= 6; i++) for (let x = -5; x <= 4; x++) {
       const z = 6 - i;
-      for (const sz of [-1, 1]) P(x, fy + 6 + i, sz * z, 'w', roofC.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.04), 12 + i);
+      for (const sz of [-1, 1]) P(x, fy + 6 + i, sz * z, 'w', roofC.clone().offsetHSL(0, 0, z === 0 || z === 6 ? -0.07 : (rng() - 0.5) * 0.04), 12 + i);   // darker ridge and eaves
       if (z === 0) break;
     }
     P(5, fy + 3, 3, 'g', hex(0xffd59a), 16, s * 0.9); P(5, fy + 4, 3, 'w', hex(DARK), 16, s * 0.6);
@@ -792,6 +798,12 @@
     const P = (x, y, z, layer, c, ord, size) => { const [wx, wz] = rot(x, z, k); o.vox(layer, wx * s, s * (y + 0.5), wz * s, size || s, c, ord); };
     foundation(o, rng, rec, s, 5, k, P);
     for (let x = -5; x <= 5; x++) for (let z = -5; z <= 5; z++) P(x, 0, z, 'w', stoneC(rng), 1);
+    // a red railing round the stone base, open at the front
+    for (let x = -5; x <= 5; x++) for (let z = -5; z <= 5; z++) {
+      if (Math.max(Math.abs(x), Math.abs(z)) !== 5 || (x === 5 && Math.abs(z) <= 1)) continue;
+      if ((x + z) % 2 === 0) P(x, 1, z, 'w', red, 2, s * 0.45);
+      P(x, 2, z, 'w', red, 3, s * 0.4);
+    }
     let y = 1;
     for (let f = 0; f < 4; f++) {
       const h = 4 - (f > 1 ? 1 : 0), w = 4 - f;
@@ -806,8 +818,8 @@
       for (let x = -e; x <= e; x++) for (let z = -e; z <= e; z++) {
         const ring = Math.max(Math.abs(x), Math.abs(z));
         if (ring > e || ring < w - 1) continue;
-        const up = Math.abs(x) === e && Math.abs(z) === e ? 1 : 0;   // the corners turn up
-        P(x, y + up, z, 'w', roofC.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.05), y + 1);
+        const up = Math.abs(x) === e && Math.abs(z) === e ? 1 : 0;   // the corners turn up, tipped with gold
+        P(x, y + up, z, 'w', up ? gold : roofC.clone().offsetHSL(0, 0, ring === e ? -0.05 : (rng() - 0.5) * 0.05), y + 1);
       }
       for (const [x, z] of [[e, e], [-e, e], [e, -e], [-e, -e]]) P(x, y - 1, z, 'g', hex(0xffc274), y, s * 0.7);
       y += 1;

@@ -189,7 +189,8 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
   the gardens, each in its own colour, fading in once a build has finished growing.
 - **Cabins** have dark corner posts, windows in cream frames with painted shutters and a box of flowers
   beneath each, a step and a lantern at the door, a darker trim along the eaves and ridge, and a
-  chimney cap.
+  chimney cap. Stilt houses have framed windows with painted shutters, a darker ridge and a ladder down
+  to the water; pagodas have gold tips on their upturned eaves and a red railing round the base.
 - **Contact shadow** under the walker's feet, and footprints that fill in slowly. The walker and every
   creature carry a soft rim of sky light round their silhouettes (ember-orange in Hell), so they stand
   out from busy ground.
