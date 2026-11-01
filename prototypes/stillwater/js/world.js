@@ -1024,6 +1024,8 @@
     uRes: { value: new THREE.Vector2(1, 1) }, uTexMat: { value: new THREE.Matrix4() }, uNear: { value: 0.3 }, uFar: { value: 2400 },
     uCloudTex: PU.uCloudTex, uCloudSh: PU.uCloudSh,
     uSea: { value: K.WORLD.look.sea === 'lava' ? 2 : K.WORLD.look.sea === 'cloud' ? 1 : 0 },
+    uSkySun: { value: new THREE.Vector3(0, 1, 0) }, uMoonDir: { value: new THREE.Vector3(0, 1, 0) }, uMoonVis: { value: 0 },
+    uSkyLut: skyU.uSkyLut, uPhys: skyU.uPhys,   // shared with the sky
   };
   const WAVE = `
     uniform float uTime, uBreath, uAmp;
@@ -1060,8 +1062,9 @@
         }`,
       fragmentShader: WAVE + CLOUD_GLSL + `
         uniform vec3 uSunDir, uSunCol, uTop, uHor, uFog, uCam, uShallow, uDeep, uBioCol;
-        uniform float uFogNear, uFogFar, uNight, uWL, uRain, uBio, uPost, uReflOn, uNear, uFar, uClear, uWind, uSea;
-        uniform sampler2D uHeight, tRefl, tScene; uniform vec2 uHX, uRes; uniform vec4 uRip[10];
+        uniform float uFogNear, uFogFar, uNight, uWL, uRain, uBio, uPost, uReflOn, uNear, uFar, uClear, uWind, uSea, uPhys, uMoonVis;
+        uniform sampler2D uHeight, tRefl, tScene, uSkyLut; uniform vec2 uHX, uRes; uniform vec4 uRip[10];
+        uniform vec3 uSkySun, uMoonDir;
         varying vec3 vW; varying vec4 vRefl; varying float vVZ;
         float h12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
         float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -1084,6 +1087,17 @@
         // A sea of cloud: puffy cumulus heaps (ridged noise, so each billow has a rounded top and a crease
         // around it), lit warm on the sun side and shaded a sky-tinted blue in the hollows between them.
         float billow(vec2 q){ return 1.0 - abs(vn(q) * 2.0 - 1.0); }
+        // foam lace: a slowly churning cell pattern whose thin walls are the bubbles' edges
+        float lace(vec2 p){
+          vec2 i = floor(p), f = fract(p); float d1 = 8.0, d2 = 8.0;
+          for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+            vec2 g = vec2(float(x), float(y)), o = vec2(h12(i + g), h12(i + g + 17.3));
+            o = 0.5 + 0.42 * sin(uTime * 0.5 + 6.2831 * o);
+            float d = length(g + o - f);
+            if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+          }
+          return 1.0 - smoothstep(0.0, 0.16, d2 - d1);
+        }
         float cloudH(vec2 p){
           vec2 drift = vec2(uTime * 0.005, uTime * 0.002);
           return billow(p * 0.045 + drift) * 0.55 + billow(p * 0.12 - drift * 1.7) * 0.3 + billow(p * 0.34 + drift * 3.0) * 0.15;
@@ -1124,6 +1138,12 @@
           float d1 = vn(p * 1.3 + vec2(uTime * 0.25, uTime * 0.12)) - vn(p * 1.3 + vec2(-uTime * 0.18, uTime * 0.2));
           float d2 = vn(p * 4.1 + vec2(-uTime * 0.6, uTime * 0.35)) - vn(p * 3.7 + vec2(uTime * 0.45, -uTime * 0.5));
           n.xz += vec2(d1, -d1) * 0.05 + vec2(d2, d2 * 0.7) * 0.025;
+          // and up close, a third layer of tiny capillary ripples, faded with distance so it never shimmers
+          float near = 1.0 - smoothstep(5.0, 28.0, vVZ);
+          if (near > 0.0) {
+            float d3 = vn(p * 9.0 + vec2(uTime * 1.1, -uTime * 0.8)) - vn(p * 8.3 - vec2(uTime * 0.9, uTime * 1.2));
+            n.xz += vec2(d3, -d3 * 0.8) * 0.02 * near;
+          }
           float ring = 0.0;
           for (int i = 0; i < 10; i++) {
             vec4 r = uRip[i];
@@ -1156,6 +1176,11 @@
           float ndv = max(dot(n, V), 0.0);
           vec3 Rf = reflect(-V, n);
           vec3 skyc = mix(uHor, uTop, clamp(Rf.y * 1.6, 0.0, 1.0));
+          // the reflected sky from the same table the sky itself is drawn from
+          if (uPhys > 0.001 && Rf.y > 0.0) {
+            float phi = acos(clamp(dot(normalize(Rf.xz + 1e-5), normalize(uSkySun.xz + 1e-5)), -1.0, 1.0)) / 3.14159265;
+            skyc = mix(skyc, texture2D(uSkyLut, vec2(phi, sqrt(clamp(Rf.y, 0.004, 1.0)))).rgb * 2.0, uPhys);
+          }
           // under a cloud's shadow the sea loses its glitter and turns a deeper, duller blue
           float cs = swCloudShade(vW);
           float spec = pow(max(dot(reflect(-L, n), V), 0.0), 220.0) * cs * cs;
@@ -1184,6 +1209,13 @@
             col = mix(col, skyc, 0.12 + 0.68 * pow(1.0 - ndv, 4.0));
             col += uSunCol * spec * 1.2;
           }
+          // a glade of moonlight: a long, broken path of glitter on the water toward the moon
+          if (uMoonVis > 0.01) {
+            vec3 M = normalize(uMoonDir);
+            float mr = max(dot(reflect(-M, n), V), 0.0);
+            float mg = pow(mr, 70.0) * 1.4 + pow(h12(floor(p * 10.0) + floor(uTime * 4.0)), 24.0) * pow(mr, 14.0) * 2.2;
+            col += vec3(0.78, 0.85, 1.0) * mg * uMoonVis * cs;
+          }
           col += uSunCol * ring * 0.08 + vec3(rr * 0.05);
           float line = 0.5 + 0.3 * uBreath + 0.07 * sin(uTime * 0.7 + p.x * 0.4 + p.y * 0.3);
           float foam = (1.0 - smoothstep(0.05, line, depth)) * smoothstep(0.3, 0.7, vn(p * 2.6 + uTime * 0.12));
@@ -1196,7 +1228,9 @@
           // whitecaps on the crests when the wind is up
           float crest = smoothstep(0.55, 0.95, hc / max(uAmp, 0.001)) * smoothstep(0.55, 1.0, uWind) * smoothstep(1.0, 4.0, depth);
           foam = max(foam, crest * smoothstep(0.55, 0.8, vn(p * 3.0 + uTime * 0.5)) * 0.8);
-          col = mix(col, vec3(0.95, 0.97, 0.96) * (1.0 - 0.72 * uNight), foam * 0.75);
+          // up close the foam is lace: bright bubble walls with thinner water between
+          if (near > 0.0 && foam > 0.01) foam *= mix(1.0, 0.35 + 0.85 * lace(p * 2.4 + vec2(uTime * 0.05, 0.0)), near);
+          col = mix(col, vec3(0.95, 0.97, 0.96) * (1.0 - 0.72 * uNight), clamp(foam * 0.75, 0.0, 0.9));
           col += uBioCol * uBio * (ring * 1.2 + foam * 0.42 + rr * 0.4);
           if (uPost < 0.5) alpha = max(mix(0.48, 1.0, smoothstep(0.3, 4.5, depth)), foam * 0.85);
           float f = smoothstep(uFogNear, uFogFar, length(uCam - vW));
@@ -2104,6 +2138,8 @@
     waterU.uAmp.value = (S.reduceMotion ? 0.05 : LOOK.sea ? 0.04 : 0.11) * (1 + wx.wind * 0.35 + wx.rain * 0.2);
     waterU.uSunDir.value.copy(L); waterU.uSunCol.value.copy(P.sun).multiplyScalar((0.4 + P.si * 0.7) * (1 - over * 0.7));
     waterU.uTop.value.copy(E.top); waterU.uHor.value.copy(E.hor); waterU.uFog.value.copy(E.hor);
+    waterU.uSkySun.value.copy(skySun); waterU.uMoonDir.value.copy(moonDir);
+    waterU.uMoonVis.value = smooth(0.5, 0.95, P.night) * (0.35 + 0.65 * full) * smooth(-0.02, 0.1, moonDir.y) * (1 - over);
     waterU.uShallow.value.copy(shallowDay).lerp(shallowWinter, winter).lerp(shallowNight, P.night).lerp(E.hor, over * 0.2);
     waterU.uDeep.value.copy(deepDay).lerp(deepWinter, winter).lerp(deepNight, P.night);
     waterU.uNight.value = P.night; waterU.uCam.value.copy(camera.position);

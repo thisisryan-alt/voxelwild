@@ -162,7 +162,10 @@ Everything is drawn with three.js r128 and hand-written shaders; there are no im
 - **Sea:** planar reflections from a mirrored camera with an oblique clip plane, refraction of the
   sea floor tinted by how much water the light passes through, sun glints, whitecaps in wind, shore
   foam, lines of surf that roll in to the beaches, light through the backs of the waves, rain rings,
-  ripples and night glow.
+  ripples and night glow. Up close, a third layer of tiny capillary ripples (faded with distance so it
+  never shimmers) and foam drawn as churning lace of bubble walls. Without planar reflections (Balanced)
+  the sea reflects the physically based sky from the same table the sky is drawn from. At night a glade
+  of moonlight glitters on the water toward the moon, brightest at full moon.
 - **Cloud sea** (Heaven): billowing ridged noise with lit tops and soft blue creases, shaded from
   its own normals, brightening everything above it from below.
 - **Lava sea** (Hell): a dark crust that drifts and cracks into glowing HDR veins, lighting the rock
