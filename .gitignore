@@ -58,3 +58,7 @@ mono_crash.*
 __pycache__/
 *.pyc
 /SourceArt/**/_download/
+
+# Character generator look-dev output
+/SourceArt/**/_preview/
+*.blend.bak
