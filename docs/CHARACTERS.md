@@ -226,9 +226,16 @@ under a CC0 studio HDRI plus a soft key light (`docs/images/human/`).
   extreme close-up. The base anatomy is MakeHuman's averaged morph space, and the skin is procedural:
   convincing at portrait distance, but without a real person's idiosyncrasies. Replacing the albedo
   and normal maps with scan data is a drop-in change, using the same UVs and channels.
-- **Shaders not yet verified in Unity.** This repository was built in an environment without the
-  Unity editor. The Cycles renders in `docs/images/human/` are the reference; the URP shaders have not
-  been compiled or captured here. Run *Build Human Character* and capture before relying on them.
+- **Shaders compile-checked, but not yet run in Unity.** This repository was built without the Unity
+  editor.
+  - `tools/check_shaders.py` compiles every pass and keyword variant against the real URP 17.4 shader
+    library, using Slang (an HLSL front end): 164 variants across all project shaders, with zero errors
+    in project code.
+  - The checker is proven sensitive: deliberate errors injected into a pass and into a shared include
+    are both caught.
+  - It is not Unity's own compiler. Platform limits, SRP Batcher layout and the final look are only
+    confirmed by an in-editor capture. Run *Build Human Character* and `CharacterAssetTests`, then
+    capture.
 - **Hair is cards, not strands.** It is tuned for a short cut. Long hair needs a different card
   layout.
 - **No clothing.** The body is a smooth base mesh without genitals, ready for clothing.

@@ -101,6 +101,7 @@ python tools/fetch_ambientcg.py            # re-download scanned CC0 materials
 python tools/generate_textures.py          # regenerate procedural sets (foliage, plants, ores, torch...)
 python tools/blender/human/build_human.py --stage full --regen --size 4096   # human character -> Assets/ (bpy 5.2.1)
 python tools/blender/human/validate_fbx.py # check the exported character (skeleton, LODs, blend shapes, weights)
+python tools/check_shaders.py              # compile every shader pass/variant against URP 17.4 (pip install slangpy)
 ```
 
 `WorldSceneBuilder` generates the scene, materials, sky, post-processing and URP settings. Change the

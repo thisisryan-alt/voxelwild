@@ -62,3 +62,4 @@ __pycache__/
 # Character generator look-dev output
 /SourceArt/**/_preview/
 *.blend.bak
+/tools/.cache/
