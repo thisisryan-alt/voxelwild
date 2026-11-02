@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 
+import gc
 import math
 import os
 import time
@@ -222,8 +223,10 @@ def scalp_cover(L, P, seed):
     jitter = n3.fbm(P, 6.0, 3, seed + 1) * 3.0 + n3.fbm(P, 1.5, 2, seed + 2) * 1.5
     soft = np.where(az < 60, 6.5, 3.5)            # the front hairline thins out gradually
     cov = nz.smoothstep(el_t - soft, el_t + soft, el + jitter)
-    d = (np.c_[ax, L[:, 1], L[:, 2]] - EAR_C) / EAR_R
-    cov *= nz.smoothstep(0.9, 1.25, np.sqrt((d * d).sum(1)))
+    # the ear itself is removed by the caller with the exact MPFB ear mask (texture: UV mask, cards:
+    # per-vertex mask); only a thin geometric margin is kept here for points behind the ear root
+    d = (np.c_[ax, L[:, 1], L[:, 2]] - EAR_C) / (EAR_R * np.array([1.0, 0.85, 0.85]))
+    cov *= nz.smoothstep(0.75, 0.95, np.sqrt((d * d).sum(1)) + (ax < 70) * 0.25)
     # sideburns: a strip directly in front of the ear, fading downward
     sb = np.exp(-(((L[:, 2] + 58) / 6.0) ** 2 + ((L[:, 1] + 6) / 17.0) ** 2) ** 2) * nz.smoothstep(56, 62, ax)
     cov = np.maximum(cov, nz.smoothstep(0.3, 0.8, sb + jitter * 0.04) * 0.9)
@@ -253,9 +256,10 @@ def skin_fields(P, N, UV, lm: Landmarks, masks, cfg, seed=0):
     scalp = scalp_cover(L, P, seed) * (1 - ears) * head
     yline = -32.0 - (60.0 - np.clip(ax, 20, 60)) * 0.7
     bj = n3.fbm(P, 7.0, 3, seed + 3) * 4.0
-    cheek = nz.smoothstep(yline + 2, yline - 7, y + bj) * nz.smoothstep(18, 24, ax) * nz.smoothstep(-50, -38, z)
+    cheek = nz.smoothstep(yline + 2, yline - 7, y + bj) * nz.smoothstep(14, 26, ax + bj * 0.5) * nz.smoothstep(-50, -38, z)
     cheek *= nz.smoothstep(70, 62, ax)
-    mous = nz.smoothstep(26, 21, ax) * nz.smoothstep(-52, -56, y + bj * 0.3) * nz.smoothstep(-71, -66, y)
+    # moustache: rounded at the sides, fading into the cheek stubble at the mouth corners
+    mous = nz.smoothstep(31, 17, ax + bj * 0.6) * nz.smoothstep(-51, -57, y + bj * 0.3) * nz.smoothstep(-71, -65, y)
     chin = nz.smoothstep(24, 18, ax) * nz.smoothstep(-82, -87, y + bj * 0.3) * nz.smoothstep(-20, -5, z)
     beard = np.clip(cheek + mous + chin, 0, 1)
     neck_fade = nz.smoothstep(-188, -165, y + bj) * nz.smoothstep(-55, -40, z)
@@ -342,7 +346,7 @@ def skin_fields(P, N, UV, lm: Landmarks, masks, cfg, seed=0):
     pore_size = 0.07 + 0.07 * pore_strength
     F1, F2, R = n3.worley(P, 0.62, seed + 40)
     pit = (1 - nz.smoothstep(0.0, pore_size * (0.6 + 0.8 * R), F1)) ** 2
-    H -= pit * (0.025 + 0.05 * pore_strength) * (R > 0.15)
+    H -= pit * (0.035 + 0.07 * pore_strength) * (R > 0.15)
     pore_dark = pit * pore_strength * (R > 0.15)
     # secondary sparse larger pores on the nose
     F1b, _, Rb = n3.worley(P, 1.1, seed + 41)
@@ -599,7 +603,25 @@ def height_to_normal_uv(H, pos):
     return nrm * 0.5 + 0.5
 
 
-def generate(body_ob, hu, eye_centers, cfg, out_dir, size=4096, names=("Head", "Body")):
+def eval_fields(P, N, UV, lm, masks, cfg, body, chunk=2_500_000):
+    """skin_fields (+ body_fields) in chunks: everything is pointwise in 3D, so chunking changes nothing
+    but the peak memory (a 4K tile is ~10M texels)."""
+    seed = cfg["seed"] + (1000 if body else 0)
+    out = {}
+    for s0 in range(0, len(P), chunk):
+        s1 = min(len(P), s0 + chunk)
+        F = skin_fields(P[s0:s1], N[s0:s1], UV[s0:s1], lm, masks, cfg, seed=seed)
+        if body:
+            body_fields(P[s0:s1], N[s0:s1], F, lm, seed=cfg["seed"] + 2000)
+        for k, v in F.items():
+            if isinstance(v, np.ndarray) and v.ndim >= 1 and len(v) == s1 - s0:
+                out.setdefault(k, []).append(v.astype(np.float32))
+        del F
+        gc.collect()
+    return {k: np.concatenate(v).astype(np.float64) for k, v in out.items()}
+
+
+def generate(body_ob, hu, eye_centers, cfg, out_dir, size=4096, names=("Head", "Body"), only=None):
     os.makedirs(out_dir, exist_ok=True)
     t0 = time.time()
     tiles = bake_surface(body_ob, size)
@@ -607,15 +629,16 @@ def generate(body_ob, hu, eye_centers, cfg, out_dir, size=4096, names=("Head", "
     masks = _masks()
     lut = skin_model.LUT(beta=cfg["melanin_type"])
     hair_col = np.array([0.035, 0.024, 0.016])
-    for tile, name in zip(tiles, names):
+    for ti, name in enumerate(names):
+        if only and name not in only:
+            continue
+        tile = tiles[ti]
         comp = tile["computed"]
-        P = tile["pos"][comp]
-        N = tile["nrm"][comp]
+        P = tile["pos"][comp].astype(np.float64)
+        N = tile["nrm"][comp].astype(np.float64)
         N = N / np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-6)
-        UV = tile["mhuv"][comp]
-        F = skin_fields(P, N, UV, lm, masks, cfg, seed=cfg["seed"] + (0 if name == "Head" else 1000))
-        if name == "Body":
-            body_fields(P, N, F, lm, seed=cfg["seed"] + 2000)
+        UV = tile["mhuv"][comp].astype(np.float64)
+        F = eval_fields(P, N, UV, lm, masks, cfg, body=(name == "Body"))
         alb = lut(F["Cm"], F["Ch"], F["S"], F["T"]).astype(np.float64)
         # five-o'clock shadow: hair shafts under the skin read as a cool grey veil
         # lips: dusky rose rather than the model's pink (vermilion is thin but pigmented in this skin type)
@@ -625,11 +648,12 @@ def generate(body_ob, hu, eye_centers, cfg, out_dir, size=4096, names=("Head", "
         alb = alb * (1 - sh) + alb * np.array([0.55, 0.58, 0.66]) * sh
         sc = (F["scalp"] * 0.25)[:, None]
         alb = alb * (1 - sc) + alb * np.array([0.6, 0.6, 0.64]) * sc
-        alb *= (1 - 0.18 * F["pore_dark"])[:, None]
+        alb *= (1 - 0.25 * F["pore_dark"])[:, None]
         a = np.clip(F["hair_alpha"], 0, 1)[:, None]
         alb = alb * (1 - a) + hair_col * a
         hc = F["hair_cap"][:, None]
-        cap_col = np.array(cfg.get("hair_color", (0.105, 0.066, 0.040))) * F["cap_shade"][:, None]
+        # painted cap sits under the cards' self-shadowing: darker than the card albedo to match on screen
+        cap_col = np.array(cfg.get("hair_color", (0.105, 0.066, 0.040))) * 0.62 * F["cap_shade"][:, None]
         alb = alb * (1 - hc * 0.92) + cap_col * hc * 0.92
         fo = (F["follicle"] * 0.4)[:, None]
         alb = alb * (1 - fo) + hair_col * fo
@@ -658,6 +682,9 @@ def generate(body_ob, hu, eye_centers, cfg, out_dir, size=4096, names=("Head", "
         nz.save_png(os.path.join(out_dir, f"T_Human_{name}_Normal.png"), nrm)
         nz.save_png(os.path.join(out_dir, f"T_Human_{name}_Mask.png"), mask)
         print(f"[skin] wrote {name} tile ({time.time() - t0:.0f}s)")
+        del F, P, N, UV, alb, alb_img, H_img, nrm, mask, r_img, c_img, ao, trans, tile
+        tiles[ti] = None
+        gc.collect()
 
 
 def _put(arr, comp, shape, fill):

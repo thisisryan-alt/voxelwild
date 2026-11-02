@@ -91,7 +91,7 @@ namespace Voxelwild.EditorTools
                 m.SetTexture("_BaseMap", Tex("T_Human_HairCards"));
                 m.SetFloat("_Ribbon", 0f);
                 m.DisableKeyword("_RIBBON");
-                m.SetColor("_HairColor", new Color(0.40f, 0.32f, 0.25f));   // sRGB of the linear look-dev albedo (0.13, 0.085, 0.052)
+                m.SetColor("_HairColor", new Color(0.44f, 0.36f, 0.28f));   // sRGB of the linear look-dev albedo (0.16, 0.105, 0.065)
             });
             var lashes = Mat("M_Human_Eyelashes", hair, m =>
             {
@@ -105,7 +105,7 @@ namespace Voxelwild.EditorTools
             {
                 m.SetFloat("_Ribbon", 1f);
                 m.EnableKeyword("_RIBBON");
-                m.SetColor("_HairColor", new Color(0.36f, 0.29f, 0.22f));
+                m.SetColor("_HairColor", new Color(0.39f, 0.32f, 0.25f));
                 m.SetFloat("_Cutoff", 0.4f);
             });
 
@@ -153,7 +153,7 @@ namespace Voxelwild.EditorTools
             rim.range = 6f;
             rim.spotAngle = 40f;
             rim.intensity = 6f;
-            rim.transform.position = new Vector3(0.9f, 2.1f, 1.2f);
+            rim.transform.position = new Vector3(0.9f, 2.1f, -1.2f);       // behind: the character faces +Z
             rim.transform.LookAt(new Vector3(0f, 1.65f, 0f));
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.55f, 0.6f, 0.7f);
@@ -166,7 +166,7 @@ namespace Voxelwild.EditorTools
             cam.tag = "MainCamera";
             cam.fieldOfView = 18f;
             cam.nearClipPlane = 0.02f;
-            cam.transform.position = new Vector3(0.18f, 1.68f, -1.05f);
+            cam.transform.position = new Vector3(0.18f, 1.68f, 1.05f);
             cam.transform.LookAt(new Vector3(0f, 1.66f, 0f));
             human.GetComponent<HumanCharacter>().LookTarget = cam.transform;
             var probe = new GameObject("Reflection Probe").AddComponent<ReflectionProbe>();

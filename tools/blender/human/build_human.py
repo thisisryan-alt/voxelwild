@@ -196,6 +196,26 @@ def scalp_coverage(P_mm, O_mm):
     return scalp_cover(L, P_mm, config.SKIN["seed"])
 
 
+def vertex_mask(ob, name):
+    """Per-vertex value of an MPFB region mask, sampled through the MakeHuman UVs (0..1)."""
+    import noise as nz
+    from scipy.ndimage import map_coordinates
+    me = ob.data
+    uv = np.zeros(len(me.loops) * 2, np.float32)
+    me.uv_layers["UVMap_MH"].data.foreach_get("uv", uv)
+    vi = np.zeros(len(me.loops), np.int64)
+    me.loops.foreach_get("vertex_index", vi)
+    acc = np.zeros((len(me.vertices), 2))
+    np.add.at(acc, vi, uv.reshape(-1, 2))
+    cnt = np.bincount(vi, minlength=len(me.vertices))[:, None]
+    uvv = acc / np.maximum(cnt, 1)
+    m = nz.load_png(os.path.join(mh.DATA, "masks", f"mpfb_{name}.jpg"))
+    m = m if m.ndim == 2 else m[..., 0]
+    h, w = m.shape
+    v = map_coordinates(m, [(1 - uvv[:, 1]) * (h - 1), uvv[:, 0] * (w - 1)], order=1, mode="nearest")
+    return np.clip((v - 0.2) / 0.4, 0, 1)
+
+
 def build_hair(hu: Human, body, eyes_) -> dict:
     import materials as mats
     import strands
@@ -220,7 +240,7 @@ def build_hair(hu: Human, body, eyes_) -> dict:
     atlas = os.path.join(TEX_DIR, "T_Human_HairCards.png")
     if not os.path.exists(atlas):
         strands.hair_atlas(atlas)
-    cov = scalp_coverage(co * 1000.0, O * 1000.0)
+    cov = scalp_coverage(co * 1000.0, O * 1000.0) * (1.0 - vertex_mask(body, "ears"))
     ob, bind = strands.hair_cards(surf, co, cov, O, config.NAME, config.NAME, hc)
     ob.data.materials.append(mats.hair_card("M_Human_Hair", bl.load_image(atlas, "Non-Color"), hc["color"]))
     out["hair"] = (ob, bind)
@@ -256,6 +276,7 @@ def main(argv):
     ap.add_argument("--norender", action="store_true")
     ap.add_argument("--save-blend", dest="save_blend", action="store_true")
     ap.add_argument("--shots", default="front,34")
+    ap.add_argument("--tiles", default="", help="regenerate only these skin tiles, e.g. Body")
     args = ap.parse_args(argv)
 
     bl.reset_scene()
@@ -304,7 +325,7 @@ def main(argv):
         import skin_textures
         if args.regen or not os.path.exists(os.path.join(TEX_DIR, "T_Human_Head_BaseColor.png")):
             skin_textures.generate(body, hu, [eyes_["L"]["center"], eyes_["R"]["center"]], config.SKIN, TEX_DIR,
-                                   size=args.size)
+                                   size=args.size, only=args.tiles.split(",") if args.tiles else None)
             skin_textures.detail_normal(os.path.join(TEX_DIR, "T_Human_SkinDetail_Normal.png"))
         detail = bl.load_image(os.path.join(TEX_DIR, "T_Human_SkinDetail_Normal.png"), "Non-Color")
         for i, nm in enumerate(("Head", "Body")):

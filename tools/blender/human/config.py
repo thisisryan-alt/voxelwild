@@ -61,7 +61,7 @@ SKIN = {
     "freckles": 0.12,
     "moles": 6,                 # number of visible nevi on face/neck
     "age_wrinkles": 0.45,
-    "hair_color": (0.13, 0.085, 0.052),     # must match HAIR["color"]: painted scalp hair cap
+    "hair_color": (0.16, 0.105, 0.065),     # must match HAIR["color"]: painted scalp hair cap
     "seed": 7,
 }
 
@@ -73,7 +73,7 @@ EYES = {
 }
 
 HAIR = {
-    "color": (0.13, 0.085, 0.052),   # dark brown, linear albedo
+    "color": (0.16, 0.105, 0.065),   # dark brown, linear albedo
     "melanin": 0.82,
     "melanin_redness": 0.35,
     "top_length": 0.055,             # m, combed back/side
