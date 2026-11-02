@@ -49,9 +49,16 @@ Legend: ✅ done · 🟡 partial or stopgap · ⬜ not started
 - Trees and plants are voxel/sprite generated. Hero trees, rocks and cave formations come from Blender.
   → Phase 3
 
-## Phase 3 — Art pipeline (Blender → Unity) ⬜
+## Phase 3 — Art pipeline (Blender → Unity) 🟡
 
-Blender 5.2.1 LTS is installed and runs headless (`blender --background --python`). Plan:
+Blender 5.2.1 LTS is installed and runs headless (`blender --background --python`). The `bpy` 5.2.1
+wheel runs the same scripts. First asset done:
+
+| Item | Status | Notes |
+|---|---|---|
+| Human character `Human_Adam` | 🟡 | generated end to end from CC0 MakeHuman data: 4K spectral skin, anatomical eyes, ribbon lashes/brows, hair cards, mixamorig skeleton, 34 face shapes, LOD0-2, URP skin/eye/hair shaders ([CHARACTERS.md](CHARACTERS.md)). Not yet captured in Unity; no clothing or correctives |
+
+Plan for the rest:
 
 - `SourceArt/Blender/` holds .blend sources. `tools/blender/*.py` generators and exporters run headless
   from `tools/blender.ps1`.

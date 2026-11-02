@@ -62,9 +62,32 @@ the generator.
 **Git LFS budget.** The three atlases total about 190 MB and change whenever a layer changes. Commit
 rebuilt atlases once per phase, not on every tuning iteration.
 
+## Characters (in use)
+
+The first Blender-generated asset is the human character `Human_Adam`. Full details are in
+[CHARACTERS.md](CHARACTERS.md).
+
+```
+SourceArt/Characters/Human/makehuman/       CC0 MakeHuman/MPFB2 data (base mesh, targets, rig, weights, masks, proxies)
+        │  tools/blender/human/fetch_makehuman.py   (restores the full set; the repo keeps what config.py uses)
+tools/blender/human/build_human.py          bpy 5.2.1 (pip wheel or blender --background --python)
+        │  morph -> UV split -> weights + expression shapes -> subdivide -> eyes, mouth, lashes, brows, hair
+        │  skin_textures.py: Cycles-baked position/normal maps -> numpy skin model -> 4K maps
+        ▼
+Assets/Art/Models/Characters/Human/Human_Adam.fbx     skeleton (mixamorig), LOD0-2, 34 blend shapes
+Assets/Art/Textures/Characters/Human/T_Human_*.png    BaseColor (sRGB), Normal (GL), Mask (R AO, G rough, B cavity, A translucency)
+        │  CharacterAssetPostprocessor: Humanoid avatar, blend shapes, BC5 normals, coverage-preserving card mips
+        ▼
+Voxelwild ▸ Art ▸ Build Human Character    materials (Voxelwild/Character/*) + Assets/Art/Prefabs/Characters/Human_Adam.prefab
+```
+
+The character masks deliberately differ from the block masks: skin has no metal, so B holds cavity
+(specular occlusion), and A holds translucency (back-lit ears) in place of emission.
+
 ## Blender → Unity (Phase 3, planned)
 
-Blender 5.2.1 LTS is installed and can run headless. The planned layout:
+Blender 5.2.1 LTS is installed and can run headless. The `bpy` 5.2.1 wheel (`pip install bpy==5.2.1`, Python
+3.13) runs the same scripts without a Blender install. The planned layout:
 
 ```
 SourceArt/Blender/<category>/<asset>.blend        hand-authored hero assets

@@ -45,6 +45,14 @@ eight phases, what is still a stopgap, and known issues.
   - Mesh jobs copy their own input, so the main thread stays at 2–5 ms.
 - **Player:** walk, sprint, jump, swim and fly on custom voxel physics. Break and place blocks,
   including torches. Plants and torches drop when their support is broken.
+- **Characters (Phase 3, started):** `Human_Adam`, a photoreal human generated end to end from CC0
+  MakeHuman data by `tools/blender/human/`:
+  - 4K skin from a spectral melanin/haemoglobin model, with pores, wrinkles and stubble;
+  - anatomically built eyes; lash, brow and hair geometry;
+  - a Humanoid skeleton, 34 facial blend shapes and LODs;
+  - URP skin, eye and hair shaders lit by the voxel light.
+
+  See [docs/CHARACTERS.md](docs/CHARACTERS.md).
 - **Verification:** 44 EditMode and 4 PlayMode tests. The capture tool tours every biome and a cave,
   and reports CPU/GPU time per view.
 
@@ -91,6 +99,8 @@ Builds/Windows/Voxelwild.exe -vwCapture Screenshots/player            # real-GPU
 Builds/Windows/Voxelwild.exe -vwCapture out -vwShots 08,13 -vwToggles nossao,hardshadows   # A/B a render feature
 python tools/fetch_ambientcg.py            # re-download scanned CC0 materials
 python tools/generate_textures.py          # regenerate procedural sets (foliage, plants, ores, torch...)
+python tools/blender/human/build_human.py --stage full --regen --size 4096   # human character -> Assets/ (bpy 5.2.1)
+python tools/blender/human/validate_fbx.py # check the exported character (skeleton, LODs, blend shapes, weights)
 ```
 
 `WorldSceneBuilder` generates the scene, materials, sky, post-processing and URP settings. Change the
@@ -126,14 +136,15 @@ Assets/
         Generation/   terrain/biome noise, column generation job, tree decoration job
         Meshing/      Burst lighting + mesher, vertex format, region builder
       Player/       controller, voxel physics body, block interaction
+      Characters/   HumanCharacter (blinks, gaze, voxel light for character shaders)
       Rendering/    layer profile (material framework), environment lighting
       Diagnostics/  debug HUD, capture/perf director
     Editor/       scene builder, texture arrays, capture runner, player build
-  Shaders/        Terrain/, Foliage/, Water/, Utility/, Include/ (shared HLSL)
+  Shaders/        Terrain/, Foliage/, Water/, Utility/, Character/, Include/ (shared HLSL)
   Settings/       URP assets, post profile, TerrainLayerProfile
   Tests/          EditMode/, PlayMode/
 SourceArt/        scanned + generated source textures (later .blend files), outside Assets/
-tools/            unity.ps1, fetch_ambientcg.py, generate_textures.py
+tools/            unity.ps1, fetch_ambientcg.py, generate_textures.py, blender/human/ (character generator)
 docs/             ROADMAP, ARCHITECTURE, ASSET_PIPELINE, perf data, images
 ```
 
@@ -142,4 +153,5 @@ docs/             ROADMAP, ARCHITECTURE, ASSET_PIPELINE, perf data, images
 - [docs/ROADMAP.md](docs/ROADMAP.md): phases, status, stopgaps, known issues
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): world data, generation, lighting, meshing, culling, rendering
 - [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md): scanned and generated textures, Blender → Unity (Phase 3)
+- [docs/CHARACTERS.md](docs/CHARACTERS.md): the human character, layer by layer, and how to rebuild it
 - [CREDITS.md](CREDITS.md): texture sources (CC0)
