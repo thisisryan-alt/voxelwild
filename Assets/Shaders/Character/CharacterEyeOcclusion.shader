@@ -6,7 +6,7 @@ Shader "Voxelwild/Character/EyeOcclusion"
 {
     Properties
     {
-        _OcclusionColor ("Occlusion Colour", Color) = (0.32, 0.22, 0.20, 1)
+        _OcclusionColor ("Occlusion Tint RGB (linear)", Vector) = (0.32, 0.22, 0.20, 0)
         _Strength ("Strength", Range(0, 1)) = 0.8
         _Width ("Width (UV v)", Range(0.05, 1)) = 0.45
         _TopBoost ("Upper Lid Boost", Range(0, 2)) = 0.9

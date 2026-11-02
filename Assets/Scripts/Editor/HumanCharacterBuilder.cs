@@ -91,13 +91,13 @@ namespace Voxelwild.EditorTools
                 m.SetTexture("_BaseMap", Tex("T_Human_HairCards"));
                 m.SetFloat("_Ribbon", 0f);
                 m.DisableKeyword("_RIBBON");
-                m.SetColor("_HairColor", new Color(0.20f, 0.14f, 0.10f));
+                m.SetColor("_HairColor", new Color(0.40f, 0.32f, 0.25f));   // sRGB of the linear look-dev albedo (0.13, 0.085, 0.052)
             });
             var lashes = Mat("M_Human_Eyelashes", hair, m =>
             {
                 m.SetFloat("_Ribbon", 1f);
                 m.EnableKeyword("_RIBBON");
-                m.SetColor("_HairColor", new Color(0.06f, 0.05f, 0.045f));
+                m.SetColor("_HairColor", new Color(0.11f, 0.09f, 0.07f));
                 m.SetFloat("_Cutoff", 0.35f);
                 m.SetFloat("_SpecStrength1", 0.08f);
             });
@@ -105,7 +105,7 @@ namespace Voxelwild.EditorTools
             {
                 m.SetFloat("_Ribbon", 1f);
                 m.EnableKeyword("_RIBBON");
-                m.SetColor("_HairColor", new Color(0.15f, 0.11f, 0.08f));
+                m.SetColor("_HairColor", new Color(0.36f, 0.29f, 0.22f));
                 m.SetFloat("_Cutoff", 0.4f);
             });
 

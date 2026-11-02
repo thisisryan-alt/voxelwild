@@ -20,11 +20,11 @@ Shader "Voxelwild/Character/Skin"
         _RoughnessScale ("Roughness Scale", Range(0.2, 2)) = 1
         _SpecularLevel ("Specular Level (1 = skin F0 0.028)", Range(0, 2)) = 1
         _LobeMix ("Sharp/Broad Lobe Mix", Range(0, 1)) = 0.65
-        _ScatterColor ("Scatter Colour", Color) = (0.95, 0.38, 0.22, 1)
+        _ScatterColor ("Scatter Width RGB (linear)", Vector) = (0.95, 0.38, 0.22, 0)
         _ScatterWidth ("Scatter Width", Range(0, 2)) = 0.9
         _CurvatureScale ("Curvature Scale", Range(0, 0.2)) = 0.03
         _NormalBlurMip ("Diffuse Normal Blur (mips)", Range(0, 6)) = 3.5
-        _TransmissionColor ("Transmission Colour", Color) = (1.0, 0.25, 0.12, 1)
+        _TransmissionColor ("Transmission Tint RGB (linear)", Vector) = (1.0, 0.25, 0.12, 0)
         _Translucency ("Translucency", Range(0, 3)) = 1
         _Sheen ("Vellus Sheen", Range(0, 1)) = 0.15
         _CavityAlbedo ("Cavity Darkening", Range(0, 1)) = 0.6

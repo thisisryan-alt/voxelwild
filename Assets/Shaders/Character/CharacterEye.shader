@@ -14,7 +14,7 @@ Shader "Voxelwild/Character/Eye"
         [Toggle(_EYE_IRIS)] _Iris ("Iris", Float) = 0
         _PupilScale ("Pupil Scale (dilation)", Range(0.5, 1.8)) = 1
         _Roughness ("Roughness", Range(0, 1)) = 0.5
-        _ScatterColor ("Scatter Colour", Color) = (0.9, 0.5, 0.4, 1)
+        _ScatterColor ("Scatter Width RGB (linear)", Vector) = (0.9, 0.5, 0.4, 0)
         _Wrap ("Diffuse Wrap", Range(0, 1)) = 0.35
         _Caustic ("Iris Caustic", Range(0, 2)) = 0.6
         _Brightness ("Brightness", Range(0.2, 2)) = 1

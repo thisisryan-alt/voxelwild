@@ -12,7 +12,7 @@ Shader "Voxelwild/Character/Hair"
     {
         [MainTexture] _BaseMap ("Card Texture (R root-tip, G strand id, A coverage)", 2D) = "white" {}
         [Toggle(_RIBBON)] _Ribbon ("Ribbon (alpha from UV)", Float) = 0
-        _HairColor ("Hair Colour (linear-ish albedo)", Color) = (0.24, 0.17, 0.12, 1)
+        _HairColor ("Hair Colour", Color) = (0.40, 0.32, 0.25, 1)
         _RootDarken ("Root Darken", Range(0, 1)) = 0.35
         _TipLighten ("Tip Lighten", Range(0, 1)) = 0.2
         _StrandVariation ("Strand Variation", Range(0, 1)) = 0.35
