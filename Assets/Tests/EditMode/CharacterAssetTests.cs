@@ -15,7 +15,7 @@ namespace Voxelwild.Tests
         static readonly string[] Shaders =
         {
             "Voxelwild/Character/Skin", "Voxelwild/Character/Eye", "Voxelwild/Character/Cornea",
-            "Voxelwild/Character/EyeOcclusion", "Voxelwild/Character/Hair",
+            "Voxelwild/Character/EyeOcclusion", "Voxelwild/Character/Hair", "Voxelwild/Character/Cloth",
         };
 
         [TestCaseSource(nameof(Shaders))]

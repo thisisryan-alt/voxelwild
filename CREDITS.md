@@ -44,7 +44,7 @@ given here anyway.
 | Source | Used for | License |
 |---|---|---|
 | [MPFB2](https://github.com/makehumancommunity/mpfb2) / [MakeHuman](http://www.makehumancommunity.org) (hm08 base mesh, macro/detail/expression targets, `mixamo_unity` rig and weights, region masks) | anatomy, morphs, facial blend shapes, skeleton, skin weights | [CC0 1.0](https://github.com/makehumancommunity/mpfb2/blob/master/LICENSE.ASSETS.md) |
-| MakeHuman system asset pack (high-poly eye, teeth_base, tongue01) | eye socket fit, teeth and tongue meshes and textures | CC0 1.0 |
+| MakeHuman system asset pack (high-poly eye, teeth_base, tongue01, male_casualsuit06, shoes05) | eye socket fit, teeth, tongue and clothing meshes and textures (logos and watermark removed) | CC0 1.0 |
 | [Poly Haven](https://polyhaven.com) HDRIs (studio_small_09 and others) | look-dev lighting only, downloaded on demand, not committed | CC0 1.0 |
 
 The skin, iris, sclera and hair-card textures, the eyes, eyelashes, eyebrows and hair geometry, and

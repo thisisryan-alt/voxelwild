@@ -421,7 +421,7 @@ def skin_fields(P, N, UV, lm: Landmarks, masks, cfg, seed=0):
     q2 = np.stack([u_al / 3.0, v_ac / 0.05, np.full(n, 7.3)], 1)
     strand_n = 0.65 * n3.value(q, 1.0, seed + 111) + 0.35 * n3.value(q2, 1.0, seed + 112)
     clump = n3.fbm(P, 4.0, 2, seed + 113)
-    cap_cov = np.clip(scalp * (0.55 + 0.45 * nz.smoothstep(-0.3, 0.2, strand_n + 0.3 * clump)), 0, 1)
+    cap_cov = np.clip(scalp * (0.78 + 0.22 * nz.smoothstep(-0.3, 0.2, strand_n + 0.3 * clump)), 0, 1)
     hair_cap = cap_cov * nz.smoothstep(0.35, 0.75, scalp)
     cap_shade = 0.75 + 0.5 * nz.smoothstep(-0.6, 0.6, strand_n)
     F1c, _, Rc = n3.worley(P, 0.85, seed + 110, seg_dir=cdir, seg_len=0.9)
@@ -653,8 +653,8 @@ def generate(body_ob, hu, eye_centers, cfg, out_dir, size=4096, names=("Head", "
         alb = alb * (1 - a) + hair_col * a
         hc = F["hair_cap"][:, None]
         # painted cap sits under the cards' self-shadowing: darker than the card albedo to match on screen
-        cap_col = np.array(cfg.get("hair_color", (0.105, 0.066, 0.040))) * 0.62 * F["cap_shade"][:, None]
-        alb = alb * (1 - hc * 0.92) + cap_col * hc * 0.92
+        cap_col = np.array(cfg.get("hair_color", (0.105, 0.066, 0.040))) * 0.45 * F["cap_shade"][:, None]
+        alb = alb * (1 - hc * 0.96) + cap_col * hc * 0.96
         fo = (F["follicle"] * 0.4)[:, None]
         alb = alb * (1 - fo) + hair_col * fo
         mo = (F["mole"] * 0.5)[:, None]

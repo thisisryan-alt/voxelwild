@@ -34,6 +34,7 @@ namespace Voxelwild.EditorTools
             var cornea = Shader.Find("Voxelwild/Character/Cornea");
             var occl = Shader.Find("Voxelwild/Character/EyeOcclusion");
             var hair = Shader.Find("Voxelwild/Character/Hair");
+            var cloth = Shader.Find("Voxelwild/Character/Cloth");
             var detail = Tex("T_Human_SkinDetail_Normal");
 
             var head = Mat("M_Human_Head", skin, m =>
@@ -109,6 +110,35 @@ namespace Voxelwild.EditorTools
                 m.SetFloat("_Cutoff", 0.4f);
             });
 
+            // clothing: one texture set for shirt + jeans, different weave detail and sheen per fabric
+            var shirt = Mat("M_Human_Shirt", cloth, m =>
+            {
+                m.SetTexture("_BaseMap", Tex("T_Human_Outfit_BaseColor"));
+                m.SetTexture("_NormalMap", Tex("T_Human_Outfit_Normal"));
+                m.SetTexture("_MaskMap", Tex("T_Human_Outfit_Mask"));
+                m.SetTexture("_DetailNormalMap", Tex("T_Human_KnitDetail_Normal"));
+                m.SetFloat("_DetailTiling", 18f);      // ~0.7 mm jersey stitches (outfit UV unit ~0.4 m)
+                m.SetFloat("_DetailStrength", 0.3f);
+                m.SetFloat("_Sheen", 0.7f);
+            });
+            var jeans = Mat("M_Human_Jeans", cloth, m =>
+            {
+                m.SetTexture("_BaseMap", Tex("T_Human_Outfit_BaseColor"));
+                m.SetTexture("_NormalMap", Tex("T_Human_Outfit_Normal"));
+                m.SetTexture("_MaskMap", Tex("T_Human_Outfit_Mask"));
+                m.SetTexture("_DetailNormalMap", Tex("T_Human_TwillDetail_Normal"));
+                m.SetFloat("_DetailTiling", 20f);
+                m.SetFloat("_DetailStrength", 0.4f);
+                m.SetFloat("_Sheen", 0.35f);
+            });
+            var shoes = Mat("M_Human_Shoes", cloth, m =>
+            {
+                m.SetTexture("_BaseMap", Tex("T_Human_Shoes_BaseColor"));
+                m.SetFloat("_Roughness", 0.55f);
+                m.SetFloat("_Sheen", 0.1f);
+                m.SetFloat("_DetailStrength", 0f);
+            });
+
             // remap the FBX material slots (named after the Blender materials) to the generated assets
             var importer = AssetImporter.GetAtPath(ModelPath) as ModelImporter;
             if (importer == null)
@@ -116,7 +146,8 @@ namespace Voxelwild.EditorTools
                 Debug.LogError($"[Human] {ModelPath} not found. Run tools/blender/human/build_human.py --stage full first.");
                 return;
             }
-            foreach (var mat in new[] { head, body, sclera, iris, corneaMat, wet, occlusion, teeth, tongue, hairMat, lashes, brows })
+            foreach (var mat in new[] { head, body, sclera, iris, corneaMat, wet, occlusion, teeth, tongue, hairMat, lashes, brows,
+                                        shirt, jeans, shoes })
                 importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), mat.name), mat);
             importer.SaveAndReimport();
 

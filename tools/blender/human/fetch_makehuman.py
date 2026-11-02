@@ -8,7 +8,7 @@ set after changing macro parameters (gender, age, ethnicity...) or detail target
 
 Sources (all CC0, see CREDITS.md):
   - MPFB2 (github.com/makehumancommunity/mpfb2): base mesh, morph targets, rig + weights, region masks
-  - MakeHuman system asset pack (mirror1.makehuman.net): eye, teeth and tongue proxies
+  - MakeHuman system asset pack (mirror1.makehuman.net): eye, teeth, tongue and clothing proxies
 Needs git on PATH for the MPFB2 sparse checkout. Stdlib only otherwise.
 """
 from __future__ import annotations
@@ -31,6 +31,10 @@ PROXIES = {
     "eyes_highpoly": ("eyes/high-poly", ("high-poly.mhclo", "high-poly.obj")),
     "teeth_base": ("teeth/teeth_base", ("teeth_base.mhclo", "teeth_base.obj", "teeth.mhmat", "teeth.png")),
     "tongue01": ("tongue/tongue01", ("tongue01.mhclo", "tongue01.obj", "tongue01.mhmat", "tongue01_diffuse.png")),
+    "male_casualsuit06": ("clothes/male_casualsuit06", ("male_casualsuit06.mhclo", "male_casualsuit06.obj",
+                                                        "male_casualsuit06.mhmat", "male_casualsuit06_diffuse.png",
+                                                        "male_casualsuit06_normal.png", "male_casualsuit06_ao.png")),
+    "shoes05": ("clothes/shoes05", ("shoes05.mhclo", "shoes05.obj", "shoes05.mhmat", "shoes05_diffuse.png")),
 }
 
 

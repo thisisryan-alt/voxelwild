@@ -140,6 +140,21 @@ unit.
   strand brightness, A is coverage.
 - Lashes and brows are bound to body triangles, so they take every face blend shape.
 
+### Clothing (`outfit.py`)
+- A white cotton T-shirt, washed jeans and white trainers, from MakeHuman's CC0 `male_casualsuit06`
+  and `shoes05`. They are fitted like the teeth (triangle references plus offsets), so they follow any
+  body the config makes.
+- Textures are cleaned for a game:
+  - the shirt's printed MakeHuman logo is replaced with procedural off-white cotton, keeping the
+    source's fold AO and wrinkle normals;
+  - the "www.makehuman.org" watermark is padded away;
+  - the trainers' green accents are neutralised.
+- Tiling knit (shirt) and twill (denim) weave normals provide close-up detail. The `Cloth` shader
+  combines wrapped diffuse, low GGX and a Charlie sheen lobe.
+- Body faces fully hidden under the clothes are flagged before subdivision and removed at export. This
+  avoids poke-through and hidden overdraw. `config.OUTFIT = False` exports the nude base body instead.
+- Garments are subdivided at LOD0, base resolution at LOD1, and 50 % decimated at LOD2.
+
 ### Rig, blend shapes and LODs (`rig_export.py`)
 **Skeleton.** MPFB's CC0 `mixamo_unity` skeleton (65 bones), fitted from MakeHuman's joint cubes.
 Unity's Humanoid auto-mapper recognises its Mixamo names. Eyelid and jaw bones are included. It uses
@@ -161,7 +176,7 @@ occlusion shells, lashes and brows carry the same-named shapes.
 |---|---|---|---|
 | 0 | subdivided | all | all |
 | 1 | base resolution | all | all |
-| 2 | 42 % decimated | none | eyes and hair only |
+| 2 | 42 % decimated | none | eyes, hair and clothes only |
 
 ### Unity shaders (`Assets/Shaders/Character/`)
 **`Skin`:**
@@ -180,6 +195,13 @@ occlusion shells, lashes and brows carry the same-named shapes.
 **`Cornea`:** a wet, premultiplied reflection-only shell, also used for the tear meniscus.
 
 **`EyeOcclusion`:** a multiplicative contact shadow, stronger under the upper lid.
+
+**`Cloth`:**
+- wrapped diffuse;
+- low GGX specular;
+- Charlie sheen;
+- fold AO;
+- tiling weave normal.
 
 **`Hair`:**
 - Kajiya-Kay/Scheuermann dual shifted highlights;
@@ -204,15 +226,15 @@ current export passes with no errors:
 | Check | Result |
 |---|---|
 | Skeleton | 64 bones, every Humanoid-required bone plus all finger bones, jaw and eyes. Hips at 0.97 m, head at 1.64 m |
-| LOD0 | 16 meshes, ~161k triangles |
-| LOD1 | 16 meshes, ~81k triangles |
-| LOD2 | 4 meshes, ~26k triangles |
+| LOD0 | 18 meshes, ~161k triangles (hidden body faces under the clothes removed) |
+| LOD1 | 18 meshes, ~78k triangles |
+| LOD2 | 6 meshes, ~24k triangles |
 | Blend shapes | 34 on the body. Matching shapes on lashes, brows, tear lines and occlusion shells. `jawOpen` on teeth and tongue |
 | Skin weights | at most 4 influences per vertex, normalised; no unweighted vertices |
-| Materials | 12 slots, named as `HumanCharacterBuilder` expects |
+| Materials | 15 slots (skin, eyes, mouth, hair, shirt, jeans, shoes), named as `HumanCharacterBuilder` expects |
 
 In Unity, `CharacterAssetTests` (EditMode) checks that:
-- the five shaders compile;
+- the six shaders compile;
 - the FBX imports as a valid Humanoid avatar with an LODGroup, the expected blend shapes and two body
   submeshes;
 - textures have the character import settings.
@@ -233,12 +255,14 @@ under a CC0 studio HDRI plus a soft key light (`docs/images/human/`).
     in project code.
   - The checker is proven sensitive: deliberate errors injected into a pass and into a shared include
     are both caught.
+  - The Cloth shader, added later, adds 24 more variants, also clean.
   - It is not Unity's own compiler. Platform limits, SRP Batcher layout and the final look are only
     confirmed by an in-editor capture. Run *Build Human Character* and `CharacterAssetTests`, then
     capture.
 - **Hair is cards, not strands.** It is tuned for a short cut. Long hair needs a different card
   layout.
-- **No clothing.** The body is a smooth base mesh without genitals, ready for clothing.
+- **One outfit.** Clothes are MakeHuman's game-resolution garments with baked wrinkles, not simulated
+  cloth. With `OUTFIT = False`, the body is a smooth base mesh without genitals.
 - **No animation clips.** The skeleton imports as a Unity Humanoid avatar, so any Humanoid clip
   retargets onto it. MakeHuman's CC0 BVH poses target its own skeleton and are not converted.
 - **4K skin textures need about 14 GB of RAM to generate.** Fields are evaluated in 2.5M-texel chunks.

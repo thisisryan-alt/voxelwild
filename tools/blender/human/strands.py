@@ -392,7 +392,7 @@ def hair_cards(surface: Surface, body_co, scalp_weight, O, name, col, cfg, varia
             length = scalp_length(L, cfg) * lscale * rng.uniform(0.75, 1.15)
             # the short taper on the sides and nape is carried by the painted hair cap; cards there only
             # read as flakes
-            if length < (0.010 if li < 3 else 0.006):
+            if length < (0.020 if li < 3 else 0.012):
                 continue
             K = 7 if length > 0.02 else 4
             d = to_bl_dir(scalp_direction(L))

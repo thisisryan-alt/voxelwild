@@ -83,3 +83,6 @@ HAIR = {
 }
 
 HEIGHT_TARGET_M = 1.80
+
+# Clothing (CC0 MakeHuman proxies, cleaned: see outfit.py). False exports the nude base body instead.
+OUTFIT = True

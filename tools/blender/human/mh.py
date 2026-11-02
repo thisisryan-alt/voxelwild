@@ -259,7 +259,8 @@ def load_proxy(folder: str) -> Proxy:
             if not s or s.startswith("#"):
                 continue
             p = s.split()
-            if mode == "verts" and len(p) in (1, 9) and p[0].lstrip("-").isdigit() and (len(p) == 9 or len(p) == 1):
+            # vertex lines may follow other keyword lines after "verts N" (e.g. shoes: material, weights file)
+            if mode == "verts" and len(p) in (1, 9) and p[0].lstrip("-").isdigit():
                 if len(p) == 9:
                     refs.append([int(p[0]), int(p[1]), int(p[2])])
                     wts.append([float(p[3]), float(p[4]), float(p[5])])
@@ -270,14 +271,19 @@ def load_proxy(folder: str) -> Proxy:
                 offs.append([0.0, 0.0, 0.0])
                 continue
             if mode == "delete_verts" and p[0][0].isdigit():
-                for tok in p:
-                    if "-" in tok:
-                        a, b = tok.split("-")
-                        delete.extend(range(int(a), int(b) + 1))
+                # "12 15 - 20 31-33": singles and inclusive ranges, with or without spaces round '-'
+                toks = " ".join(p).replace("-", " - ").split()
+                i = 0
+                while i < len(toks):
+                    if i + 2 < len(toks) and toks[i + 1] == "-":
+                        delete.extend(range(int(toks[i]), int(toks[i + 2]) + 1))
+                        i += 3
                     else:
-                        delete.append(int(tok))
+                        delete.append(int(toks[i]))
+                        i += 1
                 continue
-            mode = None
+            if mode != "verts" or p[0] == "delete_verts":
+                mode = None
             if p[0] == "verts":
                 mode = "verts"
             elif p[0] == "delete_verts":

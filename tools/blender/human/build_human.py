@@ -306,6 +306,16 @@ def main(argv):
     make_game_uv(body, hu)
     body.data.materials.append(bl.material("M_Human_Head"))
     body.data.materials.append(bl.material("M_Human_Body"))
+    if config.OUTFIT:
+        # flag body faces fully hidden under the clothes; the flag survives subdivision and the faces are
+        # removed at export (no poke-through, no hidden overdraw)
+        import outfit
+        cov = np.zeros(hu.n_body, bool)
+        cv = outfit.covered_body_verts()
+        cov[cv[cv < hu.n_body]] = True
+        faces_cov = np.array([all(cov[v] for v in pl.vertices) for pl in body.data.polygons], np.int32)
+        attr = body.data.attributes.new("covered", "INT", "FACE")
+        attr.data.foreach_set("value", faces_cov)
     rigged = args.stage == "full"
     weights = mh.load_weights("mixamo_unity")
     deltas = rx.expression_deltas(hu) if rigged else {}
@@ -340,15 +350,59 @@ def main(argv):
     hair = None
     if args.stage in ("skin", "full") and not args.nohair:
         hair = build_hair(hu, body, eyes_)
+    clothes = build_outfit(hu, weights, args) if (config.OUTFIT and args.stage in ("skin", "full")) else None
 
     if rigged:
-        export_character(hu, body, body_lod1, eyes_, mouth, hair, weights, deltas, args)
+        export_character(hu, body, body_lod1, eyes_, mouth, hair, weights, deltas, args, clothes)
 
     if args.stage in ("eyes", "skin", "full") and not args.norender:
         render_lookdev(hu, body, eyes_, args)
 
 
-def export_character(hu, body, body_lod1, eyes_, mouth, hair, weights, deltas, args):
+def build_outfit(hu, weights, args):
+    """Fitted clothes: base-resolution meshes (LOD1/2) and Catmull-Clark copies (LOD0), with weights."""
+    import outfit
+    import rig_export as rx
+    if args.regen or not os.path.exists(os.path.join(TEX_DIR, "T_Human_Outfit_BaseColor.png")):
+        outfit.generate_textures(TEX_DIR)
+    base = outfit.build(hu, config.NAME, config.NAME, rx.weight_matrix(weights, len(hu.mh_verts)))
+    shirt, jeans, shoes = outfit.materials(TEX_DIR)
+    base["Outfit"][0].data.materials.append(shirt)
+    base["Outfit"][0].data.materials.append(jeans)
+    base["Shoes"][0].data.materials.append(shoes)
+    out = {}
+    for key, (ob, _px) in base.items():
+        hi = ob.copy()
+        hi.data = ob.data.copy()
+        bl.collection(config.NAME).objects.link(hi)
+        bl.subdivide_with_shapes(hi, 1)
+        ob.hide_render = True
+        out[key] = (hi, ob)
+    print(f"[outfit] shirt+jeans {len(out['Outfit'][0].data.polygons)} quads, shoes {len(out['Shoes'][0].data.polygons)} quads")
+    return out
+
+
+def delete_covered_faces(ob):
+    """Removes faces flagged 'covered' (hidden under clothing), keeping shape keys, weights and UVs."""
+    import bmesh
+    if "covered" not in ob.data.attributes:
+        return 0
+    flags = np.zeros(len(ob.data.polygons), np.int32)
+    ob.data.attributes["covered"].data.foreach_get("value", flags)
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bm.faces.ensure_lookup_table()
+    dead = [bm.faces[i] for i in np.nonzero(flags)[0]]
+    bmesh.ops.delete(bm, geom=dead, context="FACES")
+    loose = [v for v in bm.verts if not v.link_faces]
+    bmesh.ops.delete(bm, geom=loose, context="VERTS")
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.update()
+    return len(dead)
+
+
+def export_character(hu, body, body_lod1, eyes_, mouth, hair, weights, deltas, args, clothes=None):
     """Skeleton, weights and blend shapes for every part, LOD chain, FBX + textures into Assets/."""
     import rig_export as rx
     import eyes as eyemod
@@ -397,6 +451,13 @@ def export_character(hu, body, body_lod1, eyes_, mouth, hair, weights, deltas, a
         rx.rigid_weight(hair["hair"][0], "mixamorig:Head")
     print(f"[rig] weights + blend shapes for all parts in {time.time() - t:.0f}s")
 
+    if clothes:
+        # subdivision blends neighbouring weights (up to ~6 bones): clamp the LOD0 garments to 4 again
+        for key in ("Outfit", "Shoes"):
+            rx.set_weights(clothes[key][0], *rx.object_weights(clothes[key][0]))
+        n0 = delete_covered_faces(body)
+        n1 = delete_covered_faces(body_lod1)
+        print(f"[outfit] removed hidden body faces: LOD0 {n0}, LOD1 {n1}")
     arm = rx.build_armature(hu, config.NAME, config.NAME)
     N = config.NAME
     lod0 = {"Body": body, "Teeth": mouth["teeth_base"][0], "Tongue": mouth["tongue01"][0]}
@@ -404,6 +465,8 @@ def export_character(hu, body, body_lod1, eyes_, mouth, hair, weights, deltas, a
         e = eyes_[side]
         lod0.update({f"Eye_{side}": e["eye"], f"Cornea_{side}": e["cornea"], f"EyeWet_{side}": e["wet"],
                      f"EyeOcclusion_{side}": e["occlusion"]})
+    if clothes:
+        lod0.update({"Outfit": clothes["Outfit"][0], "Shoes": clothes["Shoes"][0]})
     if hair:
         lod0.update({"Hair": hair["hair"][0], "Eyelashes_L": hair["lashes_L"][0], "Eyelashes_R": hair["lashes_R"][0],
                      "Eyebrows_L": hair["brows_L"][0], "Eyebrows_R": hair["brows_R"][0]})
@@ -417,8 +480,16 @@ def export_character(hu, body, body_lod1, eyes_, mouth, hair, weights, deltas, a
     rx.parent_to_armature(body_lod1, arm)
     export.append(body_lod1)
     for part, ob in lod0.items():
-        if part != "Body":
-            export.append(rx.linked_copy(ob, f"{N}_{part}_LOD1"))
+        if part == "Body":
+            continue
+        if clothes and part in clothes:
+            lo = clothes[part][1]                     # base-resolution garment
+            lo.name = f"{N}_{part}_LOD1"
+            lo.hide_render = True
+            rx.parent_to_armature(lo, arm)
+            export.append(lo)
+            continue
+        export.append(rx.linked_copy(ob, f"{N}_{part}_LOD1"))
     # LOD2: decimated body without blend shapes, eyes and hair only
     lod2 = rx.decimated_copy(body_lod1, f"{N}_Body_LOD2", 0.42)
     rx.set_weights(lod2, *rx.object_weights(lod2))      # collapses mix weights: clamp again
@@ -431,6 +502,12 @@ def export_character(hu, body, body_lod1, eyes_, mouth, hair, weights, deltas, a
         export.append(e2)
     if "Hair" in lod0:
         export.append(rx.linked_copy(lod0["Hair"], f"{N}_Hair_LOD2"))
+    if clothes:
+        for part in ("Outfit", "Shoes"):
+            c2 = rx.decimated_copy(clothes[part][1], f"{N}_{part}_LOD2", 0.5)
+            rx.set_weights(c2, *rx.object_weights(c2))
+            rx.parent_to_armature(c2, arm)
+            export.append(c2)
     for ob in export:
         if not ob.name.endswith("_LOD0"):
             ob.hide_render = True

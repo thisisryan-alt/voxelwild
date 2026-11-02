@@ -364,3 +364,61 @@ def strand_ribbon(name, color_lin, roughness=0.35, tip_fade=True):
     g.link(al.outputs[0], p.inputs["Alpha"])
     g.link(p.outputs[0], g.out.inputs[0])
     return mat
+
+
+def cloth(name, img_albedo, img_normal=None, img_mask=None, img_detail=None, detail_tiling=8.0, sheen=0.5,
+          roughness=None, detail_strength=0.6):
+    """Fabric: diffuse-dominant with a velvety sheen lobe, low specular, fold AO, tiling weave normal.
+    Mask: R AO, G roughness, B unused, A sheen weight (same layout as Voxelwild/Character/Cloth)."""
+    mat = bl.material(name)
+    g = G(mat)
+    p = g.principled(IOR=1.45)
+    t = g.tex(img_albedo)
+    if img_mask is not None:
+        mt = g.tex(img_mask, colorspace="Non-Color")
+        sep = g.node("ShaderNodeSeparateColor")
+        g.link(mt.outputs[0], sep.inputs[0])
+        mul = g.node("ShaderNodeMix", data_type="RGBA", blend_type="MULTIPLY")
+        mul.inputs["Factor"].default_value = 0.6
+        g.link(t.outputs[0], mul.inputs[6])
+        g.link(sep.outputs[0], mul.inputs[7])
+        g.link(mul.outputs[2], p.inputs["Base Color"])
+        g.link(sep.outputs[1], p.inputs["Roughness"])
+        sw = g.node("ShaderNodeMath", operation="MULTIPLY")
+        sw.inputs[1].default_value = sheen
+        g.link(mt.outputs["Alpha"], sw.inputs[0])
+        g.link(sw.outputs[0], p.inputs["Sheen Weight"])
+    else:
+        g.link(t.outputs[0], p.inputs["Base Color"])
+        p.inputs["Roughness"].default_value = roughness if roughness is not None else 0.8
+        p.inputs["Sheen Weight"].default_value = sheen
+    p.inputs["Sheen Roughness"].default_value = 0.4
+    p.inputs["Specular IOR Level"].default_value = 0.3
+    n_out = None
+    if img_normal is not None:
+        n_out = g.normal_map(img_normal, 1.0).outputs[0]
+    if img_detail is not None:
+        tc = g.node("ShaderNodeUVMap", uv_map="UV0")
+        mp = g.node("ShaderNodeMapping")
+        mp.inputs["Scale"].default_value = (detail_tiling,) * 3
+        g.link(tc.outputs[0], mp.inputs[0])
+        dt = g.node("ShaderNodeTexImage")
+        dt.image = img_detail
+        img_detail.colorspace_settings.name = "Non-Color"
+        g.link(mp.outputs[0], dt.inputs[0])
+        dn = g.node("ShaderNodeNormalMap", uv_map="UV0")
+        dn.inputs["Strength"].default_value = detail_strength
+        g.link(dt.outputs[0], dn.inputs["Color"])
+        if n_out is not None:
+            add = g.node("ShaderNodeVectorMath", operation="ADD")
+            g.link(n_out, add.inputs[0])
+            g.link(dn.outputs[0], add.inputs[1])
+            nn = g.node("ShaderNodeVectorMath", operation="NORMALIZE")
+            g.link(add.outputs[0], nn.inputs[0])
+            n_out = nn.outputs[0]
+        else:
+            n_out = dn.outputs[0]
+    if n_out is not None:
+        g.link(n_out, p.inputs["Normal"])
+    g.link(p.outputs[0], g.out.inputs[0])
+    return mat
